@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-10-01: Keep the shortcut out of the install folder and make uninstall retryable
+
+The fourteenth review, of 1.4.1, answered here. Version 1.4.2. It found no Critical or High issues, 2 Medium and 4 Low; saved in `reviews/round-14.md`. It was the first review to cover the 1.4.0 shortcut, Apps entry and `uninstall.ps1`.
+
+- The shortcut's working directory is `%SystemRoot%`. The review said (M1): "While an employee has the hello-world window open, upgrades and uninstalls fail." A window left at the `pause` had the install folder as its current directory.
+- `uninstall.ps1` deletes the folders first and the shortcut and Apps entry last, so a failed delete leaves the Uninstall button. It wraps the work in `try/catch/finally`, prints the error, and waits for Enter so the elevated window doesn't close on it. The review said (M2): "`uninstall.ps1` removes the Apps entry first, so a failed uninstall leaves no way to retry, and its error is never seen."
+- `install.ps1` checks the shortcut's ACL after the Apps entry is written. The review said (L1): "If the shortcut's ACL check throws, the install is left with no Apps entry."
+- `uninstall.ps1` uses `-LiteralPath` for its removals. The review said (L2): "`uninstall.ps1` still calls `Remove-Item` with `-Path`."
+- `uninstall.ps1` refuses a 32-bit PowerShell. The review said (L3): "`uninstall.ps1` has no 64-bit check."
+
+Declined, and added to `BACKLOG.md`: a check of the Git version or of `C:\ProgramData\Git` (L4, a repeat of the Git hardening entries). The reviewer's claim that Git older than 2.35.2 reads that config is from memory, and the five machines run a current Git for Windows. The "Before deploying" run on a Windows machine is process, not code.
+
+Tested: `python test_hello.py` passes on Linux. Not tested: `install.ps1` and `uninstall.ps1`, which weren't run or even parsed (`pwsh` isn't installed here). The shortcut, the uninstall order and the pause prompt need a Windows machine, ideally with the hello-world window left open during an upgrade and an uninstall.
+
 ## 2026-10-01: Use -LiteralPath for hello.cmd and say how to install again
 
 The thirteenth review, of 1.3.3, answered here. Version 1.4.1. It found no Critical or High issues, 2 Medium and 7 Low; saved in `reviews/round-13.md`. Both Medium findings repeat items already declined.
