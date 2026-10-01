@@ -47,7 +47,7 @@ The cd is needed because Windows won't delete a window's current folder, and
 The installer upgrades an existing install in place.
 
 .NOTES
-Permission checks on Git for Windows can take several minutes — let them finish even
+Permission checks on Git for Windows can take several minutes - let them finish even
 if the window appears idle. The installer verifies that only administrators can modify
 Git's installation and config folders in C:\Program Files and C:\ProgramData\Git.
 
@@ -147,7 +147,7 @@ function Assert-AdminOnlyTree([string]$Root) {
         }
         Assert-AdminOnly $i.FullName $edit
     }
-    Write-Host "Checked $checked items in $Root — all admin-only"
+    Write-Host "Checked $checked items in $Root - all admin-only"
     # Check that parent folders can only be modified by admins. If a parent is writable by
     # non-admins, they could move or delete the entire $Root tree. At the drive root,
     # Delete permission doesn't matter (can't delete a drive root), so we exclude it.
@@ -155,7 +155,7 @@ function Assert-AdminOnlyTree([string]$Root) {
         $checkRights = if ($p.Parent) { $swap } else { $swap -band -bnot 0x10000 }
         Assert-AdminOnly $p.FullName $checkRights
     }
-    Write-Host "Checked parent folders of $Root up to drive root — all parent directories are admin-only"
+    Write-Host "Checked parent folders of $Root up to drive root - all parent directories are admin-only"
 }
 
 function Assert-NotLink([string]$Path) {
@@ -165,7 +165,7 @@ function Assert-NotLink([string]$Path) {
 # cmd's rmdir removes a link inside the tree without following it.
 function Remove-Tree([string]$Path) {
     Assert-NotLink $Path
-    & (Join-Path $sys32 'cmd.exe') /c rmdir /s /q "`"$Path`""
+    & (Join-Path $sys32 'cmd.exe') /d /c rmdir /s /q "`"$Path`""
     # rmdir can report success after failing on a locked file, so check the folder is gone.
     if ($LASTEXITCODE -or (Test-Path -LiteralPath $Path)) { throw "Couldn't remove $Path" }
 }
@@ -208,11 +208,12 @@ catch { throw "Non-admin write access in Git for Windows ($gitDir). Reinstall Gi
 $gitData = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'Git'
 if (Test-Path -LiteralPath $gitData) {
     try { Assert-AdminOnlyTree $gitData }
-    catch { throw "Non-admin write access in $gitData (shared Git for Windows config). Ensure only administrators can modify this folder." }
+    catch { throw "Non-admin write access in $gitData (shared Git for Windows config). Ensure only administrators can modify this folder, for example: icacls `"$gitData`" /inheritance:r /grant:r *S-1-5-32-544:(OI)(CI)F *S-1-5-18:(OI)(CI)F *S-1-5-32-545:(OI)(CI)RX" }
 }
 # The admin's own session can carry GIT_DIR and friends that point git elsewhere, and
-# HOME/XDG_CONFIG_HOME can point to employee-writable locations. Clear all of them to
-# ensure git uses only the reviewed clone and pinned configuration.
+# HOME/XDG_CONFIG_HOME can point to employee-writable locations. Clear them. Git then
+# falls back to the admin's profile for ~/.gitconfig, which is admin-only unless the
+# profile is redirected.
 Get-ChildItem Env: | Where-Object Name -like 'GIT_*' | ForEach-Object { Remove-Item -LiteralPath "Env:$($_.Name)" }
 Remove-Item -LiteralPath 'Env:HOME' -ErrorAction SilentlyContinue
 Remove-Item -LiteralPath 'Env:XDG_CONFIG_HOME' -ErrorAction SilentlyContinue
@@ -234,7 +235,7 @@ try {
 # The ACL checks show nobody else can change the clone. This shows the clone is
 # the reviewed commit, so a moved tag or an edited file fails here.
 # git also finds a repository in a parent folder, so require .git here.
-if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot '.git'))) { throw "$PSScriptRoot is not the top of a git clone." }
+if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot '.git') -PathType Container)) { throw "$PSScriptRoot is not the top of a git clone (.git must be a folder)." }
 $head = & $git -C $PSScriptRoot rev-parse HEAD
 if ($LASTEXITCODE) { throw "git rev-parse failed with exit $LASTEXITCODE in $PSScriptRoot. If the message above mentions 'dubious ownership', a different account made this clone." }
 if ($head -ne $Commit) { throw "Source is at '$head', not the reviewed commit $Commit." }
@@ -336,7 +337,7 @@ foreach ($name in 'NoModify', 'NoRepair') { New-ItemProperty $key -Name $name -V
 $lnk = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'hello-world.lnk'
 $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk)
 $shortcut.TargetPath = Join-Path $sys32 'cmd.exe'
-$shortcut.Arguments = "/c `"`"$dir\hello.cmd`" & pause`""
+$shortcut.Arguments = "/d /c `"`"$dir\hello.cmd`" & pause`""
 # Not $dir: a window left open there is a current directory, and Windows won't
 # rename or delete a folder that one is in.
 $shortcut.WorkingDirectory = $winDir

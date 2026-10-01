@@ -14,3 +14,6 @@
 *.pptx binary
 *.xlsx binary
 *.zip binary
+
+*.py text eol=lf
+VERSION text eol=lf
