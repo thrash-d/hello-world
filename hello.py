@@ -19,7 +19,8 @@ def main():
         print("Hello, world!", flush=True)
     except (OSError, ValueError) as e:
         try:
-            print(f"hello.py: cannot write to stdout: {e}", file=sys.stderr,
+            print(f"hello.py: cannot write to stdout: {e} "
+                  "(contact IT if this keeps happening)", file=sys.stderr,
                   flush=True)
         except Exception:
             pass

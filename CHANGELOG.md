@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-10-01: Usability pass on the installer, uninstaller and docs
+
+Version 1.6.0. Answers a usability read-through and a business value read-through of the program, both done by hand. There is no review file for this change.
+
+Changes:
+- "There is no README": added `README.md` with the audience split, the install steps, update and failure notes.
+- "Placeholders break if pasted": the install steps in `README.md` and in the installer help use `$tag` and `$commit` variables.
+- "Permission checks are silent for minutes", "numbered steps": `install.ps1` prints `[1/6]` to `[6/6]` and shows a progress bar during the permission walks.
+- "Failures print a raw error block": a `trap` and the final `catch` print one `FAILED:` line and exit 1. The full text is in `install.log`.
+- "Success line is cluttered and out of date": the result says the version and whether it was a new install, a reinstall or an upgrade, then a next step. The stale LF/CRLF note is gone.
+- "No unattended mode": added `-Quiet` to `install.ps1`. It prints only warnings, errors and the result.
+- "Colors are inconsistent": green for success and red for failure in both scripts.
+- "The Settings > Apps entry is thin": added Publisher, DisplayIcon and EstimatedSize.
+- "Shortcut has no icon or description", "no title": the shortcut has the Python icon, a description and a window title. The docs say "hello-world".
+- "Errors read like developer output": `hello.py`'s message ends with "(contact IT if this keeps happening)". The tests still pass.
+- "Failure message gives no next step": `uninstall.ps1` says to close windows and retry, then ask IT. The admin-rights failure says to ask IT.
+- Added `PLAN.md` with the value, retention and rollout plan.
+
+Declined, added to the backlog: pausing `hello.cmd`, a one-step reinstall helper, and splitting the payload from the installer.
+
+Not tested: `pwsh` is not installed here, so neither script was parsed. None of it ran on Windows. Untested: the `trap`, `exit 1` inside the catch, `-Quiet`, `Write-Progress`, the Python icon on the shortcut and in Apps, the shortcut's `title` command line, the `EstimatedSize` value, and the upgrade message. `python test_hello.py` passes.
+
 ## 2026-10-01: Round 25: ASCII-only strings, line endings pinned for the file check
 
 Version 1.5.13. Answers the twenty-fifth review (`reviews/round-25.md`).

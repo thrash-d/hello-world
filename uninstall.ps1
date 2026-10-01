@@ -33,7 +33,7 @@ if (-not $me.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         if ($Quiet) { $argList += '-Quiet' }
         Start-Process $ps -Verb RunAs -ArgumentList $argList
     }
-    catch { Write-Host "Couldn't get administrator rights: $_" -ForegroundColor Red; Wait-Close }
+    catch { Write-Host "Couldn't get administrator rights: $($_.Exception.Message) Ask IT to uninstall hello-world." -ForegroundColor Red; Wait-Close }
     exit
 }
 
@@ -62,8 +62,12 @@ try {
     }
     $key = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\hello-world'
     if (Test-Path -LiteralPath $key) { Remove-Item -LiteralPath $key }
-    'hello-world is uninstalled.'
+    Write-Host 'hello-world is uninstalled.' -ForegroundColor Green
 }
-catch { Write-Host "Uninstall failed: $_" -ForegroundColor Red; $failed = $true }
+catch {
+    Write-Host "Uninstall failed: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host 'Close any hello-world windows, then try again from Settings > Apps > Installed apps > hello-world > Uninstall. If it fails again, ask IT.'
+    $failed = $true
+}
 finally { Wait-Close }
 if ($failed) { exit 1 }

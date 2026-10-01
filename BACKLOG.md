@@ -49,3 +49,7 @@ Changes considered and declined, with the reason.
 - Normalize the Git path with `GetFullPath` (twenty-fifth review L5): the registry value is admin-only.
 - Add WriteAttributes and WriteExtendedAttributes to the rights masks (twenty-fifth review L6): neither changes file contents.
 - Clean up a half-finished install, keep the original error when the restore fails, proxy support, Python pin process (twenty-fifth review L7, L8): same as the entries above, and a failed install is visible to the admin who ran it.
+- Make `hello.cmd` pause when double-clicked (usability review): the installer's test run and any console run capture its output, and a pause would hang both. The shortcut already pauses, and the README says what to open.
+- A one-step reinstall helper (usability review): a fresh clone of the reviewed release is the point of the design, so the README lists the steps instead.
+- Split the payload from the installer (value review): there is only one payload. Do it when a second tool exists, with both in hand and a Windows test run. See `PLAN.md`, phase 3.
+- Rename the elevation prompt in the uninstaller (usability review): Windows names the prompt after the program it starts, and the README says what to expect.
