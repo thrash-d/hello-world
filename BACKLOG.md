@@ -39,3 +39,6 @@ Changes considered and declined, with the reason.
 - Check `.old` is intact before restoring it (twelfth review L4): the same run replaces it with a tested install, and only administrators can touch it.
 - Drop `-ErrorAction SilentlyContinue` from the uninstall line (twelfth review L5): without it, a missing folder prints an error for each one that was never created.
 - A reminder to bump the pinned Python (twelfth review L6): process, not code. Updating means changing the URL and hash in `install.ps1`.
+- Pilot install, hand-checked hash, Git environment and config hardening (thirteenth review M1, M2): same as the eleventh and tenth review entries above. The pilot is process, and the Git environment comes from the admin's own session.
+- Verify `.old` after restoring it (thirteenth review L1): same as the twelfth review L4 entry above. Only administrators can write to `Program Files`.
+- Proxy credentials and Windows 10 builds before 1809 (thirteenth review L6): same as the proxy entry above. The install runs once per workstation, and failures are visible.

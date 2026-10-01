@@ -36,6 +36,8 @@ never a tag name. The tools run by full path for the same reason the
 installer pins them. Windows clients block scripts by default, so the
 example allows them for this PowerShell window only. If a Group Policy sets
 the execution policy, that line errors and the policy decides.
+To install again, run the uninstall line below first. It clears the setup
+folder, so the example's New-Item and clone work a second time.
 
 .NOTES
 The setup folder isn't needed after a successful install. The installer makes
@@ -164,7 +166,7 @@ try {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'hello.py') -Destination $new
     # -I ignores PYTHON* variables and the user's site-packages, so nothing the
     # employee controls loads into the run.
-    Set-Content (Join-Path $new 'hello.cmd') '@"%~dp0python\python.exe" -I "%~dp0hello.py"' -Encoding ascii
+    Set-Content -LiteralPath (Join-Path $new 'hello.cmd') -Value '@"%~dp0python\python.exe" -I "%~dp0hello.py"' -Encoding ascii
 
     $hash = (Get-FileHash -LiteralPath (Join-Path $new 'hello.py')).Hash
     if ($hash -ne (Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'hello.py')).Hash) { throw 'Installed hello.py differs from the source' }
