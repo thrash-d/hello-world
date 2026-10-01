@@ -128,6 +128,8 @@ Assert-AdminOnlyTree $PSScriptRoot
 
 # The ACL checks show nobody else can change the clone. This shows the clone is
 # the reviewed commit, so a moved tag or an edited file fails here.
+# git also finds a repository in a parent folder, so require .git here.
+if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot '.git'))) { throw "$PSScriptRoot is not the top of a git clone." }
 $head = & $git -C $PSScriptRoot rev-parse HEAD
 if ($LASTEXITCODE -or $head -ne $Commit) { throw "Source is at '$head', not the reviewed commit $Commit." }
 foreach ($f in 'install.ps1', 'uninstall.ps1', 'hello.py', 'VERSION') {
@@ -170,6 +172,10 @@ try {
 
     $hash = (Get-FileHash -LiteralPath (Join-Path $new 'hello.py')).Hash
     if ($hash -ne (Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'hello.py')).Hash) { throw 'Installed hello.py differs from the source' }
+
+    foreach ($f in 'hello.py', 'uninstall.ps1') {
+        if ((Get-FileHash -LiteralPath (Join-Path $new $f)).Hash -ne (Get-FileHash -LiteralPath (Join-Path $PSScriptRoot $f)).Hash) { throw "Installed $f differs from the source" }
+    }
 
     # Check the tree before running anything from it as admin.
     Assert-AdminOnlyTree $new
