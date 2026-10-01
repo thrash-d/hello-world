@@ -25,9 +25,10 @@ Enter to skip anything you don't want to answer. Press Enter again to close.
 - To see the options, type `m` at the last prompt. You can see exactly what is
   saved, open hello-world once a day when you sign in, hide the "in a row"
   line, or delete everything saved.
-- The "in a row" line shows only after the third visit. It counts a visit
-  within three days of the last one, so weekends and days off don't break it.
-  Turn it off in the options if you don't like it.
+- The "in a row" line shows only on your 3rd, 7th and 14th visit in a row, and
+  then every 30th. It counts a visit within three days of the last one, so
+  weekends and days off don't break it. Turn it off in the options if you
+  don't like it.
 - To remove the program, use Settings > Apps > Installed apps > hello-world >
   Uninstall. Windows asks for an administrator password, and the prompt says
   "Windows PowerShell". That is expected. If you don't have the password, ask

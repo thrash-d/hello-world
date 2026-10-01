@@ -15,7 +15,7 @@ Ranked from a design review of the first version, then built:
 | Something fresh and warm | 100 original short thoughts, chosen by date; they repeat every 100 days | Done |
 | One thing with real personal use: a plan, then a follow-up | One optional plan a day. Next day: "Did you do it?" with y, n or Enter. "Not yet" offers to keep it for today, so nothing is retyped | Done |
 | Welcome, never guilt | After a gap of more than a week it says "Welcome back". No word like missed, lost or broke appears. Skipping everything is normal | Done |
-| A quiet sense of continuity | An "in a row" line after the third visit, counting any visit within three days of the last. Off with one menu choice | Done |
+| A quiet sense of continuity | An "in a row" line at the 3rd, 7th and 14th visit, then every 30th, counting any visit within three days of the last. Off with one menu choice | Done |
 | It is easy to find | Start menu entry with an icon and description, and an optional once-a-day sign-in launcher that the employee turns on and off themselves | Done |
 
 ## What was kept out on purpose

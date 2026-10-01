@@ -240,7 +240,7 @@ HELP = """hello-world prints a greeting, a thought, and a small thing to try.
 
 At the end of the screen, type m for options. You can also run hello.cmd
 with one of these:
-  --plain         Print only Hello, world!
+  --plain         Print only the greeting
   --stats         Show what is saved on this computer
   --reset         Delete everything saved (asks first)
   --remind on     Open once a day when you sign in (off to stop)
@@ -251,6 +251,9 @@ Saved notes stay on this computer, in your user folder. Nothing is sent
 anywhere. IT staff who can read this computer's files could read them."""
 
 MAX_VISITS = 400
+MAX_FILE = 1_000_000
+YES = ("y", "yes", "yep", "ya", "yeah", "done")
+NO = ("n", "no", "nope", "not yet")
 
 
 def today():
@@ -294,31 +297,68 @@ def new_state():
     return {"visits": [], "intent": None, "streak": True}
 
 
+def clean(text):
+    """One printable line: tabs and odd spaces become spaces, controls go."""
+    text = "".join(" " if c.isspace() else c for c in text)
+    text = "".join(c for c in text if c.isprintable())
+    return " ".join(text.split())[:120]
+
+
+def day(value):
+    """The date as a canonical string, or ValueError."""
+    if not isinstance(value, str):
+        raise ValueError("not a date")
+    return datetime.date.fromisoformat(value).isoformat()
+
+
 def load():
-    """Read the saved file. A missing or damaged file gives a fresh start."""
+    """Read the saved file. Returns (state, can_save).
+
+    A missing file or a damaged one gives a fresh start; a damaged file is kept
+    as notes.json.bak. A file that exists but can't be read right now is left
+    alone, so a locked file is never overwritten with an empty one.
+    """
     state = new_state()
+    path = data_file()
     try:
-        with open(data_file(), encoding="utf-8") as f:
-            raw = json.load(f)
-        visits = []
-        for v in raw.get("visits", []):
-            try:
-                datetime.date.fromisoformat(v)
-                visits.append(v)
-            except (TypeError, ValueError):
-                pass
-        state["visits"] = sorted(set(visits))[-MAX_VISITS:]
-        intent = raw.get("intent")
-        if (isinstance(intent, dict) and isinstance(intent.get("text"), str)
-                and isinstance(intent.get("date"), str)):
-            datetime.date.fromisoformat(intent["date"])
-            state["intent"] = {"text": intent["text"][:120],
-                               "date": intent["date"]}
-        if raw.get("streak") is False:
-            state["streak"] = False
-    except (OSError, ValueError, AttributeError, TypeError):
+        with open(path, encoding="utf-8") as f:
+            text = f.read(MAX_FILE + 1)
+    except FileNotFoundError:
+        return state, True
+    except OSError:
+        return state, False
+    except ValueError:
+        text = None
+    try:
+        if text is None or len(text) > MAX_FILE:
+            raise ValueError("too big or not text")
+        raw = json.loads(text)
+        if not isinstance(raw, dict):
+            raise ValueError("not an object")
+    except (ValueError, RecursionError, MemoryError):
+        try:
+            os.replace(path, path + ".bak")
+        except OSError:
+            return state, False
+        return state, True
+    if raw.get("streak") is False:
+        state["streak"] = False
+    visits = []
+    for v in raw["visits"] if isinstance(raw.get("visits"), list) else []:
+        try:
+            visits.append(day(v))
+        except ValueError:
+            pass
+    state["visits"] = sorted(set(visits))[-MAX_VISITS:]
+    intent = raw.get("intent")
+    try:
+        if isinstance(intent, dict) and isinstance(intent.get("text"), str):
+            text = clean(intent["text"])
+            if text:
+                state["intent"] = {"text": text, "date": day(intent.get("date"))}
+    except ValueError:
         pass
-    return state
+    return state, True
 
 
 def save(state):
@@ -359,15 +399,15 @@ def ask(prompt):
 
 
 def is_yes(text):
-    return (text or "").lower() in ("y", "yes")
+    return (text or "").lower().strip(" .!") in YES
 
 
 def is_no(text):
-    return (text or "").lower() in ("n", "no")
+    return (text or "").lower().strip(" .!") in NO
 
 
-def clean(text):
-    return "".join(c for c in text if c.isprintable()).strip()[:120]
+def wrapped(prefix, text):
+    return textwrap.fill(prefix + text, 72, subsequent_indent="  ")
 
 
 def in_a_row(visits, d):
@@ -426,7 +466,7 @@ def show_saved(state):
     say(f"Days you opened hello-world: {len(state['visits'])}"
         f" (last 7 days: {len(recent)})")
     if state["intent"]:
-        say(f"Your current plan: {state['intent']['text']}")
+        say(wrapped("Your current plan: ", state["intent"]["text"]))
     say("The file holds only this:")
     say(json.dumps(state, indent=2))
 
@@ -472,9 +512,12 @@ def menu(state):
             remind(not reminding)
         elif choice == "3":
             state["streak"] = not state["streak"]
-            save(state)
-            say("Done. The in-a-row line is "
-                + ("on." if state["streak"] else "off."))
+            if save(state):
+                say("Done. The in-a-row line is "
+                    + ("on." if state["streak"] else "off."))
+            else:
+                state["streak"] = not state["streak"]
+                say("Could not save that choice on this computer.")
         elif choice == "4":
             reset(state)
         elif choice == "5":
@@ -486,12 +529,17 @@ def menu(state):
 def daily(startup):
     d = today()
     iso = d.isoformat()
-    state = load()
+    state, can_save = load()
+    person = interactive()
     seen_today = iso in state["visits"]
     if startup and seen_today:
         return
     first = not state["visits"]
     intent = state["intent"]
+    if intent and intent["date"] > iso:
+        intent["date"] = iso  # the clock moved back; it is today's plan now
+    if intent and (d - datetime.date.fromisoformat(intent["date"])).days > 14:
+        intent = None
 
     say("Hello, world!")
     say(long_date(d))
@@ -511,12 +559,12 @@ def daily(startup):
         if (d - last).days > 7:
             say("Welcome back. Glad you are here.")
             say()
-        elif state["streak"] and row >= 3:
+        elif state["streak"] and (row in (3, 7, 14) or row % 30 == 0):
             say(f"You have opened this {row} times in a row. Nice to see you.")
             say()
 
     if not seen_today and intent and intent["date"] < iso:
-        say("Last time you planned: " + intent["text"])
+        say(wrapped("Last time you planned: ", intent["text"]))
         answer = ask("Did you do it? (y = yes, n = not yet, Enter = skip) > ")
         if answer is not None:
             if is_yes(answer):
@@ -528,8 +576,6 @@ def daily(startup):
                     intent = {"text": intent["text"], "date": iso}
                 else:
                     intent = None
-            else:
-                intent = None
         say()
 
     say("Thought for today:")
@@ -540,7 +586,7 @@ def daily(startup):
     say()
 
     if intent and intent["date"] == iso:
-        say("Your plan for today: " + intent["text"])
+        say(wrapped("Your plan for today: ", intent["text"]))
         say()
     elif not seen_today:
         text = ask("What is one thing you want to get done today?\n"
@@ -551,12 +597,15 @@ def daily(startup):
                 intent = {"text": text, "date": iso}
         say()
 
-    if not seen_today:
-        state["visits"] = (state["visits"] + [iso])[-MAX_VISITS:]
-    state["intent"] = intent
-    if not save(state):
-        say("Your notes could not be saved on this computer. This screen "
-            "still works.")
+    # With nobody at the keyboard, such as a launch with no console, show the
+    # screen but keep today's questions for the next real visit.
+    if person:
+        if not seen_today:
+            state["visits"] = (state["visits"] + [iso])[-MAX_VISITS:]
+        state["intent"] = intent
+        if not can_save or not save(state):
+            say("Your notes could not be saved on this computer. This screen "
+                "still works.")
 
     answer = ask("Press Enter to close, or type m for options > ")
     if (answer or "").lower() in ("m", "menu"):
@@ -564,6 +613,9 @@ def daily(startup):
 
 
 def run(argv):
+    argv = [a.lower() for a in argv]
+    if argv in (["/?"], ["-?"], ["/help"], ["-help"], ["help"]):
+        argv = ["--help"]
     if argv == ["--plain"]:
         print("Hello, world!", flush=True)
         return 0
@@ -576,7 +628,7 @@ def run(argv):
     if not argv:
         daily(startup=False)
         return 0
-    state = load()
+    state, can_save = load()
     if argv == ["--stats"]:
         show_saved(state)
         return 0
@@ -591,11 +643,15 @@ def run(argv):
         return 0
     if len(argv) == 2 and argv[0] == "--streak" and argv[1] in ("on", "off"):
         state["streak"] = argv[1] == "on"
-        save(state)
-        say("Done. The in-a-row line is " + ("on." if state["streak"]
-                                             else "off."))
+        if can_save and save(state):
+            say("Done. The in-a-row line is "
+                + ("on." if state["streak"] else "off."))
+        else:
+            say("Could not save that choice on this computer.")
         return 0
-    say("Unknown option. Run hello.cmd --help to see the options.")
+    say("Unknown option. Here are the options.")
+    say()
+    say(HELP)
     return 2
 
 

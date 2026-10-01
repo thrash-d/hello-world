@@ -69,7 +69,9 @@ def test_output_is_plain_ascii_and_short():
 def test_no_prompts_and_no_waiting_without_a_person():
     p = run()  # stdin is not a terminal here
     assert p.returncode == 0 and "> " not in p.stdout
-    assert notes(p.home)["intent"] is None
+    assert p.stdout.startswith("Hello, world!")
+    # nothing is recorded, so the next real visit still gets its questions
+    assert not os.path.exists(os.path.join(p.home, "notes.json"))
 
 
 def test_opening_again_the_same_day_asks_nothing_new():
@@ -96,20 +98,15 @@ def test_next_day_not_done_can_be_kept():
                                            "date": "2026-10-02"}
 
 
-def test_skipping_the_follow_up_clears_the_plan():
-    first = run(text="Send the invoice\n\n")
-    run(text="\n\n\n", day="2026-10-02", home=first.home)
-    assert notes(first.home)["intent"] is None
-
-
-def test_in_a_row_line_appears_on_the_third_visit_only():
+def test_in_a_row_line_appears_at_milestones_only():
     home = tempfile.mkdtemp()
     outs = [run(text="\n\n", day=f"2026-10-0{n}", home=home).stdout
-            for n in (1, 2, 3)]
-    assert "in a row" not in outs[0] and "in a row" not in outs[1]
+            for n in range(1, 8)]
+    shown = [n for n, out in enumerate(outs, 1) if "in a row" in out]
+    assert shown == [3, 7]
     assert "3 times in a row" in outs[2]
     run(["--streak", "off"], home=home)
-    assert "in a row" not in run(text="\n\n", day="2026-10-04", home=home).stdout
+    assert "in a row" not in run(text="\n\n", day="2026-10-14", home=home).stdout
 
 
 def test_welcome_back_after_a_long_gap_and_no_shaming():
@@ -188,9 +185,101 @@ def test_startup_run_is_silent_if_already_opened_today():
     assert p.returncode == 0 and p.stdout == ""
 
 
-def test_unknown_option_exits_2():
+def test_unknown_option_exits_2_and_shows_the_options():
     p = run(["--nope"])
-    assert p.returncode == 2 and "--help" in p.stdout
+    assert p.returncode == 2 and "--plain" in p.stdout
+
+
+def test_help_in_the_usual_spellings():
+    for arg in ("--help", "-h", "/?", "-?", "--HELP"):
+        p = run([arg])
+        assert p.returncode == 0 and "--plain" in p.stdout, arg
+    assert "!" not in run(["--help"]).stdout
+
+
+def test_follow_up_keeps_the_plan_unless_the_answer_is_clear():
+    first = run(text="Book travel\n\n")
+    run(text="\n\n\n", day="2026-10-02", home=first.home)  # Enter skips
+    assert notes(first.home)["intent"]["text"] == "Book travel"
+    run(text="maybe\n\n\n", day="2026-10-03", home=first.home)
+    assert notes(first.home)["intent"]["text"] == "Book travel"
+
+
+def test_friendly_yes_words_count():
+    for word in ("yep", "Yes!", "done", "ya"):
+        first = run(text="Book travel\n\n")
+        p = run(text=word + "\n\n\n", day="2026-10-02", home=first.home)
+        assert "Last time you planned: Book travel" in p.stdout
+        assert notes(first.home)["intent"] is None, word
+
+
+def test_a_hostile_notes_file_cannot_write_controls_to_the_screen():
+    home = tempfile.mkdtemp()
+    bad = {"visits": ["2026-09-30"],
+           "intent": {"text": "\x1b[31mEVIL\r\nFAKE", "date": "2026-09-30"}}
+    with open(os.path.join(home, "notes.json"), "w") as f:
+        json.dump(bad, f)
+    p = run(text="y\n\n\n", home=home)
+    assert "\x1b" not in p.stdout and "\r" not in p.stdout
+    assert "Last time you planned: [31mEVIL FAKE" in p.stdout
+    assert "\x1b" not in run(["--stats"], home=home).stdout
+
+
+def test_pasted_tabs_and_odd_spaces_become_spaces():
+    p = run(text="call\tBob\u00a0now\n\n")
+    assert notes(p.home)["intent"]["text"] == "call Bob now"
+
+
+def test_very_deep_json_gives_a_fresh_start_and_keeps_a_copy():
+    home = tempfile.mkdtemp()
+    with open(os.path.join(home, "notes.json"), "w") as f:
+        f.write("[" * 200000)
+    p = run(text="\n\n", home=home)
+    assert p.returncode == 0 and "Welcome." in p.stdout
+    assert os.path.exists(os.path.join(home, "notes.json.bak"))
+
+
+def test_a_damaged_file_is_kept_as_a_backup():
+    home = tempfile.mkdtemp()
+    with open(os.path.join(home, "notes.json"), "w") as f:
+        f.write('{"visits":["2026-10-0')
+    run(text="\n\n", home=home)
+    with open(os.path.join(home, "notes.json.bak")) as f:
+        assert f.read() == '{"visits":["2026-10-0'
+
+
+def test_a_bad_plan_date_does_not_turn_the_in_a_row_line_back_on():
+    home = tempfile.mkdtemp()
+    bad = {"visits": ["2026-10-01", "2026-10-02", "2026-10-03"],
+           "intent": {"text": "x", "date": "junk"}, "streak": False}
+    with open(os.path.join(home, "notes.json"), "w") as f:
+        json.dump(bad, f)
+    p = run(text="\n\n", day="2026-10-04", home=home)
+    assert "in a row" not in p.stdout
+    assert notes(home)["streak"] is False
+
+
+def test_odd_date_spellings_are_normalised():
+    home = tempfile.mkdtemp()
+    with open(os.path.join(home, "notes.json"), "w") as f:
+        json.dump({"visits": ["20261001"], "intent": None}, f)
+    run(text="\n\n", home=home)
+    assert notes(home)["visits"] == ["2026-10-01"]
+
+
+def test_long_plans_wrap_within_72_columns():
+    first = run(text="word " * 24 + "\n\n")
+    p = run(text="\n\n\n", day="2026-10-02", home=first.home)
+    assert all(len(x) <= 72 for x in p.stdout.splitlines() if "> " not in x)
+
+
+def test_a_plan_dated_in_the_future_becomes_todays_plan():
+    home = tempfile.mkdtemp()
+    with open(os.path.join(home, "notes.json"), "w") as f:
+        json.dump({"visits": ["2026-12-01"],
+                   "intent": {"text": "Pay rent", "date": "2026-12-01"}}, f)
+    p = run(text="\n", day="2026-10-04", home=home)
+    assert "Your plan for today: Pay rent" in p.stdout
 
 
 def test_dead_stdout_exits_1_with_one_line_on_stderr():
