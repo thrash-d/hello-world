@@ -2,14 +2,31 @@
 
 ## 2026-10-01: Use -LiteralPath for hello.cmd and say how to install again
 
-The thirteenth review, of 1.3.3, answered here. Version 1.3.4. It found no Critical or High issues, 2 Medium and 7 Low; saved in `reviews/round-13.md`. Both Medium findings repeat items already declined.
+The thirteenth review, of 1.3.3, answered here. Version 1.4.1. It found no Critical or High issues, 2 Medium and 7 Low; saved in `reviews/round-13.md`. Both Medium findings repeat items already declined.
 
 - `Set-Content` for `hello.cmd` takes `-LiteralPath`. The review said (L7): "`Set-Content` uses `-Path` (wildcard interpretation) for a path with no brackets, so it is harmless, but `-LiteralPath` would be consistent."
-- The help says to run the uninstall line before installing again. The review said (L4): "A second run fails because the folder exists and isn't empty. Add a line to the help: run the uninstall one-liner first."
+- The help says to delete the setup folder before installing again, and that the installer upgrades in place. The review said (L4): "A second run fails because the folder exists and isn't empty. Add a line to the help: run the uninstall one-liner first." The uninstall line no longer exists, so the note names the setup folder instead.
 
 Declined, and added to `BACKLOG.md` where new: the pilot install and hand-checked hash (M1), hardening Git's environment and config (M2), checking `.old` after restoring it (L1), `GetFolderPath` and the running admin's SID (L2), the ARM64 gate (L5), and the proxy and old-Windows notes (L6). The rename window and missing mutex (L3), the null owner, the junction walk time, and the case-insensitive hash (L7) need no change.
 
 Tested: `python test_hello.py` passes on Linux. Not tested: all of `install.ps1`. `pwsh` isn't installed here, so it wasn't even parsed. The `-LiteralPath` change needs a Windows workstation.
+
+## 2026-10-01: Add a Start menu shortcut and an uninstall entry
+
+Version 1.4.0. After the first successful live install, three problems came up. Opening `hello.cmd` from Explorer flashed a window that closed before the line could be read. Employees had no reasonable way to find the program inside Program Files. Uninstalling meant typing a command.
+
+- `install.ps1` adds a hello-world shortcut to the all-users Start menu. It runs `cmd /c "hello.cmd" & pause`, so the window stays open until a key is pressed. `hello.cmd` itself doesn't pause, so the installer's test run and scripted use don't wait for a key. The shortcut is checked so only administrators can change it.
+- `install.ps1` registers hello-world in Settings > Apps with its version from `VERSION`. The entry's Uninstall button runs the new `uninstall.ps1`, which asks for administrator rights. It then removes the shortcut, the Apps entry, and the install folder.
+- The shortcut and the Apps entry are added only after every check passes, so a failed install doesn't show up anywhere.
+- `uninstall.ps1` and `VERSION` are now checked against the reviewed commit along with `install.ps1` and `hello.py`.
+
+`uninstall.ps1` also removes the `hello-world.new` and `hello-world.old` folders an interrupted install can leave, so the long uninstall line in the help is gone.
+
+Removed from `BACKLOG.md`: the declined `uninstall.ps1`, which this change adds, and keeping `-ErrorAction SilentlyContinue` on the uninstall line, which no longer exists.
+
+Tested under Windows PowerShell 5.1 by installing to a test folder with a space in its name, with the Start menu folder and the Apps entry moved somewhere an unelevated test could write. The install passed every check. The shortcut's exact command line printed the line and reached the pause, and the Apps entry showed version 1.4.0 with the expected Uninstall command. Running the uninstaller from inside the install folder removed the folder, the shortcut, and the entry. Unelevated, the uninstaller's administrator check reads false, so the real one asks for elevation.
+
+Also tested on Windows: the 1.3.1 to 1.3.3 installer changes, which their entries below list as never run or parsed. It parses under Windows PowerShell 5.1 and PowerShell 7. Under 5.1 it installed fresh, and it upgraded over an existing install with no `.new` or `.old` left behind. With the install folder renamed to `.old` to fake an interrupted swap, a run that then failed the commit check still put the old install back, and it worked. With a file held open in the live install, the swap failed after its retries. The live install stayed in place and still ran, and `.new` was removed. In that case the error reads "Access to the path ... is denied", which doesn't say a file is open.
 
 ## 2026-10-01: Restore an interrupted swap before any check, and make the tests report skips
 

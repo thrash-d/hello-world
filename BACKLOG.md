@@ -15,7 +15,6 @@ Changes considered and declined, with the reason.
 - Catch every exception on the stderr write in hello.py, as the ninth review asked: stderr uses the `backslashreplace` error handler, so the `UnicodeEncodeError` it describes can't happen there.
 - Make the help example find Git through the registry like the script does: if Git sits somewhere else, the clone step fails visibly.
 - Trust every local administrator's SID along with the account running the installer: Git's first run leaves a few files in `Git\etc` owned by whoever installed it. If a different admin installed Git, the tree check refuses that account. Change this if a live install hits it.
-- An `uninstall.ps1`: uninstalling is one line in the installer help.
 - Leave the clone URL out of the installer help: the repo is private, and the URL names only the pseudonymous account.
 - Add TrustedInstaller to the installed folder's ACL to match the source check: nothing needs it there. Trusting it on the source walk lets Program Files and System32 pass.
 - Branch protection, 2FA, and force-push rules on GitHub: account settings, not repo files. Decide them in github-mog.
@@ -37,8 +36,8 @@ Changes considered and declined, with the reason.
 - Allow native ARM64 PowerShell on Windows 11 (eleventh review L9): it fails safe with a clear message, and the five machines are x64.
 - Warn about the slow Git tree walk and long paths (twelfth review L3): the walk is the check, and the install runs once per workstation. Revisit if a live install fails on a long path.
 - Check `.old` is intact before restoring it (twelfth review L4): the same run replaces it with a tested install, and only administrators can touch it.
-- Drop `-ErrorAction SilentlyContinue` from the uninstall line (twelfth review L5): without it, a missing folder prints an error for each one that was never created.
 - A reminder to bump the pinned Python (twelfth review L6): process, not code. Updating means changing the URL and hash in `install.ps1`.
 - Pilot install, hand-checked hash, Git environment and config hardening (thirteenth review M1, M2): same as the eleventh and tenth review entries above. The pilot is process, and the Git environment comes from the admin's own session.
 - Verify `.old` after restoring it (thirteenth review L1): same as the twelfth review L4 entry above. Only administrators can write to `Program Files`.
 - Proxy credentials and Windows 10 builds before 1809 (thirteenth review L6): same as the proxy entry above. The install runs once per workstation, and failures are visible.
+- A desktop shortcut for every user: typing "hello" in the Start menu finds the Start menu shortcut, and desktop icons pile up on shared machines. Add one if employees ask.
