@@ -38,3 +38,4 @@ Changes considered and declined, with the reason.
 - Walk the tree without recursing into links (nineteenth review L8): only administrators can place links there, and the walk fails closed.
 - Print the install error once instead of on the console and in the log (twentieth review L1): the console copy is harmless and the log copy is the point.
 - Make the Apps Uninstall button elevate (twentieth review L4): `uninstall.ps1` already restarts itself with `-Verb RunAs`.
+- Walk the tree without recursing into junctions, again (twenty-first review L1): same as the nineteenth review entry above. Only administrators can plant one and the worst case is a slow check.

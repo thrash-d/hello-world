@@ -37,7 +37,8 @@ never a tag name. The tools run by full path for the same reason the
 installer pins them. Windows clients block scripts by default, so the
 example allows them for this PowerShell window only. If a Group Policy sets
 the execution policy, that line errors and the policy decides.
-To install again, delete the setup folder first, so the example's New-Item and
+To install again, delete the setup folder first (Remove-Item -Recurse -Force,
+because git leaves read-only files in .git), so the example's New-Item and
 clone work a second time. The installer upgrades an existing install in place.
 
 .NOTES
@@ -45,7 +46,7 @@ Employees open hello-world from the Start menu. To uninstall, use Settings >
 Apps > Installed apps > hello-world > Uninstall. That also removes the folders
 named .new and .old that an interrupted run can leave. The setup folder isn't needed after
 a successful install and can be deleted, along with install.log, the record of
-the run, so copy the log first if you want to keep it.
+the steps after the permission checks, so copy the log first if you want to keep it.
 #>
 #Requires -RunAsAdministrator
 param([Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$Commit)
