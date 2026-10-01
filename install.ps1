@@ -32,10 +32,19 @@ to the clone, then installs the reviewed commit. Pass the full commit hash,
 never a tag name. The tools run by full path for the same reason the
 installer pins them. Windows clients block scripts by default, so the
 example allows them for this PowerShell window only.
+
+.NOTES
+The setup folder isn't needed after a successful install. The installer makes
+nothing outside these two folders, so this elevated line uninstalls it:
+
+cd C:\; Remove-Item "$env:ProgramFiles\hello-world", C:\ProgramData\hello-setup -Recurse -Force
 #>
 #Requires -RunAsAdministrator
 param([Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$Commit)
 $ErrorActionPreference = 'Stop'
+# A 32-bit PowerShell reads the 32-bit registry and Program Files (x86), so it
+# would pin a different Python than the one checked here.
+if (-not [Environment]::Is64BitProcess) { throw 'Run this from 64-bit PowerShell.' }
 $dir = Join-Path $env:ProgramFiles 'hello-world'
 
 # Rights that let someone swap a file or folder out: Delete, DeleteChild,
@@ -48,7 +57,8 @@ $trusted = 'S-1-5-32-544', 'S-1-5-18', 'S-1-5-80-956008885-3418522649-1831038044
     [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 
 function Assert-AdminOnly([string]$Path, [int64]$Rights) {
-    $acl = Get-Acl $Path
+    # Literal, because Git ships a file named "[.exe".
+    $acl = Get-Acl -LiteralPath $Path
     $sid = [Security.Principal.SecurityIdentifier]
     # An owner can always rewrite the DACL, so a non-admin owner counts too.
     $others = @($acl.GetOwner($sid).Value) + @($acl.GetAccessRules($true, $true, $sid) |
@@ -56,26 +66,38 @@ function Assert-AdminOnly([string]$Path, [int64]$Rights) {
             -not $_.PropagationFlags.HasFlag([Security.AccessControl.PropagationFlags]::InheritOnly) -and
             ([int64]$_.FileSystemRights -band $Rights) } |
         ForEach-Object { $_.IdentityReference.Value }) | Where-Object { $_ -notin $trusted }
-    if ($others) { throw "Non-administrators can change $Path ($($others -join ', ')). Copy the installer to a folder only administrators can write." }
+    if ($others) { throw "Non-administrators can change $Path ($($others -join ', '))." }
+}
+
+# Everything this installer runs as admin comes from a folder tree: the clone,
+# Git, and Python, whose standard library loads on every start. Nobody but
+# administrators may change anything in the tree, and nobody may swap out a
+# folder above it.
+function Assert-AdminOnlyTree([string]$Root) {
+    Write-Host "Checking permissions under $Root"
+    foreach ($i in @(Get-Item -LiteralPath $Root -Force) + @(Get-ChildItem -LiteralPath $Root -Recurse -Force)) {
+        # A link's own ACL says nothing about its target.
+        if ($i.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "$($i.FullName) is a link." }
+        Assert-AdminOnly $i.FullName $edit
+    }
+    # A drive root can't be deleted or renamed, so Delete on it doesn't matter.
+    for ($p = (Get-Item -LiteralPath $Root -Force).Parent; $p; $p = $p.Parent) {
+        Assert-AdminOnly $p.FullName ($(if ($p.Parent) { $swap } else { $swap -band -bnot 0x10000 }))
+    }
 }
 
 # PATH can list folders employees can write, and a git or icacls found there
 # would run as admin. Call both by full path.
 $icacls = "$env:SystemRoot\System32\icacls.exe"
-$git = "$((Get-ItemProperty HKLM:\SOFTWARE\GitForWindows -ErrorAction SilentlyContinue).InstallPath)\cmd\git.exe"
+$gitDir = (Get-ItemProperty HKLM:\SOFTWARE\GitForWindows -ErrorAction SilentlyContinue).InstallPath
+$git = "$gitDir\cmd\git.exe"
 if (-not $git.StartsWith("$env:ProgramFiles\") -or -not (Test-Path $git)) {
     throw "Need Git for Windows installed for all users under $env:ProgramFiles. Found: '$git'"
 }
+Assert-AdminOnlyTree $gitDir
 
-# The installer runs as admin, so whoever can swap its files or folders runs
-# code as admin. Check the files, then every folder up to the root. Nobody else
-# may add files to the clone itself, or they could plant git objects that
-# fool the commit check below.
-foreach ($f in $PSCommandPath, (Join-Path $PSScriptRoot 'hello.py'), $PSScriptRoot) { Assert-AdminOnly $f $edit }
-# A drive root can't be deleted or renamed, so Delete on it doesn't matter.
-for ($p = (Get-Item $PSScriptRoot).Parent; $p; $p = $p.Parent) {
-    Assert-AdminOnly $p.FullName ($(if ($p.Parent) { $swap } else { $swap -band -bnot 0x10000 }))
-}
+# Covers .git too, so nobody can plant git objects that fool the commit check.
+Assert-AdminOnlyTree $PSScriptRoot
 
 # The ACL checks show nobody else can change the clone. This shows the clone is
 # the reviewed commit, so a moved tag or an edited file fails here.
@@ -98,12 +120,15 @@ if ($python -notmatch "^$([regex]::Escape($env:ProgramFiles))\\Python3[\w.-]*\\p
     throw "Need Python 3 installed for all users in $env:ProgramFiles\Python3*. Found: '$python'"
 }
 # Windows searches PATH for a DLL missing from the exe's folder, and a planted
-# copy there would load as admin in the runs below.
-foreach ($f in ('python{0}.dll' -f ($key.PSChildName -replace '\.')), 'vcruntime140.dll') {
+# copy there would load as admin in the runs below. These four ship with every
+# official 64-bit build.
+$pyDlls = ('python{0}.dll' -f ($key.PSChildName -replace '\.')), 'python3.dll', 'vcruntime140.dll', 'vcruntime140_1.dll'
+foreach ($f in $pyDlls) {
     if (-not (Test-Path (Join-Path (Split-Path $python) $f))) {
         throw "$f is missing next to $python. Repair that Python install first."
     }
 }
+Assert-AdminOnlyTree (Split-Path $python)
 # Start it before touching the install folder, so a broken Python doesn't
 # replace a working install with one that can't run.
 & $python -I -c pass

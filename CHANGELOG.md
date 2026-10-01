@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-09-30: Check the whole Git and Python trees before running them
+
+The ninth review, of 1.2.3, answered here. Version 1.2.4.
+
+- New `Assert-AdminOnlyTree` checks a folder, everything under it, and every folder above it, and refuses links anywhere in the tree. It runs on the Git install, the Python install, and the clone, which now includes `.git`. The review said: "It never runs `Assert-AdminOnly` on `python.exe`, those DLLs, or the install directory." The gap was wider than the review's fix: the start check and the test run load Python's standard library as admin, and the installer runs git as admin. One employee-writable file anywhere in either tree was enough.
+- `python3.dll` and `vcruntime140_1.dll` must also sit next to `python.exe`. The review said: "Official Windows CPython also ships `python3.dll` next to `python.exe`. Many current VC++ runtimes also need `vcruntime140_1.dll`."
+- The installer refuses to run from 32-bit PowerShell. The review said: "A 32-bit elevated host reads `WOW6432Node` and `$env:ProgramFiles` is `C:\Program Files (x86)`."
+- `Assert-AdminOnly` reads ACLs with `-LiteralPath`. Git ships a file named `[.exe`, and `Get-Acl` read the bracket as a wildcard and failed. Found while testing the tree check.
+- The help has a one-line uninstall. The installer creates only the install folder and the setup folder.
+
+Tested: the Git tree, 10,101 items, was accepted in about 11 seconds. A folder holding one file with Modify for Authenticated Users was refused, and so was a junction. `[Environment]::Is64BitProcess` is false under the 32-bit Windows PowerShell host. The script parses under Windows PowerShell 5.1.
+
 ## 2026-09-30: Require Python's DLLs next to python.exe
 
 The eighth review, of 1.2.2, answered here. Version 1.2.3.

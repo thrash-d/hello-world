@@ -15,6 +15,12 @@ Changes considered and declined, with the reason.
 - Fall back to an older working Python when the newest registered one is broken: refusing tells the admin to repair it, and silently picking another version would hide the broken install.
 - Shrink `PATH` in `hello.cmd`: with Python's DLLs required next to `python.exe`, Windows finds them there first. The employee's own PATH can only affect the employee's own run.
 - Print exit codes as `[uint32]` in hex: `$LASTEXITCODE` is an int32, so `{0:X8}` already prints `C0000135`.
+- Tie `ExecutablePath` to the registry key's `InstallPath`, as the ninth review asked: changing HKLM takes admin, and the path pattern, link refusal, and tree check already cover where it points.
+- Accept uppercase in `-Commit`, as the ninth review asked: `ValidatePattern` and `-ne` both ignore case, so an uppercase hash already works.
+- Catch every exception on the stderr write in hello.py, as the ninth review asked: stderr uses the `backslashreplace` error handler, so the `UnicodeEncodeError` it describes can't happen there.
+- Make the help example find Git through the registry like the script does: if Git sits somewhere else, the clone step fails visibly.
+- Trust every local administrator's SID, not only the account running the installer: Git's first run leaves a few files in `Git\etc` owned by whoever installed it. If a different admin installed Git, the tree check refuses that account. Change this if a live install hits it.
+- An `uninstall.ps1`: uninstalling is one line in the installer help.
 - Leave the clone URL out of the installer help: the repo is private, and the URL names only the pseudonymous account.
 - Add TrustedInstaller to the installed folder's ACL to match the source check: nothing needs it there. Trusting it on the source walk lets Program Files and System32 pass.
 - Check the Authenticode signature on the pinned `python.exe`: replacing it under Program Files already takes admin rights.
