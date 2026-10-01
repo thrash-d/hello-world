@@ -4,14 +4,15 @@ Installs hello.py for all users in a folder only administrators can change.
 
 .DESCRIPTION
 Creates "Program Files\hello-world", where only Administrators and SYSTEM can
-write. Copies hello.py there and writes hello.cmd next to it. Employees run
-hello.cmd, which starts hello.py with the all-users Python 3 in isolated mode.
+write. Unpacks a pinned, hash-checked Python from python.org into it, copies
+hello.py there, and writes hello.cmd next to it. Employees run hello.cmd,
+which starts hello.py with that Python in isolated mode. The workstation needs
+Git for Windows and internet access, but no Python of its own.
 
 Run it from an elevated PowerShell on each workstation, from a git clone of a
 release tag in a folder only administrators can write. It refuses anything
 else, such as an employee's Downloads folder, a clone at another commit, or a
-file changed since checkout. Run it again after a Python upgrade, because
-hello.cmd pins the interpreter's path.
+file changed since checkout.
 
 .PARAMETER Commit
 The full commit hash that was reviewed. The clone must be at this commit.
@@ -42,10 +43,14 @@ cd C:\; Remove-Item "$env:ProgramFiles\hello-world", C:\ProgramData\hello-setup 
 #Requires -RunAsAdministrator
 param([Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$Commit)
 $ErrorActionPreference = 'Stop'
-# A 32-bit PowerShell reads the 32-bit registry and Program Files (x86), so it
-# would pin a different Python than the one checked here.
+# A 32-bit PowerShell sees Program Files (x86) and the 32-bit registry.
 if (-not [Environment]::Is64BitProcess) { throw 'Run this from 64-bit PowerShell.' }
 $dir = Join-Path $env:ProgramFiles 'hello-world'
+
+# The Python hello.py runs on. To update it, change both values. The hash is
+# the SHA-256 recorded in the .sigstore file python.org publishes next to the zip.
+$pyUrl = 'https://www.python.org/ftp/python/3.14.8/python-3.14.8-embed-amd64.zip'
+$pySha256 = 'A93ABE456AB01BD96D7A085B3CDB6566B3063F4241360D114142FBDB07F0A310'
 
 # Rights that let someone swap a file or folder out: Delete, DeleteChild,
 # WRITE_DAC, WRITE_OWNER, GENERIC_ALL. Editing a file adds WriteData,
@@ -69,10 +74,9 @@ function Assert-AdminOnly([string]$Path, [int64]$Rights) {
     if ($others) { throw "Non-administrators can change $Path ($($others -join ', '))." }
 }
 
-# Everything this installer runs as admin comes from a folder tree: the clone,
-# Git, and Python, whose standard library loads on every start. Nobody but
-# administrators may change anything in the tree, and nobody may swap out a
-# folder above it.
+# Everything this installer runs as admin comes from a folder tree: Git, the
+# clone, and the installed Python. Nobody but administrators may change
+# anything in the tree, and nobody may swap out a folder above it.
 function Assert-AdminOnlyTree([string]$Root) {
     Write-Host "Checking permissions under $Root"
     foreach ($i in @(Get-Item -LiteralPath $Root -Force) + @(Get-ChildItem -LiteralPath $Root -Recurse -Force)) {
@@ -107,36 +111,16 @@ foreach ($f in 'install.ps1', 'hello.py') {
     if ((& $git -C $PSScriptRoot hash-object $f) -ne (& $git -C $PSScriptRoot rev-parse "HEAD:$f")) { throw "$f differs from commit $Commit." }
 }
 
-# py -3 also picks per-user installs, which the employee can replace, so pin
-# the newest all-users Python 3 from the PEP 514 registry keys instead.
-$key = Get-ChildItem HKLM:\SOFTWARE\Python\PythonCore -ErrorAction SilentlyContinue |
-    Where-Object PSChildName -match '^3\.\d+$' |
-    Sort-Object { [version]$_.PSChildName } |
-    Select-Object -Last 1
-$python = if ($key) { (Get-ItemProperty "$($key.PSPath)\InstallPath").ExecutablePath }
-# Folders under C:\ outside Program Files are often writable by every user.
-# The path goes into a cmd line, so the pattern also rules out ", %, and &.
-# Test for no value first: in Windows PowerShell 5.1 an empty if-statement
-# result makes -notmatch return nothing, which reads as false.
-if (-not $python -or $python -notmatch "^$([regex]::Escape($env:ProgramFiles))\\Python3[\w.-]*\\python\.exe$") {
-    throw "Need Python 3 installed for all users in $env:ProgramFiles\Python3*. Found: '$python'"
-}
-# Windows searches PATH for a DLL missing from the exe's folder, and a planted
-# copy there would load as admin in the runs below. These four ship with every
-# official 64-bit build.
-$pyDlls = ('python{0}.dll' -f ($key.PSChildName -replace '\.')), 'python3.dll', 'vcruntime140.dll', 'vcruntime140_1.dll'
-foreach ($f in $pyDlls) {
-    if (-not (Test-Path (Join-Path (Split-Path $python) $f))) {
-        throw "$f is missing next to $python. Repair that Python install first."
-    }
-}
-Assert-AdminOnlyTree (Split-Path $python)
-# Start it before touching the install folder, so a broken Python doesn't
-# replace a working install with one that can't run.
-& $python -I -c pass
-if ($LASTEXITCODE) {
-    throw ("$python won't start (exit 0x{0:X8}; 0xC0000135 means a missing DLL). Repair that Python install first." -f $LASTEXITCODE)
-}
+# Download into the clone, which only administrators can change, and check the
+# hash before the old install is touched.
+Write-Host "Downloading $pyUrl"
+$zip = Join-Path $PSScriptRoot 'python-embed.zip'
+# Windows PowerShell 5.1 can default to TLS versions python.org refuses, and its
+# progress bar slows downloads to a crawl.
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$ProgressPreference = 'SilentlyContinue'
+Invoke-WebRequest $pyUrl -OutFile $zip -UseBasicParsing
+if ((Get-FileHash $zip).Hash -ne $pySha256) { throw "The Python download doesn't match the pinned SHA-256." }
 
 # Start from an empty folder so no access entry from an earlier copy survives.
 if (Test-Path $dir) { Remove-Item $dir -Recurse -Force }
@@ -146,10 +130,11 @@ New-Item -ItemType Directory $dir | Out-Null
 & $icacls $dir /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-545:(OI)(CI)RX' | Out-Null
 if ($LASTEXITCODE) { throw "icacls failed on $dir" }
 
+Expand-Archive -LiteralPath $zip -DestinationPath (Join-Path $dir 'python')
 Copy-Item (Join-Path $PSScriptRoot 'hello.py') $dir
 # -I ignores PYTHON* variables and the user's site-packages, so nothing the
 # employee controls loads into the run.
-Set-Content (Join-Path $dir 'hello.cmd') "@`"$python`" -I `"%~dp0hello.py`"" -Encoding ascii
+Set-Content (Join-Path $dir 'hello.cmd') '@"%~dp0python\python.exe" -I "%~dp0hello.py"' -Encoding ascii
 
 $hash = (Get-FileHash (Join-Path $dir 'hello.py')).Hash
 if ($hash -ne (Get-FileHash (Join-Path $PSScriptRoot 'hello.py')).Hash) { throw 'Installed hello.py differs from the source' }
@@ -157,10 +142,10 @@ $out = & (Join-Path $dir 'hello.cmd')
 if ($LASTEXITCODE -or "$out" -ne 'Hello, world!') { throw "Test run failed with exit $LASTEXITCODE`: $out" }
 
 # The test run above ran as admin, so check what employees get from the ACL.
-foreach ($f in $dir, (Join-Path $dir 'hello.py'), (Join-Path $dir 'hello.cmd')) {
-    Assert-AdminOnly $f $edit
-    $usersRX = (Get-Acl $f).GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | Where-Object {
+Assert-AdminOnlyTree $dir
+foreach ($f in $dir, (Join-Path $dir 'hello.py'), (Join-Path $dir 'hello.cmd'), (Join-Path $dir 'python\python.exe')) {
+    $usersRX = (Get-Acl -LiteralPath $f).GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | Where-Object {
         $_.IdentityReference.Value -eq 'S-1-5-32-545' -and $_.FileSystemRights.HasFlag([Security.AccessControl.FileSystemRights]::ReadAndExecute) }
     if (-not $usersRX) { throw "Users can't read and run $f" }
 }
-"Installed to $dir with $python. hello.py SHA-256: $hash"
+"Installed to $dir. hello.py SHA-256: $hash"

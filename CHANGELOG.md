@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-10-01: Bring a pinned Python instead of using the workstation's
+
+Version 1.3.0. Three live installs in a row stopped on the workstation's own Python: first a missing `python314.dll`, then no all-users Python registered at all while it was being reinstalled. Each fix to the discovery code exposed the next way a machine's Python can be wrong.
+
+- `install.ps1` no longer looks for an installed Python. It downloads the python.org embeddable Python 3.14.8 for 64-bit Windows. It checks the zip against a SHA-256 pinned in the script before touching the old install, then unpacks it into `Program Files\hello-world\python`. The pinned hash matches the digest in python.org's `.sigstore` file for that zip.
+- `hello.cmd` runs `%~dp0python\python.exe`, a path inside the install folder. No interpreter path is written into the cmd line anymore.
+- The permission check after install covers the whole install folder, Python included.
+- Removed: the PEP 514 registry lookup, the Program Files path pattern, the DLL list, the tree check on the system Python, and the start check. The zip ships all four DLLs next to `python.exe`, and the tree check on the install folder covers them.
+- Workstations now need Git for Windows and internet access, but no Python. Updating Python means changing the URL and hash in `install.ps1`.
+
+Removed from `BACKLOG.md` because the change makes them moot: launching with `py -3`, falling back to an older Python, shrinking `PATH` in `hello.cmd`, printing exit codes as `uint32`, tying `ExecutablePath` to `InstallPath`, an Authenticode check on the pinned `python.exe`, stale-interpreter detection, and finding Python outside Program Files.
+
 ## 2026-09-30: Refuse with a clear message when no Python is registered
 
 Version 1.2.5. The third live install stopped with "Cannot bind argument to parameter 'Path' because it is null." No all-users Python was registered on that workstation while Python was being reinstalled. In Windows PowerShell 5.1, the empty result of `$python = if ($key) { ... }` makes `-notmatch` return nothing, which reads as false. The "Need Python 3" guard never fired, and `Split-Path` got the missing value. The guard now tests for a missing value first. It failed closed either way, but with a message that pointed at the wrong step.
