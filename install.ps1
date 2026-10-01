@@ -6,7 +6,7 @@ Installs hello.py for all users in a folder only administrators can change.
 Creates "Program Files\hello-world", where only Administrators and SYSTEM can
 write. Unpacks a pinned, hash-checked Python from python.org into it, copies
 hello.py and uninstall.ps1 there, and writes hello.cmd next to them. hello.cmd
-starts hello.py with that Python in isolated mode. Adds a hello-world shortcut
+starts hello.py with that Python in isolated mode and passes its options on. Adds a hello-world shortcut
 to every user's Start menu and an entry with an Uninstall button to Settings >
 Apps. The workstation needs Git for Windows and internet access, but no Python
 of its own. Its guarantees hold only if the employees use standard accounts. A
@@ -20,16 +20,25 @@ file changed since checkout.
 .PARAMETER Commit
 The full commit hash that was reviewed. The clone must be at this commit.
 
+.PARAMETER Quiet
+Prints only warnings, errors, and the final result line. Everything is still
+written to install.log. The exit code is 0 on success and 1 on failure, so a
+management tool can run the installer unattended. It never asks questions.
+
 .EXAMPLE
+$tag = 'v1.6.0'
+$commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"; New-Item -ItemType Directory $d
 $icacls = "$([Environment]::SystemDirectory)\icacls.exe"; $git = (Get-ItemProperty HKLM:\SOFTWARE\GitForWindows).InstallPath + '\cmd\git.exe'
 & $icacls $d /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F'
-& $git clone -b <release tag> --depth 1 https://github.com/thrash-d/hello-world $d
+& $git clone -b $tag --depth 1 https://github.com/thrash-d/hello-world $d
 cd $d; Set-ExecutionPolicy -Scope Process Bypass -Force
-.\install.ps1 -Commit <reviewed commit hash>
+.\install.ps1 -Commit $commit
 
 Run each line on its own, in order, in one elevated window. Long lines wrap
-when copied from a terminal and break the paste.
+when copied from a terminal and break the paste. Change the first two lines to
+the release tag and the full 40-character commit hash that was reviewed, and
+keep the quotes. The README has the same steps.
 
 Locks the setup folder before cloning into it, so nobody else can add files
 to the clone, then installs the reviewed commit. Pass the full commit hash,
@@ -51,7 +60,7 @@ Permission checks on Git for Windows can take several minutes - let them finish 
 if the window appears idle. The installer verifies that only administrators can modify
 Git's installation and config folders in C:\Program Files and C:\ProgramData\Git.
 
-Employees open hello-world from the Start menu or by typing "hello" in Windows Search.
+Employees open hello-world from the Start menu or by typing "hello-world" in Windows Search.
 To uninstall, use Settings > Apps > Installed apps > hello-world > Uninstall.
 That also removes folders named .new and .old left by an interrupted run.
 
@@ -59,8 +68,14 @@ The setup folder can be deleted after a successful install. Copy install.log fir
 if you need a record of the installation steps.
 #>
 #Requires -RunAsAdministrator
-param([Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$Commit)
+param([Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$Commit, [switch]$Quiet)
 $ErrorActionPreference = 'Stop'
+# A failure before the log starts prints one plain line, not PowerShell's error
+# block with its line numbers. A failure after that is reported by the catch below.
+trap { Write-Host "FAILED: $($_.Exception.Message)" -ForegroundColor Red; exit 1 }
+# Progress lines for the person running this. -Quiet hides them; the log keeps them.
+function Write-Step([string]$Text) { if (-not $Quiet) { Write-Host $Text -ForegroundColor Cyan } }
+function Write-Info([string]$Text) { if (-not $Quiet) { Write-Host $Text } }
 # A 32-bit PowerShell sees Program Files (x86) and the 32-bit registry.
 if (-not [Environment]::Is64BitProcess) { throw 'Run this from 64-bit PowerShell.' }
 # The pinned Python is the amd64 build, which ARM64 Windows 10 can't run.
@@ -70,6 +85,7 @@ $pf = [Environment]::GetFolderPath('ProgramFiles')
 $winDir = [Environment]::GetFolderPath('Windows')
 $sys32 = [Environment]::SystemDirectory
 $dir = Join-Path $pf 'hello-world'
+$key = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\hello-world'
 
 # The Python hello.py runs on. To update it, change both values. The hash is
 # the SHA-256 recorded in the .sigstore file python.org publishes next to the zip.
@@ -136,10 +152,11 @@ function Assert-AdminOnly([string]$Path, [int64]$Rights) {
 # clone, and the installed Python. Nobody but administrators may change
 # anything in the tree, and nobody may swap out a folder above it.
 function Assert-AdminOnlyTree([string]$Root) {
-    Write-Host "Checking permissions under $Root (this can take several minutes on Git for Windows)"
+    Write-Info "Checking permissions under $Root (this can take several minutes on Git for Windows)"
     $checked = 0
     foreach ($i in @(Get-Item -LiteralPath $Root -Force) + @(Get-ChildItem -LiteralPath $Root -Recurse -Force)) {
         $checked++
+        if (-not $Quiet -and $checked % 200 -eq 0) { Write-Progress -Activity "Checking permissions under $Root" -Status "$checked items checked so far" }
         # A link's own ACL says nothing about its target. Reject both symlinks and junctions.
         if ($i.Attributes -band [IO.FileAttributes]::ReparsePoint) {
             $type = if ($i.Attributes -band [IO.FileAttributes]::Directory) { 'junction' } else { 'symlink' }
@@ -147,7 +164,8 @@ function Assert-AdminOnlyTree([string]$Root) {
         }
         Assert-AdminOnly $i.FullName $edit
     }
-    Write-Host "Checked $checked items in $Root - all admin-only"
+    Write-Progress -Activity "Checking permissions under $Root" -Completed
+    Write-Info "Checked $checked items in $Root - all admin-only"
     # Check that parent folders can only be modified by admins. If a parent is writable by
     # non-admins, they could move or delete the entire $Root tree. At the drive root,
     # Delete permission doesn't matter (can't delete a drive root), so we exclude it.
@@ -155,7 +173,7 @@ function Assert-AdminOnlyTree([string]$Root) {
         $checkRights = if ($p.Parent) { $swap } else { $swap -band -bnot 0x10000 }
         Assert-AdminOnly $p.FullName $checkRights
     }
-    Write-Host "Checked parent folders of $Root up to drive root - all parent directories are admin-only"
+    Write-Info "Checked parent folders of $Root up to drive root - all parent directories are admin-only"
 }
 
 function Assert-NotLink([string]$Path) {
@@ -194,6 +212,7 @@ if (-not (Test-Path -LiteralPath $dir) -and (Test-Path -LiteralPath $old)) {
 }
 
 # === VERIFICATION: Validate the setup environment ===
+Write-Step '[1/6] Checking Git for Windows and its folders'
 # PATH can list folders employees can write, and a git or icacls found there
 # would run as admin. Call both by full path.
 $icacls = Join-Path $sys32 'icacls.exe'
@@ -221,6 +240,7 @@ Remove-Item -LiteralPath 'Env:XDG_CONFIG_HOME' -ErrorAction SilentlyContinue
 $env:GIT_CONFIG_NOSYSTEM = '1'
 
 # Covers .git too, so nobody can plant git objects that fool the commit check.
+Write-Step '[2/6] Checking the setup folder'
 Assert-AdminOnlyTree $PSScriptRoot
 
 # A record of the steps from here on; the checks above print to the console
@@ -228,10 +248,11 @@ Assert-AdminOnlyTree $PSScriptRoot
 # stopped in the last finally below.
 try { Start-Transcript -LiteralPath (Join-Path $PSScriptRoot 'install.log') -Append | Out-Null }
 catch { throw "Couldn't start the install log (is a transcript already running in this window?): $_" }
-Write-Host "Logging to $(Join-Path $PSScriptRoot 'install.log')"
+Write-Info "Logging to $(Join-Path $PSScriptRoot 'install.log')"
 try {
 
 # === COMMIT VERIFICATION: Ensure the clone is at the reviewed commit ===
+Write-Step '[3/6] Verifying the reviewed commit'
 # The ACL checks show nobody else can change the clone. This shows the clone is
 # the reviewed commit, so a moved tag or an edited file fails here.
 # git also finds a repository in a parent folder, so require .git here.
@@ -250,9 +271,10 @@ foreach ($f in 'install.ps1', 'uninstall.ps1', 'hello.py', 'VERSION') {
 }
 
 # === DOWNLOAD AND BUILD: Fetch Python, build, and test in isolation ===
+Write-Step '[4/6] Downloading Python and verifying its hash'
 # Download into the clone, which only administrators can change, and check the
 # hash before the old install is touched. The zip is deleted afterward.
-Write-Host "Downloading $pyUrl"
+Write-Info "Downloading $pyUrl"
 $zip = Join-Path $PSScriptRoot 'python-embed.zip'
 # Windows PowerShell 5.1 can default to TLS versions python.org refuses, and its
 # progress bar slows downloads to a crawl.
@@ -268,6 +290,7 @@ try {
     # Build and test the new install beside the old one, so a failure leaves
     # the working install alone. Both sit in Program Files, which only
     # administrators can write to.
+    Write-Step '[5/6] Building, testing and installing'
     foreach ($leftover in $new, $old) { if (Test-Path -LiteralPath $leftover) { Remove-Tree $leftover } }
     New-Item -ItemType Directory $new | Out-Null
     # Drop inherited entries. Administrators and SYSTEM get full control, Users
@@ -279,7 +302,7 @@ try {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'hello.py'), (Join-Path $PSScriptRoot 'uninstall.ps1') -Destination $new
     # -I ignores PYTHON* variables and the user's site-packages, so nothing the
     # employee controls loads into the run.
-    Set-Content -LiteralPath (Join-Path $new 'hello.cmd') -Value '@"%~dp0python\python.exe" -I "%~dp0hello.py"' -Encoding ascii
+    Set-Content -LiteralPath (Join-Path $new 'hello.cmd') -Value '@"%~dp0python\python.exe" -I "%~dp0hello.py" %*' -Encoding ascii
 
     $hash = (Get-FileHash -LiteralPath (Join-Path $new 'hello.py')).Hash
     foreach ($f in 'hello.py', 'uninstall.ps1') {
@@ -293,11 +316,13 @@ try {
             $_.IdentityReference.Value -eq 'S-1-5-32-545' -and $_.FileSystemRights.HasFlag([Security.AccessControl.FileSystemRights]::ReadAndExecute) }
         if (-not $usersRX) { throw "Users can't read and run $f" }
     }
-    $out = & (Join-Path $new 'hello.cmd')
+    # --plain prints only the greeting and saves nothing, so the test leaves no notes in the admin's profile.
+    $out = & (Join-Path $new 'hello.cmd') --plain
     if ($LASTEXITCODE -or "$out" -ne 'Hello, world!') { throw "Test run failed with exit $LASTEXITCODE`: $out" }
 
     # Swap in the new folder, and put the old one back if that fails.
     $hadOld = Test-Path -LiteralPath $dir
+    $prevVersion = (Get-ItemProperty -LiteralPath $key -ErrorAction SilentlyContinue).DisplayVersion
     # Only administrators can plant a link here, but never delete through one.
     if ($hadOld) { Assert-NotLink $dir }
     if ($hadOld) { Rename-Retry $dir (Split-Path $old -Leaf) }
@@ -318,26 +343,35 @@ finally {
 }
 
 # === FINALIZATION: Register the installation in Windows settings and Start menu ===
+Write-Step '[6/6] Adding the Start menu shortcut and the Settings > Apps entry'
 # Added only after the checks pass. The entry in Settings > Apps, whose Uninstall button runs uninstall.ps1.
-$key = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\hello-world'
+$version = (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'VERSION')).Trim()
+$pyExe = Join-Path $dir 'python\python.exe'
 New-Item $key -Force | Out-Null
 $entry = @{
     DisplayName     = 'hello-world'
-    DisplayVersion  = (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'VERSION')).Trim()
+    DisplayVersion  = $version
+    Publisher       = 'IT Department'
+    DisplayIcon     = "$pyExe,0"
     InstallLocation = $dir
     UninstallString = "`"$(Join-Path $sys32 'WindowsPowerShell\v1.0\powershell.exe')`" -NoProfile -ExecutionPolicy Bypass -File `"$dir\uninstall.ps1`""
 }
 foreach ($name in $entry.Keys) { New-ItemProperty $key -Name $name -Value $entry[$name] -Force | Out-Null }
-foreach ($name in 'NoModify', 'NoRepair') { New-ItemProperty $key -Name $name -Value 1 -PropertyType DWord -Force | Out-Null }
+# Settings > Apps shows the size in KB.
+$sizeKB = [int]((Get-ChildItem -LiteralPath $dir -Recurse -File -Force | Measure-Object Length -Sum).Sum / 1KB)
+$dwords = @{ NoModify = 1; NoRepair = 1; EstimatedSize = $sizeKB }
+foreach ($name in $dwords.Keys) { New-ItemProperty $key -Name $name -Value $dwords[$name] -PropertyType DWord -Force | Out-Null }
 
 # Added only after the checks pass, so a failed install never shows up in the
 # Start menu, and after the Apps entry, so a half-finished install still has
-# an Uninstall button. Run straight from Explorer, hello.cmd's window closes before
-# anyone can read it; the shortcut keeps it open until a key is pressed.
+# an Uninstall button. hello.py waits for Enter before it closes its window; the
+# shortcut adds a pause only when hello.cmd fails, so an error message stays readable.
 $lnk = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'hello-world.lnk'
 $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk)
 $shortcut.TargetPath = Join-Path $sys32 'cmd.exe'
-$shortcut.Arguments = "/d /c `"`"$dir\hello.cmd`" & pause`""
+$shortcut.Arguments = "/d /c `"title hello-world & `"$dir\hello.cmd`" & if errorlevel 1 pause`""
+$shortcut.Description = 'A daily thought and one small thing to try'
+$shortcut.IconLocation = "$pyExe,0"
 # Not $dir: a window left open there is a current directory, and Windows won't
 # rename or delete a folder that one is in.
 $shortcut.WorkingDirectory = $winDir
@@ -348,8 +382,11 @@ $shortcut.Save()
 try { Assert-AdminOnly $lnk $edit }
 catch { Remove-Item -LiteralPath $lnk -Force -ErrorAction SilentlyContinue; throw }
 
-"Installed to $dir. hello.py SHA-256: $hash (it differs between LF and CRLF checkouts; the -Commit check is what pins the source)"
+$how = if ($prevVersion -and $prevVersion -ne $version) { "upgraded from $prevVersion" } elseif ($prevVersion) { 'reinstalled' } else { 'new install' }
+Write-Host "Installed hello-world $version to $dir ($how)." -ForegroundColor Green
+Write-Host "hello.py SHA-256: $hash"
+Write-Info 'Next: open hello-world from the Start menu to check it. The setup folder can be deleted; copy install.log first if you want the record.'
 }
-# The host prints a script's error only after this finally, so write it to the log first.
-catch { Write-Host "FAILED: $($_ | Out-String)"; throw }
+# The host prints a script's error only after the finally below, so write it to the log first.
+catch { Write-Host "FAILED: $($_.Exception.Message)" -ForegroundColor Red; Write-Host 'The steps above and this message are in install.log in the setup folder.'; exit 1 }
 finally { Stop-Transcript -ErrorAction SilentlyContinue | Out-Null }

@@ -33,7 +33,7 @@ if (-not $me.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         if ($Quiet) { $argList += '-Quiet' }
         Start-Process $ps -Verb RunAs -ArgumentList $argList
     }
-    catch { Write-Host "Couldn't get administrator rights: $_" -ForegroundColor Red; Wait-Close }
+    catch { Write-Host "Couldn't get administrator rights: $($_.Exception.Message) Ask IT to uninstall hello-world." -ForegroundColor Red; Wait-Close }
     exit
 }
 
@@ -60,10 +60,23 @@ try {
             catch { if ($try -ge 5) { throw }; Start-Sleep -Seconds 1 }
         }
     }
+    # Any user can turn on a sign-in reminder. Its launcher sits in that user's own
+    # Startup folder and would show an error at every sign-in once hello.cmd is gone.
+    $profiles = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\*' -ErrorAction SilentlyContinue).ProfileImagePath
+    foreach ($p in $profiles) {
+        if (-not $p) { continue }
+        $launcher = Join-Path ([Environment]::ExpandEnvironmentVariables($p)) 'AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\hello-world-daily.cmd'
+        Remove-Item -LiteralPath $launcher -Force -ErrorAction SilentlyContinue
+    }
     $key = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\hello-world'
     if (Test-Path -LiteralPath $key) { Remove-Item -LiteralPath $key }
-    'hello-world is uninstalled.'
+    Write-Host 'hello-world is uninstalled.' -ForegroundColor Green
+    Write-Host 'Each user keeps their own saved notes in AppData\Local\hello-world. They can delete that folder if they want.'
 }
-catch { Write-Host "Uninstall failed: $_" -ForegroundColor Red; $failed = $true }
+catch {
+    Write-Host "Uninstall failed: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host 'Close any hello-world windows, then try again from Settings > Apps > Installed apps > hello-world > Uninstall. If it fails again, ask IT.'
+    $failed = $true
+}
 finally { Wait-Close }
 if ($failed) { exit 1 }
