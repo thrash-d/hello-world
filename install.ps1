@@ -111,7 +111,8 @@ function Assert-NotLink([string]$Path) {
 function Remove-Tree([string]$Path) {
     Assert-NotLink $Path
     & (Join-Path $sys32 'cmd.exe') /c rmdir /s /q "`"$Path`""
-    if ($LASTEXITCODE) { throw "Couldn't remove $Path" }
+    # rmdir can report success after failing on a locked file, so check the folder is gone.
+    if ($LASTEXITCODE -or (Test-Path -LiteralPath $Path)) { throw "Couldn't remove $Path" }
 }
 
 # Antivirus scans and a running hello.cmd can hold a file open for a moment,
@@ -157,7 +158,8 @@ Assert-AdminOnlyTree $PSScriptRoot
 # A record of the steps from here on; the checks above print to the console
 # only. Opened only now that the setup folder is known to be admin-only, and
 # stopped in the last finally below.
-Start-Transcript -LiteralPath (Join-Path $PSScriptRoot 'install.log') -Append | Out-Null
+try { Start-Transcript -LiteralPath (Join-Path $PSScriptRoot 'install.log') -Append | Out-Null }
+catch { throw "Couldn't start the install log (is a transcript already running in this window?): $_" }
 Write-Host "Logging to $(Join-Path $PSScriptRoot 'install.log')"
 try {
 
@@ -166,7 +168,8 @@ try {
 # git also finds a repository in a parent folder, so require .git here.
 if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot '.git'))) { throw "$PSScriptRoot is not the top of a git clone." }
 $head = & $git -C $PSScriptRoot rev-parse HEAD
-if ($LASTEXITCODE -or $head -ne $Commit) { throw "Source is at '$head', not the reviewed commit $Commit." }
+if ($LASTEXITCODE) { throw "git rev-parse failed with exit $LASTEXITCODE in $PSScriptRoot. If the message above mentions 'dubious ownership', a different account made this clone." }
+if ($head -ne $Commit) { throw "Source is at '$head', not the reviewed commit $Commit." }
 foreach ($f in 'install.ps1', 'uninstall.ps1', 'hello.py', 'VERSION') {
     $actual = & $git -C $PSScriptRoot hash-object $f
     $actualOk = $LASTEXITCODE -eq 0

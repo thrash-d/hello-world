@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-10-01: Check that Remove-Tree removed the folder, and clearer start-up errors
+
+The twentieth review, of 1.5.3, answered here. Version 1.5.4. It found no Critical or High issues, 1 Medium and 5 Low; saved in `reviews/round-20.md`.
+
+- `Remove-Tree` also throws when the folder still exists after `rmdir`. The review said (M1): "`Remove-Tree` trusts rmdir's exit code and never checks the folder is gone."
+- `Start-Transcript` sits in a `try` that says a transcript may already be running in the window. The review said (L2): "It is also unguarded. If a transcript is already running in that window, `Start-Transcript` throws and the run stops with a cryptic error."
+- A failed `git rev-parse` now has its own message with the exit code and a hint about "dubious ownership". The review said (L3): "The message you see is 'Source is at '', not the reviewed commit'. That points at the wrong problem."
+
+Declined:
+- Printing the error once (L1): it appears in the console and the log, and the repeat on the console is harmless. Added to `BACKLOG.md`.
+- Uninstall button needing elevation (L4): `uninstall.ps1` already starts an elevated copy with `Start-Process -Verb RunAs` when it isn't an administrator; checked by reading it. Added to `BACKLOG.md`.
+- Proxy credentials and the `ProgramData\Git` check (L5): both already in `BACKLOG.md`.
+
+Tested: `python test_hello.py` passes on Linux. Not tested: `install.ps1`, which wasn't run or parsed (`pwsh` isn't installed here). Whether `rmdir` really returns 0 after a failed delete, the `Start-Transcript` error path, and the new `rev-parse` message need a Windows machine.
+
 ## 2026-10-01: Log the failure, and delete folders without following links
 
 The nineteenth review, of 1.5.2, answered here. Version 1.5.3. It found no Critical or High issues, 2 Medium and 6 Low; saved in `reviews/round-19.md`.

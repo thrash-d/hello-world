@@ -36,3 +36,5 @@ Changes considered and declined, with the reason.
 - Show account names instead of SIDs in the permission errors, and explain `ProgramData\Git` in the help (nineteenth review L5): the SIDs identify the group, and the check fails closed. Add it if an install stops there.
 - Clear `HOME` and `XDG_CONFIG_HOME` before calling git (nineteenth review L6): they come from the admin's own session, the same reason as the Git config entries above.
 - Walk the tree without recursing into links (nineteenth review L8): only administrators can place links there, and the walk fails closed.
+- Print the install error once instead of on the console and in the log (twentieth review L1): the console copy is harmless and the log copy is the point.
+- Make the Apps Uninstall button elevate (twentieth review L4): `uninstall.ps1` already restarts itself with `-Verb RunAs`.
