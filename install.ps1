@@ -109,18 +109,26 @@ function SID-ToName([string]$SID) {
 }
 
 function Assert-AdminOnly([string]$Path, [int64]$Rights) {
-    # Literal, because Git ships a file named "[.exe".
+    # Verify that only administrators can modify this file/folder.
+    # Use -LiteralPath because Git ships files with unusual names like "[.exe".
     $acl = Get-Acl -LiteralPath $Path
     $sid = [Security.Principal.SecurityIdentifier]
-    # An owner can always rewrite the DACL, so a non-admin owner counts too.
-    $others = @($acl.GetOwner($sid).Value) + @($acl.GetAccessRules($true, $true, $sid) |
+
+    # Collect non-admin principals with dangerous rights:
+    # - The owner (owner can always rewrite the DACL, so non-admin owner is a problem)
+    # - Any Allow ACE (not InheritOnly) that grants the specified Rights to non-admins
+    # InheritOnly entries don't apply directly; they only affect children
+    $owner = $acl.GetOwner($sid).Value
+    $aceRules = $acl.GetAccessRules($true, $true, $sid) |
         Where-Object { $_.AccessControlType -eq 'Allow' -and
             -not $_.PropagationFlags.HasFlag([Security.AccessControl.PropagationFlags]::InheritOnly) -and
             ([int64]$_.FileSystemRights -band $Rights) } |
-        ForEach-Object { $_.IdentityReference.Value }) | Where-Object { $_ -notin $trusted }
+        ForEach-Object { $_.IdentityReference.Value }
+
+    $others = @($owner) + @($aceRules) | Where-Object { $_ -notin $trusted } | Select-Object -Unique
     if ($others) {
         $names = @($others | ForEach-Object { SID-ToName $_ })
-        throw "Non-administrators can change $Path ($($names -join ', '))."
+        throw "Non-administrators can change $Path ($($names -join ', ')). Restrict write access to administrators only."
     }
 }
 
@@ -129,7 +137,9 @@ function Assert-AdminOnly([string]$Path, [int64]$Rights) {
 # anything in the tree, and nobody may swap out a folder above it.
 function Assert-AdminOnlyTree([string]$Root) {
     Write-Host "Checking permissions under $Root (this can take several minutes on Git for Windows)"
+    $checked = 0
     foreach ($i in @(Get-Item -LiteralPath $Root -Force) + @(Get-ChildItem -LiteralPath $Root -Recurse -Force)) {
+        $checked++
         # A link's own ACL says nothing about its target. Reject both symlinks and junctions.
         if ($i.Attributes -band [IO.FileAttributes]::ReparsePoint) {
             $type = if ($i.Attributes -band [IO.FileAttributes]::Directory) { 'junction' } else { 'symlink' }
@@ -137,10 +147,15 @@ function Assert-AdminOnlyTree([string]$Root) {
         }
         Assert-AdminOnly $i.FullName $edit
     }
-    # A drive root can't be deleted or renamed, so Delete on it doesn't matter.
+    Write-Host "Checked $checked items in $Root — all admin-only"
+    # Check that parent folders can only be modified by admins. If a parent is writable by
+    # non-admins, they could move or delete the entire $Root tree. At the drive root,
+    # Delete permission doesn't matter (can't delete a drive root), so we exclude it.
     for ($p = (Get-Item -LiteralPath $Root -Force).Parent; $p; $p = $p.Parent) {
-        Assert-AdminOnly $p.FullName ($(if ($p.Parent) { $swap } else { $swap -band -bnot 0x10000 }))
+        $checkRights = if ($p.Parent) { $swap } else { $swap -band -bnot 0x10000 }
+        Assert-AdminOnly $p.FullName $checkRights
     }
+    Write-Host "Checked parent folders of $Root up to drive root — all parent directories are admin-only"
 }
 
 function Assert-NotLink([string]$Path) {

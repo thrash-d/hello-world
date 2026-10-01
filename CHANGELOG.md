@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-10-01: Improve permission check comments and add diagnostic output
+
+Version 1.5.11. Better observability and code clarity for permission verification.
+
+Changes:
+- Enhanced comments in `Assert-AdminOnly` explaining ACL logic and the purpose of each check (owner, Allow ACEs, InheritOnly propagation flags).
+- Better comments in parent folder checks explaining why they're needed and what happens at drive root.
+- Add diagnostic output: `Assert-AdminOnlyTree` now reports how many items were checked and confirms all parents are admin-only.
+- Clearer error message guidance ("Restrict write access to administrators only").
+
+These improvements help administrators understand permission check output during installation and aid debugging if issues arise.
+
+Not tested: install.ps1 not run on Windows. `python test_hello.py` passes.
+
 ## 2026-10-01: Harden Git environment and improve error messages
 
 Version 1.5.10. Additional security and usability improvements.
