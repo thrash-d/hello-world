@@ -10,7 +10,9 @@ it starts without them.
 #>
 $ErrorActionPreference = 'Stop'
 # A 32-bit PowerShell sees Program Files (x86) and the 32-bit registry.
-if (-not [Environment]::Is64BitProcess) { throw 'Run this from 64-bit PowerShell.' }
+if (-not [Environment]::Is64BitProcess) {
+    Write-Host 'Run this from 64-bit PowerShell.' -ForegroundColor Red; Read-Host 'Press Enter to close'; exit 1
+}
 $dir = Join-Path $env:ProgramFiles 'hello-world'
 
 # Settings > Apps starts this without elevation, so ask for it.
@@ -31,8 +33,10 @@ try {
     Set-Location $env:SystemRoot
     [Environment]::CurrentDirectory = $env:SystemRoot
     # The Apps entry runs $dir\uninstall.ps1, so it is the way to try again:
-    # it and its folder go last, after the .new and .old folders an interrupted
-    # install can leave, and the shortcut and Apps entry go after that.
+    # it and its folder go late, after the shortcut, which a failure can leave
+    # harmlessly, and the Apps entry goes last.
+    $lnk = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'hello-world.lnk'
+    if (Test-Path -LiteralPath $lnk) { Remove-Item -LiteralPath $lnk }
     foreach ($f in "$dir.new", "$dir.old") {
         if (Test-Path -LiteralPath $f) { Remove-Item -LiteralPath $f -Recurse -Force }
     }
@@ -41,10 +45,8 @@ try {
             Remove-Item -Recurse -Force
         Remove-Item -LiteralPath $dir -Recurse -Force
     }
-    foreach ($f in (Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'hello-world.lnk'),
-            'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\hello-world') {
-        if (Test-Path -LiteralPath $f) { Remove-Item -LiteralPath $f }
-    }
+    $key = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\hello-world'
+    if (Test-Path -LiteralPath $key) { Remove-Item -LiteralPath $key }
     'hello-world is uninstalled.'
 }
 catch { Write-Host "Uninstall failed: $_" -ForegroundColor Red }

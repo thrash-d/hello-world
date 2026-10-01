@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-10-01: Remove the shortcut before the install folder and show the 64-bit message
+
+The sixteenth review, of 1.4.3, answered here. Version 1.4.4. It found no Critical or High issues, 1 Medium and 4 Low; saved in `reviews/round-16.md`.
+
+- `uninstall.ps1` removes the shortcut first, the folders next and the Apps entry last. The review said (L1): "The retry gap moved rather than closed... remove the shortcut before the folder, since it almost never fails and a leftover one is harmless. Then remove the folder, then the Apps entry last."
+- The 64-bit check in `uninstall.ps1` prints its message and waits for Enter instead of throwing before the `try`. The review said (L2): "If it ever fired, the window would close immediately and nobody would see the message."
+
+Declined: the Windows trial run (M1, process, already in `BACKLOG.md`), creating the setup folder under `Program Files` (L3, added to `BACKLOG.md`; it fails closed), and the `C:\ProgramData\Git` config (L4, the reviewer agreed with the existing entry).
+
+Tested: `python test_hello.py` passes on Linux. Not tested: `install.ps1` and `uninstall.ps1`, which weren't run or even parsed (`pwsh` isn't installed here). The new uninstall order and the 64-bit message need a Windows machine.
+
 ## 2026-10-01: Keep uninstall.ps1 until last and install the Apps entry before the shortcut
 
 The fifteenth review, of 1.4.2, answered here. Version 1.4.3. It found no Critical or High issues, 1 Medium and 6 Low; saved in `reviews/round-15.md`. The reviewer's fixes were kept to what each finding asked for.
