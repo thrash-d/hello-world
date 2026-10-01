@@ -42,3 +42,4 @@ Changes considered and declined, with the reason.
 - Review `uninstall.ps1` with the reviewer (twenty-second review L2): left out on purpose; it was read by hand in round 20.
 - Elevation for the Uninstall button, again (twenty-second review L3): same as the twentieth review entry above.
 - Re-check the Start Menu folder ACL and `$new` after the test run (twenty-second review L5): the first is listed from the seventeenth review, and the second adds little after the tree check.
+- Pilot install, `ProgramData\Git` hardening step, admin-config note and Python pin reminder, again (twenty-third review L1, L2, Info): same as the eleventh, nineteenth and twelfth review entries above.
