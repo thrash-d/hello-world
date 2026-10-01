@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-10-01: Add section headers and clarify installation flow
+
+Version 1.5.12. Improved code organization and navigation.
+
+Changes:
+- Added clear section headers marking major phases of installation:
+  - RECOVERY: Handle interrupted installations
+  - VERIFICATION: Validate the setup environment
+  - COMMIT VERIFICATION: Ensure correct commit
+  - DOWNLOAD AND BUILD: Fetch Python and build
+  - FINALIZATION: Register installation
+- Headers make it easier to navigate the script and understand the sequence of checks and operations.
+
+Not tested: install.ps1 not run on Windows. `python test_hello.py` passes.
+
 ## 2026-10-01: Improve permission check comments and add diagnostic output
 
 Version 1.5.11. Better observability and code clarity for permission verification.

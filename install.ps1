@@ -179,6 +179,7 @@ function Rename-Retry([string]$Path, [string]$NewName) {
     }
 }
 
+# === RECOVERY: Handle interrupted installations ===
 # An interrupted swap leaves the old install as the only good copy. Restore it
 # before any check or download that could fail and leave the PC without one.
 $new = "$dir.new"
@@ -192,6 +193,7 @@ if (-not (Test-Path -LiteralPath $dir) -and (Test-Path -LiteralPath $old)) {
     else { Write-Warning "$old has no hello.cmd, so it isn't restored. This run installs fresh." }
 }
 
+# === VERIFICATION: Validate the setup environment ===
 # PATH can list folders employees can write, and a git or icacls found there
 # would run as admin. Call both by full path.
 $icacls = Join-Path $sys32 'icacls.exe'
@@ -228,6 +230,7 @@ catch { throw "Couldn't start the install log (is a transcript already running i
 Write-Host "Logging to $(Join-Path $PSScriptRoot 'install.log')"
 try {
 
+# === COMMIT VERIFICATION: Ensure the clone is at the reviewed commit ===
 # The ACL checks show nobody else can change the clone. This shows the clone is
 # the reviewed commit, so a moved tag or an edited file fails here.
 # git also finds a repository in a parent folder, so require .git here.
@@ -245,6 +248,7 @@ foreach ($f in 'install.ps1', 'uninstall.ps1', 'hello.py', 'VERSION') {
     }
 }
 
+# === DOWNLOAD AND BUILD: Fetch Python, build, and test in isolation ===
 # Download into the clone, which only administrators can change, and check the
 # hash before the old install is touched. The zip is deleted afterward.
 Write-Host "Downloading $pyUrl"
@@ -312,6 +316,7 @@ finally {
     if (Test-Path -LiteralPath $new) { try { Remove-Tree $new } catch { Write-Warning "Couldn't remove $new. The next run clears it." } }
 }
 
+# === FINALIZATION: Register the installation in Windows settings and Start menu ===
 # Added only after the checks pass. The entry in Settings > Apps, whose Uninstall button runs uninstall.ps1.
 $key = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\hello-world'
 New-Item $key -Force | Out-Null
