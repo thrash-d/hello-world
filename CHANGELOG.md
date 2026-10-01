@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-09-30: Run git and icacls by full path
+
+The seventh review, of 1.1.0, answered here. Version 1.2.0.
+
+- `install.ps1` runs git from the all-users Git for Windows install, read from `HKLM\SOFTWARE\GitForWindows`, and refuses when that's missing or outside Program Files. It runs icacls from System32. The review said: "Commit and blob checks are only as strong as the `git.exe` that answers `rev-parse` / `hash-object`. Admin `PATH` can still start with a user-writable directory." The risk was larger than a lying git: anything the installer finds on PATH runs as admin. That applies to icacls too.
+- The help example calls both tools by full path, clones `v1.2.0`, and says to pass the full commit hash, never a tag name. The review said: "Keep using the full hash, not the tag name, in `-Commit`."
+
+The review withdrew the sign-extension finding.
+
+Tested with a fake `git.cmd` first on PATH that printed the expected commit. Given a wrong `-Commit`, the installer's check still refused, because it used the pinned git. The right commit was accepted and a wrong one refused. No bare `git` or `icacls` calls are left in the script.
+
 ## 2026-09-30: Require the reviewed commit and a locked clone folder
 
 The sixth review, of the v1.0.0 tree, answered here. Version 1.1.0.

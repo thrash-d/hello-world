@@ -17,10 +17,12 @@ hello.cmd pins the interpreter's path.
 The full commit hash that was reviewed. The clone must be at this commit.
 
 .EXAMPLE
-$d = 'C:\ProgramData\hello-setup'; New-Item -ItemType Directory $d; icacls $d /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F'; git clone --branch v1.1.0 --depth 1 https://github.com/thrash-d/hello-world $d; cd $d; .\install.ps1 -Commit <reviewed commit hash>
+$d = 'C:\ProgramData\hello-setup'; New-Item -ItemType Directory $d; & "$env:SystemRoot\System32\icacls.exe" $d /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F'; & "$env:ProgramFiles\Git\cmd\git.exe" clone --branch v1.2.0 --depth 1 https://github.com/thrash-d/hello-world $d; cd $d; .\install.ps1 -Commit <reviewed commit hash>
 
 Locks the setup folder before cloning into it, so nobody else can add files
-to the clone, then installs the reviewed commit.
+to the clone, then installs the reviewed commit. Pass the full commit hash,
+never a tag name. The tools run by full path for the same reason the
+installer pins them.
 #>
 #Requires -RunAsAdministrator
 param([Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$Commit)
@@ -48,6 +50,14 @@ function Assert-AdminOnly([string]$Path, [int64]$Rights) {
     if ($others) { throw "Non-administrators can change $Path ($($others -join ', ')). Copy the installer to a folder only administrators can write." }
 }
 
+# PATH can list folders employees can write, and a git or icacls found there
+# would run as admin. Call both by full path.
+$icacls = "$env:SystemRoot\System32\icacls.exe"
+$git = "$((Get-ItemProperty HKLM:\SOFTWARE\GitForWindows -ErrorAction SilentlyContinue).InstallPath)\cmd\git.exe"
+if (-not $git.StartsWith("$env:ProgramFiles\") -or -not (Test-Path $git)) {
+    throw "Need Git for Windows installed for all users under $env:ProgramFiles. Found: '$git'"
+}
+
 # The installer runs as admin, so whoever can swap its files or folders runs
 # code as admin. Check the files, then every folder up to the root. Nobody else
 # may add files to the clone itself, or they could plant git objects that
@@ -57,10 +67,10 @@ for ($p = (Get-Item $PSScriptRoot).Parent; $p; $p = $p.Parent) { Assert-AdminOnl
 
 # The ACL checks show nobody else can change the clone. This shows the clone is
 # the reviewed commit, so a moved tag or an edited file fails here.
-$head = git -C $PSScriptRoot rev-parse HEAD
+$head = & $git -C $PSScriptRoot rev-parse HEAD
 if ($LASTEXITCODE -or $head -ne $Commit) { throw "Source is at '$head', not the reviewed commit $Commit." }
 foreach ($f in 'install.ps1', 'hello.py') {
-    if ((git -C $PSScriptRoot hash-object $f) -ne (git -C $PSScriptRoot rev-parse "HEAD:$f")) { throw "$f differs from commit $Commit." }
+    if ((& $git -C $PSScriptRoot hash-object $f) -ne (& $git -C $PSScriptRoot rev-parse "HEAD:$f")) { throw "$f differs from commit $Commit." }
 }
 
 # py -3 also picks per-user installs, which the employee can replace, so pin
@@ -81,7 +91,7 @@ if (Test-Path $dir) { Remove-Item $dir -Recurse -Force }
 New-Item -ItemType Directory $dir | Out-Null
 # Drop inherited entries. Administrators and SYSTEM get full control, Users
 # get read and run. Files created below inherit this.
-icacls $dir /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-545:(OI)(CI)RX' | Out-Null
+& $icacls $dir /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-545:(OI)(CI)RX' | Out-Null
 if ($LASTEXITCODE) { throw "icacls failed on $dir" }
 
 Copy-Item (Join-Path $PSScriptRoot 'hello.py') $dir
