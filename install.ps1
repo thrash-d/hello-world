@@ -37,11 +37,14 @@ never a tag name. The tools run by full path for the same reason the
 installer pins them. Windows clients block scripts by default, so the
 example allows them for this PowerShell window only. If a Group Policy sets
 the execution policy, that line errors and the policy decides.
-To install again, delete the setup folder first (cd out of it, for example
-`cd \`, because Windows won't delete a window's current folder; then
-Remove-Item -Recurse -Force $d, because git leaves read-only files in .git; $d is set by the
-example's first line, so in a new window type the folder's path instead), so the example's New-Item and
-clone work a second time. The installer upgrades an existing install in place.
+To install again, delete the setup folder first, so the example's New-Item and
+clone work a second time. Run each line on its own, in the same window as the
+example (in a new window, type the folder's path in place of $d):
+cd \
+Remove-Item -Recurse -Force $d
+The cd is needed because Windows won't delete a window's current folder, and
+-Force because git leaves read-only files in .git.
+The installer upgrades an existing install in place.
 
 .NOTES
 The permission checks on Git for Windows can take several minutes, so let them finish.
@@ -95,7 +98,7 @@ function Assert-AdminOnly([string]$Path, [int64]$Rights) {
 # clone, and the installed Python. Nobody but administrators may change
 # anything in the tree, and nobody may swap out a folder above it.
 function Assert-AdminOnlyTree([string]$Root) {
-    Write-Host "Checking permissions under $Root (this can take a minute)"
+    Write-Host "Checking permissions under $Root (this can take several minutes on Git for Windows)"
     foreach ($i in @(Get-Item -LiteralPath $Root -Force) + @(Get-ChildItem -LiteralPath $Root -Recurse -Force)) {
         # A link's own ACL says nothing about its target.
         if ($i.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "$($i.FullName) is a link." }
