@@ -33,3 +33,6 @@ Changes considered and declined, with the reason.
 - A desktop shortcut for every user: typing "hello" in the Start menu finds the Start menu shortcut, and desktop icons pile up on shared machines. Add one if employees ask.
 - Check the ACL of the Start Menu Programs folder after creating the shortcut (seventeenth review L2): the default ACLs on `C:\ProgramData` may not pass the parent check, and I can't test that here. Try it in the Windows trial run first.
 - Read the architecture from `[RuntimeInformation]` instead of `$env:PROCESSOR_ARCHITECTURE` (eighteenth review L2): an emulated x64 process on ARM64 reports a different value there, I can't test it here, and the machines are x64. The check fails safe.
+- Show account names instead of SIDs in the permission errors, and explain `ProgramData\Git` in the help (nineteenth review L5): the SIDs identify the group, and the check fails closed. Add it if an install stops there.
+- Clear `HOME` and `XDG_CONFIG_HOME` before calling git (nineteenth review L6): they come from the admin's own session, the same reason as the Git config entries above.
+- Walk the tree without recursing into links (nineteenth review L8): only administrators can place links there, and the walk fails closed.

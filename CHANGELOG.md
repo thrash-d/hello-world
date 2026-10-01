@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-10-01: Log the failure, and delete folders without following links
+
+The nineteenth review, of 1.5.2, answered here. Version 1.5.3. It found no Critical or High issues, 2 Medium and 6 Low; saved in `reviews/round-19.md`.
+
+- A `catch` before the final `finally` writes the error to the transcript, and `Stop-Transcript` can no longer replace it. The review said (M2): "A failed run's error message probably never reaches install.log."
+- A new `Remove-Tree` refuses a link at the root and deletes with `cmd /c rmdir /s /q`, which doesn't follow links inside the tree. It replaces the three recursive deletes, and the cleanup in `finally` now checks `$new` too. The review said (L3): "Two recursive deletes still have no link check."
+- The comment on the log says it covers the steps after the checks, and the script prints the log path. The review said (L4): "The header comment says the log is 'a record of what this run checked and did', which overstates it."
+- The `.NOTES` line that began with `.old` is reflowed, and the Antivirus comment sits above `Rename-Retry` again. The review said (L7): "A wrapped line begins with `.old folders`... This was misplaced when Assert-NotLink was inserted."
+
+Declined, all added to `BACKLOG.md`: a trial run before rollout (M1, process, already listed); SID names in errors and help for `ProgramData\Git` (L5); clearing `HOME` and `XDG_CONFIG_HOME` (L6); a link-aware tree walk (L8).
+
+Tested: `python test_hello.py` passes on Linux. Not tested: `install.ps1`, which wasn't run or parsed (`pwsh` isn't installed here). `Remove-Tree` and its `rmdir` quoting, the `catch` output in the transcript, and the `Get-Help` parse of `.NOTES` need a Windows machine.
+
 ## 2026-10-01: Open the install log only after the setup folder is checked, and stop it
 
 The eighteenth review, of 1.5.1, answered here. Version 1.5.2. It found no Critical or High issues, 2 Medium and 5 Low; saved in `reviews/round-18.md`.

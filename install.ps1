@@ -42,8 +42,8 @@ clone work a second time. The installer upgrades an existing install in place.
 
 .NOTES
 Employees open hello-world from the Start menu. To uninstall, use Settings >
-Apps > Installed apps > hello-world > Uninstall. That also removes the .new and
-.old folders an interrupted run can leave. The setup folder isn't needed after
+Apps > Installed apps > hello-world > Uninstall. That also removes the folders
+named .new and .old that an interrupted run can leave. The setup folder isn't needed after
 a successful install and can be deleted, along with install.log, the record of
 the run, so copy the log first if you want to keep it.
 #>
@@ -103,12 +103,19 @@ function Assert-AdminOnlyTree([string]$Root) {
     }
 }
 
-# Antivirus scans and a running hello.cmd can hold a file open for a moment,
-# and Windows won't rename a folder with an open file in it.
 function Assert-NotLink([string]$Path) {
     if ((Get-Item -LiteralPath $Path -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "$Path is a link." }
 }
 
+# cmd's rmdir removes a link inside the tree without following it.
+function Remove-Tree([string]$Path) {
+    Assert-NotLink $Path
+    & (Join-Path $sys32 'cmd.exe') /c rmdir /s /q "`"$Path`""
+    if ($LASTEXITCODE) { throw "Couldn't remove $Path" }
+}
+
+# Antivirus scans and a running hello.cmd can hold a file open for a moment,
+# and Windows won't rename a folder with an open file in it.
 function Rename-Retry([string]$Path, [string]$NewName) {
     for ($try = 1; ; $try++) {
         try { Rename-Item -LiteralPath $Path -NewName $NewName; return }
@@ -147,9 +154,11 @@ Get-ChildItem Env: | Where-Object Name -like 'GIT_*' | ForEach-Object { Remove-I
 # Covers .git too, so nobody can plant git objects that fool the commit check.
 Assert-AdminOnlyTree $PSScriptRoot
 
-# A record of what this run checked and did. Opened only now that the setup
-# folder is known to be admin-only, and stopped in the last finally below.
+# A record of the steps from here on; the checks above print to the console
+# only. Opened only now that the setup folder is known to be admin-only, and
+# stopped in the last finally below.
 Start-Transcript -LiteralPath (Join-Path $PSScriptRoot 'install.log') -Append | Out-Null
+Write-Host "Logging to $(Join-Path $PSScriptRoot 'install.log')"
 try {
 
 # The ACL checks show nobody else can change the clone. This shows the clone is
@@ -186,7 +195,7 @@ try {
     # Build and test the new install beside the old one, so a failure leaves
     # the working install alone. Both sit in Program Files, which only
     # administrators can write to.
-    foreach ($leftover in $new, $old) { if (Test-Path -LiteralPath $leftover) { Assert-NotLink $leftover; Remove-Item -LiteralPath $leftover -Recurse -Force } }
+    foreach ($leftover in $new, $old) { if (Test-Path -LiteralPath $leftover) { Remove-Tree $leftover } }
     New-Item -ItemType Directory $new | Out-Null
     # Drop inherited entries. Administrators and SYSTEM get full control, Users
     # get read and run. Files created below inherit this.
@@ -226,13 +235,13 @@ try {
     }
     # The new install is live now, so a leftover .old is only a warning.
     if ($hadOld) {
-        try { Remove-Item -LiteralPath $old -Recurse -Force }
+        try { Remove-Tree $old }
         catch { Write-Warning "Installed, but couldn't remove $old. The next run clears it." }
     }
 }
 finally {
     Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
-    Remove-Item -LiteralPath "$dir.new" -Recurse -Force -ErrorAction SilentlyContinue
+    if (Test-Path -LiteralPath $new) { try { Remove-Tree $new } catch { Write-Warning "Couldn't remove $new. The next run clears it." } }
 }
 
 # Added only after the checks pass. The entry in Settings > Apps, whose Uninstall button runs uninstall.ps1.
@@ -267,4 +276,6 @@ catch { Remove-Item -LiteralPath $lnk -Force -ErrorAction SilentlyContinue; thro
 
 "Installed to $dir. hello.py SHA-256: $hash (it differs between LF and CRLF checkouts; the -Commit check is what pins the source)"
 }
-finally { Stop-Transcript | Out-Null }
+# The host prints a script's error only after this finally, so write it to the log first.
+catch { Write-Host "FAILED: $($_ | Out-String)"; throw }
+finally { Stop-Transcript -ErrorAction SilentlyContinue | Out-Null }
