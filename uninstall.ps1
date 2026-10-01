@@ -9,6 +9,8 @@ Uninstall command in Settings > Apps. It asks for administrator rights when
 it starts without them.
 #>
 $ErrorActionPreference = 'Stop'
+# A 32-bit PowerShell sees Program Files (x86) and the 32-bit registry.
+if (-not [Environment]::Is64BitProcess) { throw 'Run this from 64-bit PowerShell.' }
 $dir = Join-Path $env:ProgramFiles 'hello-world'
 
 # Settings > Apps starts this without elevation, so ask for it.
@@ -19,12 +21,18 @@ if (-not $me.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     exit
 }
 
-# Windows won't delete a folder that is the current directory.
-Set-Location $env:SystemRoot
-Remove-Item (Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'hello-world.lnk') -ErrorAction SilentlyContinue
-Remove-Item 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\hello-world' -ErrorAction SilentlyContinue
-# The .new and .old folders exist only after an interrupted install.
-foreach ($f in $dir, "$dir.new", "$dir.old") {
-    if (Test-Path -LiteralPath $f) { Remove-Item -LiteralPath $f -Recurse -Force }
+# The elevated window closes when the script ends, so hold it open to show the result.
+try {
+    # Windows won't delete a folder that is the current directory.
+    Set-Location $env:SystemRoot
+    # Folders first. The Apps entry is the way to try again, so it goes last.
+    # The .new and .old folders exist only after an interrupted install.
+    foreach ($f in $dir, "$dir.new", "$dir.old") {
+        if (Test-Path -LiteralPath $f) { Remove-Item -LiteralPath $f -Recurse -Force }
+    }
+    Remove-Item -LiteralPath (Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'hello-world.lnk') -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\hello-world' -ErrorAction SilentlyContinue
+    'hello-world is uninstalled.'
 }
-'hello-world is uninstalled.'
+catch { Write-Host "Uninstall failed: $_" -ForegroundColor Red }
+finally { Read-Host 'Press Enter to close' }

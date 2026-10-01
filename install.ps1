@@ -207,10 +207,10 @@ $lnk = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'hello-world.l
 $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk)
 $shortcut.TargetPath = "$env:SystemRoot\System32\cmd.exe"
 $shortcut.Arguments = "/c `"`"$dir\hello.cmd`" & pause`""
-$shortcut.WorkingDirectory = $dir
+# Not $dir: a window left open there is a current directory, and Windows won't
+# rename or delete a folder that one is in.
+$shortcut.WorkingDirectory = $env:SystemRoot
 $shortcut.Save()
-# Every employee opens this shortcut, so only administrators may change it.
-Assert-AdminOnly $lnk $edit
 
 # The entry in Settings > Apps, whose Uninstall button runs uninstall.ps1.
 $key = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\hello-world'
@@ -223,5 +223,9 @@ $entry = @{
 }
 foreach ($name in $entry.Keys) { New-ItemProperty $key -Name $name -Value $entry[$name] -Force | Out-Null }
 foreach ($name in 'NoModify', 'NoRepair') { New-ItemProperty $key -Name $name -Value 1 -PropertyType DWord -Force | Out-Null }
+
+# Every employee opens this shortcut, so only administrators may change it.
+# Checked last, so a failure still leaves an Uninstall button.
+Assert-AdminOnly $lnk $edit
 
 "Installed to $dir. hello.py SHA-256: $hash"
