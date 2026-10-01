@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-10-01: Say "several minutes" where the operator sees it, and set the reinstall commands on their own lines
+
+The twenty-fourth review, of 1.5.7, answered here. Version 1.5.8. It found no Critical, High or Medium issues, 3 Low; saved in `reviews/round-24.md`. Only a console message and help text changed.
+
+- The permission-check message now says "this can take several minutes on Git for Windows". The review said (L1): "An operator who never runs `Get-Help` will see a silent window and may kill the run."
+- The reinstall help puts `cd \` and `Remove-Item -Recurse -Force $d` on their own lines and explains them after. The review said (L2): "A comma directly after `$d` is easy to paste into the shell. `$d,` would be parsed as an array."
+
+Declined:
+- Checking that the help parses with `Get-Help` (L3): process, already in `BACKLOG.md` from the eleventh review. The reviewer says it isn't a new finding.
+- Reviewing `uninstall.ps1` (scope note): left out of the reviewer's files on purpose, listed from the twenty-second review.
+- The pinned Python URL and hash (Info): fails closed, and the pilot install is already listed.
+
+Tested: `python test_hello.py` passes on Linux. Not tested: `install.ps1`, which wasn't run or parsed (`pwsh` isn't installed here). The edits are one string in a `Write-Host` and the comment-based help; that the script still parses and `Get-Help` still shows the example needs a Windows machine.
+
 ## 2026-10-01: Name the folder to delete, and warn the Git check is slow
 
 The twenty-third review, of 1.5.6, answered here. Version 1.5.7. It found no Critical, High or Medium issues, 3 Low and 4 Info; saved in `reviews/round-23.md`. Only help text changed.
