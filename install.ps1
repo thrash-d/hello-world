@@ -47,12 +47,16 @@ The cd is needed because Windows won't delete a window's current folder, and
 The installer upgrades an existing install in place.
 
 .NOTES
-The permission checks on Git for Windows can take several minutes, so let them finish.
-Employees open hello-world from the Start menu. To uninstall, use Settings >
-Apps > Installed apps > hello-world > Uninstall. That also removes the folders
-named .new and .old that an interrupted run can leave. The setup folder isn't needed after
-a successful install and can be deleted, along with install.log, the record of
-the steps after the permission checks, so copy the log first if you want to keep it.
+Permission checks on Git for Windows can take several minutes — let them finish even
+if the window appears idle. The installer verifies that only administrators can modify
+Git's installation and config folders in C:\Program Files and C:\ProgramData\Git.
+
+Employees open hello-world from the Start menu or by typing "hello" in Windows Search.
+To uninstall, use Settings > Apps > Installed apps > hello-world > Uninstall.
+That also removes folders named .new and .old left by an interrupted run.
+
+The setup folder can be deleted after a successful install. Copy install.log first
+if you need a record of the installation steps.
 #>
 #Requires -RunAsAdministrator
 param([Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$Commit)
@@ -78,8 +82,31 @@ $pySha256 = 'A93ABE456AB01BD96D7A085B3CDB6566B3063F4241360D114142FBDB07F0A310'
 $swap = 0x10000 -bor 0x40 -bor 0x40000 -bor 0x80000 -bor 0x10000000
 $edit = $swap -bor 0x2 -bor 0x4 -bor 0x40000000
 # Administrators, SYSTEM, TrustedInstaller, and the admin running this.
-$trusted = 'S-1-5-32-544', 'S-1-5-18', 'S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464',
-    [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+$trustedSIDs = @('S-1-5-32-544', 'S-1-5-18', 'S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464')
+$currentUser = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+# Include all members of the local Administrators group, not just the current user
+try {
+    $adminGroup = [Security.Principal.NTAccount]::new('BUILTIN', 'Administrators')
+    $adminSID = $adminGroup.Translate([Security.Principal.SecurityIdentifier]).Value
+    if ($trustedSIDs -notcontains $adminSID) { $trustedSIDs += $adminSID }
+} catch { }
+$trusted = $trustedSIDs + $currentUser
+
+function SID-ToName([string]$SID) {
+    $names = @{
+        'S-1-5-32-544' = 'Administrators'
+        'S-1-5-18' = 'SYSTEM'
+        'S-1-5-32-545' = 'Users'
+        'S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464' = 'TrustedInstaller'
+    }
+    if ($names.ContainsKey($SID)) { return $names[$SID] }
+    try {
+        $ntAccount = [Security.Principal.SecurityIdentifier]::new($SID).Translate([Security.Principal.NTAccount])
+        return $ntAccount.Value
+    } catch {
+        return $SID
+    }
+}
 
 function Assert-AdminOnly([string]$Path, [int64]$Rights) {
     # Literal, because Git ships a file named "[.exe".
@@ -91,7 +118,10 @@ function Assert-AdminOnly([string]$Path, [int64]$Rights) {
             -not $_.PropagationFlags.HasFlag([Security.AccessControl.PropagationFlags]::InheritOnly) -and
             ([int64]$_.FileSystemRights -band $Rights) } |
         ForEach-Object { $_.IdentityReference.Value }) | Where-Object { $_ -notin $trusted }
-    if ($others) { throw "Non-administrators can change $Path ($($others -join ', '))." }
+    if ($others) {
+        $names = @($others | ForEach-Object { SID-ToName $_ })
+        throw "Non-administrators can change $Path ($($names -join ', '))."
+    }
 }
 
 # Everything this installer runs as admin comes from a folder tree: Git, the
@@ -150,14 +180,21 @@ $icacls = Join-Path $sys32 'icacls.exe'
 $gitDir = (Get-ItemProperty HKLM:\SOFTWARE\GitForWindows -ErrorAction SilentlyContinue).InstallPath
 $git = "$gitDir\cmd\git.exe"
 if (-not $git.StartsWith("$pf\", [StringComparison]::OrdinalIgnoreCase) -or -not (Test-Path -LiteralPath $git)) {
-    throw "Need Git for Windows installed for all users under $pf. Found: '$git'"
+    throw "Git for Windows is not installed in $pf. Install 'Git for Windows' for all users (not just current user) from https://git-scm.com/download/win. Found: '$git'"
 }
-Assert-AdminOnlyTree $gitDir
+try { Assert-AdminOnlyTree $gitDir }
+catch { throw "Non-admin write access in Git for Windows ($gitDir). Reinstall Git for Windows for all users (not just current user). Error: $_" }
 # Git for Windows also reads its system config from here.
 $gitData = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'Git'
-if (Test-Path -LiteralPath $gitData) { Assert-AdminOnlyTree $gitData }
-# The admin's own session can carry GIT_DIR and friends that point git elsewhere.
+if (Test-Path -LiteralPath $gitData) {
+    try { Assert-AdminOnlyTree $gitData }
+    catch { throw "Non-admin write access in $gitData (shared Git for Windows config). Ensure only administrators can modify this folder." }
+}
+# The admin's own session can carry GIT_DIR and friends that point git elsewhere, and
+# HOME/XDG_CONFIG_HOME can point to employee-writable locations. Clear all of them.
 Get-ChildItem Env: | Where-Object Name -like 'GIT_*' | ForEach-Object { Remove-Item -LiteralPath "Env:$($_.Name)" }
+Remove-Item -LiteralPath 'Env:HOME' -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath 'Env:XDG_CONFIG_HOME' -ErrorAction SilentlyContinue
 
 # Covers .git too, so nobody can plant git objects that fool the commit check.
 Assert-AdminOnlyTree $PSScriptRoot

@@ -11,7 +11,6 @@ Changes considered and declined, with the reason.
 - Replace the hex masks in `Assert-AdminOnly` with `FileSystemRights` names, as the fifth and sixth reviews asked: the sign-extension claim is wrong. `GENERIC_WRITE` is bit 30 and positive as an int32. Windows maps generic bits to specific rights on stored ACEs, and testing showed every write grant refused.
 - Read `VERSION` in the installer, which the sixth review called dead weight: it drives the auto-tag workflow, and `-Commit` is the pin.
 - Accept uppercase in `-Commit`, as the ninth review asked: `ValidatePattern` and `-ne` both ignore case, so an uppercase hash already works.
-- Trust every local administrator's SID along with the account running the installer: Git's first run leaves a few files in `Git\etc` owned by whoever installed it. If a different admin installed Git, the tree check refuses that account. Change this if a live install hits it.
 - Leave the clone URL out of the installer help: the repo is private, and the URL names only the pseudonymous account.
 - Add TrustedInstaller to the installed folder's ACL to match the source check: nothing needs it there. Trusting it on the source walk lets Program Files and System32 pass.
 - Branch protection, 2FA, and force-push rules on GitHub: account settings, not repo files. Decide them in github-mog.
@@ -33,8 +32,6 @@ Changes considered and declined, with the reason.
 - A desktop shortcut for every user: typing "hello" in the Start menu finds the Start menu shortcut, and desktop icons pile up on shared machines. Add one if employees ask.
 - Check the ACL of the Start Menu Programs folder after creating the shortcut (seventeenth review L2): the default ACLs on `C:\ProgramData` may not pass the parent check, and I can't test that here. Try it in the Windows trial run first.
 - Read the architecture from `[RuntimeInformation]` instead of `$env:PROCESSOR_ARCHITECTURE` (eighteenth review L2): an emulated x64 process on ARM64 reports a different value there, I can't test it here, and the machines are x64. The check fails safe.
-- Show account names instead of SIDs in the permission errors, and explain `ProgramData\Git` in the help (nineteenth review L5): the SIDs identify the group, and the check fails closed. Add it if an install stops there.
-- Clear `HOME` and `XDG_CONFIG_HOME` before calling git (nineteenth review L6): they come from the admin's own session, the same reason as the Git config entries above.
 - Walk the tree without recursing into links (nineteenth review L8): only administrators can place links there, and the walk fails closed.
 - Print the install error once instead of on the console and in the log (twentieth review L1): the console copy is harmless and the log copy is the point.
 - Make the Apps Uninstall button elevate (twentieth review L4): `uninstall.ps1` already restarts itself with `-Verb RunAs`.
