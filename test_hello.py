@@ -1,6 +1,7 @@
 import os
 import subprocess
 import sys
+import unittest
 
 HELLO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hello.py")
 
@@ -35,10 +36,18 @@ def test_dead_stdout_and_stderr_exits_1():
 
 def test_closed_stdout_exits_1():
     if os.name != "posix":
-        print("SKIPPED test_closed_stdout_exits_1: needs preexec_fn, posix only")
-        return
+        raise unittest.SkipTest("needs preexec_fn, posix only")
     p = subprocess.run([sys.executable, HELLO], stdout=subprocess.DEVNULL,
                        stderr=subprocess.PIPE, preexec_fn=lambda: os.close(1))
+    assert p.returncode == 1
+    assert p.stderr.startswith(b"hello.py: cannot write to stdout:")
+
+
+def test_stdout_closed_after_start_exits_1():
+    # sys.stdout.close() makes print() raise ValueError, not OSError
+    code = ("import runpy, sys; sys.stdout.close(); "
+            f"runpy.run_path({HELLO!r}, run_name='__main__')")
+    p = subprocess.run([sys.executable, "-c", code], stderr=subprocess.PIPE)
     assert p.returncode == 1
     assert p.stderr.startswith(b"hello.py: cannot write to stdout:")
 
@@ -46,5 +55,8 @@ def test_closed_stdout_exits_1():
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):
-            fn()
+            try:
+                fn()
+            except unittest.SkipTest as e:
+                print(f"SKIPPED {name}: {e}")
     print("ok")

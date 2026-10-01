@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-10-01: Restore an interrupted swap before any check, and make the tests report skips
+
+The twelfth review, of 1.3.2, answered here. Version 1.3.3. It found no Critical or High issues, 2 Medium and 5 Low; saved in `reviews/round-12.md`.
+
+- The installer restores `hello-world.old` as `hello-world` right after the helper functions, before the Git, ACL, commit and download steps. The review said (M1): "Interrupted-swap recovery runs too late, so an offline or failed run leaves the workstation with no install." It uses `Rename-Retry`, as the review asked.
+- A skipped test raises `unittest.SkipTest`, and the plain runner prints `SKIPPED <name>: <reason>`. The review said (M2): "pytest captures stdout and reports the test as passed."
+- New test `test_stdout_closed_after_start_exits_1` covers the `ValueError` path. The review said (L1): "The new `except (OSError, ValueError)` path has no regression test." Checked by reverting `hello.py` to catch only `OSError`: the test fails.
+- `Get-FileHash` and `Copy-Item` take `-LiteralPath`. The review said (L2): "Wildcard-interpreting cmdlets are used on paths that could contain `[`."
+- The help notes that a Group Policy execution policy makes the `Set-ExecutionPolicy` line error. The review said (L7): "Mention that in the help."
+
+Declined, and added to `BACKLOG.md`: the slow permission walk and long paths (L3), checking `.old` before restoring it (L4), the uninstall line's `SilentlyContinue` (L5), and the Python patch reminder (L6). The informational notes need no change.
+
+Tested: `python test_hello.py` passes on Linux. Not tested: all of `install.ps1`. `pwsh` isn't installed here, so it wasn't even parsed. The earlier recovery, the `-LiteralPath` changes, and the help text need a Windows workstation.
+
 ## 2026-10-01: Recover an interrupted swap, retry the rename, and keep a late failure from failing the install
 
 The eleventh review, of 1.3.1, answered here. Version 1.3.2. It found no Critical or High issues; saved in `reviews/round-11.md`.
