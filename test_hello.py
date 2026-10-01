@@ -7,17 +7,39 @@ import unittest
 
 HELLO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hello.py")
 
+# Imports hello.py, sets its test values from argv[2], and runs it with the
+# remaining arguments. hello.py itself reads no test settings from anywhere.
+LAUNCH = (
+    "import importlib.util, json, sys\n"
+    "spec = importlib.util.spec_from_file_location('hello', sys.argv[1])\n"
+    "hello = importlib.util.module_from_spec(spec)\n"
+    "spec.loader.exec_module(hello)\n"
+    "for name, value in json.loads(sys.argv[2]).items():\n"
+    "    setattr(hello, name, value)\n"
+    "sys.argv = sys.argv[1:2] + sys.argv[3:]\n"
+    "sys.exit(hello.main())\n"
+)
+
+
+def launch(args=(), prelude="", **values):
+    # UTF-8 mode, because on Windows a child reads piped text in the console's
+    # code page, which differs between PowerShell and Git Bash.
+    return [sys.executable, "-X", "utf8", "-c", prelude + LAUNCH, HELLO,
+            json.dumps(values), *args]
+
 
 def run(args=(), text=None, day="2026-10-01", home=None, startup=None):
-    """Run hello.py with its own data folder. text is typed at the prompts."""
+    """Run hello.py with its own data folder. text is typed at the prompts.
+
+    Without text, stdin is the null device, so the result doesn't depend on
+    what the test runner's own stdin is.
+    """
     home = home or tempfile.mkdtemp()
-    env = dict(os.environ, HELLO_HOME=home, HELLO_TODAY=day)
-    if startup:
-        env["HELLO_STARTUP_DIR"] = startup
-    if text is not None:
-        env["HELLO_INTERACTIVE"] = "1"
-    p = subprocess.run([sys.executable, HELLO, *args], input=text,
-                       capture_output=True, text=True, env=env)
+    values = {"TODAY": day, "HOME": home, "STARTUP_DIR": startup,
+              "FORCE_INTERACTIVE": text is not None}
+    stdin = {"input": text} if text is not None else {"stdin": subprocess.DEVNULL}
+    p = subprocess.run(launch(args, **values), capture_output=True,
+                       encoding="utf-8", **stdin)
     p.home = home
     return p
 
@@ -32,10 +54,9 @@ def dead_pipe(args=(), dead_stderr=False):
     r, w = os.pipe()
     os.close(r)
     try:
-        return subprocess.run([sys.executable, HELLO, *args], stdout=w,
+        return subprocess.run(launch(args, HOME=tempfile.mkdtemp()), stdout=w,
                               stderr=w if dead_stderr else subprocess.PIPE,
-                              stdin=subprocess.DEVNULL,
-                              env=dict(os.environ, HELLO_HOME=tempfile.mkdtemp()))
+                              stdin=subprocess.DEVNULL)
     finally:
         os.close(w)
 
@@ -67,11 +88,29 @@ def test_output_is_plain_ascii_and_short():
 
 
 def test_no_prompts_and_no_waiting_without_a_person():
-    p = run()  # stdin is not a terminal here
+    # stdin is the null device, which Windows also reports as a terminal
+    p = run()
     assert p.returncode == 0 and "> " not in p.stdout
     assert p.stdout.startswith("Hello, world!")
     # nothing is recorded, so the next real visit still gets its questions
     assert not os.path.exists(os.path.join(p.home, "notes.json"))
+
+
+def test_hello_variables_in_the_environment_are_ignored():
+    home = tempfile.mkdtemp()
+    env = dict(os.environ, HELLO_HOME=home, HELLO_TODAY="2000-01-01",
+               HELLO_INTERACTIVE="1")
+    p = subprocess.run([sys.executable, HELLO, "--stats"], capture_output=True,
+                       text=True, stdin=subprocess.DEVNULL, env=env)
+    assert p.returncode == 0 and home not in p.stdout
+    assert not os.listdir(home)
+
+
+def test_other_errors_are_not_reported_as_a_dead_stdout():
+    p = run(day="not a date")
+    assert p.returncode == 1
+    assert "something went wrong (ValueError)" in p.stderr
+    assert "cannot write to stdout" not in p.stderr
 
 
 def test_opening_again_the_same_day_asks_nothing_new():
@@ -298,9 +337,8 @@ def test_dead_stdout_and_stderr_exits_1():
 def test_closed_stdout_exits_1():
     if os.name != "posix":
         raise unittest.SkipTest("needs preexec_fn, posix only")
-    p = subprocess.run([sys.executable, HELLO], stdout=subprocess.DEVNULL,
+    p = subprocess.run(launch(HOME=tempfile.mkdtemp()), stdout=subprocess.DEVNULL,
                        stderr=subprocess.PIPE, stdin=subprocess.DEVNULL,
-                       env=dict(os.environ, HELLO_HOME=tempfile.mkdtemp()),
                        preexec_fn=lambda: os.close(1))
     assert p.returncode == 1
     assert p.stderr.startswith(b"hello.py: cannot write to stdout:")
@@ -308,27 +346,28 @@ def test_closed_stdout_exits_1():
 
 def test_stdout_closed_after_start_exits_1():
     # sys.stdout.close() makes print() raise ValueError, not OSError
-    code = ("import runpy, sys; sys.stdout.close(); "
-            f"runpy.run_path({HELLO!r}, run_name='__main__')")
-    p = subprocess.run([sys.executable, "-c", code], stderr=subprocess.PIPE,
-                       stdin=subprocess.DEVNULL,
-                       env=dict(os.environ, HELLO_HOME=tempfile.mkdtemp()))
+    p = subprocess.run(launch(prelude="sys_ = __import__('sys'); sys_.stdout.close()\n",
+                              HOME=tempfile.mkdtemp()),
+                       stderr=subprocess.PIPE, stdin=subprocess.DEVNULL)
     assert p.returncode == 1
     assert p.stderr.startswith(b"hello.py: cannot write to stdout:")
 
 
 if __name__ == "__main__":
-    failed = 0
+    import traceback
+    failed = []
     for name, fn in list(globals().items()):
         if name.startswith("test_"):
             try:
                 fn()
             except unittest.SkipTest as e:
                 print(f"SKIPPED {name}: {e}")
-            except AssertionError:
-                failed += 1
+            # Any exception counts as a failure, and the remaining tests still run.
+            except Exception:
+                failed.append(name)
                 print(f"FAILED {name}")
-                import traceback
                 traceback.print_exc()
-    print("FAILED" if failed else "ok")
-    sys.exit(1 if failed else 0)
+    if failed:
+        print(f"FAILED {len(failed)}: {', '.join(failed)}")
+        sys.exit(1)
+    print("ok")

@@ -28,8 +28,10 @@ management tool can run the installer unattended. It never asks questions.
 .EXAMPLE
 $tag = 'v1.6.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
-$d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"; New-Item -ItemType Directory $d
-$icacls = "$([Environment]::SystemDirectory)\icacls.exe"; $git = (Get-ItemProperty HKLM:\SOFTWARE\GitForWindows).InstallPath + '\cmd\git.exe'
+$d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
+New-Item -ItemType Directory $d
+$icacls = "$([Environment]::SystemDirectory)\icacls.exe"
+$git = (Get-ItemProperty HKLM:\SOFTWARE\GitForWindows).InstallPath + '\cmd\git.exe'
 & $icacls $d /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F'
 & $git clone -b $tag --depth 1 https://github.com/thrash-d/hello-world $d
 cd $d; Set-ExecutionPolicy -Scope Process Bypass -Force
@@ -70,9 +72,25 @@ if you need a record of the installation steps.
 #Requires -RunAsAdministrator
 param([Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$Commit, [switch]$Quiet)
 $ErrorActionPreference = 'Stop'
+# The admin runs this in their own window and keeps using it afterward, for a
+# reinstall's git clone among other things. Save what this script changes in
+# the window's process, and put it back on every way out: the trap below and
+# the last finally.
+$savedEnv = @{}
+foreach ($name in @('HOME', 'XDG_CONFIG_HOME', 'GIT_CONFIG_NOSYSTEM') + @(Get-ChildItem Env: | Where-Object Name -like 'GIT_*' | ForEach-Object Name)) {
+    $savedEnv[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
+}
+$savedTls = [Net.ServicePointManager]::SecurityProtocol
+function Restore-Window {
+    # A $null value removes the variable, so one that didn't exist stays gone.
+    foreach ($name in @(Get-ChildItem Env: | Where-Object Name -like 'GIT_*' | ForEach-Object Name) + @($savedEnv.Keys)) {
+        [Environment]::SetEnvironmentVariable($name, $savedEnv[$name], 'Process')
+    }
+    [Net.ServicePointManager]::SecurityProtocol = $savedTls
+}
 # A failure before the log starts prints one plain line, not PowerShell's error
 # block with its line numbers. A failure after that is reported by the catch below.
-trap { Write-Host "FAILED: $($_.Exception.Message)" -ForegroundColor Red; exit 1 }
+trap { Write-Host "FAILED: $($_.Exception.Message)" -ForegroundColor Red; Restore-Window; exit 1 }
 # Progress lines for the person running this. -Quiet hides them; the log keeps them.
 function Write-Step([string]$Text) { if (-not $Quiet) { Write-Host $Text -ForegroundColor Cyan } }
 function Write-Info([string]$Text) { if (-not $Quiet) { Write-Host $Text } }
@@ -98,15 +116,8 @@ $pySha256 = 'A93ABE456AB01BD96D7A085B3CDB6566B3063F4241360D114142FBDB07F0A310'
 $swap = 0x10000 -bor 0x40 -bor 0x40000 -bor 0x80000 -bor 0x10000000
 $edit = $swap -bor 0x2 -bor 0x4 -bor 0x40000000
 # Administrators, SYSTEM, TrustedInstaller, and the admin running this.
-$trustedSIDs = @('S-1-5-32-544', 'S-1-5-18', 'S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464')
-$currentUser = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-# Include all members of the local Administrators group, not just the current user
-try {
-    $adminGroup = [Security.Principal.NTAccount]::new('BUILTIN', 'Administrators')
-    $adminSID = $adminGroup.Translate([Security.Principal.SecurityIdentifier]).Value
-    if ($trustedSIDs -notcontains $adminSID) { $trustedSIDs += $adminSID }
-} catch { }
-$trusted = $trustedSIDs + $currentUser
+$trusted = 'S-1-5-32-544', 'S-1-5-18', 'S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464',
+    [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 
 function SID-ToName([string]$SID) {
     $names = @{
@@ -389,4 +400,4 @@ Write-Info 'Next: open hello-world from the Start menu to check it. The setup fo
 }
 # The host prints a script's error only after the finally below, so write it to the log first.
 catch { Write-Host "FAILED: $($_.Exception.Message)" -ForegroundColor Red; Write-Host 'The steps above and this message are in install.log in the setup folder.'; exit 1 }
-finally { Stop-Transcript -ErrorAction SilentlyContinue | Out-Null }
+finally { Stop-Transcript -ErrorAction SilentlyContinue | Out-Null; Restore-Window }

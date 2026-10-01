@@ -255,15 +255,20 @@ MAX_FILE = 1_000_000
 YES = ("y", "yes", "yep", "ya", "yeah", "done")
 NO = ("n", "no", "nope", "not yet")
 
+# The tests set these after importing the module, to run against a fixed date,
+# a temporary folder, and typed input. Nothing outside the program sets them.
+TODAY = None
+HOME = None
+STARTUP_DIR = None
+FORCE_INTERACTIVE = False
+
+
+class OutputClosed(Exception):
+    """Writing to stdout failed, so nothing more can be shown."""
+
 
 def today():
-    value = os.environ.get("HELLO_TODAY")
-    if value:
-        try:
-            return datetime.date.fromisoformat(value)
-        except ValueError:
-            pass
-    return datetime.date.today()
+    return datetime.date.fromisoformat(TODAY) if TODAY else datetime.date.today()
 
 
 def long_date(d):
@@ -271,9 +276,8 @@ def long_date(d):
 
 
 def data_dir():
-    home = os.environ.get("HELLO_HOME")
-    if home:
-        return home
+    if HOME:
+        return HOME
     if os.name == "nt":
         base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
         return os.path.join(base, "hello-world")
@@ -286,7 +290,7 @@ def data_file():
 
 
 def startup_file():
-    folder = os.environ.get("HELLO_STARTUP_DIR")
+    folder = STARTUP_DIR
     if not folder and os.name == "nt" and os.environ.get("APPDATA"):
         folder = os.path.join(os.environ["APPDATA"], "Microsoft", "Windows",
                               "Start Menu", "Programs", "Startup")
@@ -374,7 +378,10 @@ def save(state):
 
 
 def say(text=""):
-    print(text, flush=True)
+    try:
+        print(text, flush=True)
+    except (OSError, ValueError) as e:
+        raise OutputClosed(e) from e
 
 
 def indent(text):
@@ -383,9 +390,22 @@ def indent(text):
 
 
 def interactive():
-    if os.environ.get("HELLO_INTERACTIVE") == "1":
+    if FORCE_INTERACTIVE:
         return True
-    return sys.stdin is not None and sys.stdin.isatty()
+    if sys.stdin is None or not sys.stdin.isatty():
+        return False
+    if os.name != "nt":
+        return True
+    # Windows calls the NUL device a terminal too. Only a real console has a
+    # console mode, so ask for one.
+    import ctypes
+    import msvcrt
+    try:
+        handle = msvcrt.get_osfhandle(sys.stdin.fileno())
+    except (OSError, ValueError):
+        return False
+    mode = ctypes.c_ulong()
+    return bool(ctypes.windll.kernel32.GetConsoleMode(handle, ctypes.byref(mode)))
 
 
 def ask(prompt):
@@ -617,7 +637,7 @@ def run(argv):
     if argv in (["/?"], ["-?"], ["/help"], ["-help"], ["help"]):
         argv = ["--help"]
     if argv == ["--plain"]:
-        print("Hello, world!", flush=True)
+        say("Hello, world!")
         return 0
     if argv == ["--help"] or argv == ["-h"]:
         say(HELP)
@@ -660,13 +680,17 @@ def main():
         # print() silently does nothing when stdout is None (fd 1 closed at start).
         # A stdout object that was closed later raises ValueError instead.
         if sys.stdout is None:
-            raise OSError("stdout is closed")
+            raise OutputClosed("stdout is closed")
         # A console that can't show a typed character prints ? instead of failing.
         for stream in (sys.stdout, sys.stderr):
             if stream is not None and hasattr(stream, "reconfigure"):
-                stream.reconfigure(errors="replace")
+                try:
+                    stream.reconfigure(errors="replace")
+                except (OSError, ValueError) as e:
+                    if stream is sys.stdout:
+                        raise OutputClosed(e) from e
         return run(sys.argv[1:])
-    except (OSError, ValueError) as e:
+    except OutputClosed as e:
         try:
             print(f"hello.py: cannot write to stdout: {e} "
                   "(contact IT if this keeps happening)", file=sys.stderr,

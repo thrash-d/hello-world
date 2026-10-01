@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-10-01: Fix the console check on Windows and leave the admin's window as it was
+
+Version 1.7.1. A Windows test run of 1.7.0 found these. The scheduled review rounds can't run PowerShell or Windows Python, so none of them had been seen.
+
+- `hello.py` no longer treats the NUL device as a person at the keyboard. Windows reports NUL as a terminal, so a run with its input from NUL printed every question and recorded the day as a visit, which used up that day's plan question. It now also asks Windows for a console mode, which only a real console has. Two tests failed under pytest on Windows because of this.
+- The tests no longer depend on the runner's own stdin. A run with no typed text now gets the null device explicitly. Before, it inherited the runner's stdin, so pytest (which points it at NUL) failed two tests that the plain runner, started from a shell with a pipe for stdin, passed. The plain runner was already exiting 1 on a failed assert; it now also counts any other exception as a failure, keeps running the remaining tests, and lists every failed test before exiting 1.
+- `install.ps1` puts the admin's window back the way it found it, on success, on an early failure, and on a failure after the log starts. It had left `GIT_CONFIG_NOSYSTEM` set and `HOME`, `XDG_CONFIG_HOME` and the admin's `GIT_*` variables deleted. Git in that window then lost Git for Windows' system config, including `credential.helper = manager`, so the README's reinstall, which clones the private repo again in the same window, would ask for a username and password. The TLS setting it widens is restored too.
+- The tests run the program in Python's UTF-8 mode and exchange text with it as UTF-8. On Windows a child process reads piped text in the console's code page, which is UTF-8 in a PowerShell window and cp1252 in Git Bash, while the test wrote cp1252. So the non-English plan test and the pasted-spaces test passed from Git Bash and failed from PowerShell, on Python 3.13 and on the bundled 3.14.8. Employees type into a real console, which Python reads as Unicode, so the program itself was not affected.
+- `hello.py` reads no `HELLO_*` environment variables. The test date, data folder, Startup folder and typed input are module values that the tests set after importing it. A new test checks that the variables are ignored.
+- Only a failed write to stdout is reported as "cannot write to stdout". Other errors now give "something went wrong" with the error type. Before, any `OSError` or `ValueError` anywhere in the program got the stdout message. A new test covers it.
+- Removed the `install.ps1` block commented as adding every member of the local Administrators group. It only looked up the Administrators group's own SID, which was already in the list, so it changed nothing.
+- The paste-in steps in the `install.ps1` help and the README have no line over 90 characters. The `$icacls`/`$git` line was 132 characters, and the setup folder line 99; both are now two lines each.
+
+Tested on Windows:
+- Tests: 35 pass and the POSIX-only test skips on Python 3.13 and on the bundled Python 3.14.8, from PowerShell 7, Windows PowerShell 5.1 and Git Bash, with the plain runner (stdin from NUL) and with pytest. The three new tests fail against the 1.7.0 `hello.py`, and the plain runner then lists every failure and exits 1.
+- `install.ps1` under Windows PowerShell 5.1, in one window with `HOME`, `XDG_CONFIG_HOME` and a `GIT_TRACE` set beforehand: a run that fails the setup folder check, a run that fails the commit check, and a successful install. After each, all three variables, `GIT_CONFIG_NOSYSTEM` (unset) and the TLS setting matched their values from before the run, and git still found `credential.helper = manager`. The installs used a test copy pointed at test folders, the current user's registry and a test Start menu folder, since the test account isn't an administrator.
+- The installed `hello.cmd` with stdin from NUL asks nothing, saves nothing and exits 0.
+- `uninstall.ps1`, from the same kind of test copy, removed the install folder, the shortcut, the Apps entry and a real sign-in launcher in the current user's Startup folder.
+- Not tested: typing into a real console, including non-English text; the real all-users Start menu, HKLM and the administrator prompt; more than one user profile; and the launcher at an actual sign-in.
+
 ## 2026-10-01: Make hello-world a daily-use program
 
 Version 1.7.0. Answers the business value read-through: "this program is for the user. this program must reinforce user retention." A behavioural design review (read-only) shaped it: lead with real value, keep counters quiet, be honest about privacy, and never shame.

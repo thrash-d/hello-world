@@ -48,15 +48,17 @@ delete the folder if you don't want it.
 
 ## For IT: install
 
-Run these in one elevated PowerShell window, each line on its own. Change the
+Run these in one PowerShell window opened as administrator, each line on its own. Change the
 first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
 $tag = 'v1.6.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
-$d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"; New-Item -ItemType Directory $d
-$icacls = "$([Environment]::SystemDirectory)\icacls.exe"; $git = (Get-ItemProperty HKLM:\SOFTWARE\GitForWindows).InstallPath + '\cmd\git.exe'
+$d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
+New-Item -ItemType Directory $d
+$icacls = "$([Environment]::SystemDirectory)\icacls.exe"
+$git = (Get-ItemProperty HKLM:\SOFTWARE\GitForWindows).InstallPath + '\cmd\git.exe'
 & $icacls $d /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F'
 & $git clone -b $tag --depth 1 https://github.com/thrash-d/hello-world $d
 cd $d; Set-ExecutionPolicy -Scope Process Bypass -Force
