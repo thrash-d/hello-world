@@ -7,7 +7,9 @@ Creates "Program Files\hello-world", where only Administrators and SYSTEM can
 write. Unpacks a pinned, hash-checked Python from python.org into it, copies
 hello.py there, and writes hello.cmd next to it. Employees run hello.cmd,
 which starts hello.py with that Python in isolated mode. The workstation needs
-Git for Windows and internet access, but no Python of its own.
+Git for Windows and internet access, but no Python of its own. Its guarantees
+hold only if the employees use standard accounts. A local administrator can
+change anything it protects.
 
 Run it from an elevated PowerShell on each workstation, from a git clone of a
 release tag in a folder only administrators can write. It refuses anything
@@ -36,9 +38,10 @@ example allows them for this PowerShell window only.
 
 .NOTES
 The setup folder isn't needed after a successful install. The installer makes
-nothing outside these two folders, so this elevated line uninstalls it:
+nothing outside the folders in this elevated line, which uninstalls it. The
+.new and .old folders exist only after an interrupted run.
 
-cd C:\; Remove-Item "$env:ProgramFiles\hello-world", C:\ProgramData\hello-setup -Recurse -Force
+cd C:\; Remove-Item "$env:ProgramFiles\hello-world", "$env:ProgramFiles\hello-world.new", "$env:ProgramFiles\hello-world.old", C:\ProgramData\hello-setup -Recurse -Force -ErrorAction SilentlyContinue
 #>
 #Requires -RunAsAdministrator
 param([Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$Commit)
@@ -92,6 +95,15 @@ function Assert-AdminOnlyTree([string]$Root) {
     }
 }
 
+# Antivirus scans and a running hello.cmd can hold a file open for a moment,
+# and Windows won't rename a folder with an open file in it.
+function Rename-Retry([string]$Path, [string]$NewName) {
+    for ($try = 1; ; $try++) {
+        try { Rename-Item -LiteralPath $Path -NewName $NewName; return }
+        catch { if ($try -ge 5) { throw }; Start-Sleep -Seconds 1 }
+    }
+}
+
 # PATH can list folders employees can write, and a git or icacls found there
 # would run as admin. Call both by full path.
 $icacls = "$env:SystemRoot\System32\icacls.exe"
@@ -136,6 +148,8 @@ try {
     # administrators can write to.
     $new = "$dir.new"
     $old = "$dir.old"
+    # An interrupted swap leaves the old install as the only good copy.
+    if (-not (Test-Path -LiteralPath $dir) -and (Test-Path -LiteralPath $old)) { Rename-Item -LiteralPath $old -NewName (Split-Path $dir -Leaf) }
     foreach ($leftover in $new, $old) { if (Test-Path -LiteralPath $leftover) { Remove-Item -LiteralPath $leftover -Recurse -Force } }
     New-Item -ItemType Directory $new | Out-Null
     # Drop inherited entries. Administrators and SYSTEM get full control, Users
@@ -164,13 +178,20 @@ try {
 
     # Swap in the new folder, and put the old one back if that fails.
     $hadOld = Test-Path -LiteralPath $dir
-    if ($hadOld) { Rename-Item -LiteralPath $dir -NewName (Split-Path $old -Leaf) }
-    try { Rename-Item -LiteralPath $new -NewName (Split-Path $dir -Leaf) }
+    if ($hadOld) { Rename-Retry $dir (Split-Path $old -Leaf) }
+    try { Rename-Retry $new (Split-Path $dir -Leaf) }
     catch {
-        if ($hadOld) { Rename-Item -LiteralPath $old -NewName (Split-Path $dir -Leaf) }
+        if ($hadOld) { Rename-Retry $old (Split-Path $dir -Leaf) }
         throw
     }
-    if ($hadOld) { Remove-Item -LiteralPath $old -Recurse -Force }
+    # The new install is live now, so a leftover .old is only a warning.
+    if ($hadOld) {
+        try { Remove-Item -LiteralPath $old -Recurse -Force }
+        catch { Write-Warning "Installed, but couldn't remove $old. The next run clears it." }
+    }
 }
-finally { Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue }
+finally {
+    Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath "$dir.new" -Recurse -Force -ErrorAction SilentlyContinue
+}
 "Installed to $dir. hello.py SHA-256: $hash"
