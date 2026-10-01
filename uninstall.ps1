@@ -60,9 +60,18 @@ try {
             catch { if ($try -ge 5) { throw }; Start-Sleep -Seconds 1 }
         }
     }
+    # Any user can turn on a sign-in reminder. Its launcher sits in that user's own
+    # Startup folder and would show an error at every sign-in once hello.cmd is gone.
+    $profiles = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\*' -ErrorAction SilentlyContinue).ProfileImagePath
+    foreach ($p in $profiles) {
+        if (-not $p) { continue }
+        $launcher = Join-Path ([Environment]::ExpandEnvironmentVariables($p)) 'AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\hello-world-daily.cmd'
+        Remove-Item -LiteralPath $launcher -Force -ErrorAction SilentlyContinue
+    }
     $key = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\hello-world'
     if (Test-Path -LiteralPath $key) { Remove-Item -LiteralPath $key }
     Write-Host 'hello-world is uninstalled.' -ForegroundColor Green
+    Write-Host 'Each user keeps their own saved notes in AppData\Local\hello-world. They can delete that folder if they want.'
 }
 catch {
     Write-Host "Uninstall failed: $($_.Exception.Message)" -ForegroundColor Red

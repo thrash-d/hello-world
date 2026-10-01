@@ -1,23 +1,49 @@
 # hello-world
 
-A small Python program that prints "Hello, world!", and the PowerShell
-installer that deploys it to Windows workstations.
+A small daily moment for employees, written in Python, and the PowerShell
+installer that deploys it to Windows workstations. It starts every day with
+"Hello, world!".
 
 ## What it is for
 
-Today the program is a pilot. Its job is to prove that IT can ship a program
-to employee PCs safely: a pinned source commit, a pinned and hash-checked
-Python, folders only administrators can change, a tested swap with rollback,
-and a clean uninstall. Employees get no benefit from the greeting itself. See
-`PLAN.md` for how it becomes a tool people use.
+hello-world is a small daily moment for the people who use it. Each time you
+open it, you get a greeting, one short thought, and one small thing to try
+that takes under five minutes. You can also write down one thing you want to
+get done today. The next day it asks, gently, whether you did it, and offers to
+keep it for today if you didn't.
+
+It is meant to be useful in under twenty seconds, which is why people keep
+opening it. It has no accounts, no network access, no scores and no reminders
+unless you ask for one.
 
 ## For employees
 
 Open **hello-world** from the Start menu, or type "hello-world" in Windows
-Search. A window shows the greeting and waits for a key. To remove it, use
-Settings > Apps > Installed apps > hello-world > Uninstall. Windows asks for an
-administrator password, and the prompt says "Windows PowerShell". That is
-expected. If you don't have the password, ask IT.
+Search. Read the screen, type a plan for the day if you want one, and press
+Enter to skip anything you don't want to answer. Press Enter again to close.
+
+- To see the options, type `m` at the last prompt. You can see exactly what is
+  saved, open hello-world once a day when you sign in, hide the "in a row"
+  line, or delete everything saved.
+- The "in a row" line shows only after the third visit. It counts a visit
+  within three days of the last one, so weekends and days off don't break it.
+  Turn it off in the options if you don't like it.
+- To remove the program, use Settings > Apps > Installed apps > hello-world >
+  Uninstall. Windows asks for an administrator password, and the prompt says
+  "Windows PowerShell". That is expected. If you don't have the password, ask
+  IT.
+
+### What is saved, and who can see it
+
+hello-world saves the dates you opened it and your current plan, in one small
+file, `notes.json`, in the `hello-world` folder under `AppData\Local` in your
+own user folder. It saves nothing else: no name, no computer name, no times.
+It makes no network connections and sends nothing to anyone. It does not report
+use to IT or to managers. Other people who can read the files on your computer,
+such as IT staff, could read that file, so don't type passwords or private
+details. Choose option 1 in the menu to see the file's contents, or option 4 to
+delete it. When the program is uninstalled, the file stays so you can keep it;
+delete the folder if you don't want it.
 
 ## For IT: install
 
@@ -35,6 +61,10 @@ $icacls = "$([Environment]::SystemDirectory)\icacls.exe"; $git = (Get-ItemProper
 cd $d; Set-ExecutionPolicy -Scope Process Bypass -Force
 .\install.ps1 -Commit $commit
 ```
+
+Employees can then turn on a once-a-day sign-in reminder themselves. It lives
+in their own Startup folder, needs no administrator rights, and the uninstaller
+removes it.
 
 The installer needs Git for Windows installed for all users and internet
 access. It checks six steps and prints `[1/6]` to `[6/6]` as it goes. The
@@ -67,7 +97,7 @@ it was.
 
 ## Files
 
-- `hello.py`: the program.
+- `hello.py`: the program. `hello.cmd --help` lists its options, such as `--plain`, which prints only the greeting and saves nothing.
 - `install.ps1`, `uninstall.ps1`: deploy and remove it.
 - `test_hello.py`: run with `python test_hello.py`.
 - `VERSION`: the release version; a new version on `main` gets a tag.

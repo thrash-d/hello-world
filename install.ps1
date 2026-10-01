@@ -6,7 +6,7 @@ Installs hello.py for all users in a folder only administrators can change.
 Creates "Program Files\hello-world", where only Administrators and SYSTEM can
 write. Unpacks a pinned, hash-checked Python from python.org into it, copies
 hello.py and uninstall.ps1 there, and writes hello.cmd next to them. hello.cmd
-starts hello.py with that Python in isolated mode. Adds a hello-world shortcut
+starts hello.py with that Python in isolated mode and passes its options on. Adds a hello-world shortcut
 to every user's Start menu and an entry with an Uninstall button to Settings >
 Apps. The workstation needs Git for Windows and internet access, but no Python
 of its own. Its guarantees hold only if the employees use standard accounts. A
@@ -302,7 +302,7 @@ try {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'hello.py'), (Join-Path $PSScriptRoot 'uninstall.ps1') -Destination $new
     # -I ignores PYTHON* variables and the user's site-packages, so nothing the
     # employee controls loads into the run.
-    Set-Content -LiteralPath (Join-Path $new 'hello.cmd') -Value '@"%~dp0python\python.exe" -I "%~dp0hello.py"' -Encoding ascii
+    Set-Content -LiteralPath (Join-Path $new 'hello.cmd') -Value '@"%~dp0python\python.exe" -I "%~dp0hello.py" %*' -Encoding ascii
 
     $hash = (Get-FileHash -LiteralPath (Join-Path $new 'hello.py')).Hash
     foreach ($f in 'hello.py', 'uninstall.ps1') {
@@ -316,7 +316,8 @@ try {
             $_.IdentityReference.Value -eq 'S-1-5-32-545' -and $_.FileSystemRights.HasFlag([Security.AccessControl.FileSystemRights]::ReadAndExecute) }
         if (-not $usersRX) { throw "Users can't read and run $f" }
     }
-    $out = & (Join-Path $new 'hello.cmd')
+    # --plain prints only the greeting and saves nothing, so the test leaves no notes in the admin's profile.
+    $out = & (Join-Path $new 'hello.cmd') --plain
     if ($LASTEXITCODE -or "$out" -ne 'Hello, world!') { throw "Test run failed with exit $LASTEXITCODE`: $out" }
 
     # Swap in the new folder, and put the old one back if that fails.
@@ -363,13 +364,13 @@ foreach ($name in $dwords.Keys) { New-ItemProperty $key -Name $name -Value $dwor
 
 # Added only after the checks pass, so a failed install never shows up in the
 # Start menu, and after the Apps entry, so a half-finished install still has
-# an Uninstall button. Run straight from Explorer, hello.cmd's window closes before
-# anyone can read it; the shortcut keeps it open until a key is pressed.
+# an Uninstall button. hello.py waits for Enter before it closes its window; the
+# shortcut adds a pause only when hello.cmd fails, so an error message stays readable.
 $lnk = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'hello-world.lnk'
 $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk)
 $shortcut.TargetPath = Join-Path $sys32 'cmd.exe'
-$shortcut.Arguments = "/d /c `"title hello-world & `"$dir\hello.cmd`" & pause`""
-$shortcut.Description = 'Prints Hello, world!'
+$shortcut.Arguments = "/d /c `"title hello-world & `"$dir\hello.cmd`" & if errorlevel 1 pause`""
+$shortcut.Description = 'A daily thought and one small thing to try'
 $shortcut.IconLocation = "$pyExe,0"
 # Not $dir: a window left open there is a current directory, and Windows won't
 # rename or delete a folder that one is in.

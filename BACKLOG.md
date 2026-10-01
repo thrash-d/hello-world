@@ -49,7 +49,11 @@ Changes considered and declined, with the reason.
 - Normalize the Git path with `GetFullPath` (twenty-fifth review L5): the registry value is admin-only.
 - Add WriteAttributes and WriteExtendedAttributes to the rights masks (twenty-fifth review L6): neither changes file contents.
 - Clean up a half-finished install, keep the original error when the restore fails, proxy support, Python pin process (twenty-fifth review L7, L8): same as the entries above, and a failed install is visible to the admin who ran it.
-- Make `hello.cmd` pause when double-clicked (usability review): the installer's test run and any console run capture its output, and a pause would hang both. The shortcut already pauses, and the README says what to open.
 - A one-step reinstall helper (usability review): a fresh clone of the reviewed release is the point of the design, so the README lists the steps instead.
 - Split the payload from the installer (value review): there is only one payload. Do it when a second tool exists, with both in hand and a Windows test run. See `PLAN.md`, phase 3.
 - Rename the elevation prompt in the uninstaller (usability review): Windows names the prompt after the program it starts, and the README says what to expect.
+- Visit counts, best streak and a record of whether plans were done (value review): a count is not value, and a performance record at work feels like being checked. Only the dates and the current plan are saved.
+- A sign-in reminder that is on by default (value review): an unrequested window at sign-in is intrusive on a work PC. It is opt-in, per user.
+- Usage reporting to IT, and feedback built into the program (value review): the program makes no network calls so people can trust it. Ask the employees directly.
+- Translations and tone settings (design review): add a language file when someone asks. The text is plain, short and ASCII.
+- A desktop icon, again (value review): same as the earlier entry. The Start menu entry and the opt-in sign-in launcher cover it.
