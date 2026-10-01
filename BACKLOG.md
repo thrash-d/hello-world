@@ -24,3 +24,10 @@ Changes considered and declined, with the reason.
 - Test `hello.cmd`, `-I`, and the ACLs in CI: CI runs on Linux, and the installer checks these itself on each workstation.
 - Commit the Python zip to the repo instead of downloading it: that's 12 MB of binary in history for each Python update, and the SHA-256 pinned in the reviewed commit gives the same guarantee.
 - Verify the zip's sigstore signature in the installer: it needs a sigstore client on every workstation, and the pinned hash was checked against the sigstore record when it was set.
+- Harden Git's environment and config, as the tenth review asked (clear `GIT_*`, `GIT_CONFIG_NOSYSTEM`, `--no-filters`, `core.autocrlf=false` on clone): the `GIT_*` part is declined above. `--no-filters` would refuse a clone with CRLF checkout, while the default clean filter makes the check match on either setting. Revisit `C:\ProgramData\Git\config` if the Git version in use predates its ownership check.
+- Test `LinkType` instead of the reparse-point attribute, and check parents for links: the attribute check fails closed, and a loosened check could let a real link through. Change it if a live install stops on a CompactOS file. Replacing a parent with a link needs rights the parent ACL check already refuses.
+- Proxy credentials, download retries, and Git's "dubious ownership" message: the install runs once per workstation, and failures are visible.
+- `exit /b %ERRORLEVEL%` in `hello.cmd`: the exit code already passes through, and the install test run checks it.
+- Run the tests on the pinned embeddable Python in CI: CI lives in `.github/`, which this routine doesn't change.
+- A transcript of the install in the setup folder: the console output is enough for five machines.
+- Patch reminders for the bundled Python and a scoped allow rule for it: process and Group Policy, not repo code. Updating means changing the URL and hash in `install.ps1`.

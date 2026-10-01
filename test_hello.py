@@ -33,6 +33,15 @@ def test_dead_stdout_and_stderr_exits_1():
     assert run(dead_stderr=True).returncode == 1
 
 
+def test_closed_stdout_exits_1():
+    if os.name != "posix":
+        return  # needs preexec_fn to close fd 1 before Python starts
+    p = subprocess.run([sys.executable, HELLO], stdout=subprocess.DEVNULL,
+                       stderr=subprocess.PIPE, preexec_fn=lambda: os.close(1))
+    assert p.returncode == 1
+    assert p.stderr.startswith(b"hello.py: cannot write to stdout:")
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):
