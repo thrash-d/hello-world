@@ -44,3 +44,5 @@ Changes considered and declined, with the reason.
 - Check the Git version or `C:\ProgramData\Git` for planted config (fourteenth review L4): same as the Git hardening entries above. The five machines run a current Git for Windows, and the reviewer's 2.35.2 cutoff was from memory.
 - A non-zero exit code and a `-Quiet` switch for `uninstall.ps1` (fifteenth review L3): it is run by hand from Settings > Apps on five machines. Add them if it is ever scripted.
 - Check `C:\ProgramData\Git` for planted config (fifteenth review L6): same as the Git hardening entries above; the reviewer agreed it isn't needed to deploy.
+- Create the setup folder under `Program Files` instead of `C:\ProgramData` (sixteenth review L3): the gap before `icacls` fails closed, since a planted file breaks the clone and the tree check.
+- Retry loop around the final folder removal in `uninstall.ps1` (sixteenth review L1, second option): the shortcut-first order covers the review's cheap fix, and re-running install repairs a dangling entry.
