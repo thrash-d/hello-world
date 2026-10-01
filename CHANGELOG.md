@@ -1,5 +1,33 @@
 # Changelog
 
+## 2026-10-01: Ask Windows for folders in install.ps1 and keep an install log
+
+Version 1.5.1. More backlog items cleared.
+
+- `install.ps1` gets Program Files, the Windows folder and the system folder from `[Environment]`, as `uninstall.ps1` does (eleventh review L8: "Use `GetFolderPath` instead of `$env:SystemRoot` and `$env:ProgramFiles`").
+- It refuses to swap if the install folder is a link (backlog: "Refuse a junction at `Program Files\hello-world` before deleting it").
+- It writes a transcript to `install.log` in the setup folder (backlog: "A transcript of the install in the setup folder").
+- The help example finds Git through the registry, as the script does (backlog: "Make the help example find Git through the registry like the script does").
+
+Tested: `python test_hello.py` passes on Linux. Not tested: `install.ps1`, which wasn't run or parsed (`pwsh` isn't installed here). The transcript and the `[Environment]` calls need a Windows machine.
+
+## 2026-10-01: Clear the backlog items that code can answer
+
+Version 1.5.0. A request to clear `BACKLOG.md`. Each item below was declined in an earlier round and is now removed from the backlog.
+
+- `install.ps1` clears every `GIT_*` environment variable before calling git (tenth review: "clear `GIT_*`").
+- `install.ps1` checks `C:\ProgramData\Git` with `Assert-AdminOnlyTree` when it exists (fourteenth review L4, fifteenth review L6).
+- `install.ps1` restores `.old` only if it holds `hello.cmd`, and warns if the restored folder doesn't (twelfth review L4, thirteenth review L1).
+- `install.ps1` retries the Python download 3 times and says the tree check can take a minute (thirteenth review L6, twelfth review L3).
+- The help example creates the setup folder under `Program Files`, not `C:\ProgramData` (sixteenth review L3).
+- The final line says the printed hello.py hash differs between LF and CRLF checkouts (seventeenth review L4).
+- `uninstall.ps1` takes `-Quiet`, which skips the Enter prompts, and exits 1 on failure (fifteenth review L3). It retries the install folder removal 5 times (sixteenth review L1, second option).
+- `hello.py` catches any exception on the stderr write, not just `OSError` and `ValueError` (ninth review). The tested case still can't happen; the change only widens the net.
+
+Still in `BACKLOG.md`, because code can't do them or the earlier reason stands: process and settings (the Windows trial run, hand-checked hash, Group Policy, GitHub account settings, Python patch reminders, CI under `.github/`), claims shown wrong (hex masks, uppercase `-Commit`), and changes that would loosen or untestably change a security check (`--no-filters`, trusting every admin's SID, `LinkType`, TrustedInstaller in the ACL, the Start Menu ACL check).
+
+Tested: `python test_hello.py` passes on Linux. Not tested: `install.ps1` and `uninstall.ps1`, which weren't run or parsed (`pwsh` isn't installed here). The `ProgramData\Git` check could refuse a machine whose default ACLs let Users create files there; the environment clearing, `.old` check, download retry, `-Quiet` argument passing and exit code all need a Windows machine.
+
 ## 2026-10-01: Ask Windows for folders in uninstall.ps1 and tighten the install checks
 
 The seventeenth review, of 1.4.4, answered here. Version 1.4.5. It found no Critical or High issues, 2 Medium and 4 Low; saved in `reviews/round-17.md`.

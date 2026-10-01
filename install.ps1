@@ -21,8 +21,8 @@ file changed since checkout.
 The full commit hash that was reviewed. The clone must be at this commit.
 
 .EXAMPLE
-$d = 'C:\ProgramData\hello-setup'; New-Item -ItemType Directory $d
-$icacls = "$env:SystemRoot\System32\icacls.exe"; $git = "$env:ProgramFiles\Git\cmd\git.exe"
+$d = "$env:ProgramFiles\hello-setup"; New-Item -ItemType Directory $d
+$icacls = "$env:SystemRoot\System32\icacls.exe"; $git = (Get-ItemProperty HKLM:\SOFTWARE\GitForWindows).InstallPath + '\cmd\git.exe'
 & $icacls $d /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F'
 & $git clone -b <release tag> --depth 1 https://github.com/thrash-d/hello-world $d
 cd $d; Set-ExecutionPolicy -Scope Process Bypass -Force
@@ -53,7 +53,13 @@ $ErrorActionPreference = 'Stop'
 if (-not [Environment]::Is64BitProcess) { throw 'Run this from 64-bit PowerShell.' }
 # The pinned Python is the amd64 build, which ARM64 Windows 10 can't run.
 if ($env:PROCESSOR_ARCHITECTURE -ne 'AMD64') { throw "Need an x64 PC, found $env:PROCESSOR_ARCHITECTURE." }
-$dir = Join-Path $env:ProgramFiles 'hello-world'
+# Ask Windows for the folders; the admin's own session can carry other values.
+$pf = [Environment]::GetFolderPath('ProgramFiles')
+$winDir = [Environment]::GetFolderPath('Windows')
+$sys32 = [Environment]::SystemDirectory
+$dir = Join-Path $pf 'hello-world'
+# A record of what this run checked and did, in the admin-only setup folder.
+Start-Transcript -LiteralPath (Join-Path $PSScriptRoot 'install.log') -Force | Out-Null
 
 # The Python hello.py runs on. To update it, change both values. The hash is
 # the SHA-256 recorded in the .sigstore file python.org publishes next to the zip.
@@ -86,7 +92,7 @@ function Assert-AdminOnly([string]$Path, [int64]$Rights) {
 # clone, and the installed Python. Nobody but administrators may change
 # anything in the tree, and nobody may swap out a folder above it.
 function Assert-AdminOnlyTree([string]$Root) {
-    Write-Host "Checking permissions under $Root"
+    Write-Host "Checking permissions under $Root (this can take a minute)"
     foreach ($i in @(Get-Item -LiteralPath $Root -Force) + @(Get-ChildItem -LiteralPath $Root -Recurse -Force)) {
         # A link's own ACL says nothing about its target.
         if ($i.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "$($i.FullName) is a link." }
@@ -111,17 +117,28 @@ function Rename-Retry([string]$Path, [string]$NewName) {
 # before any check or download that could fail and leave the PC without one.
 $new = "$dir.new"
 $old = "$dir.old"
-if (-not (Test-Path -LiteralPath $dir) -and (Test-Path -LiteralPath $old)) { Rename-Retry $old (Split-Path $dir -Leaf) }
+if (-not (Test-Path -LiteralPath $dir) -and (Test-Path -LiteralPath $old)) {
+    if (Test-Path -LiteralPath (Join-Path $old 'hello.cmd')) {
+        Rename-Retry $old (Split-Path $dir -Leaf)
+        if (-not (Test-Path -LiteralPath (Join-Path $dir 'hello.cmd'))) { Write-Warning "$dir has no hello.cmd after the restore." }
+    }
+    else { Write-Warning "$old has no hello.cmd, so it isn't restored. This run installs fresh." }
+}
 
 # PATH can list folders employees can write, and a git or icacls found there
 # would run as admin. Call both by full path.
-$icacls = "$env:SystemRoot\System32\icacls.exe"
+$icacls = Join-Path $sys32 'icacls.exe'
 $gitDir = (Get-ItemProperty HKLM:\SOFTWARE\GitForWindows -ErrorAction SilentlyContinue).InstallPath
 $git = "$gitDir\cmd\git.exe"
-if (-not $git.StartsWith("$env:ProgramFiles\", [StringComparison]::OrdinalIgnoreCase) -or -not (Test-Path -LiteralPath $git)) {
-    throw "Need Git for Windows installed for all users under $env:ProgramFiles. Found: '$git'"
+if (-not $git.StartsWith("$pf\", [StringComparison]::OrdinalIgnoreCase) -or -not (Test-Path -LiteralPath $git)) {
+    throw "Need Git for Windows installed for all users under $pf. Found: '$git'"
 }
 Assert-AdminOnlyTree $gitDir
+# Git for Windows also reads its system config from here.
+$gitData = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'Git'
+if (Test-Path -LiteralPath $gitData) { Assert-AdminOnlyTree $gitData }
+# The admin's own session can carry GIT_DIR and friends that point git elsewhere.
+Get-ChildItem Env: | Where-Object Name -like 'GIT_*' | ForEach-Object { Remove-Item -LiteralPath "Env:$($_.Name)" }
 
 # Covers .git too, so nobody can plant git objects that fool the commit check.
 Assert-AdminOnlyTree $PSScriptRoot
@@ -151,7 +168,10 @@ $zip = Join-Path $PSScriptRoot 'python-embed.zip'
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 $ProgressPreference = 'SilentlyContinue'
 try {
-    Invoke-WebRequest $pyUrl -OutFile $zip -UseBasicParsing -TimeoutSec 300
+    for ($try = 1; ; $try++) {
+        try { Invoke-WebRequest $pyUrl -OutFile $zip -UseBasicParsing -TimeoutSec 300; break }
+        catch { if ($try -ge 3) { throw }; Write-Warning "Download failed ($_). Trying again."; Start-Sleep -Seconds 5 }
+    }
     if ((Get-FileHash -LiteralPath $zip).Hash -ne $pySha256) { throw "The Python download doesn't match the pinned SHA-256." }
 
     # Build and test the new install beside the old one, so a failure leaves
@@ -189,6 +209,8 @@ try {
 
     # Swap in the new folder, and put the old one back if that fails.
     $hadOld = Test-Path -LiteralPath $dir
+    # Only administrators can plant a link here, but never delete through one.
+    if ($hadOld -and ((Get-Item -LiteralPath $dir -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw "$dir is a link." }
     if ($hadOld) { Rename-Retry $dir (Split-Path $old -Leaf) }
     try { Rename-Retry $new (Split-Path $dir -Leaf) }
     catch {
@@ -213,7 +235,7 @@ $entry = @{
     DisplayName     = 'hello-world'
     DisplayVersion  = (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'VERSION')).Trim()
     InstallLocation = $dir
-    UninstallString = "`"$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe`" -NoProfile -ExecutionPolicy Bypass -File `"$dir\uninstall.ps1`""
+    UninstallString = "`"$(Join-Path $sys32 'WindowsPowerShell\v1.0\powershell.exe')`" -NoProfile -ExecutionPolicy Bypass -File `"$dir\uninstall.ps1`""
 }
 foreach ($name in $entry.Keys) { New-ItemProperty $key -Name $name -Value $entry[$name] -Force | Out-Null }
 foreach ($name in 'NoModify', 'NoRepair') { New-ItemProperty $key -Name $name -Value 1 -PropertyType DWord -Force | Out-Null }
@@ -224,11 +246,11 @@ foreach ($name in 'NoModify', 'NoRepair') { New-ItemProperty $key -Name $name -V
 # anyone can read it; the shortcut keeps it open until a key is pressed.
 $lnk = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'hello-world.lnk'
 $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk)
-$shortcut.TargetPath = "$env:SystemRoot\System32\cmd.exe"
+$shortcut.TargetPath = Join-Path $sys32 'cmd.exe'
 $shortcut.Arguments = "/c `"`"$dir\hello.cmd`" & pause`""
 # Not $dir: a window left open there is a current directory, and Windows won't
 # rename or delete a folder that one is in.
-$shortcut.WorkingDirectory = $env:SystemRoot
+$shortcut.WorkingDirectory = $winDir
 $shortcut.Save()
 
 # Every employee opens this shortcut, so only administrators may change it.
@@ -236,4 +258,4 @@ $shortcut.Save()
 try { Assert-AdminOnly $lnk $edit }
 catch { Remove-Item -LiteralPath $lnk -Force -ErrorAction SilentlyContinue; throw }
 
-"Installed to $dir. hello.py SHA-256: $hash"
+"Installed to $dir. hello.py SHA-256: $hash (it differs between LF and CRLF checkouts; the -Commit check is what pins the source)"

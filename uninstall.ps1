@@ -6,12 +6,15 @@ entry in Settings > Apps.
 .DESCRIPTION
 install.ps1 copies this into the install folder and registers it as the
 Uninstall command in Settings > Apps. It asks for administrator rights when
-it starts without them.
+it starts without them. -Quiet skips the Press Enter prompts, and a failed
+uninstall exits with 1.
 #>
+param([switch]$Quiet)
 $ErrorActionPreference = 'Stop'
+function Wait-Close { if (-not $Quiet) { Read-Host 'Press Enter to close' } }
 # A 32-bit PowerShell sees Program Files (x86) and the 32-bit registry.
 if (-not [Environment]::Is64BitProcess) {
-    Write-Host 'Run this from 64-bit PowerShell.' -ForegroundColor Red; Read-Host 'Press Enter to close'; exit 1
+    Write-Host 'Run this from 64-bit PowerShell.' -ForegroundColor Red; Wait-Close; exit 1
 }
 # Settings > Apps starts this as a standard user, and the elevated copy can
 # inherit that user's environment variables, so ask Windows for the folders.
@@ -19,17 +22,18 @@ $winDir = [Environment]::GetFolderPath('Windows')
 $ps = Join-Path ([Environment]::SystemDirectory) 'WindowsPowerShell\v1.0\powershell.exe'
 $dir = Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'hello-world'
 if ($PSScriptRoot -ne $dir) {
-    Write-Host "Run this from $dir, not $PSScriptRoot." -ForegroundColor Red; Read-Host 'Press Enter to close'; exit 1
+    Write-Host "Run this from $dir, not $PSScriptRoot." -ForegroundColor Red; Wait-Close; exit 1
 }
 
 # Settings > Apps starts this without elevation, so ask for it.
 $me = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
 if (-not $me.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     try {
-        Start-Process $ps -Verb RunAs `
-            -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`""
+        $argList = '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`""
+        if ($Quiet) { $argList += '-Quiet' }
+        Start-Process $ps -Verb RunAs -ArgumentList $argList
     }
-    catch { Write-Host "Couldn't get administrator rights: $_" -ForegroundColor Red; Read-Host 'Press Enter to close' }
+    catch { Write-Host "Couldn't get administrator rights: $_" -ForegroundColor Red; Wait-Close }
     exit
 }
 
@@ -50,11 +54,16 @@ try {
     if (Test-Path -LiteralPath $dir) {
         Get-ChildItem -LiteralPath $dir -Force | Where-Object Name -ne 'uninstall.ps1' |
             Remove-Item -Recurse -Force
-        Remove-Item -LiteralPath $dir -Recurse -Force
+        # Antivirus can hold a file for a moment.
+        for ($try = 1; ; $try++) {
+            try { Remove-Item -LiteralPath $dir -Recurse -Force; break }
+            catch { if ($try -ge 5) { throw }; Start-Sleep -Seconds 1 }
+        }
     }
     $key = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\hello-world'
     if (Test-Path -LiteralPath $key) { Remove-Item -LiteralPath $key }
     'hello-world is uninstalled.'
 }
-catch { Write-Host "Uninstall failed: $_" -ForegroundColor Red }
-finally { Read-Host 'Press Enter to close' }
+catch { Write-Host "Uninstall failed: $_" -ForegroundColor Red; $failed = $true }
+finally { Wait-Close }
+if ($failed) { exit 1 }
