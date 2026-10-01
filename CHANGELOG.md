@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-10-01: Open the install log only after the setup folder is checked, and stop it
+
+The eighteenth review, of 1.5.1, answered here. Version 1.5.2. It found no Critical or High issues, 2 Medium and 5 Low; saved in `reviews/round-18.md`.
+
+- `install.ps1` starts the transcript after `Assert-AdminOnlyTree $PSScriptRoot`, with `-Append` instead of `-Force`. The review said (M1): "That refusal now comes after the elevated process has already written and truncated install.log there."
+- The script body after that point sits in a `try` whose `finally` calls `Stop-Transcript`. The review said (M2): "The transcript stays active in the admin's window after the script ends or throws... install.log stays open and locked." The body isn't re-indented, to keep the diff small.
+- A new `Assert-NotLink` refuses a link at `.old` before restoring it, at `.new` and `.old` before deleting them, and at the install folder before the swap. The review said (L1): "`Remove-Item -Recurse -Force`... with no reparse-point check."
+- The help example gets its folders from `[Environment]`. The review said (L2): "The help example still uses `$env:ProgramFiles` and `$env:SystemRoot`."
+- The notes say the log lives in the setup folder and goes with it (L3). The duplicate hello.py hash comparison is gone; the loop already checks it (L4).
+
+Declined: `$env:PROCESSOR_ARCHITECTURE` (L2, added to `BACKLOG.md`) and the pilot install and hash check (L5, process, already in `BACKLOG.md`).
+
+Tested: `python test_hello.py` passes on Linux. Not tested: `install.ps1`, which wasn't run or parsed (`pwsh` isn't installed here). The transcript start and stop, a second run in the same window, and `Assert-NotLink` need a Windows machine.
+
 ## 2026-10-01: Ask Windows for folders in install.ps1 and keep an install log
 
 Version 1.5.1. More backlog items cleared.
