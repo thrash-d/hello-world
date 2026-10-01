@@ -32,3 +32,4 @@ Changes considered and declined, with the reason.
 - Proxy credentials and Windows 10 builds before 1809 (thirteenth review L6): same as the proxy entry above. The install runs once per workstation, and failures are visible.
 - A desktop shortcut for every user: typing "hello" in the Start menu finds the Start menu shortcut, and desktop icons pile up on shared machines. Add one if employees ask.
 - Check the ACL of the Start Menu Programs folder after creating the shortcut (seventeenth review L2): the default ACLs on `C:\ProgramData` may not pass the parent check, and I can't test that here. Try it in the Windows trial run first.
+- Read the architecture from `[RuntimeInformation]` instead of `$env:PROCESSOR_ARCHITECTURE` (eighteenth review L2): an emulated x64 process on ARM64 reports a different value there, I can't test it here, and the machines are x64. The check fails safe.

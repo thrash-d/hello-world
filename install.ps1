@@ -21,8 +21,8 @@ file changed since checkout.
 The full commit hash that was reviewed. The clone must be at this commit.
 
 .EXAMPLE
-$d = "$env:ProgramFiles\hello-setup"; New-Item -ItemType Directory $d
-$icacls = "$env:SystemRoot\System32\icacls.exe"; $git = (Get-ItemProperty HKLM:\SOFTWARE\GitForWindows).InstallPath + '\cmd\git.exe'
+$d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"; New-Item -ItemType Directory $d
+$icacls = "$([Environment]::SystemDirectory)\icacls.exe"; $git = (Get-ItemProperty HKLM:\SOFTWARE\GitForWindows).InstallPath + '\cmd\git.exe'
 & $icacls $d /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F'
 & $git clone -b <release tag> --depth 1 https://github.com/thrash-d/hello-world $d
 cd $d; Set-ExecutionPolicy -Scope Process Bypass -Force
@@ -44,7 +44,8 @@ clone work a second time. The installer upgrades an existing install in place.
 Employees open hello-world from the Start menu. To uninstall, use Settings >
 Apps > Installed apps > hello-world > Uninstall. That also removes the .new and
 .old folders an interrupted run can leave. The setup folder isn't needed after
-a successful install and can be deleted.
+a successful install and can be deleted, along with install.log, the record of
+the run, so copy the log first if you want to keep it.
 #>
 #Requires -RunAsAdministrator
 param([Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$Commit)
@@ -58,8 +59,6 @@ $pf = [Environment]::GetFolderPath('ProgramFiles')
 $winDir = [Environment]::GetFolderPath('Windows')
 $sys32 = [Environment]::SystemDirectory
 $dir = Join-Path $pf 'hello-world'
-# A record of what this run checked and did, in the admin-only setup folder.
-Start-Transcript -LiteralPath (Join-Path $PSScriptRoot 'install.log') -Force | Out-Null
 
 # The Python hello.py runs on. To update it, change both values. The hash is
 # the SHA-256 recorded in the .sigstore file python.org publishes next to the zip.
@@ -106,6 +105,10 @@ function Assert-AdminOnlyTree([string]$Root) {
 
 # Antivirus scans and a running hello.cmd can hold a file open for a moment,
 # and Windows won't rename a folder with an open file in it.
+function Assert-NotLink([string]$Path) {
+    if ((Get-Item -LiteralPath $Path -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "$Path is a link." }
+}
+
 function Rename-Retry([string]$Path, [string]$NewName) {
     for ($try = 1; ; $try++) {
         try { Rename-Item -LiteralPath $Path -NewName $NewName; return }
@@ -119,6 +122,7 @@ $new = "$dir.new"
 $old = "$dir.old"
 if (-not (Test-Path -LiteralPath $dir) -and (Test-Path -LiteralPath $old)) {
     if (Test-Path -LiteralPath (Join-Path $old 'hello.cmd')) {
+        Assert-NotLink $old
         Rename-Retry $old (Split-Path $dir -Leaf)
         if (-not (Test-Path -LiteralPath (Join-Path $dir 'hello.cmd'))) { Write-Warning "$dir has no hello.cmd after the restore." }
     }
@@ -142,6 +146,11 @@ Get-ChildItem Env: | Where-Object Name -like 'GIT_*' | ForEach-Object { Remove-I
 
 # Covers .git too, so nobody can plant git objects that fool the commit check.
 Assert-AdminOnlyTree $PSScriptRoot
+
+# A record of what this run checked and did. Opened only now that the setup
+# folder is known to be admin-only, and stopped in the last finally below.
+Start-Transcript -LiteralPath (Join-Path $PSScriptRoot 'install.log') -Append | Out-Null
+try {
 
 # The ACL checks show nobody else can change the clone. This shows the clone is
 # the reviewed commit, so a moved tag or an edited file fails here.
@@ -177,7 +186,7 @@ try {
     # Build and test the new install beside the old one, so a failure leaves
     # the working install alone. Both sit in Program Files, which only
     # administrators can write to.
-    foreach ($leftover in $new, $old) { if (Test-Path -LiteralPath $leftover) { Remove-Item -LiteralPath $leftover -Recurse -Force } }
+    foreach ($leftover in $new, $old) { if (Test-Path -LiteralPath $leftover) { Assert-NotLink $leftover; Remove-Item -LiteralPath $leftover -Recurse -Force } }
     New-Item -ItemType Directory $new | Out-Null
     # Drop inherited entries. Administrators and SYSTEM get full control, Users
     # get read and run. Files created below inherit this.
@@ -191,8 +200,6 @@ try {
     Set-Content -LiteralPath (Join-Path $new 'hello.cmd') -Value '@"%~dp0python\python.exe" -I "%~dp0hello.py"' -Encoding ascii
 
     $hash = (Get-FileHash -LiteralPath (Join-Path $new 'hello.py')).Hash
-    if ($hash -ne (Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'hello.py')).Hash) { throw 'Installed hello.py differs from the source' }
-
     foreach ($f in 'hello.py', 'uninstall.ps1') {
         if ((Get-FileHash -LiteralPath (Join-Path $new $f)).Hash -ne (Get-FileHash -LiteralPath (Join-Path $PSScriptRoot $f)).Hash) { throw "Installed $f differs from the source" }
     }
@@ -210,7 +217,7 @@ try {
     # Swap in the new folder, and put the old one back if that fails.
     $hadOld = Test-Path -LiteralPath $dir
     # Only administrators can plant a link here, but never delete through one.
-    if ($hadOld -and ((Get-Item -LiteralPath $dir -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw "$dir is a link." }
+    if ($hadOld) { Assert-NotLink $dir }
     if ($hadOld) { Rename-Retry $dir (Split-Path $old -Leaf) }
     try { Rename-Retry $new (Split-Path $dir -Leaf) }
     catch {
@@ -259,3 +266,5 @@ try { Assert-AdminOnly $lnk $edit }
 catch { Remove-Item -LiteralPath $lnk -Force -ErrorAction SilentlyContinue; throw }
 
 "Installed to $dir. hello.py SHA-256: $hash (it differs between LF and CRLF checkouts; the -Commit check is what pins the source)"
+}
+finally { Stop-Transcript | Out-Null }
