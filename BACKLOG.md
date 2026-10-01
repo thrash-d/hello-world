@@ -41,3 +41,11 @@ Changes considered and declined, with the reason.
 - Re-check the Start Menu folder ACL and `$new` after the test run (twenty-second review L5): the first is listed from the seventeenth review, and the second adds little after the tree check.
 - Pilot install, `ProgramData\Git` hardening step, admin-config note and Python pin reminder, again (twenty-third review L1, L2, Info): same as the eleventh, nineteenth and twelfth review entries above.
 - Check the help with `Get-Help`, and review `uninstall.ps1` with the reviewer, again (twenty-fourth review L3, scope note): same as the eleventh and twenty-second review entries above.
+- Run the install cycle on a Windows VM, parse-check under 5.1, and review `uninstall.ps1` again (twenty-fifth review H3): same as the eleventh and twenty-second review entries above.
+- Verify Git before the documented `git clone` (twenty-fifth review M1): Git for Windows installs into Program Files, which is admin-only by default, and the installer checks it before using anything from the clone.
+- Set `GIT_CONFIG_GLOBAL=NUL` (twenty-fifth review M3): needs Git 2.32 or later and I can't test the Windows `NUL` handling here. The comment now says what is cleared. The admin's profile is admin-only.
+- Fail on `git status` output, alternates, or `commondir` (twenty-fifth review M4): only administrators can plant them, and the install copies only the files whose hashes were checked.
+- Reject links in parent folders, walk without descending into junctions, and `Set-Location` first (twenty-fifth review L1, L2, L4): same as the nineteenth and twenty-first review entries above. Git runs with `-C` on the clone.
+- Normalize the Git path with `GetFullPath` (twenty-fifth review L5): the registry value is admin-only.
+- Add WriteAttributes and WriteExtendedAttributes to the rights masks (twenty-fifth review L6): neither changes file contents.
+- Clean up a half-finished install, keep the original error when the restore fails, proxy support, Python pin process (twenty-fifth review L7, L8): same as the entries above, and a failed install is visible to the admin who ran it.
