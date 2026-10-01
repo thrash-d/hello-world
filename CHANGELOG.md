@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-30: Refuse with a clear message when no Python is registered
+
+Version 1.2.5. The third live install stopped with "Cannot bind argument to parameter 'Path' because it is null." No all-users Python was registered on that workstation while Python was being reinstalled. In Windows PowerShell 5.1, the empty result of `$python = if ($key) { ... }` makes `-notmatch` return nothing, which reads as false. The "Need Python 3" guard never fired, and `Split-Path` got the missing value. The guard now tests for a missing value first. It failed closed either way, but with a message that pointed at the wrong step.
+
+Tested by running the installer from a `v1.2.4` clone in `C:\ProgramData` under Windows PowerShell 5.1 on a machine with no all-users Python. That gave the same error as the workstation. With the fix it stops with "Need Python 3 installed for all users in C:\Program Files\Python3*. Found: ''". The Git tree and clone checks passed on the way there.
+
 ## 2026-09-30: Check the whole Git and Python trees before running them
 
 The ninth review, of 1.2.3, answered here. Version 1.2.4.

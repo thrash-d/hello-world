@@ -116,7 +116,9 @@ $key = Get-ChildItem HKLM:\SOFTWARE\Python\PythonCore -ErrorAction SilentlyConti
 $python = if ($key) { (Get-ItemProperty "$($key.PSPath)\InstallPath").ExecutablePath }
 # Folders under C:\ outside Program Files are often writable by every user.
 # The path goes into a cmd line, so the pattern also rules out ", %, and &.
-if ($python -notmatch "^$([regex]::Escape($env:ProgramFiles))\\Python3[\w.-]*\\python\.exe$") {
+# Test for no value first: in Windows PowerShell 5.1 an empty if-statement
+# result makes -notmatch return nothing, which reads as false.
+if (-not $python -or $python -notmatch "^$([regex]::Escape($env:ProgramFiles))\\Python3[\w.-]*\\python\.exe$") {
     throw "Need Python 3 installed for all users in $env:ProgramFiles\Python3*. Found: '$python'"
 }
 # Windows searches PATH for a DLL missing from the exe's folder, and a planted
