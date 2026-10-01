@@ -8,8 +8,10 @@ Changes considered and declined, with the reason.
 - Launch with `py -3 hello.py` as the review wrote it: `py -3` also picks per-user Python installs the employee can replace, so `hello.cmd` pins the all-users interpreter.
 - Application control, such as AppLocker or WDAC rules or signing the script: Group Policy on the workstations, not code in this repo.
 - A scheduled hash check of the installed file: only administrators can change it, and `install.ps1` prints the hash for a manual check.
-- Bake hello.py's SHA-256 into `install.ps1`: anyone who can swap hello.py can swap `install.ps1` too. The source folder check covers both files. From GitHub, both files come from the same commit, so the commit hash checked with `git rev-parse HEAD` is already the digest.
-- Replace the hex masks in `Assert-AdminOnly` with `FileSystemRights` names, as the fifth review asked: its sign-extension claim is wrong. `GENERIC_WRITE` is bit 30, Windows maps generic bits to specific rights on stored ACEs, and testing showed every write grant refused.
+- Bake hello.py's SHA-256 or the expected commit into `install.ps1`: a commit can't hold its own hash, and a pinned file hash would need updating every release. The installer takes the reviewed commit as `-Commit` and checks both files against it instead.
+- Replace the hex masks in `Assert-AdminOnly` with `FileSystemRights` names, as the fifth and sixth reviews asked: the sign-extension claim is wrong. `GENERIC_WRITE` is bit 30 and positive as an int32. Windows maps generic bits to specific rights on stored ACEs, and testing showed every write grant refused.
+- Read `VERSION` in the installer, which the sixth review called dead weight: it drives the auto-tag workflow, and `-Commit` is the pin.
+- Leave the clone URL out of the installer help: the repo is private, and the URL names only the pseudonymous account.
 - Add TrustedInstaller to the installed folder's ACL to match the source check: nothing needs it there. Trusting it on the source walk lets Program Files and System32 pass.
 - Check the Authenticode signature on the pinned `python.exe`: replacing it under Program Files already takes admin rights.
 - Branch protection, 2FA, and force-push rules on GitHub: account settings, not repo files. Decide them in github-mog.

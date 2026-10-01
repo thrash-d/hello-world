@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-09-30: Require the reviewed commit and a locked clone folder
+
+The sixth review, of the v1.0.0 tree, answered here. Version 1.1.0.
+
+- `install.ps1` takes a mandatory `-Commit`, the full hash that was reviewed. It refuses when the clone's HEAD is another commit, or when `install.ps1` or `hello.py` differ from that commit's blobs. The review said: "Installer does not pin SHA-256 or `git rev-parse HEAD`. A moved tag or a swap after you looked at HEAD still installs" and "The human `rev-parse` check is the real control; the script does not enforce it."
+- The clone folder itself must now be closed to everyone but administrators, including adding files. Its parents still only need to be safe from a swap. Without that rule, someone could add git objects to the clone that fool the commit check. The help example locks the folder before cloning into it. The review said: "Create the setup directory yourself, tighten its ACL **before** clone, then clone into that empty locked folder."
+
+Finding 1, the sign-extension claim, came back unchanged and still needed no change. `GENERIC_WRITE` (`0x40000000`) is positive as an int32. Widening `0xC0000000` to int64 gives `0xFFFFFFFFC0000000`, which still has bit 30. The value in the review, `0xFFFFFFFF80000000`, is `GENERIC_READ`. See `BACKLOG.md` and the entry below.
+
+Tested against a local clone. The right commit was accepted. A wrong commit, an edited `hello.py`, an edited `install.ps1`, and a folder with no clone were each refused, and `-Commit HEAD` failed the hash pattern. A default folder under `C:\ProgramData` was refused because Users can add files to it; one locked as in the help example was accepted.
+
 ## 2026-09-30: Version 1.0.0 and install from a release tag
 
 The fifth review, for five workstations, answered here.

@@ -7,21 +7,23 @@ Creates "Program Files\hello-world", where only Administrators and SYSTEM can
 write. Copies hello.py there and writes hello.cmd next to it. Employees run
 hello.cmd, which starts hello.py with the all-users Python 3 in isolated mode.
 
-Run it from an elevated PowerShell on each workstation, from a folder only
-administrators can change. It refuses to run from anywhere else, such as an
-employee's Downloads folder. Run it again after a Python upgrade, because
+Run it from an elevated PowerShell on each workstation, from a git clone of a
+release tag in a folder only administrators can write. It refuses anything
+else, such as an employee's Downloads folder, a clone at another commit, or a
+file changed since checkout. Run it again after a Python upgrade, because
 hello.cmd pins the interpreter's path.
 
-Install a release tag, not main. In an elevated PowerShell, clone the tag into
-a new folder under C:\ProgramData. Check that git rev-parse HEAD prints the
-commit you reviewed, then run this script from that folder.
+.PARAMETER Commit
+The full commit hash that was reviewed. The clone must be at this commit.
 
 .EXAMPLE
-git clone --branch v1.0.0 --depth 1 https://github.com/thrash-d/hello-world C:\ProgramData\hello-setup; cd C:\ProgramData\hello-setup; git rev-parse HEAD
+$d = 'C:\ProgramData\hello-setup'; New-Item -ItemType Directory $d; icacls $d /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F'; git clone --branch v1.1.0 --depth 1 https://github.com/thrash-d/hello-world $d; cd $d; .\install.ps1 -Commit <reviewed commit hash>
 
-Run .\install.ps1 once the printed commit matches.
+Locks the setup folder before cloning into it, so nobody else can add files
+to the clone, then installs the reviewed commit.
 #>
 #Requires -RunAsAdministrator
+param([Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$Commit)
 $ErrorActionPreference = 'Stop'
 $dir = Join-Path $env:ProgramFiles 'hello-world'
 
@@ -47,9 +49,19 @@ function Assert-AdminOnly([string]$Path, [int64]$Rights) {
 }
 
 # The installer runs as admin, so whoever can swap its files or folders runs
-# code as admin. Check the files, then every folder up to the root.
-foreach ($f in $PSCommandPath, (Join-Path $PSScriptRoot 'hello.py')) { Assert-AdminOnly $f $edit }
-for ($p = Get-Item $PSScriptRoot; $p; $p = $p.Parent) { Assert-AdminOnly $p.FullName $swap }
+# code as admin. Check the files, then every folder up to the root. Nobody else
+# may add files to the clone itself, or they could plant git objects that
+# fool the commit check below.
+foreach ($f in $PSCommandPath, (Join-Path $PSScriptRoot 'hello.py'), $PSScriptRoot) { Assert-AdminOnly $f $edit }
+for ($p = (Get-Item $PSScriptRoot).Parent; $p; $p = $p.Parent) { Assert-AdminOnly $p.FullName $swap }
+
+# The ACL checks show nobody else can change the clone. This shows the clone is
+# the reviewed commit, so a moved tag or an edited file fails here.
+$head = git -C $PSScriptRoot rev-parse HEAD
+if ($LASTEXITCODE -or $head -ne $Commit) { throw "Source is at '$head', not the reviewed commit $Commit." }
+foreach ($f in 'install.ps1', 'hello.py') {
+    if ((git -C $PSScriptRoot hash-object $f) -ne (git -C $PSScriptRoot rev-parse "HEAD:$f")) { throw "$f differs from commit $Commit." }
+}
 
 # py -3 also picks per-user installs, which the employee can replace, so pin
 # the newest all-users Python 3 from the PEP 514 registry keys instead.
