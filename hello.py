@@ -21,7 +21,7 @@ def main():
         try:
             print(f"hello.py: cannot write to stdout: {e}", file=sys.stderr,
                   flush=True)
-        except (OSError, ValueError):
+        except Exception:
             pass
         # A failed write stays buffered, and the shutdown flush would fail
         # again and turn exit 1 into 120. _exit skips that flush.
