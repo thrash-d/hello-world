@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-09-30: Refuse an installer source that non-admins can change
+
+The fourth review, covering hello.py, install.ps1, and test_hello.py, answered here.
+
+- `install.ps1` now refuses to run when a non-administrator can change `install.ps1`, `hello.py`, or any folder above them up to the drive root. It also refuses when such an account owns one of them. The review said: "If an admin right-clicks `install.ps1` in `Downloads` / Desktop / a share the user can write, another process can swap `hello.py` (or the script) before `Copy-Item`."
+- The pinned Python path must now match `Program Files\Python3*\python.exe` with no `"`, `%`, or `&`. The review said: "A PEP 514 `ExecutablePath` that contained `&`, `%`, or `"` would break quoting or, in ugly cases, run extra commands."
+- After installing, the same check runs on the install folder, `hello.py`, and `hello.cmd`, and Users must have read and run access to each. The review said: "The smoke test runs as SYSTEM/Administrator. It does not prove Users-only `RX`" and "You do not verify the resulting DACL contains exactly those three SIDs."
+- The test-run output is compared as one string. The review said: "`& hello.cmd` sometimes yields an array or a trailing CR."
+- `test_hello.py` compares stderr as bytes. The review said: "A localized `OSError` string can theoretically trip the 'starts with / one line' asserts."
+
+Tested without admin rights on a dev machine by loading the check from `install.ps1`. It refused the repo folder once the account running it wasn't the folder's owner. It also refused the repo folder for its owner, because an orphaned account SID has write access on a folder above it. It passed `Program Files\Git` up to `C:\` and `System32\notepad.exe`. On a scratch folder with the installer's three access entries, the post-install check passed; after Authenticated Users got modify on `hello.py`, it refused. The path pattern accepted `Program Files\Python313` and `Python313-arm64`, and rejected `C:\Python313`, `&`, `"`, and a nested folder. `python test_hello.py` passes. The full installer has not yet run as administrator.
+
 ## 2026-09-30: Skip the shutdown flush and add a locked-down installer
 
 The third hello.py review answered here.

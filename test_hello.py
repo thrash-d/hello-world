@@ -24,7 +24,8 @@ def test_prints_and_exits_0():
 def test_dead_stdout_exits_1_with_one_line_on_stderr():
     p = run(dead_stderr=False)
     assert p.returncode == 1
-    assert p.stderr.decode().startswith("hello.py: cannot write to stdout:")
+    # bytes, since a localized OS error after the prefix may not be UTF-8
+    assert p.stderr.startswith(b"hello.py: cannot write to stdout:")
     assert len(p.stderr.splitlines()) == 1
 
 
