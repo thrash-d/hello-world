@@ -37,8 +37,9 @@ never a tag name. The tools run by full path for the same reason the
 installer pins them. Windows clients block scripts by default, so the
 example allows them for this PowerShell window only. If a Group Policy sets
 the execution policy, that line errors and the policy decides.
-To install again, delete the setup folder first (Remove-Item -Recurse -Force,
-because git leaves read-only files in .git), so the example's New-Item and
+To install again, delete the setup folder first (cd out of it, for example
+`cd \`, because Windows won't delete a window's current folder; then
+Remove-Item -Recurse -Force, because git leaves read-only files in .git), so the example's New-Item and
 clone work a second time. The installer upgrades an existing install in place.
 
 .NOTES

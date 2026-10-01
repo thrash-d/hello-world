@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-10-01: Tell the admin to leave the setup folder before deleting it
+
+The twenty-second review, of 1.5.5, answered here. Version 1.5.6. It found no Critical, High or Medium issues, 4 Low and 2 Info; saved in `reviews/round-22.md`. Only help text changed.
+
+- The help now says to `cd` out of the setup folder before deleting it. The review said (L1): "Windows can't delete a folder that is a process's current directory, so `Remove-Item` fails with 'in use' if they run it from that same window."
+
+Declined, all in `BACKLOG.md`:
+- Reviewing `uninstall.ps1` (L2): left out of the reviewer's files on purpose, and the self-elevation claim was checked by reading it in round 20.
+- Elevation when a standard user clicks Uninstall (L3): `uninstall.ps1` restarts itself with `-Verb RunAs`; same entry as the twentieth review L4. A real click-through needs Windows.
+- Python update path and hash re-check (L4): process, already listed.
+- Start Menu folder ACL and re-checking `$new` after the test run (L5): the folder check is listed from the seventeenth review. The test run happens after the tree check and the folder is only writable by administrators, so a second check adds little.
+- `ProgramData\Git` inheriting Users write (L6): the check fails closed and is already listed.
+
+Tested: `python test_hello.py` passes on Linux. Not tested: `install.ps1`, which wasn't run or parsed (`pwsh` isn't installed here). The edit touches only the comment-based help; that it still parses and that `cd \` then `Remove-Item -Recurse -Force` clears a clone need a Windows machine.
+
 ## 2026-10-01: Say how to delete the setup folder, and what the log covers
 
 The twenty-first review, of 1.5.4, answered here. Version 1.5.5. It found no Critical, High or Medium issues and 3 Low; saved in `reviews/round-21.md`. Only help text changed.

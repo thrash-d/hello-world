@@ -39,3 +39,6 @@ Changes considered and declined, with the reason.
 - Print the install error once instead of on the console and in the log (twentieth review L1): the console copy is harmless and the log copy is the point.
 - Make the Apps Uninstall button elevate (twentieth review L4): `uninstall.ps1` already restarts itself with `-Verb RunAs`.
 - Walk the tree without recursing into junctions, again (twenty-first review L1): same as the nineteenth review entry above. Only administrators can plant one and the worst case is a slow check.
+- Review `uninstall.ps1` with the reviewer (twenty-second review L2): left out on purpose; it was read by hand in round 20.
+- Elevation for the Uninstall button, again (twenty-second review L3): same as the twentieth review entry above.
+- Re-check the Start Menu folder ACL and `$new` after the test run (twenty-second review L5): the first is listed from the seventeenth review, and the second adds little after the tree check.
