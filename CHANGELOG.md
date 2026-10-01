@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-10-01: Ask Windows for folders in install.ps1 and keep an install log
+
+Version 1.5.1. More backlog items cleared.
+
+- `install.ps1` gets Program Files, the Windows folder and the system folder from `[Environment]`, as `uninstall.ps1` does (eleventh review L8: "Use `GetFolderPath` instead of `$env:SystemRoot` and `$env:ProgramFiles`").
+- It refuses to swap if the install folder is a link (backlog: "Refuse a junction at `Program Files\hello-world` before deleting it").
+- It writes a transcript to `install.log` in the setup folder (backlog: "A transcript of the install in the setup folder").
+- The help example finds Git through the registry, as the script does (backlog: "Make the help example find Git through the registry like the script does").
+
+Tested: `python test_hello.py` passes on Linux. Not tested: `install.ps1`, which wasn't run or parsed (`pwsh` isn't installed here). The transcript and the `[Environment]` calls need a Windows machine.
+
 ## 2026-10-01: Clear the backlog items that code can answer
 
 Version 1.5.0. A request to clear `BACKLOG.md`. Each item below was declined in an earlier round and is now removed from the backlog.
