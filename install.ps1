@@ -39,10 +39,12 @@ example allows them for this PowerShell window only. If a Group Policy sets
 the execution policy, that line errors and the policy decides.
 To install again, delete the setup folder first (cd out of it, for example
 `cd \`, because Windows won't delete a window's current folder; then
-Remove-Item -Recurse -Force, because git leaves read-only files in .git), so the example's New-Item and
+Remove-Item -Recurse -Force $d, because git leaves read-only files in .git; $d is set by the
+example's first line, so in a new window type the folder's path instead), so the example's New-Item and
 clone work a second time. The installer upgrades an existing install in place.
 
 .NOTES
+The permission checks on Git for Windows can take several minutes, so let them finish.
 Employees open hello-world from the Start menu. To uninstall, use Settings >
 Apps > Installed apps > hello-world > Uninstall. That also removes the folders
 named .new and .old that an interrupted run can leave. The setup folder isn't needed after

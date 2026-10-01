@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-10-01: Name the folder to delete, and warn the Git check is slow
+
+The twenty-third review, of 1.5.6, answered here. Version 1.5.7. It found no Critical, High or Medium issues, 3 Low and 4 Info; saved in `reviews/round-23.md`. Only help text changed.
+
+- The reinstall help now gives `Remove-Item -Recurse -Force $d` and says `$d` comes from the example's first line. The review said (Info): "The help says to `cd` out and then `Remove-Item -Recurse -Force`, but gives no target."
+- `.NOTES` says the permission checks on Git for Windows can take several minutes. The review said (L3): "Mention this in the help so nobody kills the run."
+
+Declined:
+- Parsing `install.ps1` and a pilot install (L1): process, already in `BACKLOG.md` from the eleventh review.
+- `ProgramData\Git` blocking installs (L2): the check fails closed and is already listed from the nineteenth review. The reviewer itself says to act only if a pilot shows it.
+- Stating the admin-config assumption for `HOME` and `.gitconfig` (Info): already listed from the nineteenth review.
+- Calendar reminder for the Python pin (Info): process, listed from the twelfth review.
+- Design size (Info): not a defect.
+
+Tested: `python test_hello.py` passes on Linux. Not tested: `install.ps1`, which wasn't run or parsed (`pwsh` isn't installed here). Only comment-based help changed; that it still parses and shows in `Get-Help` needs a Windows machine.
+
 ## 2026-10-01: Tell the admin to leave the setup folder before deleting it
 
 The twenty-second review, of 1.5.5, answered here. Version 1.5.6. It found no Critical, High or Medium issues, 4 Low and 2 Info; saved in `reviews/round-22.md`. Only help text changed.
