@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-10-01: Use -LiteralPath for hello.cmd and say how to install again
+
+The thirteenth review, of 1.3.3, answered here. Version 1.4.1. It found no Critical or High issues, 2 Medium and 7 Low; saved in `reviews/round-13.md`. Both Medium findings repeat items already declined.
+
+- `Set-Content` for `hello.cmd` takes `-LiteralPath`. The review said (L7): "`Set-Content` uses `-Path` (wildcard interpretation) for a path with no brackets, so it is harmless, but `-LiteralPath` would be consistent."
+- The help says to delete the setup folder before installing again, and that the installer upgrades in place. The review said (L4): "A second run fails because the folder exists and isn't empty. Add a line to the help: run the uninstall one-liner first." The uninstall line no longer exists, so the note names the setup folder instead.
+
+Declined, and added to `BACKLOG.md` where new: the pilot install and hand-checked hash (M1), hardening Git's environment and config (M2), checking `.old` after restoring it (L1), `GetFolderPath` and the running admin's SID (L2), the ARM64 gate (L5), and the proxy and old-Windows notes (L6). The rename window and missing mutex (L3), the null owner, the junction walk time, and the case-insensitive hash (L7) need no change.
+
+Tested: `python test_hello.py` passes on Linux. Not tested: all of `install.ps1`. `pwsh` isn't installed here, so it wasn't even parsed. The `-LiteralPath` change needs a Windows workstation.
+
 ## 2026-10-01: Add a Start menu shortcut and an uninstall entry
 
 Version 1.4.0. After the first successful live install, three problems came up. Opening `hello.cmd` from Explorer flashed a window that closed before the line could be read. Employees had no reasonable way to find the program inside Program Files. Uninstalling meant typing a command.
