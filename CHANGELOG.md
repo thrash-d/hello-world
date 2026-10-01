@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-30: Split the install example into short lines
+
+The second live attempt never ran. The 300-character one-line example hard-wrapped in the terminal it was copied from, and each fragment failed to parse. The help example is now six short lines, run one at a time in the same window. Help text only, so no version bump.
+
 ## 2026-09-30: Allow scripts in the install example
 
 The first live install stopped at `.\install.ps1` with "running scripts is disabled on this system", because Windows clients default to the Restricted execution policy. The help example now runs `Set-ExecutionPolicy -Scope Process Bypass -Force` first, which lasts only for that PowerShell window. Help text only, so no version bump.
