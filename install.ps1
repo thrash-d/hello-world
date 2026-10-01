@@ -12,8 +12,14 @@ administrators can change. It refuses to run from anywhere else, such as an
 employee's Downloads folder. Run it again after a Python upgrade, because
 hello.cmd pins the interpreter's path.
 
+Install a release tag, not main. In an elevated PowerShell, clone the tag into
+a new folder under C:\ProgramData. Check that git rev-parse HEAD prints the
+commit you reviewed, then run this script from that folder.
+
 .EXAMPLE
-.\install.ps1
+git clone --branch v1.0.0 --depth 1 https://github.com/thrash-d/hello-world C:\ProgramData\hello-setup; cd C:\ProgramData\hello-setup; git rev-parse HEAD
+
+Run .\install.ps1 once the printed commit matches.
 #>
 #Requires -RunAsAdministrator
 $ErrorActionPreference = 'Stop'

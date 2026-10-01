@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-09-30: Version 1.0.0 and install from a release tag
+
+The fifth review, for five workstations, answered here.
+
+- New `VERSION` file at 1.0.0. The existing auto-tag workflow tags `v1.0.0` on push, and each bump after that gets its own tag. The review said: "Tag a release, install that tag, record the commit on the five machines."
+- The `install.ps1` help now says to clone a release tag into a new folder under `C:\ProgramData` as administrator, check `git rev-parse HEAD` against the reviewed commit, and run the installer there. The review said: "clone or copy a **pinned tag/commit** to an admin-only directory, then run `.\install.ps1`."
+
+Finding 2, "`FileSystemRights` bitmask is not trustworthy", needed no change; see `BACKLOG.md`. Tested by storing ACEs with generic rights on a file, through icacls and through SDDL. Windows mapped them to specific rights both times, and the check refused every grant that included write: GW, GA, and GR with GW. GR alone and GR with GX passed. `GENERIC_WRITE` is bit 30, not the sign bit, and widening a negative int32 to int64 keeps the low 32 bits, so no write bit is lost.
+
+Also tested: a folder created under `C:\ProgramData` and the two copied files passed the source check. The only account flagged was the creator, a standard user in the test. When an administrator creates the folder, that entry is Administrators. `python test_hello.py` passes.
+
 ## 2026-09-30: Refuse an installer source that non-admins can change
 
 The fourth review, covering hello.py, install.ps1, and test_hello.py, answered here.
