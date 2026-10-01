@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-30: Ignore Delete on the drive root
+
+Version 1.2.1. The first live install refused with "Non-administrators can change C:\ (S-1-5-11)". That workstation grants Authenticated Users Modify on `C:\` itself, where the Windows default is create-folders only. Modify includes Delete, which the parent walk refuses. A drive root can't be deleted or renamed, so the walk now ignores Delete on the root and still refuses every other swap right there. Modify doesn't include DeleteChild, so no user can move `ProgramData` or `Program Files` out from under the root.
+
+Tested: Modify on the root now passes, Full Control on the root is still refused, and the walk from a Program Files folder up to `C:\` passes. The script parses under Windows PowerShell 5.1.
+
 ## 2026-09-30: Split the install example into short lines
 
 The second live attempt never ran. The 300-character one-line example hard-wrapped in the terminal it was copied from, and each fragment failed to parse. The help example is now six short lines, run one at a time in the same window. Help text only, so no version bump.

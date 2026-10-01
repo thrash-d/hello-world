@@ -72,7 +72,10 @@ if (-not $git.StartsWith("$env:ProgramFiles\") -or -not (Test-Path $git)) {
 # may add files to the clone itself, or they could plant git objects that
 # fool the commit check below.
 foreach ($f in $PSCommandPath, (Join-Path $PSScriptRoot 'hello.py'), $PSScriptRoot) { Assert-AdminOnly $f $edit }
-for ($p = (Get-Item $PSScriptRoot).Parent; $p; $p = $p.Parent) { Assert-AdminOnly $p.FullName $swap }
+# A drive root can't be deleted or renamed, so Delete on it doesn't matter.
+for ($p = (Get-Item $PSScriptRoot).Parent; $p; $p = $p.Parent) {
+    Assert-AdminOnly $p.FullName ($(if ($p.Parent) { $swap } else { $swap -band -bnot 0x10000 }))
+}
 
 # The ACL checks show nobody else can change the clone. This shows the clone is
 # the reviewed commit, so a moved tag or an edited file fails here.
