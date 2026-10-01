@@ -105,3 +105,4 @@ it was.
 - `CHANGELOG.md`, `BACKLOG.md`, `reviews/`: change history, declined changes
   with reasons, and the saved review of each round.
 - `PLAN.md`: the value and rollout plan.
+- `docs/WHY-DAILY-ACTIONS.md`: why it changed from a greeting to a daily program.
