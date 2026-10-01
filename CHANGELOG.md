@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-10-01: Add a Start menu shortcut and an uninstall entry
+
+Version 1.4.0. After the first successful live install, three problems came up. Opening `hello.cmd` from Explorer flashed a window that closed before the line could be read. Employees had no reasonable way to find the program inside Program Files. Uninstalling meant typing a command.
+
+- `install.ps1` adds a hello-world shortcut to the all-users Start menu. It runs `cmd /c "hello.cmd" & pause`, so the window stays open until a key is pressed. `hello.cmd` itself doesn't pause, so the installer's test run and scripted use don't wait for a key. The shortcut is checked so only administrators can change it.
+- `install.ps1` registers hello-world in Settings > Apps with its version from `VERSION`. The entry's Uninstall button runs the new `uninstall.ps1`, which asks for administrator rights. It then removes the shortcut, the Apps entry, and the install folder.
+- The shortcut and the Apps entry are added only after every check passes, so a failed install doesn't show up anywhere.
+- `uninstall.ps1` and `VERSION` are now checked against the reviewed commit along with `install.ps1` and `hello.py`.
+
+`uninstall.ps1` also removes the `hello-world.new` and `hello-world.old` folders an interrupted install can leave, so the long uninstall line in the help is gone.
+
+Removed from `BACKLOG.md`: the declined `uninstall.ps1`, which this change adds, and keeping `-ErrorAction SilentlyContinue` on the uninstall line, which no longer exists.
+
+Tested under Windows PowerShell 5.1 by installing to a test folder with a space in its name, with the Start menu folder and the Apps entry moved somewhere an unelevated test could write. The install passed every check. The shortcut's exact command line printed the line and reached the pause, and the Apps entry showed version 1.4.0 with the expected Uninstall command. Running the uninstaller from inside the install folder removed the folder, the shortcut, and the entry. Unelevated, the uninstaller's administrator check reads false, so the real one asks for elevation.
+
+Also tested on Windows: the 1.3.1 to 1.3.3 installer changes, which their entries below list as never run or parsed. It parses under Windows PowerShell 5.1 and PowerShell 7. Under 5.1 it installed fresh, and it upgraded over an existing install with no `.new` or `.old` left behind. With the install folder renamed to `.old` to fake an interrupted swap, a run that then failed the commit check still put the old install back, and it worked. With a file held open in the live install, the swap failed after its retries. The live install stayed in place and still ran, and `.new` was removed. In that case the error reads "Access to the path ... is denied", which doesn't say a file is open.
+
 ## 2026-10-01: Restore an interrupted swap before any check, and make the tests report skips
 
 The twelfth review, of 1.3.2, answered here. Version 1.3.3. It found no Critical or High issues, 2 Medium and 5 Low; saved in `reviews/round-12.md`.

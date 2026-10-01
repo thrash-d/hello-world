@@ -5,11 +5,12 @@ Installs hello.py for all users in a folder only administrators can change.
 .DESCRIPTION
 Creates "Program Files\hello-world", where only Administrators and SYSTEM can
 write. Unpacks a pinned, hash-checked Python from python.org into it, copies
-hello.py there, and writes hello.cmd next to it. Employees run hello.cmd,
-which starts hello.py with that Python in isolated mode. The workstation needs
-Git for Windows and internet access, but no Python of its own. Its guarantees
-hold only if the employees use standard accounts. A local administrator can
-change anything it protects.
+hello.py and uninstall.ps1 there, and writes hello.cmd next to them. hello.cmd
+starts hello.py with that Python in isolated mode. Adds a hello-world shortcut
+to every user's Start menu and an entry with an Uninstall button to Settings >
+Apps. The workstation needs Git for Windows and internet access, but no Python
+of its own. Its guarantees hold only if the employees use standard accounts. A
+local administrator can change anything it protects.
 
 Run it from an elevated PowerShell on each workstation, from a git clone of a
 release tag in a folder only administrators can write. It refuses anything
@@ -38,11 +39,10 @@ example allows them for this PowerShell window only. If a Group Policy sets
 the execution policy, that line errors and the policy decides.
 
 .NOTES
-The setup folder isn't needed after a successful install. The installer makes
-nothing outside the folders in this elevated line, which uninstalls it. The
-.new and .old folders exist only after an interrupted run.
-
-cd C:\; Remove-Item "$env:ProgramFiles\hello-world", "$env:ProgramFiles\hello-world.new", "$env:ProgramFiles\hello-world.old", C:\ProgramData\hello-setup -Recurse -Force -ErrorAction SilentlyContinue
+Employees open hello-world from the Start menu. To uninstall, use Settings >
+Apps > Installed apps > hello-world > Uninstall. That also removes the .new and
+.old folders an interrupted run can leave. The setup folder isn't needed after
+a successful install and can be deleted.
 #>
 #Requires -RunAsAdministrator
 param([Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$Commit)
@@ -128,7 +128,7 @@ Assert-AdminOnlyTree $PSScriptRoot
 # the reviewed commit, so a moved tag or an edited file fails here.
 $head = & $git -C $PSScriptRoot rev-parse HEAD
 if ($LASTEXITCODE -or $head -ne $Commit) { throw "Source is at '$head', not the reviewed commit $Commit." }
-foreach ($f in 'install.ps1', 'hello.py') {
+foreach ($f in 'install.ps1', 'uninstall.ps1', 'hello.py', 'VERSION') {
     $actual = & $git -C $PSScriptRoot hash-object $f
     $actualOk = $LASTEXITCODE -eq 0
     $expected = & $git -C $PSScriptRoot rev-parse "HEAD:$f"
@@ -161,7 +161,7 @@ try {
     if ($LASTEXITCODE) { throw "icacls failed on $new" }
 
     Expand-Archive -LiteralPath $zip -DestinationPath (Join-Path $new 'python')
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'hello.py') -Destination $new
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'hello.py'), (Join-Path $PSScriptRoot 'uninstall.ps1') -Destination $new
     # -I ignores PYTHON* variables and the user's site-packages, so nothing the
     # employee controls loads into the run.
     Set-Content (Join-Path $new 'hello.cmd') '@"%~dp0python\python.exe" -I "%~dp0hello.py"' -Encoding ascii
@@ -197,4 +197,29 @@ finally {
     Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath "$dir.new" -Recurse -Force -ErrorAction SilentlyContinue
 }
+
+# Added only after the checks pass, so a failed install never shows up in the
+# Start menu. Run straight from Explorer, hello.cmd's window closes before
+# anyone can read it; the shortcut keeps it open until a key is pressed.
+$lnk = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'hello-world.lnk'
+$shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk)
+$shortcut.TargetPath = "$env:SystemRoot\System32\cmd.exe"
+$shortcut.Arguments = "/c `"`"$dir\hello.cmd`" & pause`""
+$shortcut.WorkingDirectory = $dir
+$shortcut.Save()
+# Every employee opens this shortcut, so only administrators may change it.
+Assert-AdminOnly $lnk $edit
+
+# The entry in Settings > Apps, whose Uninstall button runs uninstall.ps1.
+$key = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\hello-world'
+New-Item $key -Force | Out-Null
+$entry = @{
+    DisplayName     = 'hello-world'
+    DisplayVersion  = (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'VERSION')).Trim()
+    InstallLocation = $dir
+    UninstallString = "`"$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe`" -NoProfile -ExecutionPolicy Bypass -File `"$dir\uninstall.ps1`""
+}
+foreach ($name in $entry.Keys) { New-ItemProperty $key -Name $name -Value $entry[$name] -Force | Out-Null }
+foreach ($name in 'NoModify', 'NoRepair') { New-ItemProperty $key -Name $name -Value 1 -PropertyType DWord -Force | Out-Null }
+
 "Installed to $dir. hello.py SHA-256: $hash"
