@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-10-01: Say how to delete the setup folder, and what the log covers
+
+The twenty-first review, of 1.5.4, answered here. Version 1.5.5. It found no Critical, High or Medium issues and 3 Low; saved in `reviews/round-21.md`. Only help text changed.
+
+- The help says to delete the setup folder with `Remove-Item -Recurse -Force`. The review said (L3): "The files under `.git\objects` are read-only. `Remove-Item -Recurse` without `-Force` fails on them."
+- The `.NOTES` call install.log "the record of the steps after the permission checks". The review said (L2): "The restore block and the early checks aren't in the log." The log stays where it is, because moving `Start-Transcript` earlier would open it before the setup folder is checked.
+
+Declined:
+- Walking the tree without following junctions (L1): already in `BACKLOG.md` from the nineteenth review (L8). Only administrators can plant a junction there, and the worst case is a slow or hung check, not a wrong result.
+- Reviewing `uninstall.ps1` (note): it was left out of the reviewer's files on purpose. The self-elevation claim was checked by reading it last round. The pinned Python hash and a Windows trial run are already in `BACKLOG.md` as process.
+
+Tested: `python test_hello.py` passes on Linux. Not tested: `install.ps1`, which wasn't run or parsed (`pwsh` isn't installed here). The edit touches only the comment-based help; that the help still parses and shows in `Get-Help` needs a Windows machine. Whether `Remove-Item -Recurse -Force` clears a git clone there is the reviewer's claim, not something I ran.
+
 ## 2026-10-01: Check that Remove-Tree removed the folder, and clearer start-up errors
 
 The twentieth review, of 1.5.3, answered here. Version 1.5.4. It found no Critical or High issues, 1 Medium and 5 Low; saved in `reviews/round-20.md`.
