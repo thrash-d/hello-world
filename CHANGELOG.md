@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-10-01: Ask Windows for folders in uninstall.ps1 and tighten the install checks
+
+The seventeenth review, of 1.4.4, answered here. Version 1.4.5. It found no Critical or High issues, 2 Medium and 4 Low; saved in `reviews/round-17.md`.
+
+- `uninstall.ps1` gets Program Files, the Windows folder and the system folder from `[Environment]` instead of `$env:ProgramFiles` and `$env:SystemRoot`, and refuses to run unless it sits in the install folder. The review said (M1): "Settings > Apps starts it as the standard employee, and it then calls `Start-Process -Verb RunAs`... an elevated process... inherits that user's environment block." I did not confirm the inheritance on Windows. The change is cheap and has no downside, so I made it anyway.
+- `install.ps1` requires a `.git` entry in the setup folder before it asks git for the commit. The review said (L1): "`git -C $PSScriptRoot rev-parse HEAD` also finds a repository in a parent folder."
+- `install.ps1` compares the copied `uninstall.ps1` to the source as it already does `hello.py`. The review said (L3): "install.ps1 hashes the copied hello.py but not the copied uninstall.ps1."
+
+Declined: the Windows trial run (M2, process, already in `BACKLOG.md`), checking the ACL of the Start Menu Programs folder (L2, added to `BACKLOG.md`) and the line-ending note on the printed hash (L4, added to `BACKLOG.md`).
+
+The reviewer read `uninstall.ps1` and `BACKLOG.md` from the working tree on its own, beyond the files it was given; the header in the saved review says so.
+
+Tested: `python test_hello.py` passes on Linux. Not tested: `install.ps1` and `uninstall.ps1`, which weren't run or even parsed (`pwsh` isn't installed here). The `[Environment]` folder calls, the `$PSScriptRoot` comparison in `uninstall.ps1`, the `.git` check and the extra hash check need a Windows machine.
+
 ## 2026-10-01: Remove the shortcut before the install folder and show the 64-bit message
 
 The sixteenth review, of 1.4.3, answered here. Version 1.4.4. It found no Critical or High issues, 1 Medium and 4 Low; saved in `reviews/round-16.md`.

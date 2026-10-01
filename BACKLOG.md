@@ -46,3 +46,5 @@ Changes considered and declined, with the reason.
 - Check `C:\ProgramData\Git` for planted config (fifteenth review L6): same as the Git hardening entries above; the reviewer agreed it isn't needed to deploy.
 - Create the setup folder under `Program Files` instead of `C:\ProgramData` (sixteenth review L3): the gap before `icacls` fails closed, since a planted file breaks the clone and the tree check.
 - Retry loop around the final folder removal in `uninstall.ps1` (sixteenth review L1, second option): the shortcut-first order covers the review's cheap fix, and re-running install repairs a dangling entry.
+- Check the ACL of the Start Menu Programs folder after creating the shortcut (seventeenth review L2): the default ACLs on `C:\ProgramData` may not pass the parent check, and I can't test that here. Try it in the Windows trial run first.
+- Warn that the printed hello.py SHA-256 depends on line endings (seventeenth review L4): the commit check doesn't depend on it, and the hashes are compared across the five machines.

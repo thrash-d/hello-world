@@ -13,13 +13,20 @@ $ErrorActionPreference = 'Stop'
 if (-not [Environment]::Is64BitProcess) {
     Write-Host 'Run this from 64-bit PowerShell.' -ForegroundColor Red; Read-Host 'Press Enter to close'; exit 1
 }
-$dir = Join-Path $env:ProgramFiles 'hello-world'
+# Settings > Apps starts this as a standard user, and the elevated copy can
+# inherit that user's environment variables, so ask Windows for the folders.
+$winDir = [Environment]::GetFolderPath('Windows')
+$ps = Join-Path ([Environment]::SystemDirectory) 'WindowsPowerShell\v1.0\powershell.exe'
+$dir = Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'hello-world'
+if ($PSScriptRoot -ne $dir) {
+    Write-Host "Run this from $dir, not $PSScriptRoot." -ForegroundColor Red; Read-Host 'Press Enter to close'; exit 1
+}
 
 # Settings > Apps starts this without elevation, so ask for it.
 $me = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
 if (-not $me.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     try {
-        Start-Process "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -Verb RunAs `
+        Start-Process $ps -Verb RunAs `
             -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`""
     }
     catch { Write-Host "Couldn't get administrator rights: $_" -ForegroundColor Red; Read-Host 'Press Enter to close' }
@@ -30,8 +37,8 @@ if (-not $me.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
 try {
     # Windows won't delete a folder that is the current directory. Set both:
     # Set-Location may leave the process's own directory where it was.
-    Set-Location $env:SystemRoot
-    [Environment]::CurrentDirectory = $env:SystemRoot
+    Set-Location $winDir
+    [Environment]::CurrentDirectory = $winDir
     # The Apps entry runs $dir\uninstall.ps1, so it is the way to try again:
     # it and its folder go late, after the shortcut, which a failure can leave
     # harmlessly, and the Apps entry goes last.
