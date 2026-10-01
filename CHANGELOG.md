@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-30: Allow scripts in the install example
+
+The first live install stopped at `.\install.ps1` with "running scripts is disabled on this system", because Windows clients default to the Restricted execution policy. The help example now runs `Set-ExecutionPolicy -Scope Process Bypass -Force` first, which lasts only for that PowerShell window. Help text only, so no version bump.
+
+The live run was in Windows PowerShell 5.1. The installer parses cleanly there, and its ACL check and git pin behave the same as in PowerShell 7.
+
 ## 2026-09-30: Run git and icacls by full path
 
 The seventh review, of 1.1.0, answered here. Version 1.2.0.

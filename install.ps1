@@ -17,12 +17,13 @@ hello.cmd pins the interpreter's path.
 The full commit hash that was reviewed. The clone must be at this commit.
 
 .EXAMPLE
-$d = 'C:\ProgramData\hello-setup'; New-Item -ItemType Directory $d; & "$env:SystemRoot\System32\icacls.exe" $d /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F'; & "$env:ProgramFiles\Git\cmd\git.exe" clone --branch v1.2.0 --depth 1 https://github.com/thrash-d/hello-world $d; cd $d; .\install.ps1 -Commit <reviewed commit hash>
+$d = 'C:\ProgramData\hello-setup'; New-Item -ItemType Directory $d; & "$env:SystemRoot\System32\icacls.exe" $d /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F'; & "$env:ProgramFiles\Git\cmd\git.exe" clone --branch v1.2.0 --depth 1 https://github.com/thrash-d/hello-world $d; cd $d; Set-ExecutionPolicy -Scope Process Bypass -Force; .\install.ps1 -Commit <reviewed commit hash>
 
 Locks the setup folder before cloning into it, so nobody else can add files
 to the clone, then installs the reviewed commit. Pass the full commit hash,
 never a tag name. The tools run by full path for the same reason the
-installer pins them.
+installer pins them. Windows clients block scripts by default, so the
+example allows them for this PowerShell window only.
 #>
 #Requires -RunAsAdministrator
 param([Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$Commit)
