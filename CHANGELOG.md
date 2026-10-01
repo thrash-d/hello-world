@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-10-01: Recover an interrupted swap, retry the rename, and keep a late failure from failing the install
+
+The eleventh review, of 1.3.1, answered here. Version 1.3.2. It found no Critical or High issues; saved in `reviews/round-11.md`.
+
+- The installer puts `hello-world.old` back as `hello-world` at the start of a run if the install folder is missing, before it clears leftovers. The review said: "If power or the session is lost between the two renames, `hello-world` is gone and `hello-world.old` is the only working copy. The next run deletes `.old` at the very start."
+- Each folder rename retries up to 5 times, a second apart. The review said: "Renaming a folder fails if any file under it is open without share-delete. This can happen with Defender scanning the freshly extracted Python."
+- If removing `.old` fails after the new install is live, the installer warns and still prints the "Installed" line. The review said: "the new install is already live, but the script throws and never prints the 'Installed' line."
+- A failed run deletes `hello-world.new`, and the uninstall line in the help now covers `.new` and `.old`. The review said: "The uninstall line also does not remove `hello-world.new` or `hello-world.old`."
+- The help states that the guarantees hold only if employees use standard accounts. The review said: "State this precondition in the docs."
+- `hello.py` also catches `ValueError`, which a stdout object closed after startup raises. The review said: "use `except (OSError, ValueError)`." Checked by closing `sys.stdout` before running it: exit 1 with the one-line message, where 1.3.1 gave a traceback.
+- `test_hello.py` prints a SKIPPED line when the closed-stdout test can't run. The review said: "Use `pytest.skip` or an explicit 'SKIPPED' line so the gap is visible."
+
+Declined, and added to `BACKLOG.md`: the pilot install and hand-checked zip hash (M1, process, not code), hashing exact bytes and cleaning Git's environment (L7, already declined as M1 last round), `GetFolderPath` in place of environment variables (L8), the architecture check (L9), and the reparse-point change (L10, already declined). L13 needs no change.
+
+Tested: `python test_hello.py` passes on Linux, and the closed `sys.stdout` case above. Not tested: all of `install.ps1`. `pwsh` isn't installed here, so it wasn't even parsed. The interrupted-swap recovery, the rename retry, the late-failure warning, the `.new` cleanup, and the changed uninstall line need a Windows workstation.
+
 ## 2026-10-01: Build the new install beside the old one and fail closed on the commit check
 
 The tenth review, of 1.3.0, answered here. Version 1.3.1. It found no Critical or High issues; saved in `reviews/round-10.md`.

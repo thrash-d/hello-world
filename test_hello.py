@@ -35,7 +35,8 @@ def test_dead_stdout_and_stderr_exits_1():
 
 def test_closed_stdout_exits_1():
     if os.name != "posix":
-        return  # needs preexec_fn to close fd 1 before Python starts
+        print("SKIPPED test_closed_stdout_exits_1: needs preexec_fn, posix only")
+        return
     p = subprocess.run([sys.executable, HELLO], stdout=subprocess.DEVNULL,
                        stderr=subprocess.PIPE, preexec_fn=lambda: os.close(1))
     assert p.returncode == 1

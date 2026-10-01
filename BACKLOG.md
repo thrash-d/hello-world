@@ -31,3 +31,7 @@ Changes considered and declined, with the reason.
 - Run the tests on the pinned embeddable Python in CI: CI lives in `.github/`, which this routine doesn't change.
 - A transcript of the install in the setup folder: the console output is enough for five machines.
 - Patch reminders for the bundled Python and a scoped allow rule for it: process and Group Policy, not repo code. Updating means changing the URL and hash in `install.ps1`.
+- Pilot the installer on a spare machine and check the zip hash by hand, as the eleventh review asked (M1): process, not code. The changelog says what's untested.
+- Hash the exact checked-out bytes and clear Git's environment and config (eleventh review L7): same as the Git hardening entry above. The default clean filter is what makes the check pass on either line-ending setting.
+- Use `GetFolderPath` instead of `$env:SystemRoot` and `$env:ProgramFiles` (eleventh review L8): changing those variables needs the admin's own session, and `#Requires` already means the admin runs this.
+- Allow native ARM64 PowerShell on Windows 11 (eleventh review L9): it fails safe with a clear message, and the five machines are x64.
