@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """Print "Hello, world!".
 
-On Windows run it as `py -3 hello.py`; the shebang only applies on Unix.
+On Windows the installer runs it through hello.cmd with its own pinned Python.
 Exit 0 when the line was written, 1 when stdout could not be written.
 """
 import os
@@ -11,6 +11,9 @@ import sys
 
 def main():
     try:
+        # print() silently does nothing when stdout is None (fd 1 closed at start)
+        if sys.stdout is None:
+            raise OSError("stdout is closed")
         # flush so a dead stdout raises here, not at interpreter exit
         print("Hello, world!", flush=True)
     except OSError as e:

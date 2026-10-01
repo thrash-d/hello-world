@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-10-01: Build the new install beside the old one and fail closed on the commit check
+
+The tenth review, of 1.3.0, answered here. Version 1.3.1. It found no Critical or High issues; saved in `reviews/round-10.md`.
+
+- The installer builds and tests the new install in `Program Files\hello-world.new`, and only then renames it into place, putting the old folder back if the rename fails. The review said: "Remove-Item $dir runs after the hash check but before the new install is built or tested. If Expand-Archive, the test run or the ACL check fails, the old working install is gone." Leftover `.new` or `.old` folders from an interrupted run are cleared at the start of the next one.
+- The per-file commit check requires each git call to succeed and print a 40-character hash. The review said: "If both commands fail and print nothing, `$null -ne $null` is False and the gate passes."
+- The tree and Users read-and-run checks now run on the new folder before the test run. The review said: "The test run executes as admin before Assert-AdminOnlyTree $dir."
+- The zip is deleted after the run, pass or fail, and the download has a 300-second timeout. TLS 1.2 is added to the protocol flags instead of replacing them. The review said: "Setting SecurityProtocol = Tls12 overwrites other flags. Use -bor." and "python-embed.zip is left behind in the clone after success."
+- The installer refuses unless `PROCESSOR_ARCHITECTURE` is `AMD64`. The review said: "Is64BitProcess is also true on ARM64. The amd64 zip needs x64 emulation."
+- The Git path check ignores case, and `Test-Path` takes `-LiteralPath`. The review said: "StartsWith is case-sensitive."
+- `hello.py` exits 1 when `sys.stdout` is `None`. The review said: "If stdout is closed or None (for example fd 1 closed), print() silently succeeds and returns 0." New test `test_closed_stdout_exits_1`, which fails on 1.3.0 (exit 0). The docstring no longer says to run it with `py -3`.
+
+Declined, and added to `BACKLOG.md`: the Git config and environment hardening (M1), the reparse-point test change (M5, L5), the proxy, retry, and Git ownership messages (L2, L4), `exit /b` in `hello.cmd` (L6), a CI run on the embeddable Python (L8), a transcript (L9), and the Python patching and application control notes (M6). M3, checking the pinned hash against a signature, is not code. It needs a person on another machine.
+
+Tested: `python test_hello.py` passes on Linux. Not tested: all of `install.ps1`. `pwsh` isn't installed here, so it wasn't even parsed. The rename swap and rollback, the ACL and tree checks, the download, the architecture check, and the Git calls need a Windows workstation. This sandbox's proxy blocked python.org, so the pinned zip hash wasn't re-checked either.
+
 ## 2026-10-01: Bring a pinned Python instead of using the workstation's
 
 Version 1.3.0. Three live installs in a row stopped on the workstation's own Python: first a missing `python314.dll`, then no all-users Python registered at all while it was being reinstalled. Each fix to the discovery code exposed the next way a machine's Python can be wrong.

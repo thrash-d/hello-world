@@ -45,6 +45,8 @@ param([Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$Commit)
 $ErrorActionPreference = 'Stop'
 # A 32-bit PowerShell sees Program Files (x86) and the 32-bit registry.
 if (-not [Environment]::Is64BitProcess) { throw 'Run this from 64-bit PowerShell.' }
+# The pinned Python is the amd64 build, which ARM64 Windows 10 can't run.
+if ($env:PROCESSOR_ARCHITECTURE -ne 'AMD64') { throw "Need an x64 PC, found $env:PROCESSOR_ARCHITECTURE." }
 $dir = Join-Path $env:ProgramFiles 'hello-world'
 
 # The Python hello.py runs on. To update it, change both values. The hash is
@@ -95,7 +97,7 @@ function Assert-AdminOnlyTree([string]$Root) {
 $icacls = "$env:SystemRoot\System32\icacls.exe"
 $gitDir = (Get-ItemProperty HKLM:\SOFTWARE\GitForWindows -ErrorAction SilentlyContinue).InstallPath
 $git = "$gitDir\cmd\git.exe"
-if (-not $git.StartsWith("$env:ProgramFiles\") -or -not (Test-Path $git)) {
+if (-not $git.StartsWith("$env:ProgramFiles\", [StringComparison]::OrdinalIgnoreCase) -or -not (Test-Path -LiteralPath $git)) {
     throw "Need Git for Windows installed for all users under $env:ProgramFiles. Found: '$git'"
 }
 Assert-AdminOnlyTree $gitDir
@@ -108,44 +110,67 @@ Assert-AdminOnlyTree $PSScriptRoot
 $head = & $git -C $PSScriptRoot rev-parse HEAD
 if ($LASTEXITCODE -or $head -ne $Commit) { throw "Source is at '$head', not the reviewed commit $Commit." }
 foreach ($f in 'install.ps1', 'hello.py') {
-    if ((& $git -C $PSScriptRoot hash-object $f) -ne (& $git -C $PSScriptRoot rev-parse "HEAD:$f")) { throw "$f differs from commit $Commit." }
+    $actual = & $git -C $PSScriptRoot hash-object $f
+    $actualOk = $LASTEXITCODE -eq 0
+    $expected = & $git -C $PSScriptRoot rev-parse "HEAD:$f"
+    # Both commands failing and printing nothing must not read as a match.
+    if (-not $actualOk -or $LASTEXITCODE -or "$actual" -notmatch '^[0-9a-f]{40}$' -or "$actual" -ne "$expected") {
+        throw "$f differs from commit $Commit."
+    }
 }
 
 # Download into the clone, which only administrators can change, and check the
-# hash before the old install is touched.
+# hash before the old install is touched. The zip is deleted afterward.
 Write-Host "Downloading $pyUrl"
 $zip = Join-Path $PSScriptRoot 'python-embed.zip'
 # Windows PowerShell 5.1 can default to TLS versions python.org refuses, and its
 # progress bar slows downloads to a crawl.
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 $ProgressPreference = 'SilentlyContinue'
-Invoke-WebRequest $pyUrl -OutFile $zip -UseBasicParsing
-if ((Get-FileHash $zip).Hash -ne $pySha256) { throw "The Python download doesn't match the pinned SHA-256." }
+try {
+    Invoke-WebRequest $pyUrl -OutFile $zip -UseBasicParsing -TimeoutSec 300
+    if ((Get-FileHash $zip).Hash -ne $pySha256) { throw "The Python download doesn't match the pinned SHA-256." }
 
-# Start from an empty folder so no access entry from an earlier copy survives.
-if (Test-Path $dir) { Remove-Item $dir -Recurse -Force }
-New-Item -ItemType Directory $dir | Out-Null
-# Drop inherited entries. Administrators and SYSTEM get full control, Users
-# get read and run. Files created below inherit this.
-& $icacls $dir /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-545:(OI)(CI)RX' | Out-Null
-if ($LASTEXITCODE) { throw "icacls failed on $dir" }
+    # Build and test the new install beside the old one, so a failure leaves
+    # the working install alone. Both sit in Program Files, which only
+    # administrators can write to.
+    $new = "$dir.new"
+    $old = "$dir.old"
+    foreach ($leftover in $new, $old) { if (Test-Path -LiteralPath $leftover) { Remove-Item -LiteralPath $leftover -Recurse -Force } }
+    New-Item -ItemType Directory $new | Out-Null
+    # Drop inherited entries. Administrators and SYSTEM get full control, Users
+    # get read and run. Files created below inherit this.
+    & $icacls $new /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-545:(OI)(CI)RX' | Out-Null
+    if ($LASTEXITCODE) { throw "icacls failed on $new" }
 
-Expand-Archive -LiteralPath $zip -DestinationPath (Join-Path $dir 'python')
-Copy-Item (Join-Path $PSScriptRoot 'hello.py') $dir
-# -I ignores PYTHON* variables and the user's site-packages, so nothing the
-# employee controls loads into the run.
-Set-Content (Join-Path $dir 'hello.cmd') '@"%~dp0python\python.exe" -I "%~dp0hello.py"' -Encoding ascii
+    Expand-Archive -LiteralPath $zip -DestinationPath (Join-Path $new 'python')
+    Copy-Item (Join-Path $PSScriptRoot 'hello.py') $new
+    # -I ignores PYTHON* variables and the user's site-packages, so nothing the
+    # employee controls loads into the run.
+    Set-Content (Join-Path $new 'hello.cmd') '@"%~dp0python\python.exe" -I "%~dp0hello.py"' -Encoding ascii
 
-$hash = (Get-FileHash (Join-Path $dir 'hello.py')).Hash
-if ($hash -ne (Get-FileHash (Join-Path $PSScriptRoot 'hello.py')).Hash) { throw 'Installed hello.py differs from the source' }
-$out = & (Join-Path $dir 'hello.cmd')
-if ($LASTEXITCODE -or "$out" -ne 'Hello, world!') { throw "Test run failed with exit $LASTEXITCODE`: $out" }
+    $hash = (Get-FileHash (Join-Path $new 'hello.py')).Hash
+    if ($hash -ne (Get-FileHash (Join-Path $PSScriptRoot 'hello.py')).Hash) { throw 'Installed hello.py differs from the source' }
 
-# The test run above ran as admin, so check what employees get from the ACL.
-Assert-AdminOnlyTree $dir
-foreach ($f in $dir, (Join-Path $dir 'hello.py'), (Join-Path $dir 'hello.cmd'), (Join-Path $dir 'python\python.exe')) {
-    $usersRX = (Get-Acl -LiteralPath $f).GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | Where-Object {
-        $_.IdentityReference.Value -eq 'S-1-5-32-545' -and $_.FileSystemRights.HasFlag([Security.AccessControl.FileSystemRights]::ReadAndExecute) }
-    if (-not $usersRX) { throw "Users can't read and run $f" }
+    # Check the tree before running anything from it as admin.
+    Assert-AdminOnlyTree $new
+    foreach ($f in $new, (Join-Path $new 'hello.py'), (Join-Path $new 'hello.cmd'), (Join-Path $new 'python\python.exe')) {
+        $usersRX = (Get-Acl -LiteralPath $f).GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | Where-Object {
+            $_.IdentityReference.Value -eq 'S-1-5-32-545' -and $_.FileSystemRights.HasFlag([Security.AccessControl.FileSystemRights]::ReadAndExecute) }
+        if (-not $usersRX) { throw "Users can't read and run $f" }
+    }
+    $out = & (Join-Path $new 'hello.cmd')
+    if ($LASTEXITCODE -or "$out" -ne 'Hello, world!') { throw "Test run failed with exit $LASTEXITCODE`: $out" }
+
+    # Swap in the new folder, and put the old one back if that fails.
+    $hadOld = Test-Path -LiteralPath $dir
+    if ($hadOld) { Rename-Item -LiteralPath $dir -NewName (Split-Path $old -Leaf) }
+    try { Rename-Item -LiteralPath $new -NewName (Split-Path $dir -Leaf) }
+    catch {
+        if ($hadOld) { Rename-Item -LiteralPath $old -NewName (Split-Path $dir -Leaf) }
+        throw
+    }
+    if ($hadOld) { Remove-Item -LiteralPath $old -Recurse -Force }
 }
+finally { Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue }
 "Installed to $dir. hello.py SHA-256: $hash"
