@@ -35,3 +35,7 @@ Changes considered and declined, with the reason.
 - Hash the exact checked-out bytes and clear Git's environment and config (eleventh review L7): same as the Git hardening entry above. The default clean filter is what makes the check pass on either line-ending setting.
 - Use `GetFolderPath` instead of `$env:SystemRoot` and `$env:ProgramFiles` (eleventh review L8): changing those variables needs the admin's own session, and `#Requires` already means the admin runs this.
 - Allow native ARM64 PowerShell on Windows 11 (eleventh review L9): it fails safe with a clear message, and the five machines are x64.
+- Warn about the slow Git tree walk and long paths (twelfth review L3): the walk is the check, and the install runs once per workstation. Revisit if a live install fails on a long path.
+- Check `.old` is intact before restoring it (twelfth review L4): the same run replaces it with a tested install, and only administrators can touch it.
+- Drop `-ErrorAction SilentlyContinue` from the uninstall line (twelfth review L5): without it, a missing folder prints an error for each one that was never created.
+- A reminder to bump the pinned Python (twelfth review L6): process, not code. Updating means changing the URL and hash in `install.ps1`.

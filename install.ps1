@@ -34,7 +34,8 @@ Locks the setup folder before cloning into it, so nobody else can add files
 to the clone, then installs the reviewed commit. Pass the full commit hash,
 never a tag name. The tools run by full path for the same reason the
 installer pins them. Windows clients block scripts by default, so the
-example allows them for this PowerShell window only.
+example allows them for this PowerShell window only. If a Group Policy sets
+the execution policy, that line errors and the policy decides.
 
 .NOTES
 The setup folder isn't needed after a successful install. The installer makes
@@ -104,6 +105,12 @@ function Rename-Retry([string]$Path, [string]$NewName) {
     }
 }
 
+# An interrupted swap leaves the old install as the only good copy. Restore it
+# before any check or download that could fail and leave the PC without one.
+$new = "$dir.new"
+$old = "$dir.old"
+if (-not (Test-Path -LiteralPath $dir) -and (Test-Path -LiteralPath $old)) { Rename-Retry $old (Split-Path $dir -Leaf) }
+
 # PATH can list folders employees can write, and a git or icacls found there
 # would run as admin. Call both by full path.
 $icacls = "$env:SystemRoot\System32\icacls.exe"
@@ -141,15 +148,11 @@ $zip = Join-Path $PSScriptRoot 'python-embed.zip'
 $ProgressPreference = 'SilentlyContinue'
 try {
     Invoke-WebRequest $pyUrl -OutFile $zip -UseBasicParsing -TimeoutSec 300
-    if ((Get-FileHash $zip).Hash -ne $pySha256) { throw "The Python download doesn't match the pinned SHA-256." }
+    if ((Get-FileHash -LiteralPath $zip).Hash -ne $pySha256) { throw "The Python download doesn't match the pinned SHA-256." }
 
     # Build and test the new install beside the old one, so a failure leaves
     # the working install alone. Both sit in Program Files, which only
     # administrators can write to.
-    $new = "$dir.new"
-    $old = "$dir.old"
-    # An interrupted swap leaves the old install as the only good copy.
-    if (-not (Test-Path -LiteralPath $dir) -and (Test-Path -LiteralPath $old)) { Rename-Item -LiteralPath $old -NewName (Split-Path $dir -Leaf) }
     foreach ($leftover in $new, $old) { if (Test-Path -LiteralPath $leftover) { Remove-Item -LiteralPath $leftover -Recurse -Force } }
     New-Item -ItemType Directory $new | Out-Null
     # Drop inherited entries. Administrators and SYSTEM get full control, Users
@@ -158,13 +161,13 @@ try {
     if ($LASTEXITCODE) { throw "icacls failed on $new" }
 
     Expand-Archive -LiteralPath $zip -DestinationPath (Join-Path $new 'python')
-    Copy-Item (Join-Path $PSScriptRoot 'hello.py') $new
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'hello.py') -Destination $new
     # -I ignores PYTHON* variables and the user's site-packages, so nothing the
     # employee controls loads into the run.
     Set-Content (Join-Path $new 'hello.cmd') '@"%~dp0python\python.exe" -I "%~dp0hello.py"' -Encoding ascii
 
-    $hash = (Get-FileHash (Join-Path $new 'hello.py')).Hash
-    if ($hash -ne (Get-FileHash (Join-Path $PSScriptRoot 'hello.py')).Hash) { throw 'Installed hello.py differs from the source' }
+    $hash = (Get-FileHash -LiteralPath (Join-Path $new 'hello.py')).Hash
+    if ($hash -ne (Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'hello.py')).Hash) { throw 'Installed hello.py differs from the source' }
 
     # Check the tree before running anything from it as admin.
     Assert-AdminOnlyTree $new
