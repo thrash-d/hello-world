@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-09-30: Skip the shutdown flush and add a locked-down installer
+
+The third hello.py review answered here.
+
+- `_silence()` is gone. The error path now calls `os._exit(1)` after the stderr message, which skips the shutdown flush that `_silence()` existed to defuse. That closes three findings at once, because the code they point at no longer exists:
+  - "Leaked file descriptor. `os.open(...)` returns a new fd. ... the original fd from `os.open` is never `os.close`d."
+  - "`_silence` is unguarded. `fileno()`, `os.open`, or `dup2` can still raise ... That exception escapes `main()`."
+  - "Process-wide fd replacement. After `_silence`, anything else in this process that still holds fd 1 or 2 writes to null."
+- The stderr message is flushed explicitly, since `os._exit` skips every flush.
+- New `test_hello.py` runs the script against a closed pipe as stdout, then as stdout and stderr, and checks for exit 1. It fails on the round 2 code that exited 120. CI's dependabot check runs `test_*.py` files with pytest.
+- New `install.ps1` does the deployment controls that `BACKLOG.md` had declined as rollout steps. The review said: "Ship it as `py -3 hello.py` from a locked-down path." The script installs to `Program Files\hello-world` with write access for Administrators and SYSTEM only. It writes `hello.cmd`, which pins the all-users Python 3 instead of calling `py -3`, because `py -3` also selects per-user installs that the employee can replace. The launcher runs Python with `-I`, so `PYTHON*` variables and user site-packages can't inject code. The script refuses to install if no all-users Python is under Program Files.
+
+Review finding 3, "Wrong object silenced on some failures", needed nothing beyond the `_silence()` removal. Findings 5 and 6 and the PEP 8 note needed no change; the file already has two blank lines around top-level definitions.
+
+Tested with `python test_hello.py` on the new code and on the round 2 code, where it fails as it should. `install.ps1` was run unelevated on a dev machine. Its guard refused there, since that machine has only a per-user Python. A copy pointed at a scratch folder installed, ran `hello.cmd`, and matched the source hash. With only the Users grant left, writes and new files in the folder were denied. It has not yet run as administrator against the real `Program Files`.
+
 ## 2026-09-30: Exit 1 on dead stdout or stderr instead of 120
 
 The second hello.py review answered here.

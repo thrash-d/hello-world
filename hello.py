@@ -9,23 +9,19 @@ import os
 import sys
 
 
-def _silence(stream):
-    # A failed write leaves its text buffered, and the shutdown flush fails
-    # again and turns the exit code into 120. Point the fd at devnull instead.
-    os.dup2(os.open(os.devnull, os.O_WRONLY), stream.fileno())
-
-
 def main():
     try:
         # flush so a dead stdout raises here, not at interpreter exit
         print("Hello, world!", flush=True)
     except OSError as e:
-        _silence(sys.stdout)
         try:
-            print(f"hello.py: cannot write to stdout: {e}", file=sys.stderr)
+            print(f"hello.py: cannot write to stdout: {e}", file=sys.stderr,
+                  flush=True)
         except OSError:
-            _silence(sys.stderr)
-        return 1
+            pass
+        # A failed write stays buffered, and the shutdown flush would fail
+        # again and turn exit 1 into 120. _exit skips that flush.
+        os._exit(1)
     return 0
 
 
