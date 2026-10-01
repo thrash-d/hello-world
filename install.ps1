@@ -97,6 +97,12 @@ $python = Get-ChildItem HKLM:\SOFTWARE\Python\PythonCore -ErrorAction SilentlyCo
 if ($python -notmatch "^$([regex]::Escape($env:ProgramFiles))\\Python3[\w.-]*\\python\.exe$") {
     throw "Need Python 3 installed for all users in $env:ProgramFiles\Python3*. Found: '$python'"
 }
+# Start it before touching the install folder, so a broken Python doesn't
+# replace a working install with one that can't run.
+& $python -I -c pass
+if ($LASTEXITCODE) {
+    throw ("$python won't start (exit 0x{0:X8}; 0xC0000135 means a missing DLL). Repair that Python install first." -f $LASTEXITCODE)
+}
 
 # Start from an empty folder so no access entry from an earlier copy survives.
 if (Test-Path $dir) { Remove-Item $dir -Recurse -Force }

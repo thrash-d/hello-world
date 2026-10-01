@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-30: Start the pinned Python before replacing the install
+
+Version 1.2.2. The second live install failed its test run with exit -1073741515, `0xC0000135`, a missing DLL. The pinned `C:\Program Files\Python314` had `python.exe` but no `python314.dll` or `python3.dll`, so that Python install is broken. The installer only found out after it had deleted and rebuilt `Program Files\hello-world`. On a machine with a working earlier install, that would leave a launcher that can't run. It now starts the pinned Python with `-I -c pass` before changing anything. It refuses with the exit code in hex and says what `0xC0000135` means.
+
+Tested by copying `python.exe` and the VC runtime DLLs without `python313.dll`, with Python folders taken off PATH, since Windows also searches PATH for DLLs. The copy exited `0xC0000135`, the same as the workstation, and the check refused it. A working Python was accepted. The script parses under Windows PowerShell 5.1.
+
 ## 2026-09-30: Ignore Delete on the drive root
 
 Version 1.2.1. The first live install refused with "Non-administrators can change C:\ (S-1-5-11)". That workstation grants Authenticated Users Modify on `C:\` itself, where the Windows default is create-folders only. Modify includes Delete, which the parent walk refuses. A drive root can't be deleted or renamed, so the walk now ignores Delete on the root and still refuses every other swap right there. Modify doesn't include DeleteChild, so no user can move `ProgramData` or `Program Files` out from under the root.
