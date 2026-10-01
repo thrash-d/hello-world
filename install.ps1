@@ -130,8 +130,11 @@ function Assert-AdminOnly([string]$Path, [int64]$Rights) {
 function Assert-AdminOnlyTree([string]$Root) {
     Write-Host "Checking permissions under $Root (this can take several minutes on Git for Windows)"
     foreach ($i in @(Get-Item -LiteralPath $Root -Force) + @(Get-ChildItem -LiteralPath $Root -Recurse -Force)) {
-        # A link's own ACL says nothing about its target.
-        if ($i.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "$($i.FullName) is a link." }
+        # A link's own ACL says nothing about its target. Reject both symlinks and junctions.
+        if ($i.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+            $type = if ($i.Attributes -band [IO.FileAttributes]::Directory) { 'junction' } else { 'symlink' }
+            throw "$($i.FullName) is a $type (reparse point). Only administrators can create these, but they could allow bypass of permission checks."
+        }
         Assert-AdminOnly $i.FullName $edit
     }
     # A drive root can't be deleted or renamed, so Delete on it doesn't matter.
@@ -191,10 +194,13 @@ if (Test-Path -LiteralPath $gitData) {
     catch { throw "Non-admin write access in $gitData (shared Git for Windows config). Ensure only administrators can modify this folder." }
 }
 # The admin's own session can carry GIT_DIR and friends that point git elsewhere, and
-# HOME/XDG_CONFIG_HOME can point to employee-writable locations. Clear all of them.
+# HOME/XDG_CONFIG_HOME can point to employee-writable locations. Clear all of them to
+# ensure git uses only the reviewed clone and pinned configuration.
 Get-ChildItem Env: | Where-Object Name -like 'GIT_*' | ForEach-Object { Remove-Item -LiteralPath "Env:$($_.Name)" }
 Remove-Item -LiteralPath 'Env:HOME' -ErrorAction SilentlyContinue
 Remove-Item -LiteralPath 'Env:XDG_CONFIG_HOME' -ErrorAction SilentlyContinue
+# Set GIT_CONFIG_NOSYSTEM to prevent git from reading /etc/gitconfig (equivalent on Windows)
+$env:GIT_CONFIG_NOSYSTEM = '1'
 
 # Covers .git too, so nobody can plant git objects that fool the commit check.
 Assert-AdminOnlyTree $PSScriptRoot
@@ -220,7 +226,7 @@ foreach ($f in 'install.ps1', 'uninstall.ps1', 'hello.py', 'VERSION') {
     $expected = & $git -C $PSScriptRoot rev-parse "HEAD:$f"
     # Both commands failing and printing nothing must not read as a match.
     if (-not $actualOk -or $LASTEXITCODE -or "$actual" -notmatch '^[0-9a-f]{40}$' -or "$actual" -ne "$expected") {
-        throw "$f differs from commit $Commit."
+        throw "$f differs from commit $Commit. Do not modify files in the clone. Re-clone from the reviewed release tag to reinstall."
     }
 }
 
