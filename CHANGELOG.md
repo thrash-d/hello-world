@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-10-01: Keep uninstall.ps1 until last and install the Apps entry before the shortcut
+
+The fifteenth review, of 1.4.2, answered here. Version 1.4.3. It found no Critical or High issues, 1 Medium and 6 Low; saved in `reviews/round-15.md`. The reviewer's fixes were kept to what each finding asked for.
+
+- `uninstall.ps1` removes `.new` and `.old` first, then everything in the install folder except itself, then the folder, so the script goes last. The review said (M1): "A failed uninstall can still leave no way to retry, which is the round-14 M2 problem again."
+- The shortcut and Apps entry are removed only if they exist, and without `-ErrorAction SilentlyContinue`, so a real failure reaches the catch. The review said (L1): "Uninstall can report success when the shortcut or Apps entry wasn't removed."
+- The elevation call in `uninstall.ps1` is in a `try/catch` that shows the error and waits for Enter. The review said (L2): "Uninstall errors that happen outside the `try` are never seen." The 64-bit check stays, since it costs nothing.
+- `uninstall.ps1` also sets `[Environment]::CurrentDirectory`. The review said (L4): "`Set-Location` may not release the process's working directory."
+- `install.ps1` writes the Apps entry before the shortcut, and deletes the shortcut if its ACL check fails. The review said (L5): "`install.ps1` can leave a half-finished install."
+
+Declined, and added to `BACKLOG.md`: a non-zero exit code and a `-Quiet` switch for uninstall (L3), and a check of `C:\ProgramData\Git` (L6, a repeat of the Git hardening entries). The pinned hash check and the Windows trial run are process, not code; the reviewer couldn't download the zip to check the hash, and the notes below still apply.
+
+Tested: `python test_hello.py` passes on Linux. Not tested: `install.ps1` and `uninstall.ps1`, which weren't run or even parsed (`pwsh` isn't installed here). The new uninstall order, the retry after a failed delete, the shortcut removal on a failed ACL check and the elevation error path all need a Windows machine.
+
 ## 2026-10-01: Keep the shortcut out of the install folder and make uninstall retryable
 
 The fourteenth review, of 1.4.1, answered here. Version 1.4.2. It found no Critical or High issues, 2 Medium and 4 Low; saved in `reviews/round-14.md`. It was the first review to cover the 1.4.0 shortcut, Apps entry and `uninstall.ps1`.

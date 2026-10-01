@@ -200,19 +200,7 @@ finally {
     Remove-Item -LiteralPath "$dir.new" -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-# Added only after the checks pass, so a failed install never shows up in the
-# Start menu. Run straight from Explorer, hello.cmd's window closes before
-# anyone can read it; the shortcut keeps it open until a key is pressed.
-$lnk = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'hello-world.lnk'
-$shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk)
-$shortcut.TargetPath = "$env:SystemRoot\System32\cmd.exe"
-$shortcut.Arguments = "/c `"`"$dir\hello.cmd`" & pause`""
-# Not $dir: a window left open there is a current directory, and Windows won't
-# rename or delete a folder that one is in.
-$shortcut.WorkingDirectory = $env:SystemRoot
-$shortcut.Save()
-
-# The entry in Settings > Apps, whose Uninstall button runs uninstall.ps1.
+# Added only after the checks pass. The entry in Settings > Apps, whose Uninstall button runs uninstall.ps1.
 $key = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\hello-world'
 New-Item $key -Force | Out-Null
 $entry = @{
@@ -224,8 +212,22 @@ $entry = @{
 foreach ($name in $entry.Keys) { New-ItemProperty $key -Name $name -Value $entry[$name] -Force | Out-Null }
 foreach ($name in 'NoModify', 'NoRepair') { New-ItemProperty $key -Name $name -Value 1 -PropertyType DWord -Force | Out-Null }
 
+# Added only after the checks pass, so a failed install never shows up in the
+# Start menu, and after the Apps entry, so a half-finished install still has
+# an Uninstall button. Run straight from Explorer, hello.cmd's window closes before
+# anyone can read it; the shortcut keeps it open until a key is pressed.
+$lnk = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'hello-world.lnk'
+$shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk)
+$shortcut.TargetPath = "$env:SystemRoot\System32\cmd.exe"
+$shortcut.Arguments = "/c `"`"$dir\hello.cmd`" & pause`""
+# Not $dir: a window left open there is a current directory, and Windows won't
+# rename or delete a folder that one is in.
+$shortcut.WorkingDirectory = $env:SystemRoot
+$shortcut.Save()
+
 # Every employee opens this shortcut, so only administrators may change it.
-# Checked last, so a failure still leaves an Uninstall button.
-Assert-AdminOnly $lnk $edit
+# A shortcut that fails the check is removed, not left in every Start menu.
+try { Assert-AdminOnly $lnk $edit }
+catch { Remove-Item -LiteralPath $lnk -Force -ErrorAction SilentlyContinue; throw }
 
 "Installed to $dir. hello.py SHA-256: $hash"

@@ -42,3 +42,5 @@ Changes considered and declined, with the reason.
 - Proxy credentials and Windows 10 builds before 1809 (thirteenth review L6): same as the proxy entry above. The install runs once per workstation, and failures are visible.
 - A desktop shortcut for every user: typing "hello" in the Start menu finds the Start menu shortcut, and desktop icons pile up on shared machines. Add one if employees ask.
 - Check the Git version or `C:\ProgramData\Git` for planted config (fourteenth review L4): same as the Git hardening entries above. The five machines run a current Git for Windows, and the reviewer's 2.35.2 cutoff was from memory.
+- A non-zero exit code and a `-Quiet` switch for `uninstall.ps1` (fifteenth review L3): it is run by hand from Settings > Apps on five machines. Add them if it is ever scripted.
+- Check `C:\ProgramData\Git` for planted config (fifteenth review L6): same as the Git hardening entries above; the reviewer agreed it isn't needed to deploy.
