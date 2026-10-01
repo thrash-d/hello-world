@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-30: Require Python's DLLs next to python.exe
+
+The eighth review, of 1.2.2, answered here. Version 1.2.3.
+
+- `install.ps1` refuses unless `python3XX.dll`, named from the registry key, and `vcruntime140.dll` sit in the same folder as the pinned `python.exe`. The review said: "If `python.exe` is present and `python314.dll` is **not** beside it, Windows will search `PATH`. An employee-writable `PATH` entry can supply that DLL, the preflight can pass, and both the admin test and later `hello.cmd` load that DLL into whoever runs it." The start check added in 1.2.2 would have loaded that DLL as admin.
+- The help example clones `<release tag>` instead of a fixed tag. The review said: "Help still clones `v1.2.0`. ... A tag/name mismatch is how you install the wrong tree if `-Commit` is copied from an old note."
+
+Tested on a copy of `python.exe` without `python313.dll`, which was refused, and on one without `vcruntime140.dll`, also refused. The real install was accepted. The script parses under Windows PowerShell 5.1.
+
 ## 2026-09-30: Start the pinned Python before replacing the install
 
 Version 1.2.2. The second live install failed its test run with exit -1073741515, `0xC0000135`, a missing DLL. The pinned `C:\Program Files\Python314` had `python.exe` but no `python314.dll` or `python3.dll`, so that Python install is broken. The installer only found out after it had deleted and rebuilt `Program Files\hello-world`. On a machine with a working earlier install, that would leave a launcher that can't run. It now starts the pinned Python with `-I -c pass` before changing anything. It refuses with the exit code in hex and says what `0xC0000135` means.

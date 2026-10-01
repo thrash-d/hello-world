@@ -12,6 +12,9 @@ Changes considered and declined, with the reason.
 - Replace the hex masks in `Assert-AdminOnly` with `FileSystemRights` names, as the fifth and sixth reviews asked: the sign-extension claim is wrong. `GENERIC_WRITE` is bit 30 and positive as an int32. Windows maps generic bits to specific rights on stored ACEs, and testing showed every write grant refused.
 - Read `VERSION` in the installer, which the sixth review called dead weight: it drives the auto-tag workflow, and `-Commit` is the pin.
 - Clear `GIT_DIR`, `GIT_OBJECT_DIRECTORY`, and other `GIT_*` variables before calling git: the installer's environment comes from the admin's own profile and the machine settings, and only administrators can change either.
+- Fall back to an older working Python when the newest registered one is broken: refusing tells the admin to repair it, and silently picking another version would hide the broken install.
+- Shrink `PATH` in `hello.cmd`: with Python's DLLs required next to `python.exe`, Windows finds them there first. The employee's own PATH can only affect the employee's own run.
+- Print exit codes as `[uint32]` in hex: `$LASTEXITCODE` is an int32, so `{0:X8}` already prints `C0000135`.
 - Leave the clone URL out of the installer help: the repo is private, and the URL names only the pseudonymous account.
 - Add TrustedInstaller to the installed folder's ACL to match the source check: nothing needs it there. Trusting it on the source walk lets Program Files and System32 pass.
 - Check the Authenticode signature on the pinned `python.exe`: replacing it under Program Files already takes admin rights.

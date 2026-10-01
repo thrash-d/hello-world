@@ -20,7 +20,7 @@ The full commit hash that was reviewed. The clone must be at this commit.
 $d = 'C:\ProgramData\hello-setup'; New-Item -ItemType Directory $d
 $icacls = "$env:SystemRoot\System32\icacls.exe"; $git = "$env:ProgramFiles\Git\cmd\git.exe"
 & $icacls $d /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F'
-& $git clone -b v1.2.0 --depth 1 https://github.com/thrash-d/hello-world $d
+& $git clone -b <release tag> --depth 1 https://github.com/thrash-d/hello-world $d
 cd $d; Set-ExecutionPolicy -Scope Process Bypass -Force
 .\install.ps1 -Commit <reviewed commit hash>
 
@@ -87,15 +87,22 @@ foreach ($f in 'install.ps1', 'hello.py') {
 
 # py -3 also picks per-user installs, which the employee can replace, so pin
 # the newest all-users Python 3 from the PEP 514 registry keys instead.
-$python = Get-ChildItem HKLM:\SOFTWARE\Python\PythonCore -ErrorAction SilentlyContinue |
+$key = Get-ChildItem HKLM:\SOFTWARE\Python\PythonCore -ErrorAction SilentlyContinue |
     Where-Object PSChildName -match '^3\.\d+$' |
     Sort-Object { [version]$_.PSChildName } |
-    Select-Object -Last 1 |
-    ForEach-Object { (Get-ItemProperty "$($_.PSPath)\InstallPath").ExecutablePath }
+    Select-Object -Last 1
+$python = if ($key) { (Get-ItemProperty "$($key.PSPath)\InstallPath").ExecutablePath }
 # Folders under C:\ outside Program Files are often writable by every user.
 # The path goes into a cmd line, so the pattern also rules out ", %, and &.
 if ($python -notmatch "^$([regex]::Escape($env:ProgramFiles))\\Python3[\w.-]*\\python\.exe$") {
     throw "Need Python 3 installed for all users in $env:ProgramFiles\Python3*. Found: '$python'"
+}
+# Windows searches PATH for a DLL missing from the exe's folder, and a planted
+# copy there would load as admin in the runs below.
+foreach ($f in ('python{0}.dll' -f ($key.PSChildName -replace '\.')), 'vcruntime140.dll') {
+    if (-not (Test-Path (Join-Path (Split-Path $python) $f))) {
+        throw "$f is missing next to $python. Repair that Python install first."
+    }
 }
 # Start it before touching the install folder, so a broken Python doesn't
 # replace a working install with one that can't run.
