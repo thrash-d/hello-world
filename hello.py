@@ -238,7 +238,7 @@ DONE_LINES = (
 
 HELP = """hello-world prints a greeting, a thought, and a small thing to try.
 
-At the end of the screen, type m for options. You can also run hello.cmd
+At the end of the screen, type p for today's plan or m for options. You can also run hello.cmd
 with one of these:
   --plain         Print only the greeting
   --stats         Show what is saved on this computer
@@ -304,7 +304,9 @@ def new_state():
 def clean(text):
     """One printable line: tabs and odd spaces become spaces, controls go."""
     text = "".join(" " if c.isspace() else c for c in text)
-    text = "".join(c for c in text if c.isprintable())
+    # ZWNJ and ZWJ are Cf, not printable, but Persian, Indic scripts and emoji
+    # sequences need them.
+    text = "".join(c for c in text if c.isprintable() or c in "\u200c\u200d")
     return " ".join(text.split())[:120]
 
 
@@ -353,7 +355,10 @@ def load():
             visits.append(day(v))
         except ValueError:
             pass
-    state["visits"] = sorted(set(visits))[-MAX_VISITS:]
+    # A visit dated after today (a wrong clock once) would sort last and hide
+    # every real visit from "welcome back" and the trim.
+    now = today().isoformat()
+    state["visits"] = sorted(v for v in set(visits) if v <= now)[-MAX_VISITS:]
     intent = raw.get("intent")
     try:
         if isinstance(intent, dict) and isinstance(intent.get("text"), str):
@@ -411,8 +416,14 @@ def interactive():
         handle = msvcrt.get_osfhandle(sys.stdin.fileno())
     except (OSError, ValueError):
         return False
-    mode = ctypes.c_ulong()
-    return bool(ctypes.windll.kernel32.GetConsoleMode(handle, ctypes.byref(mode)))
+    from ctypes import wintypes
+    try:
+        get_mode = ctypes.WinDLL("kernel32", use_last_error=True).GetConsoleMode
+        get_mode.argtypes = [wintypes.HANDLE, wintypes.LPDWORD]
+        get_mode.restype = wintypes.BOOL
+        return bool(get_mode(handle, ctypes.byref(wintypes.DWORD())))
+    except (OSError, ctypes.ArgumentError, OverflowError, AttributeError):
+        return False
 
 
 def ask(prompt):
@@ -494,8 +505,8 @@ def show_saved(state):
         f" (last 7 days: {len(recent)})")
     if state["intent"]:
         say(wrapped("Your current plan: ", state["intent"]["text"]))
-    say("The file holds only this:")
-    say(json.dumps(state, indent=2))
+    say("After tidying, the file holds only this:")
+    say(json.dumps(state, indent=2, ensure_ascii=False))
 
 
 def reset(state):

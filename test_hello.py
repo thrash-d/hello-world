@@ -416,6 +416,48 @@ def test_stdout_closed_after_start_exits_1():
     assert p.stderr.startswith(b"hello.py: cannot write to stdout:")
 
 
+def _load_hello(day="2026-10-01"):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("hello_mod", HELLO)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    mod.TODAY = day
+    return mod
+
+
+def test_joiner_characters_survive_cleaning():
+    hello = _load_hello()
+    assert hello.clean("a\u200cb\u200dc") == "a\u200cb\u200dc"
+    assert hello.clean("a\u202eb") == "ab"
+
+
+def test_visits_dated_after_today_are_dropped_on_load():
+    hello = _load_hello()
+    home = tempfile.mkdtemp()
+    hello.HOME = home
+    os.makedirs(os.path.dirname(hello.data_file()), exist_ok=True)
+    with open(hello.data_file(), "w", encoding="utf-8") as f:
+        json.dump({"visits": ["2026-09-30", "2030-01-01"]}, f)
+    state, _ = hello.load()
+    assert state["visits"] == ["2026-09-30"]
+
+
+def test_powershell_scripts_are_ascii():
+    root = os.path.dirname(HELLO)
+    for name in ("install.ps1", "uninstall.ps1"):
+        with open(os.path.join(root, name), "rb") as f:
+            f.read().decode("ascii")
+
+
+def test_documented_tag_matches_version():
+    root = os.path.dirname(HELLO)
+    with open(os.path.join(root, "VERSION")) as f:
+        tag = "$tag = 'v" + f.read().strip() + "'"
+    for name in ("README.md", "install.ps1"):
+        with open(os.path.join(root, name), encoding="utf-8") as f:
+            assert tag in f.read(), name
+
+
 if __name__ == "__main__":
     import traceback
     failed = []
