@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-10-02: the panel's round, an upgrade that fails at step 6 puts the old install back
+
+Version 1.19.0. This round answers `TODO.md`, the result of a six-voice panel (engineer, employee, salesperson, profit maximizer, IT admin, accessibility user) on the backlog.
+
+Content (panel item 3, "Give an 'or' option to every tip and thought that assumes sight", "Replace some stretches with practical work tips"): nine tips and thoughts that assumed sight now offer another way in. Six stretches and eye exercises became work tips, such as pinning the most-used document, muting a group chat, or learning one shortcut. There are still 100 tips and 101 thoughts.
+
+Prompts (item 4, "End every prompt with 'Enter to <outcome>' and drop '='"): every prompt now ends by saying what Enter does, and no prompt uses "=". A test keeps "Enter = " out of the code. The welcome and the expired-plan message are wrapped by paragraph by a new `para()`, not broken by hand mid-sentence. Both places that save a plan say "Saved. Type done when you finish it, or it asks tomorrow." The first run opens with "Press Enter at each question to skip it, and once more to close. That's it." and says everyone sees the same thought and tip on the same day.
+
+Item 5, "After `done`, show the last three finished plans": after `done` and on welcome back it reads out three, and says option 1 lists all of them. Item 6, "After two 'not yet' answers, stop asking": the plan carries a small `waits` count, and the second "not yet" puts it away as `same` with a message. The count sits inside the plan, so `commit()` has no new key to merge.
+
+Item 7, engineer cleanups: a new test runs two real windows as separate processes. Window A waits at "Did you do it?" while window B finishes the same plan, then A finishes it too. The test checks one row, a count of one, A's new plan, and the "other window" message. It passed on its first run. Another test freezes the set of saved keys, so a new key fails it until someone writes its merge rule. Visits dated after today are now dropped on load instead of carried in a `future` list, which removes that key and half of `file_form()`.
+
+Item 8, "Cut the employee part of the README roughly in half" and "Keep the 'what is saved' paragraph in one place": the employee section went from about 88 lines to about 55. `PLAN.md` and the why-doc now link to the README's list of what is saved instead of keeping their own copies.
+
+Installer (item 2, "Defer `Remove-Tree $old` and roll back when step 6 fails, and name the open windows in the rename error"): the old install now stays as `.old` until step 6 has worked. If step 6 fails during an upgrade, the new folder goes, the old one comes back, and the old Apps entry is restored with its value types. A first install that fails there keeps its files, as before. A rename that keeps failing names how many hello-world windows are running from the install folder. From the panel's "Later" list, which IT wanted now: the Apps entry records `Commit` and `InstallDate` and gets a `QuietUninstallString`, and a copy of `install.log` stays in the install folder, so deleting the setup folder no longer loses it. It goes in the install folder rather than ProgramData because the install folder is already admin-only.
+
+Item 1, "Stop the review rounds and run the pilot": `PLAN.md` now has the stop rule, a Pilot section with an assistive-tech user, in-person check-ins on day 14 and day 30, and the kill metric. No routine on this account runs the review rounds, so turning off that schedule is left to the owner.
+
+Tested here: all 137 tests pass on Windows 11, Python 3.13, under both pytest and the plain runner, and ruff is clean. `install.ps1` and `uninstall.ps1` parse in Windows PowerShell 5.1 and are ASCII. The rollback's registry restore was run against a throwaway key under HKCU, and the string and DWORD values came back with their types. Not tested: the installer itself, the step 6 rollback on a real upgrade, and a standard-user smoke run. `TODO.md` lists them for a spare PC.
+
 ## 2026-10-02: backlog sweep, tests in CI on Windows, --version, a blocked save is tried again
 
 Version 1.18.0. The owner asked for every backlog entry to be fixed. The backlog had about 150 entries from 43 rounds, many repeated. Each was checked against the current code. Fixed now:
