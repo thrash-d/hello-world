@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-10-02: every save merges with the file, one finished plan can be forgotten, the menu says where Enter goes
+
+Version 1.16.0. Round 41 review (`reviews/round-41.md`), one reviewer, no Critical, 2 High, 6 Medium, 7 Low, 6 Part 2 items.
+
+Saves from two windows. High 1, "sync() replaces the finished list instead of merging it", Medium 6, "set_plan / mark_done_now are not on the sync path", Low 11, "sync() applies a negative done delta", and Low 12, "Offer skip and reminder state are last-write": `sync()` is replaced by one `commit()` that every save of a change goes through: the follow-up screen, `done`, `plan`, menu options 2, 3, 6 and 7, and the sign-in offer. It re-reads the file just before writing, with no prompt in between. Visits are merged. Finished plans are merged by date and words, and one this window forgot stays forgotten. `done` and `offer_skips` add only what this window added, never less. Any other key is taken from this window only when this window changed it. A failed save puts the window back as it was through one `undo()`, instead of a hand rollback at each caller. The done line and count are now shown after the save, with the merged count. Tests: two windows both finishing, two windows both skipping the offer, a lower count that must not subtract.
+
+Retention change. Part 2 item 2, "Let them drop one line without Delete everything": menu option 7 lists the finished plans by number and forgets the one you pick. When those words are also the earlier plan kept for `same`, that goes too, so the plan really leaves the file. Low 9 and Part 2 item 3, "First finished plan is invisible": the list now shows after the first `done`. Tests for both.
+
+Accessibility change. High 2, "The live menu still says Enter closes": the menu line now reads "Enter  Back to the last prompt" and its prompt "Enter = back". Medium 4, "'See you tomorrow.' runs on skip words too", and Part 2 item 4: after `done`, only Enter and the quit words close, and the line is "Closing.". `no`, `none`, `nothing`, `skip` and `n` there now go back to the last prompt. Low 10: `--help` now says where `same` works, that Enter at the menu goes back, and where the finished list shows. Tests for each.
+
+Other fixes: Medium 3, "A yes on the sign-in offer is final even when the launcher write fails": the offer is closed only once the launcher is written, and a failure names menu option 2. Medium 8, "Finished dates are trusted once they parse": a finished date before 2000 or more than a year ahead is dropped on load. Low 13, "Launcher script rejects \" and % only": `&`, `^`, `<`, `>` and `|` are refused too. Medium 7, "Uninstall still removes $dir.new and $dir.old with Remove-Item -Recurse and no reparse check": `uninstall.ps1` now uses the installer's `Assert-NotLink` and `Remove-Tree`, with a pointer comment on both copies. Medium 5 and Part 2 item 5, "Decision records contradict the file": README, `PLAN.md` and `docs/WHY-DAILY-ACTIONS.md` now carry the same paragraph on what the file holds, what shows it, what deletes it, and that uninstall leaves it. Low 14: the screen test no longer bans `!`, and the "Not tested" lines now name this Windows run.
+
+The tests failed on Windows: 8 of 105 broke because a test with no Startup folder fell through to the real one in `%APPDATA%`, so the sign-in offer ate the typed input. `STARTUP_DIR = ""` now means no Startup folder, every test passes it unless it sets one, and the seven copies of the module loader in the tests are now `_load_hello()`. This also answers Part 2 item 6, "Prove it on a Windows console once", as far as a test run can.
+
+Declined (see `BACKLOG.md`, Round 41): Low 15, Dependabot can't see the tests.
+
+Tested here: all 115 tests pass on Windows 11, Python 3.13, with both pytest and the plain runner. Both PowerShell scripts parse in Windows PowerShell 5.1. I ran plan, `done`, next plan, `done`, `no`, the menu and option 7 through piped input and read the output. Not tested: a real console, a screen reader, the installer and uninstaller themselves, and ruff (not installed on this machine).
+
 ## 2026-10-02: the last seven finished plans come back, Enter really closes after done, a window left open can't undo a newer save
 
 Version 1.15.0. Round 40 review (`reviews/round-40.md`), no Critical, 1 High, about 12 Medium, about 25 Low, about 25 Part 2 items across four reviewers (lead, security, usability and retention, accessibility).

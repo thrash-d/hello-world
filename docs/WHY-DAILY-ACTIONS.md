@@ -68,11 +68,14 @@ The honest levers for retention are:
 - Visit counts, "best streak" and scores. A count is not value.
 - A reminder that is on by default, and anything that opens by itself without
   the person choosing it.
-- A history of which plans were done, or any score. At work that feels like
-  being checked on. Since 1.12 two small things are saved for the person
-  alone: the plan before this one, so a repeated plan is one word, and a bare
-  count of plans marked done. Neither is reported to anyone, and Delete
-  everything removes both.
+- A long history of plans, or any score. At work that feels like being
+  checked on. What it does keep is small and for the person alone: the file
+  holds the dates you opened the program (the last 400), your current plan,
+  the plan before it, how many plans you marked done, and your last seven
+  finished plans (words and date). It also holds your in-a-row setting and
+  your answer to the sign-in question. Menu option 1 shows all of it, option
+  7 forgets one finished plan, and option 4 deletes everything. Uninstalling
+  leaves the file in place. Nothing reports any of it.
 - Any network access, usage reporting to IT or managers, and in-program
   surveys. Trust matters more than a dashboard. Ask the employees directly.
 - Translations and tone settings. Add a language file when someone asks.
@@ -114,8 +117,8 @@ The tester's findings were fixed and each has a test. The ones that mattered:
 
 ## 8. Limits and what is untested
 
-- The tests were run on Windows for 1.7.1 only; later releases were tested on
-  Linux, and the real install has not been run. Untested there: console Unicode input, the
+- The test suite was last run on Windows 11 for 1.16.0, with piped input. The
+  real install has not been run. Untested there: console Unicode input, the
   sign-in launcher, the shortcut's `if errorlevel 1 pause` line, removing
   launchers across profiles, the icon and the window title.
 - No program can guarantee retention. These are the honest levers. Whether
