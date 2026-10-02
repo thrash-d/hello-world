@@ -78,7 +78,7 @@ The honest levers for retention are:
 
 - One small file, `notes.json`, in the user's own folder under `AppData\Local`.
   No name, no computer name, no times.
-- Menu option 1 shows the file's exact contents. Option 4 deletes it.
+- Menu option 1 shows what is saved, tidied; it is not the raw file. Option 4 deletes it.
 - The README says plainly that other people who can read the computer's files,
   such as IT staff, could read it, and to avoid passwords and private details.
 - Uninstalling removes each user's sign-in launcher but leaves their notes.
@@ -111,8 +111,8 @@ The tester's findings were fixed and each has a test. The ones that mattered:
 
 ## 8. Limits and what is untested
 
-- The program and its tests have run on Windows, but the real install has
-  not. Untested there: console Unicode input, the
+- The tests were run on Windows for 1.7.1 only; later releases were tested on
+  Linux, and the real install has not been run. Untested there: console Unicode input, the
   sign-in launcher, the shortcut's `if errorlevel 1 pause` line, removing
   launchers across profiles, the icon and the window title.
 - No program can guarantee retention. These are the honest levers. Whether

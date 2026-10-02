@@ -162,7 +162,7 @@ THOUGHTS = (
     'Stretch your shoulders and unclench your jaw. You have held them up all morning.',
     "Leave on time tonight if you can. Tomorrow's you will be glad of the evening.",
     'Rest is part of the job, because tired people tend to make the same slip twice.',
-    'Drink a glass of water and look at something far away for a moment.',
+    'Rest your eyes on something far away and let your shoulders drop.',
     'A proper break makes the second half of the day feel like a fresh start.',
     "Let the evening belong to you. Nothing in your inbox needs you at nine o'clock.",
     'Say thank you to someone today for a small thing they did without being asked.',
@@ -325,7 +325,7 @@ def load():
     state = new_state()
     path = data_file()
     try:
-        with open(path, encoding="utf-8") as f:
+        with open(path, encoding="utf-8-sig") as f:
             text = f.read(MAX_FILE + 1)
     except FileNotFoundError:
         return state, True
@@ -374,6 +374,10 @@ def save(state):
         os.replace(tmp, data_file())
         return True
     except OSError:
+        try:
+            os.remove(tmp)
+        except (OSError, UnboundLocalError):
+            pass
         return False
 
 
@@ -392,7 +396,10 @@ def indent(text):
 def interactive():
     if FORCE_INTERACTIVE:
         return True
-    if sys.stdin is None or not sys.stdin.isatty():
+    try:
+        if sys.stdin is None or not sys.stdin.isatty():
+            return False
+    except (OSError, ValueError):
         return False
     if os.name != "nt":
         return True
@@ -655,8 +662,11 @@ def daily(startup):
             say("Your notes could not be saved on this computer. This screen "
                 "still works.")
 
-    answer = ask("Press Enter to close, or type m for options > ")
-    if (answer or "").lower() in ("m", "menu"):
+    answer = (ask("Press Enter to close, p for today's plan, m for options > ")
+              or "").lower()
+    if answer in ("p", "plan") and person:
+        set_plan(state, can_save)
+    elif answer in ("m", "menu"):
         menu(state, can_save)
 
 

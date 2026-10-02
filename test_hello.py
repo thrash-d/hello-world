@@ -98,8 +98,10 @@ def test_no_prompts_and_no_waiting_without_a_person():
 
 def test_hello_variables_in_the_environment_are_ignored():
     home = tempfile.mkdtemp()
+    other = tempfile.mkdtemp()
     env = dict(os.environ, HELLO_HOME=home, HELLO_TODAY="2000-01-01",
-               HELLO_INTERACTIVE="1")
+               HELLO_INTERACTIVE="1", HOME=other, LOCALAPPDATA=other,
+               APPDATA=other, XDG_DATA_HOME=other)
     p = subprocess.run([sys.executable, HELLO, "--stats"], capture_output=True,
                        text=True, stdin=subprocess.DEVNULL, env=env)
     assert p.returncode == 0 and home not in p.stdout
@@ -144,8 +146,34 @@ def test_in_a_row_line_appears_at_milestones_only():
     shown = [n for n, out in enumerate(outs, 1) if "in a row" in out]
     assert shown == [3, 7]
     assert "3 times in a row" in outs[2]
+    home = tempfile.mkdtemp()
+    for n in (1, 2):
+        run(text="\n\n", day=f"2026-10-0{n}", home=home)
     run(["--streak", "off"], home=home)
-    assert "in a row" not in run(text="\n\n", day="2026-10-14", home=home).stdout
+    assert "in a row" not in run(text="\n\n", day="2026-10-03", home=home).stdout
+
+
+def test_p_at_the_last_prompt_sets_the_plan():
+    home = tempfile.mkdtemp()
+    run(text="\np\nWrite the report\n", home=home)
+    assert notes(home)["intent"]["text"] == "Write the report"
+
+
+def test_a_notes_file_with_a_byte_order_mark_is_read_not_moved_aside():
+    home = tempfile.mkdtemp()
+    with open(os.path.join(home, "notes.json"), "w", encoding="utf-8-sig") as f:
+        json.dump({"visits": ["2026-09-30"], "intent": None}, f)
+    run(text="\n\n", home=home)
+    assert not os.path.exists(os.path.join(home, "notes.json.bak"))
+    assert notes(home)["visits"] == ["2026-09-30", "2026-10-01"]
+
+
+def test_thought_and_tip_never_repeat_each_other_on_one_screen():
+    import hello
+    for i in range(len(hello.TIPS)):
+        t = hello.TIPS[i].lower()
+        h = hello.THOUGHTS[(i + 37) % len(hello.THOUGHTS)].lower()
+        assert not ("glass of water" in t and "glass of water" in h)
 
 
 def test_welcome_back_after_a_long_gap_and_no_shaming():
@@ -324,11 +352,11 @@ def test_a_damaged_file_is_kept_as_a_backup():
 
 def test_a_bad_plan_date_does_not_turn_the_in_a_row_line_back_on():
     home = tempfile.mkdtemp()
-    bad = {"visits": ["2026-10-01", "2026-10-02", "2026-10-03"],
+    bad = {"visits": ["2026-10-01", "2026-10-02"],
            "intent": {"text": "x", "date": "junk"}, "streak": False}
     with open(os.path.join(home, "notes.json"), "w") as f:
         json.dump(bad, f)
-    p = run(text="\n\n", day="2026-10-04", home=home)
+    p = run(text="\n\n", day="2026-10-03", home=home)
     assert "in a row" not in p.stdout
     assert notes(home)["streak"] is False
 
