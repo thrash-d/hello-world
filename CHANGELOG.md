@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-10-02: Console check made safe, joiner characters kept, future-dated visits dropped, honest wording
+
+Version 1.9.1. Round 28 review (`reviews/round-28.md`), one High, five Medium, nine Low.
+
+- M2, "`GetConsoleMode` is called without `argtypes` or `restype`": the call declares `HANDLE`, `LPDWORD` and `BOOL`, and any failure counts as no console instead of "something went wrong".
+- L4, "`clean()` damages some non-English text": U+200C and U+200D are kept; the bidi controls are still removed.
+- L2, "Future-dated visits": visits after today are dropped on load, so a wrong clock once can't hide real history.
+- L1, "Option 1 and `--stats` say more than they know": the screen says "After tidying, the file holds only this:" and shows non-ASCII text as typed.
+- L8, "`HELP` omits `p`": added.
+- L9, "`.gitignore` lacks `install.log` and `*.zip`": added, with `.ruff_cache/`.
+- L7, "No test asserts the `.ps1` files are ASCII" and "No test checks that the README and installer tag match `VERSION`": both added, plus tests for the two code changes. The README and installer tag are v1.9.1.
+
+Declined (see `BACKLOG.md`).
+
+Tested here: all 47 tests pass with the plain runner on Linux, Python 3.11. Not tested: anything on Windows, including the new `GetConsoleMode` declaration, and pytest (not installed here).
+
 ## 2026-10-02: Plan shortcut on the first screen, byte-order-mark files, tests that can fail, docs made accurate
 
 Version 1.9.0. Round 27 review (`reviews/round-27.md`), no Critical or High findings.

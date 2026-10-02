@@ -28,3 +28,8 @@ __pycache__/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Installer output
+install.log
+*.zip
+.ruff_cache/
