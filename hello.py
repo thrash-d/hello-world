@@ -368,7 +368,7 @@ def load():
 def save(state):
     try:
         os.makedirs(data_dir(), exist_ok=True)
-        tmp = data_file() + ".tmp"
+        tmp = f"{data_file()}.{os.getpid()}.tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(state, f, indent=2)
         os.replace(tmp, data_file())
@@ -496,21 +496,46 @@ def reset(state):
     if not is_yes(answer):
         say("Nothing was deleted.")
         return False
+    leftovers = [data_file(), data_file() + ".bak"]
     try:
-        os.remove(data_file())
-    except FileNotFoundError:
-        pass
+        leftovers += [os.path.join(data_dir(), n)
+                      for n in os.listdir(data_dir())
+                      if n.startswith("notes.json.") and n.endswith(".tmp")]
     except OSError:
-        say("Could not delete the file. Delete this file yourself:")
-        say("  " + data_file())
-        return False
+        pass
+    for path in leftovers:
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+        except OSError:
+            say("Could not delete the file. Delete this file yourself:")
+            say("  " + path)
+            return False
     state.clear()
     state.update(new_state())
     say("Done. Everything saved was deleted.")
     return True
 
 
-def menu(state):
+def set_plan(state, can_save):
+    old = state["intent"]
+    iso = today().isoformat()
+    if old and old["date"] == iso:
+        say(wrapped("Your plan for today: ", old["text"]))
+    text = clean(ask("Type today's plan (Enter keeps it as it is) > ") or "")
+    if not text:
+        say("Nothing changed.")
+        return
+    state["intent"] = {"text": text, "date": iso}
+    if can_save and save(state):
+        say("Done. Your plan for today is saved.")
+    else:
+        state["intent"] = old
+        say("Could not save that on this computer.")
+
+
+def menu(state, can_save=True):
     while True:
         say()
         say("Options")
@@ -522,8 +547,9 @@ def menu(state):
             + ("on" if state["streak"] else "off") + " (change it)")
         say("  4  Delete everything saved")
         say("  5  Help")
+        say("  6  Set or change today's plan")
         say("  Enter  Close")
-        choice = ask("Choose 1 to 5 > ")
+        choice = ask("Choose 1 to 6 > ")
         if not choice:
             return
         if choice == "1":
@@ -532,7 +558,7 @@ def menu(state):
             remind(not reminding)
         elif choice == "3":
             state["streak"] = not state["streak"]
-            if save(state):
+            if can_save and save(state):
                 say("Done. The in-a-row line is "
                     + ("on." if state["streak"] else "off."))
             else:
@@ -542,8 +568,10 @@ def menu(state):
             reset(state)
         elif choice == "5":
             say(HELP)
+        elif choice == "6":
+            set_plan(state, can_save)
         else:
-            say("Please type a number from 1 to 5, or press Enter.")
+            say("Please type a number from 1 to 6, or press Enter.")
 
 
 def daily(startup):
@@ -592,10 +620,10 @@ def daily(startup):
                 intent = None
             elif is_no(answer):
                 keep = ask("That is fine. Keep it for today? (y/n) > ")
-                if is_yes(keep):
-                    intent = {"text": intent["text"], "date": iso}
-                else:
+                if is_no(keep):
                     intent = None
+                else:
+                    intent = {"text": intent["text"], "date": iso}
         say()
 
     say("Thought for today:")
@@ -629,7 +657,7 @@ def daily(startup):
 
     answer = ask("Press Enter to close, or type m for options > ")
     if (answer or "").lower() in ("m", "menu"):
-        menu(state)
+        menu(state, can_save)
 
 
 def run(argv):
@@ -700,6 +728,8 @@ def main():
         # A failed write stays buffered, and the shutdown flush would fail
         # again and turn exit 1 into 120. _exit skips that flush.
         os._exit(1)
+    except KeyboardInterrupt:
+        return 1
     except Exception as e:
         try:
             print(f"hello.py: something went wrong ({type(e).__name__}). "

@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-10-02: Keep the plan on Enter, honour the unreadable-file rule in the menu, make reset complete, add a plan option
+
+Version 1.8.0. Round 26 review (`reviews/round-26.md`), no Critical or High findings.
+
+- M1, "Pressing Enter at 'Keep it for today? (y/n)' silently deletes the plan": only an explicit no drops the plan now. Enter, Ctrl-C and end of input keep it.
+- M2, "Menu option 3 can overwrite a notes file the program decided it must not touch": the menu gets `can_save` and refuses to save when it is false, as `--streak` already did. Tested with a notes path that can't be opened.
+- M3, "'Delete everything saved' leaves plan text behind": reset also removes `notes.json.bak` and any leftover temp copy.
+- L9, "Concurrent runs can race on notes.json.tmp": the temp file name includes the process id.
+- L8, "Ctrl-C outside input()": a Ctrl-C anywhere exits 1 quietly instead of "something went wrong".
+- Part 2 item 2, "Let people use the plan any time": menu option 6 sets or changes today's plan; Enter keeps what is there.
+- L1, stale docs: the example tag in `README.md` and the `install.ps1` help is v1.7.1. `PLAN.md` and `docs/WHY-DAILY-ACTIONS.md` no longer say nothing has run on Windows. Part 2 item 6 is only partly done: the facts still live in several files.
+- M4 and M5, docs only: the README's "If something fails" now says a failure at step 6 leaves the new files in place (run the installer again), and that open hello-world windows block replacing the folder. I did not change the installer's code or messages because I can't run PowerShell here.
+- README describes option 6 and that reset removes backup copies.
+- New tests: Enter and n at keep-for-today, option 6, reset removing backup and temp copies, and the menu not saving over an unreadable file. All four fail against 1.7.1's `hello.py`.
+
+Declined (see `BACKLOG.md`): the other items, with reasons there.
+
+Tested here: all 39 tests pass with the plain runner on Linux, Python 3. pytest isn't installed here, so the pytest runner was not run. Not tested: anything on Windows (the console, PowerShell, the installer, the uninstaller, the reset on a locked file), and the installer code is unchanged apart from the help example.
+
 ## 2026-10-01: Fix the console check on Windows and leave the admin's window as it was
 
 Version 1.7.1. A Windows test run of 1.7.0 found these. The scheduled review rounds can't run PowerShell or Windows Python, so none of them had been seen.

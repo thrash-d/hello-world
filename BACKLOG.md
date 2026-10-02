@@ -57,3 +57,9 @@ Changes considered and declined, with the reason.
 - Usage reporting to IT, and feedback built into the program (value review): the program makes no network calls so people can trust it. Ask the employees directly.
 - Translations and tone settings (design review): add a language file when someone asks. The text is plain, short and ASCII.
 - A desktop icon, again (value review): same as the earlier entry. The Start menu entry and the opt-in sign-in launcher cover it.
+- Defer `Remove-Tree $old` and roll back if step 6 fails, and name open windows in the rename error (twenty-sixth review M4, M5): PowerShell I can't run here; the README says what to do instead. Do it in the next Windows trial run.
+- A Windows CI job and CI supply-chain pinning (twenty-sixth review M6, L3, L4, Part 2 item 5): CI lives in `.github/`, which this routine doesn't change.
+- Skip a launcher when its parent is a junction in `uninstall.ps1` (twenty-sixth review L2): same as the nineteenth review entry above; the fixed name limits the harm.
+- Python pin reminder, again (twenty-sixth review L5): same as the twelfth review entry above.
+- Show the real file in `--stats`, and tell the person when a plan is cut at 120 characters (twenty-sixth review L6, L7): low impact; 120 characters keeps the screen to a few lines.
+- Weekday-aware tips, an IT-supplied `content.txt`, a release zip or package deployment, and a "how to ask IT to remove this" line (twenty-sixth review Part 2 items 3, 4, 7): each needs a decision from the owner and a Windows trial. Ask the employees first (item 1).

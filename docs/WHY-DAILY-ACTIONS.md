@@ -111,7 +111,8 @@ The tester's findings were fixed and each has a test. The ones that mattered:
 
 ## 8. Limits and what is untested
 
-- Nothing has run on Windows. Untested there: console Unicode input, the
+- The program and its tests have run on Windows, but the real install has
+  not. Untested there: console Unicode input, the
   sign-in launcher, the shortcut's `if errorlevel 1 pause` line, removing
   launchers across profiles, the icon and the window title.
 - No program can guarantee retention. These are the honest levers. Whether
