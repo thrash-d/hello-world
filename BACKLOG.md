@@ -1,162 +1,58 @@
 # Backlog
 
-Changes considered and declined, with the reason.
+Changes considered and declined, with the reason. On 2 October 2026 the list from rounds 1 to 43 was swept. Everything a later round had fixed, or that could be done and tested here, was done and is in the 1.18.0 changelog entry. What is left is grouped by why it stays.
 
-- Drop the OS error text from the stderr message: the review rated it acceptable, and the errno is what someone debugging a dead stdout needs.
-- Support Python 2 or versions before 3.6: f-strings already fail closed with a `SyntaxError`, which the review rated fine.
-- Keep `_silence()` and add the review's `try/finally os.close` and exception shield: `os._exit(1)` removes the need for it, with less code.
-- Application control, such as AppLocker or WDAC rules or signing the script: Group Policy on the workstations, not code in this repo.
-- A scheduled hash check of the installed file: only administrators can change it, and `install.ps1` prints the hash for a manual check.
-- Bake hello.py's SHA-256 or the expected commit into `install.ps1`: a commit can't hold its own hash, and a pinned file hash would need updating every release. The installer takes the reviewed commit as `-Commit` and checks both files against it instead.
-- Replace the hex masks in `Assert-AdminOnly` with `FileSystemRights` names, as the fifth and sixth reviews asked: the sign-extension claim is wrong. `GENERIC_WRITE` is bit 30 and positive as an int32. Windows maps generic bits to specific rights on stored ACEs, and testing showed every write grant refused.
-- Read `VERSION` in the installer, which the sixth review called dead weight: it drives the auto-tag workflow, and `-Commit` is the pin.
-- Accept uppercase in `-Commit`, as the ninth review asked: `ValidatePattern` and `-ne` both ignore case, so an uppercase hash already works.
-- Leave the clone URL out of the installer help: the repo is private, and the URL names only the pseudonymous account.
-- Add TrustedInstaller to the installed folder's ACL to match the source check: nothing needs it there. Trusting it on the source walk lets Program Files and System32 pass.
-- Branch protection, 2FA, and force-push rules on GitHub: account settings, not repo files. Decide them in github-mog.
-- A smoke run as a standard user through `runas` or a scheduled task: it needs a standard account's credentials on each workstation. The ACL check after install proves the same access.
-- Test `hello.cmd`, `-I`, and the ACLs in CI: CI runs on Linux, and the installer checks these itself on each workstation.
-- Commit the Python zip to the repo instead of downloading it: that's 12 MB of binary in history for each Python update, and the SHA-256 pinned in the reviewed commit gives the same guarantee.
-- Verify the zip's sigstore signature in the installer: it needs a sigstore client on every workstation, and the pinned hash was checked against the sigstore record when it was set.
-- Harden Git's environment and config, as the tenth review asked (clear `GIT_*`, `GIT_CONFIG_NOSYSTEM`, `--no-filters`, `core.autocrlf=false` on clone): the `GIT_*` clearing is done. `--no-filters` would refuse a clone with CRLF checkout, while the default clean filter makes the check match on either setting.  `C:\ProgramData\Git` is now checked for non-administrator write access.
-- Test `LinkType` instead of the reparse-point attribute, and check parents for links: the attribute check fails closed, and a loosened check could let a real link through. Change it if a live install stops on a CompactOS file. Replacing a parent with a link needs rights the parent ACL check already refuses.
-- Proxy credentials and Git's "dubious ownership" message: the install runs once per workstation, and failures are visible.
-- `exit /b %ERRORLEVEL%` in `hello.cmd`: the exit code already passes through, and the install test run checks it.
-- Run the tests on the pinned embeddable Python in CI: CI lives in `.github/`, which this routine doesn't change.
-- Patch reminders for the bundled Python and a scoped allow rule for it: process and Group Policy, not repo code. Updating means changing the URL and hash in `install.ps1`.
-- Pilot the installer on a spare machine and check the zip hash by hand, as the eleventh review asked (M1): process, not code. The changelog says what's untested.
-- Allow native ARM64 PowerShell on Windows 11 (eleventh review L9): it fails safe with a clear message, and the five machines are x64.
-- A reminder to bump the pinned Python (twelfth review L6): process, not code. Updating means changing the URL and hash in `install.ps1`.
-- Pilot install, hand-checked hash, Git environment and config hardening (thirteenth review M1, M2): same as the eleventh and tenth review entries above. The pilot is process, and the Git environment comes from the admin's own session.
-- Proxy credentials and Windows 10 builds before 1809 (thirteenth review L6): same as the proxy entry above. The install runs once per workstation, and failures are visible.
-- A desktop shortcut for every user: typing "hello" in the Start menu finds the Start menu shortcut, and desktop icons pile up on shared machines. Add one if employees ask.
-- Check the ACL of the Start Menu Programs folder after creating the shortcut (seventeenth review L2): the default ACLs on `C:\ProgramData` may not pass the parent check, and I can't test that here. Try it in the Windows trial run first.
-- Read the architecture from `[RuntimeInformation]` instead of `$env:PROCESSOR_ARCHITECTURE` (eighteenth review L2): an emulated x64 process on ARM64 reports a different value there, I can't test it here, and the machines are x64. The check fails safe.
-- Walk the tree without recursing into links (nineteenth review L8): only administrators can place links there, and the walk fails closed.
-- Print the install error once instead of on the console and in the log (twentieth review L1): the console copy is harmless and the log copy is the point.
-- Make the Apps Uninstall button elevate (twentieth review L4): `uninstall.ps1` already restarts itself with `-Verb RunAs`.
-- Walk the tree without recursing into junctions, again (twenty-first review L1): same as the nineteenth review entry above. Only administrators can plant one and the worst case is a slow check.
-- Review `uninstall.ps1` with the reviewer (twenty-second review L2): left out on purpose; it was read by hand in round 20.
-- Elevation for the Uninstall button, again (twenty-second review L3): same as the twentieth review entry above.
-- Re-check the Start Menu folder ACL and `$new` after the test run (twenty-second review L5): the first is listed from the seventeenth review, and the second adds little after the tree check.
-- Pilot install, `ProgramData\Git` hardening step, admin-config note and Python pin reminder, again (twenty-third review L1, L2, Info): same as the eleventh, nineteenth and twelfth review entries above.
-- Check the help with `Get-Help`, and review `uninstall.ps1` with the reviewer, again (twenty-fourth review L3, scope note): same as the eleventh and twenty-second review entries above.
-- Run the install cycle on a Windows VM, parse-check under 5.1, and review `uninstall.ps1` again (twenty-fifth review H3): same as the eleventh and twenty-second review entries above.
-- Verify Git before the documented `git clone` (twenty-fifth review M1): Git for Windows installs into Program Files, which is admin-only by default, and the installer checks it before using anything from the clone.
-- Set `GIT_CONFIG_GLOBAL=NUL` (twenty-fifth review M3): needs Git 2.32 or later and I can't test the Windows `NUL` handling here. The comment now says what is cleared. The admin's profile is admin-only.
-- Fail on `git status` output, alternates, or `commondir` (twenty-fifth review M4): only administrators can plant them, and the install copies only the files whose hashes were checked.
-- Reject links in parent folders, walk without descending into junctions, and `Set-Location` first (twenty-fifth review L1, L2, L4): same as the nineteenth and twenty-first review entries above. Git runs with `-C` on the clone.
-- Normalize the Git path with `GetFullPath` (twenty-fifth review L5): the registry value is admin-only.
-- Add WriteAttributes and WriteExtendedAttributes to the rights masks (twenty-fifth review L6): neither changes file contents.
-- Clean up a half-finished install, keep the original error when the restore fails, proxy support, Python pin process (twenty-fifth review L7, L8): same as the entries above, and a failed install is visible to the admin who ran it.
-- A one-step reinstall helper (usability review): a fresh clone of the reviewed release is the point of the design, so the README lists the steps instead.
-- Split the payload from the installer (value review): there is only one payload. Do it when a second tool exists, with both in hand and a Windows test run. See `PLAN.md`, phase 3.
-- Rename the elevation prompt in the uninstaller (usability review): Windows names the prompt after the program it starts, and the README says what to expect.
-- Visit counts, best streak and a record of whether plans were done (value review): a count is not value, and a performance record at work feels like being checked. Only the dates and the current plan are saved.
-- A sign-in reminder that is on by default (value review): an unrequested window at sign-in is intrusive on a work PC. It is opt-in, per user.
-- Usage reporting to IT, and feedback built into the program (value review): the program makes no network calls so people can trust it. Ask the employees directly.
-- Translations and tone settings (design review): add a language file when someone asks. The text is plain, short and ASCII.
-- A desktop icon, again (value review): same as the earlier entry. The Start menu entry and the opt-in sign-in launcher cover it.
-- Defer `Remove-Tree $old` and roll back if step 6 fails, and name open windows in the rename error (twenty-sixth review M4, M5): PowerShell I can't run here; the README says what to do instead. Do it in the next Windows trial run.
-- A Windows CI job and CI supply-chain pinning (twenty-sixth review M6, L3, L4, Part 2 item 5): CI lives in `.github/`, which this routine doesn't change.
-- Skip a launcher when its parent is a junction in `uninstall.ps1` (twenty-sixth review L2): same as the nineteenth review entry above; the fixed name limits the harm.
-- Python pin reminder, again (twenty-sixth review L5): same as the twelfth review entry above.
-- Show the real file in `--stats`, and tell the person when a plan is cut at 120 characters (twenty-sixth review L6, L7): low impact; 120 characters keeps the screen to a few lines.
-- Weekday-aware tips, an IT-supplied `content.txt`, a release zip or package deployment, and a "how to ask IT to remove this" line (twenty-sixth review Part 2 items 3, 4, 7): each needs a decision from the owner and a Windows trial. Ask the employees first (item 1).
-- Windows CI job, CI checksums and SHA pins, `GetConsoleMode` argtypes, launcher flash, README clone-step Git hardening, junction check in `uninstall.ps1` (twenty-seventh review Part 1 items 1, 4, 5, 6, Low): CI lives in `.github/`, and the rest is PowerShell or Windows-only code I can't run here. Do them in the next Windows trial run.
-- Org content file, success criteria for the pilot, Narrator test, "another one" tips (twenty-seventh review Part 2 items 2, 5, 6, 8): each needs a decision from the owner or a Windows trial. Ask the employees first.
-- Make `--stats` read-only, notice for plans cut at 120 characters, timestamped `.bak`, per-string content test, visit cap vs milestones, time-of-day wording (twenty-seventh review Low): low impact; the `.bak` keeps the data and the cap only matters after a year of daily use.
-- Windows CI job, pty test, `--selftest`, error log and support contact, bootstrap script for the clone, SHA pins, patch-only Dependabot merges, tag-after-CI and release hashes, Python patch checker (twenty-eighth review H1, M1-M5): CI lives in `.github/`, and the rest is PowerShell or Windows-only code I can't run here. Do them in the next Windows trial run.
-- Say "could not read" in option 1 when the file is locked, timestamped `.bak`, non-zero exit codes for failed `--reset`, `--streak` and `--remind`, notice when a plan is cut, junction handling in `uninstall.ps1`, Windows version check, `Publisher` parameter, WHY/PLAN wording on counts and desk tips, UK/US spelling (twenty-eighth review L1-L3, L5, L6, L8): low impact, or needs a decision from the owner.
-- Purpose and success test, `content.json`, rename and icon, Intune package, feedback key, accessibility and locale tests, lifecycle plan (twenty-eighth review Part 2 items 1-7): each needs a decision from the owner or a Windows trial. Ask the pilot employees first.
-- Windows CI job, SHA pins, checksums, patch-only Dependabot merges, `actor` check, tag validation, `LICENSE`, `SECURITY.md`, `CODEOWNERS` (twenty-ninth review H1, M4, M5, Low 11-14): CI lives in `.github/`, which this routine doesn't change; the rest is repository settings. M5 checked: `.devkit/kit/ruff.toml` and `vale.ini` are committed.
-- Where the reviewed commit hash is published, signed tags (twenty-ninth review M3): process for the owner. The README says the hash is the one that was reviewed.
-- `fsync` before replace, concurrent runs, Ctrl+C stopping, nag limit, `start /min`, direction marks, display width, tip wording, trust of a pilot run (twenty-ninth review Low 2, 4-9): low impact or needs a decision from the owner; direction marks stay stripped because they can reorder text on screen.
-- Content file, success test, Intune package, screen reader check, languages, privacy text under option 1, Windows install pass (twenty-ninth review Part 2 items 1-8): each needs a decision from the owner or a Windows trial. Ask the pilot employees first.
-- Windows CI, Python 3.14 in CI, workflow hardening (`if: !cancelled()`, checksums, SHA-pinned actions, no auto-merge of Actions bumps), the `interactive()` fallback test (thirtieth review H1, M3, M4): `.github/` and `.devkit/` are outside what this routine changes, and the Windows run is a process step. The fallback test needs `os.name == "nt"`.
-- Check `hello.cmd` exists before writing the sign-in launcher (thirtieth review L6): a clone has no `hello.cmd`, and the test run would need one. The installer creates it.
-- Let Ctrl-C abort the visit, a lock file, a schema version, fsync, treat FileNotFoundError on backup as success, cap backups, `--stats` wording (thirtieth review L6): rare cases; the file fails safe into a backup. Revisit if anyone reports one.
-- Git ACL line before `git clone`, junction-safe uninstall, README placeholder hash, time-of-day wording (thirtieth review L5, L7, L8): same as the earlier Git and junction entries; Program Files is admin-only by default.
-- Editable content file, time-of-day tags, "another one", `plan` command, renaming, README split, trial and stop rule (thirtieth review Part 2): needs the five-PC trial first, as `PLAN.md` says. Not built before there is evidence of what people want.
-- CI test job, PSScriptAnalyzer, Windows run, Dependabot config and auto-merge scope, checksums on CI downloads (thirty-first review M2, M3, M5, L2): `.github/` is outside what this routine changes, and the Windows run is a process step.
-- Close the window after a period of no input, find processes holding the install folder (thirty-first review M4, Part 2 item 6): needs a decision from the owner and a Windows test.
-- Git ACL check before the README clone, uninstall `-Wait` and exit code, redirected-profile launcher cleanup (thirty-first review L1, L8): same as the earlier Git and uninstall entries; needs a Windows run.
-- Re-`load()` before menu saves, retry in `save()`, mutation by read-only commands, notice for unrecognised answers and the 14-day expiry, umask on Linux (thirty-first review L4-L6, L9, L10, L12): rare cases or low impact; the file fails safe into a backup.
-- Who it is for, IT content file, editable content, repetition, quick `--plan`, success measures, MSI/Intune packaging, other platforms (thirty-first review Part 2): needs the five-PC trial first, as `PLAN.md` says. Not built before there is evidence of what people want.
-- Test job before tagging, Windows CI, checksums and SHA pins, auto-merge scope, Python patch checker, `continue-on-error` on commit lint (thirty-second review H1, H2, M4, M5, M6): `.github/` is outside what this routine changes, and the Windows run is a process step.
-- `|| pause` in the sign-in launcher (thirty-second review L3): the launcher uses `start`, which does not wait, so there is no exit code to test.
-- `-Wait` and exit code in `uninstall.ps1 -Quiet`, junction-safe profile cleanup, Domain Admins in the ACL check, fsync, tip wording for ability, README `$d` note (thirty-second review L4-L11): PowerShell I can't run here, or low impact; same as earlier entries.
-- Daily plan list, IT content file, rollout packaging, `--version`, roaming profiles, privacy grep test, pilot measure (thirty-second review Part 2): needs a decision from the owner, same as earlier entries.
-- Windows CI, action SHA pins, error log, `fsync`, launcher Known Folder and atomic rewrite, Ctrl-C, `uninstall.ps1 -Wait`, checksums for CI tools, concurrent runs, IT content file, multi-item plan, `--version`/`--doctor`, lighter packaging, pilot measure (thirty-third review M1, M2, M4, L6-L8, L11, L12, Part 2): same reasons as earlier entries; needs a Windows machine or a decision from the owner.
+## Against the design on purpose
 
-## Round 34
+- Usage reporting to IT, feedback built into the program, an error log file, or network access of any kind: the program makes no network calls and keeps nothing but `notes.json`, so people can trust it. Ask the employees directly.
+- Visit counts, a best streak, scores, or a lifetime visit count past 400 days: a count isn't value, and a record at work feels like being checked on.
+- A sign-in reminder that is on by default, or closing the window after a period of no input: a window that appears or vanishes on its own is intrusive on a work PC.
+- A longer plan history, a weekly recap, a list of several plans, or a Markdown export: the program keeps seven short finished plans on purpose.
+- A switch to hide the finished list, expiring `same` after 30 days, or an opt-in done count: option 7 forgets one plan, and option 4 deletes everything.
+- A timestamped `.bak`, or a cap on `.bak` copies: numbered backups keep every damaged file, and a cap would delete someone's data.
+- A lock file or a schema version: `commit()` merges every save, and the delete marker covers Delete everything.
+- Not counting the sign-in `--startup` window as a visit: it would change what "in a row" means.
+- Skip repairing a damaged file when nobody can see the screen: the file is set aside as a backup, never deleted.
+- Ctrl+C ending the whole visit: Ctrl+C skips one prompt, which is safer for someone who pressed it by accident.
+- Prompts that end in `:` instead of ` > `: the Narrator pass on 1.16.0 passed with the current prompts.
+- Renumbering the menu or a "Mark done" menu item: renumbering breaks saved habits, and `done` at the last prompt covers it.
+- Keeping direction marks in plan text: they can reorder text on screen.
+- Forcing UTF-8 output: Python already writes Unicode to a Windows console whatever the code page, and forcing it would change the bytes piped output and the tests read.
+- Python 2, or Python before 3.6: f-strings fail closed with a `SyntaxError`.
 
-- Windows CI job, SHA-pinned Actions, checksum-verified tool downloads, Dependabot major-version gate: need CI and Windows runs I can't do here.
-- Skip repair when the run can't save or be seen (finding 5), retry on `os.replace` (6), let Ctrl+C escape `ask` (7), error log file (11): small behaviour changes the owner has not asked for.
-- Content override file, Python pin update check, organisation-owned repo: decisions for the owner.
-- Round 35 CI and installer items (Dependabot major merges, tool checksums, SHA-pinned actions, a Windows test job, installer progress lines, junction check in uninstall, sign-in window focus): need `.github/` edits or a Windows run I don't have here.
-- Round 35 product items (note to tomorrow, Ctrl+C quits, time-of-day content tags, `extra.txt`, `.prev` backup, renamed Start entry, a 101st thought): behaviour changes for the owner to weigh against the five-person pilot; the retention and accessibility changes this round came first.
-- Round 36: dependabot auto-merge gate, SHA-pinned actions, checksums for CI tools, base-branch gate config (security M1, L1, L2; lead 12, 22): all in `.github/`, which this routine does not change.
-- Round 36: README bootstrap runs git before the installer's Git check, Authenticode on bundled Python, junction check in uninstall, installer colour and progress, `-CloseOpen` (security M2, L3, L4, L6; accessibility M3, M6; lead 14, 20, 21): PowerShell I can't run here.
-- Round 36: same-day "Is this done yet?", multi-item plans, `extra.txt`, content time tags, 365-day content, rename Start entry, yesterday's thought (usability 9, 14, 15; lead part 2): product decisions for the owner.
-- Round 36: make the sign-in `--startup` window not count as a visit or spend the plan question (usability 6): changes what "in a row" means; revisit with Windows evidence of how often it fires.
-- Round 36: `q` / Ctrl+C quit, error log, plain-words option 1, save-failure folder and remedy text, Windows CI job and test isolation (lead 5, 6, 13, 23; accessibility L3): behaviour or CI changes weighed in earlier rounds; the Windows test isolation needs a Windows run to verify.
-- Round 36: NVDA and Narrator pass (accessibility M5): needs a person with the tools; the README says it is untested.
+## Claims that turned out wrong or already true
 
-## Round 37
+- Drop the OS error text from the stderr message: the errno is what someone debugging a dead stdout needs.
+- Keep `_silence()` with a `try/finally`: `os._exit(1)` does the job with less code.
+- Replace the hex masks in `Assert-AdminOnly`: `GENERIC_WRITE` is bit 30 and positive as an int32, and testing showed every write grant refused.
+- Drop `VERSION` from the installer: it drives the auto-tag workflow.
+- Accept an uppercase `-Commit`: it already works.
+- Bake the file hash or commit into `install.ps1`: a commit can't hold its own hash. The installer checks both files against `-Commit`.
+- Add TrustedInstaller to the installed folder's access list: nothing needs it there.
+- Test `LinkType` instead of the reparse-point attribute: the attribute check fails closed.
+- Add WriteAttributes to the rights masks: it doesn't change file contents.
+- `exit /b %ERRORLEVEL%` in `hello.cmd`, or `|| pause` in the launcher: the exit code already passes through, and `start` doesn't wait.
+- Make the Apps Uninstall button elevate: `uninstall.ps1` already restarts itself elevated.
+- Restore `$ProgressPreference` after install: the script sets it in its own scope, so it never reaches the admin's window.
+- Check `hello.cmd` exists before writing the launcher: a clone has none, and the installer creates it.
+- Unknown keys in `notes.json`, the Dependabot check missing the tests, a looser access list on the data folder: Round 43 showed each is already handled.
 
-- Prompts end in `:` instead of ` > ` (accessibility H1, lead 8): wants a real NVDA and Narrator pass to show it helps, and every test and doc quotes the current prompts.
-- Wrap to the console width (accessibility M2): the width can't be read reliably when output is piped; revisit with a Windows run.
-- Installer progress lines, restoring `$ProgressPreference`, colour contrast, `SUCCESS:` prefix, `NO_COLOR` (accessibility M4, M5): `install.ps1` can't be run here.
-- `.lnk` launcher instead of `.cmd`, junction-safe uninstall, README Git check before clone, smoke test with `< NUL` (lead 4, 5, 6; security 8, 9): Windows-only work.
-- Pinned Actions, checksummed CI tools, Dependabot gate, CODEOWNERS, signed tags, required checks (security 1-6, lead 7): `.github/` and repository settings, which this routine does not change.
-- Pruning the bundled Python, scheduled Python version check (security 5, lead 20): needs Windows and an owner decision.
-- Carry unknown keys through `save()`, re-read before saving, a locked file shown as a first run (lead 13, 14): rare, and needs a design for two open windows.
-- Full "My list" with up to three items and a weekly look-back (usability retention feature): the larger version of this round's `same` memory; weighed against the five-person pilot, and the single plan stays until employees ask for more.
-- Shorter first run, later sign-in offer, shortened screen after the third visit, tip follow-up, content for other senses, weekday content, own lines, `--today` (usability 3, 4, 5, 12; lead 18, Part 2 items 2 and 3): changes what the first minute is, decided by the pilot.
-- Menu order, one name for the sign-in feature, `--version` (lead 17, accessibility L6): renumbering menu options breaks every saved habit and test; revisit with the pilot.
-- Missing `CHANGELOG.md`, `BACKLOG.md` and `.devkit/` in the packet (lead 3): the packet leaves them out on purpose; they are in the repository.
-- Lifetime visit count past 400 days (lead 19): the file keeps a bounded history on purpose; the summary says "last 7 days" beside it.
+## Settings and process, not code in this repo
 
-## Round 38
+- Branch protection, 2FA, required checks, signed tags, `CODEOWNERS`, `LICENSE`, and where the reviewed commit hash is published: GitHub settings and owner decisions. Decide them in github-mog. `SECURITY.md` comes from the account's `.github` repo.
+- AppLocker or WDAC rules, Authenticode signing, Intune or MSI packaging, a scoped allow rule and patch reminders for the bundled Python: Group Policy and deployment work.
+- Pinning the actions and checksums in `devkit-quality.yml`, `dependabot-automerge.yml` and `auto-tag.yml`, patch-only Dependabot merges, and tagging only after the tests pass: dev-kit owns those files and `devkit.ps1 update` overwrites them, so change them in `dev-kit/repo-files/`. This repo's own `tests.yml` is pinned.
+- Pilot questions: success criteria, a content file for IT, editable or more content, weekday or time-of-day tips, languages, a rename, a desktop icon, a shorter first run, when the sign-in offer comes, "another one", and UK or US spelling. Wait for what the five pilot employees ask for, as `PLAN.md` says.
 
-- Dependabot gate, SHA-pinned Actions, checksummed CI downloads, gitleaks config from the base branch, blocking default (security M2, M3, M4, lead CI note): `.github/` and repository settings, which this routine does not change; same reason as earlier rounds.
-- Junction-safe delete of the sign-in launcher in `uninstall.ps1` (security L1, lead Low): PowerShell and Windows ACL behavior I can't run here. Revisit with a Windows run.
-- chmod an existing data folder and old files, explicit Windows ACL, cap on `.bak` copies (security L2, L6): POSIX-only hardening on a Windows product; the README already says IT staff can read the file.
-- Expire `previous` after 30 days, hide it on request, make `done` opt-in or switchable (security M1, L3; lead 5, 6): this round says plainly that clearing keeps the words as `same`; a switch is a product decision for the pilot.
-- Weekly recap and a private list of finished plans, last five plans, `s` for same, Enter-keeps-yesterday setting (usability retention feature, lead Part 2 1): the larger version of this round's same-day `done`; the pilot decides how much history people want.
-- Shorter first run with the plan prompt first, sign-in offer on visit two, tip line on the 3rd and 7th visit, text at the last prompt offered as a plan, skipped-follow-up clear offer, warning before day 14 (usability H3, M1, M3, M6; lead 6): changes what the first minute is; decided by the pilot.
-- A "Mark done" menu item and menu renumbering (lead 2): the `done` word at the last prompt covers it; renumbering breaks saved habits.
-- Screen-reader pass with NVDA and Narrator, installer smoke test of the interactive path, tip content for other senses (accessibility 1, lead 9, 10): need Windows, a real screen reader, or the owner.
-- `--stats --json`, prompt endings read as "greater than", skipping the second Enter after `plan` (accessibility 12, 1; usability L1): the second Enter is deliberate (round 36); the others need a screen reader to judge.
-- Unknown keys, `--reset` with no file, launcher from a source checkout (lead Low): rare; needs a design for two open windows (see Round 37 entry).
+## Installer changes that need an administrator test run
 
-## Round 39
+These touch `install.ps1` on paths only an administrator can reach, and a mistake can leave a PC without a working install. Do them with a test install on a spare PC.
 
-- Move the sign-in offer to the first `done`, shorten the first run, accept yes-words at the last prompt, a keep-by-default "not yet" (usability 2, 3, 7, 8): changes the taught prompts again right after round 38; wait for pilot feedback.
-- Screen-reader pass with NVDA and Narrator, Python 3.14 test run, a real Windows install (lead 2, accessibility H2): need Windows and a real screen reader; still scheduled, not dropped. The README keeps saying it has not been tried.
-- CI, Dependabot, SHA pins, checksummed downloads, uninstall junction walk, trimmed embedded Python, Authenticode signing (security 1, 2, 3, 5, 6, 7): `.github/`, Windows ACL behavior and signing, outside what this routine changes or can run. Same reasons as Round 38.
-- Cut `MAX_VISITS` to about 35 and age out plan text (security 4): the in-a-row line and weekly checks need a few weeks; the PLAN.md wording is corrected instead.
-- "Forget the earlier plan" menu item and not offering a finished plan as `same` (lead 6): same reason as Round 38; `same` after a finished plan is the recurring-task path.
-- Retry in `save()` on Windows file locks, a no-save notice before the first-run welcome (lead 2a, 10): needs Windows to test; rare.
-- Reword tips that assume sight or hearing, menu reorder, README split, delete-everything typo naming (lead 14, usability 13, 15, 11): content and layout decisions for the owner.
-
-## Round 40
-
-- Sign-in launcher that pauses on error (accessibility M3), launcher only from the install folder (security 8): needs a Windows run, and an earlier entry explains `start` returns at once. Revisit with the first Windows trial.
-- README clone-step Git hardening, Dependabot, SHA pins, checksummed tool downloads, auto-tag gate, bundled Python tracking, junction-safe uninstall, installer colours (security 1-5, 7, lead 5, 7, accessibility M4): `.github/` and Windows PowerShell I can't run here; same as the Round 39 entry.
-- A simple numbered mode, one `normalize()` for every prompt, `say_wrapped()` for all prose and a 30/40/72-column test, a "where I left off" note, a bigger or refreshable content pool, `clear` for today's plan, delete counts, menu reorder (lead Part 2, accessibility M2, usability 2, 7): each changes what the person is taught or needs a design pass; the finished-plans list is this round's retention change and the rest wait for the pilot.
-- Shorter first run, one-key plan from the tip, re-offering sign-in at the first `done`, dropping a plan after two skips, a pilot pass bar (usability 1, 3, 6, 10): same reason as Round 39; the pass bar belongs to the owner.
-- `refresh()` and `can_save` after a damaged or reset file, `.tmp` sweep, save retry, a distinct Ctrl+C answer at yes/no prompts, grapheme-safe cut, test hygiene for `get_terminal_size` (lead 12, 13, 15, 16, accessibility M7, L11): rare or needs Windows; not worth the risk of changing save.
-- Tips that assume sight or hearing, regional wording, `HELP` exit codes (accessibility L1, L6, lead 15): content decisions for the owner, as in Round 39.
-- A switch to turn the finished-plans list off (usability trust note): the list is seven short plans, shown only to the person and removed by Delete everything; revisit if a pilot user objects.
-
-## Round 41
-
-- Make the Dependabot check see the tests (Low 15): it already does. `python -m pytest -q` collects every `test_` function in `test_hello.py`, 115 of them, so a red suite blocks the merge.
-
-## Round 43
-
-- Set an access list on the data folder (finding 1.3): a umask only removes permission bits, so it can't loosen `0o600`. On Windows the folder inherits the profile's list (the user, SYSTEM and Administrators only), and only someone who can already write the user's profile could pre-create it. `icacls` on `%LOCALAPPDATA%` showed exactly that list.
-- Export finished plans as Markdown daily notes (Part 2 item 1): the program keeps seven short lines on purpose, and an export is a new feature for a pilot that hasn't asked for one.
-- Force UTF-8 output with `sys.stdout.reconfigure(encoding="utf-8")` (Part 2 item 2): Python 3.6 and later already write Unicode to a Windows console whatever the code page, so `?` appears only where the font lacks a glyph. Forcing UTF-8 would change the bytes that piped output and the tests read.
+- Defer `Remove-Tree $old` and roll back when step 6 fails, and name the open windows in the rename error.
+- Installer colours and `NO_COLOR`, the Start Menu folder access list, Domain Admins in the access check.
+- ARM64 PowerShell, reading the architecture from `RuntimeInformation`, a Windows version check.
+- More Git hardening (`GIT_CONFIG_GLOBAL=NUL`, `--no-filters`), proxy credentials, the "dubious ownership" message.
+- Walking the tree without descending into junctions: only administrators can plant one, and the walk fails closed.
+- Finding launchers in redirected profiles through the Known Folder API.
+- A standard-user smoke run, committing the Python zip, a sigstore check, a scheduled hash check, a trimmed bundled Python.
+- A one-step reinstall helper, and splitting the payload from the installer once a second tool exists.

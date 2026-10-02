@@ -957,9 +957,15 @@ def test_thoughts_and_tips_do_not_repeat_as_a_pair_every_100_days():
 
 
 def test_wrapping_follows_a_narrow_window():
+    import shutil
     import hello
-    hello.shutil.get_terminal_size = lambda fallback=(80, 24): os.terminal_size((40, 24))
-    assert all(len(x) <= 38 for x in hello.wrapped("Earlier plan: ", "word " * 30).splitlines())
+    real = shutil.get_terminal_size
+    # hello.shutil is the shared module, so put it back for later tests.
+    shutil.get_terminal_size = lambda fallback=(80, 24): os.terminal_size((40, 24))
+    try:
+        assert all(len(x) <= 38 for x in hello.wrapped("Earlier plan: ", "word " * 30).splitlines())
+    finally:
+        shutil.get_terminal_size = real
 
 
 def test_done_with_no_plan_says_so_and_done_is_not_offered():
@@ -1267,6 +1273,52 @@ def test_a_day_old_temp_copy_is_swept_and_a_new_one_is_left():
     os.utime(old, (time.time() - 2 * 86400,) * 2)
     assert mod.save(mod.new_state())
     assert not os.path.exists(old) and os.path.exists(new)
+
+
+def test_version_matches_the_version_file():
+    with open(os.path.join(os.path.dirname(HELLO), "VERSION")) as f:
+        version = f.read().strip()
+    for arg in ("--version", "-v"):
+        p = run([arg])
+        assert (p.returncode, p.stdout) == (0, f"hello-world {version}\n")
+    assert "--version" in run(["--help"]).stdout
+
+
+def test_help_lists_the_exit_codes():
+    out = " ".join(run(["--help"]).stdout.split())
+    assert "Exit codes: 0 when it worked, 1 when a command failed" in out
+
+
+def test_a_save_blocked_for_a_moment_is_tried_again():
+    mod = _load_hello()
+    mod.HOME = tempfile.mkdtemp()
+    real, calls = mod.os.replace, []
+
+    def flaky(src, dst):
+        calls.append(dst)
+        if len(calls) < 3:
+            raise PermissionError("held by another program")
+        real(src, dst)
+
+    mod.os.replace = flaky
+    try:
+        assert mod.save(mod.new_state())
+    finally:
+        mod.os.replace = real
+    assert len(calls) == 3 and os.path.exists(mod.data_file())
+
+
+def test_option_1_says_when_the_file_could_not_be_read():
+    home = tempfile.mkdtemp()
+    os.mkdir(os.path.join(home, "notes.json"))  # opening it fails
+    p = run(text="\nm\n1\n\n\n\n", home=home)
+    assert "could not be read just now" in p.stdout
+
+
+def test_the_launcher_leaves_no_temp_copy():
+    startup = tempfile.mkdtemp()
+    assert run(["--remind", "on"], startup=startup).returncode == 0
+    assert os.listdir(startup) == ["hello-world-daily.cmd"]
 
 
 if __name__ == "__main__":

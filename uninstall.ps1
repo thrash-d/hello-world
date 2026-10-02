@@ -46,10 +46,12 @@ if (-not $me.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     try {
         $argList = '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`""
         if ($Quiet) { $argList += '-Quiet' }
-        Start-Process $ps -Verb RunAs -ArgumentList $argList
+        # Waiting passes the elevated copy's exit code back, so -Quiet runs
+        # from a management tool see whether the uninstall worked.
+        $child = Start-Process $ps -Verb RunAs -ArgumentList $argList -Wait -PassThru
+        exit $child.ExitCode
     }
-    catch { Write-Host "Couldn't get administrator rights: $($_.Exception.Message) Ask IT to uninstall hello-world." -ForegroundColor Red; Wait-Close }
-    exit
+    catch { Write-Host "Couldn't get administrator rights: $($_.Exception.Message) Ask IT to uninstall hello-world." -ForegroundColor Red; Wait-Close; exit 1 }
 }
 
 # The elevated window closes when the script ends, so hold it open to show the result.
@@ -83,8 +85,11 @@ try {
     $profiles = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\*' -ErrorAction SilentlyContinue).ProfileImagePath
     foreach ($p in $profiles) {
         if (-not $p) { continue }
-        $launcher = Join-Path ([Environment]::ExpandEnvironmentVariables($p)) 'AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\hello-world-daily.cmd'
-        Remove-Item -LiteralPath $launcher -Force -ErrorAction SilentlyContinue
+        $startup = Join-Path ([Environment]::ExpandEnvironmentVariables($p)) 'AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup'
+        # A Startup folder that is a link points somewhere else, so leave it.
+        $folder = Get-Item -LiteralPath $startup -Force -ErrorAction SilentlyContinue
+        if (-not $folder -or ($folder.Attributes -band [IO.FileAttributes]::ReparsePoint)) { continue }
+        Remove-Item -LiteralPath (Join-Path $startup 'hello-world-daily.cmd') -Force -ErrorAction SilentlyContinue
     }
     $key = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\hello-world'
     if (Test-Path -LiteralPath $key) { Remove-Item -LiteralPath $key }

@@ -37,7 +37,7 @@ TIPS = (
     'Blink slowly ten times to refresh your eyes.',
     'Take a short walk or roll outside, whatever suits you.',
     'Pour a warm or cool drink and enjoy it away from your screen.',
-    'Gaze at something green or calm for a quiet moment.',
+    'Rest your attention on something calm, a view, a sound or a texture.',
     'Circle your wrists a few times in each direction.',
     'Plant both feet flat and sit tall, or stand tall, for ten breaths.',
     'Stretch your sides by leaning gently one way, then the other.',
@@ -58,13 +58,13 @@ TIPS = (
     'Name three things you can see, hear, and feel right now.',
     'Write down one thing you are looking forward to this week.',
     'Set a timer for two minutes and simply sit with no screen.',
-    'Smile at something small, like a plant or a favorite mug.',
+    'Enjoy something small nearby, like a plant or a favorite mug.',
     'Think of one thing you did well this week and give yourself a nod.',
     'Listen to one favorite song, start to finish, with nothing else open.',
     'Breathe in for four counts and out for six, three times.',
     'Take one breath before reacting to the next small annoyance.',
     'Jot down one thing that made you laugh recently.',
-    'Notice one pleasant sound around you and listen for a full minute.',
+    'Notice one pleasant sound, scent or texture around you for a minute.',
     'Recall a place you love and picture it for thirty seconds.',
     'Say "good enough for now" about one small task and move on.',
     'Write one sentence about something you are grateful for.',
@@ -105,7 +105,7 @@ TIPS = (
     'Share a useful link with someone who might enjoy it.',
     'Say hello to someone you have not spoken with before.',
     'Send a quick thank-you note to someone who helped you lately.',
-    'Wave or smile at a coworker on your next video call.',
+    'Greet a coworker warmly at the start of your next call.',
     'Ask a teammate what they are looking forward to this week.',
     'Congratulate someone on a small win you noticed.',
     'Invite a colleague for a short chat over tea, coffee, or a call.',
@@ -255,7 +255,11 @@ You can also run hello.cmd with one of these:
   --reset         Delete everything saved (asks first)
   --remind on     Open once a day when you sign in (off to stop)
   --streak off    Hide the in-a-row line (on to show it)
+  --version       Show the version
   --help          Show this text
+
+Exit codes: 0 when it worked, 1 when a command failed or the screen
+could not be written, 2 for an unknown option.
 
 Saved notes stay on this computer, in your user folder. Nothing is sent
 anywhere. IT staff who can read this computer's files could read them."""
@@ -276,6 +280,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return HELP + "\n\nhello.cmd is in this folder:\n  " + here
 
+VERSION = "1.18.0"
 MAX_VISITS = 400
 MAX_FILE = 1_000_000
 YES = ("y", "yes", "yep", "ya", "yeah", "done")
@@ -520,7 +525,16 @@ def save(state):
             json.dump(file_form(state), f, indent=2)
             f.flush()
             os.fsync(f.fileno())
-        os.replace(tmp, data_file())
+        # Antivirus or another window reading the file can hold it for a
+        # moment, and Windows then refuses the replace.
+        for attempt in range(5):
+            try:
+                os.replace(tmp, data_file())
+                break
+            except PermissionError:
+                if attempt == 4:
+                    raise
+                time.sleep(0.1)
         return True
     except OSError:
         try:
@@ -644,7 +658,7 @@ def in_a_row(visits, d):
     days = [x for x in days if x <= d] + [d]
     days = sorted(set(days))
     n = 1
-    for later, earlier in zip(days[:0:-1], days[-2::-1]):
+    for later, earlier in zip(days[:0:-1], days[-2::-1], strict=True):
         if (later - earlier).days > 3:
             break
         n += 1
@@ -661,17 +675,21 @@ def remind(on):
         if any(c in target for c in '"%&^<>|!'):
             say("The reminder cannot be set up from this folder.")
             return False
+        # Written whole and then moved into place, so a sign-in never runs a
+        # half-written launcher.
+        tmp = path + ".tmp"
         try:
             os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, "w", encoding="ascii", newline="") as f:
+            with open(tmp, "w", encoding="ascii", newline="") as f:
                 # start runs a .cmd through cmd /k, which strips the quotes
                 # from a path with ( or @ in it. /d keeps the folder out of
                 # that command line.
                 f.write(f'@echo off\r\nstart "hello-world" /d "{target}" '
                         "hello.cmd --startup\r\n")
+            os.replace(tmp, path)
         except (OSError, UnicodeEncodeError):
             try:
-                os.remove(path)
+                os.remove(tmp)
             except OSError:
                 pass
             say("Could not set up the reminder.")
@@ -768,13 +786,14 @@ def reset(state):
 
 def refresh(state, can_save):
     """Re-read the file before a change, so a second open window can't
-    overwrite what the first one saved."""
+    overwrite what the first one saved. Returns False when it could not."""
     if not can_save:
-        return
+        return False
     fresh, ok = load(repair=False)
     if ok:
         state.clear()
         state.update(fresh)
+    return ok
 
 
 def commit(state, base, can_save, soft=()):
@@ -1005,7 +1024,9 @@ def menu(state, can_save=True, iso=None):
         if choice.lower() in ("help", "?", "h"):
             choice = "5"
         if choice == "1":
-            refresh(state, can_save)
+            if not refresh(state, can_save):
+                say("The saved file could not be read just now, so this may "
+                    "be out of date.")
             show_saved(state, full=False)
             if (ask("Press Enter to go on, or type full to see the whole "
                     "file > ") or "").lower() == "full":
@@ -1305,6 +1326,9 @@ def run(argv):
         argv = ["--help"]
     if argv == ["--plain"]:
         say("Hello, world!")
+        return 0
+    if argv in (["--version"], ["-v"]):
+        say("hello-world " + VERSION)
         return 0
     if argv == ["--help"] or argv == ["-h"]:
         say(help_text())
