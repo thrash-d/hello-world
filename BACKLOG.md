@@ -154,3 +154,9 @@ Changes considered and declined, with the reason.
 ## Round 41
 
 - Make the Dependabot check see the tests (Low 15): it already does. `python -m pytest -q` collects every `test_` function in `test_hello.py`, 115 of them, so a red suite blocks the merge.
+
+## Round 43
+
+- Set an access list on the data folder (finding 1.3): a umask only removes permission bits, so it can't loosen `0o600`. On Windows the folder inherits the profile's list (the user, SYSTEM and Administrators only), and only someone who can already write the user's profile could pre-create it. `icacls` on `%LOCALAPPDATA%` showed exactly that list.
+- Export finished plans as Markdown daily notes (Part 2 item 1): the program keeps seven short lines on purpose, and an export is a new feature for a pilot that hasn't asked for one.
+- Force UTF-8 output with `sys.stdout.reconfigure(encoding="utf-8")` (Part 2 item 2): Python 3.6 and later already write Unicode to a Windows console whatever the code page, so `?` appears only where the font lacks a glyph. Forcing UTF-8 would change the bytes that piped output and the tests read.

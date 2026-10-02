@@ -16,6 +16,7 @@ import os
 import shutil
 import sys
 import textwrap
+import time
 
 DAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
         "Sunday")
@@ -483,7 +484,28 @@ def file_form(state):
     return out
 
 
+def sweep_tmp():
+    """Remove temp copies left by a save that was killed partway.
+
+    Only copies a day old go, so another window's save in progress is never
+    touched.
+    """
+    try:
+        names = os.listdir(data_dir())
+    except OSError:
+        return
+    for name in names:
+        if name.startswith("notes.json.") and name.endswith(".tmp"):
+            path = os.path.join(data_dir(), name)
+            try:
+                if time.time() - os.path.getmtime(path) > 86400:
+                    os.remove(path)
+            except OSError:
+                pass
+
+
 def save(state):
+    sweep_tmp()
     try:
         os.makedirs(data_dir(), mode=0o700, exist_ok=True)
         tmp = f"{data_file()}.{os.getpid()}.tmp"
@@ -635,16 +657,18 @@ def remind(on):
         say("The sign-in reminder works on Windows only.")
         return False
     if on:
-        target = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                              "hello.cmd")
+        target = os.path.dirname(os.path.abspath(__file__))
         if any(c in target for c in '"%&^<>|!'):
             say("The reminder cannot be set up from this folder.")
             return False
         try:
             os.makedirs(os.path.dirname(path), exist_ok=True)
             with open(path, "w", encoding="ascii", newline="") as f:
-                f.write(f'@echo off\r\nstart "hello-world" "{target}" '
-                        "--startup\r\n")
+                # start runs a .cmd through cmd /k, which strips the quotes
+                # from a path with ( or @ in it. /d keeps the folder out of
+                # that command line.
+                f.write(f'@echo off\r\nstart "hello-world" /d "{target}" '
+                        "hello.cmd --startup\r\n")
         except (OSError, UnicodeEncodeError):
             try:
                 os.remove(path)
