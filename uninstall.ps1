@@ -19,6 +19,21 @@ if (-not [Environment]::Is64BitProcess) {
 # Settings > Apps starts this as a standard user, and the elevated copy can
 # inherit that user's environment variables, so ask Windows for the folders.
 $winDir = [Environment]::GetFolderPath('Windows')
+$sys32 = [Environment]::SystemDirectory
+
+# Assert-NotLink and Remove-Tree duplicated in install.ps1; change both together.
+# This script runs alone from the install folder, so it can't load that one.
+function Assert-NotLink([string]$Path) {
+    if ((Get-Item -LiteralPath $Path -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "$Path is a link." }
+}
+
+# cmd's rmdir removes a link inside the tree without following it.
+function Remove-Tree([string]$Path) {
+    Assert-NotLink $Path
+    & (Join-Path $sys32 'cmd.exe') /d /c rmdir /s /q "`"$Path`""
+    # rmdir can report success after failing on a locked file, so check the folder is gone.
+    if ($LASTEXITCODE -or (Test-Path -LiteralPath $Path)) { throw "Couldn't remove $Path" }
+}
 $ps = Join-Path ([Environment]::SystemDirectory) 'WindowsPowerShell\v1.0\powershell.exe'
 $dir = Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'hello-world'
 if ($PSScriptRoot -ne $dir) {
@@ -49,11 +64,14 @@ try {
     $lnk = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'hello-world.lnk'
     if (Test-Path -LiteralPath $lnk) { Remove-Item -LiteralPath $lnk }
     foreach ($f in "$dir.new", "$dir.old") {
-        if (Test-Path -LiteralPath $f) { Remove-Item -LiteralPath $f -Recurse -Force }
+        if (Test-Path -LiteralPath $f) { Remove-Tree $f }
     }
     if (Test-Path -LiteralPath $dir) {
-        Get-ChildItem -LiteralPath $dir -Force | Where-Object Name -ne 'uninstall.ps1' |
-            Remove-Item -Recurse -Force
+        Assert-NotLink $dir
+        foreach ($c in Get-ChildItem -LiteralPath $dir -Force | Where-Object Name -ne 'uninstall.ps1') {
+            if ($c.PSIsContainer) { Remove-Tree $c.FullName }
+            else { Assert-NotLink $c.FullName; Remove-Item -LiteralPath $c.FullName -Force }
+        }
         # Antivirus can hold a file for a moment.
         for ($try = 1; ; $try++) {
             try { Remove-Item -LiteralPath $dir -Recurse -Force; break }

@@ -150,3 +150,11 @@ Changes considered and declined, with the reason.
 - `refresh()` and `can_save` after a damaged or reset file, `.tmp` sweep, save retry, a distinct Ctrl+C answer at yes/no prompts, grapheme-safe cut, test hygiene for `get_terminal_size` (lead 12, 13, 15, 16, accessibility M7, L11): rare or needs Windows; not worth the risk of changing save.
 - Tips that assume sight or hearing, regional wording, `HELP` exit codes (accessibility L1, L6, lead 15): content decisions for the owner, as in Round 39.
 - A switch to turn the finished-plans list off (usability trust note): the list is seven short plans, shown only to the person and removed by Delete everything; revisit if a pilot user objects.
+
+## Round 41
+
+- Make the Dependabot check see the tests (Low 15): it already does. `python -m pytest -q` collects every `test_` function in `test_hello.py`, 115 of them, so a red suite blocks the merge.
+
+## Round 42
+
+- A real two-window console pass and a Narrator or NVDA pass (Part 2 items 2 and 6): they need a person at a Windows PC with the real `hello.cmd` window. `PLAN.md` lists them as the release gate.
