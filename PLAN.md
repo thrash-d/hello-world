@@ -45,8 +45,8 @@ to type passwords or private details.
 ## Accessibility and inclusion
 
 - Linear plain text laid out for a screen reader to read top to bottom, with
-  no art, no progress bars and no redrawing. Designed for, not yet verified
-  with a real screen reader.
+  no art, no progress bars and no redrawing. Checked with Narrator in a real
+  console for 1.16.0.
 - No reliance on colour, short lines, short sentences, an unambiguous date
   ("Thursday, 1 October 2026").
 - Everything works with the keyboard and with Enter alone. Typed letters other
@@ -68,13 +68,13 @@ to type passwords or private details.
 ## Not tested
 
 The test suite was last run on Windows 11 for 1.16.0, with Python 3.13 and
-piped input. A real console, a screen reader and the real all-users install
-have not been tried. The release gate is one clean PC: one install, one
-reinstall, an interrupted install and an uninstall, plus two real windows that
-both finish a plan while one of them uses Delete everything. Piped tests never
-leave a second process waiting at a prompt, so only that pass proves the
-two-window merge. The first install should be one install, one
-reinstall, an interrupted install and an uninstall on a clean PC. Check the
+piped input. For 1.16.0 the owner also ran it in a real console with Narrator
+in a sandbox, and it passed.
+
+Still to confirm on one clean PC: one install, one reinstall, an interrupted
+install and an uninstall, plus two real windows that both finish a plan while
+one of them uses Delete everything. Piped tests never leave a second process
+waiting at a prompt, so only that pass proves the two-window merge. Check the
 shortcut icon, the window title, that Enter closes the window, that the
 sign-in launcher opens once, and that uninstall removes the launcher.
 

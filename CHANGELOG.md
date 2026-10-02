@@ -12,7 +12,7 @@ Forget one finished plan. Medium 4, "Forgetting a line can still clear same afte
 
 Other fixes: Medium 5, "Uninstall still follows reparse points in the live install folder": `uninstall.ps1` checks the install folder and each file in it for a link, and removes each subfolder with `Remove-Tree`. Low 10: the launcher refuses a folder with `!`. Low 12: `--help` and the README list `x` and `close` as ways to close. Low 13: the README's run-on paragraph is now four short ones, and it says where Enter closes and that forgetting a plan leaves the count. Part 2 item 2: `PLAN.md` names the release gate, a clean-PC install pass with two real windows. README, `PLAN.md` and the why-doc say what the delete leaves behind.
 
-Not done: Part 2 items 2 and 6, a real two-window console pass and a screen-reader pass. Both need a person at a Windows PC.
+Part 2 item 6, "Do the screen-reader pass": the owner ran 1.16.0 in a real console with Narrator in a sandbox, and it passed. It is out of `BACKLOG.md`, and `PLAN.md`, the README and the why-doc say so. Not done: Part 2 item 2, the clean-PC install pass with two real windows.
 
 Tested here: all 123 tests pass on Windows 11, Python 3.13, under both pytest and the plain runner. `uninstall.ps1` parses in Windows PowerShell 5.1. I piped option 7 and Delete everything through and read the screens and the marker file. Not tested: a real console, two real windows, a screen reader, the installer and uninstaller themselves, and ruff.
 

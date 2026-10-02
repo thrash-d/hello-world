@@ -100,8 +100,8 @@ delete the folder if you don't want it.
   the menu turns it on later.
 - Without a mouse or sight: every prompt is plain text and Enter alone always
   works. Ctrl+C at a prompt skips that prompt. Prompts say what Enter does where it matters, such as "Enter = keep" and "Enter = cancel". `--stats` still prints the whole saved file. Menu option 5 explains each
-  option, and `hello.cmd --help` prints the folder `hello.cmd` is in. It has
-  not been tried with a real screen reader yet.
+  option, and `hello.cmd --help` prints the folder `hello.cmd` is in. It was
+  checked with Narrator in a real console for version 1.16.0.
 - English only. A plan in another script is saved, but a console that cannot
   show it prints `?`.
 

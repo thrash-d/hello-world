@@ -157,4 +157,4 @@ Changes considered and declined, with the reason.
 
 ## Round 42
 
-- A real two-window console pass and a Narrator or NVDA pass (Part 2 items 2 and 6): they need a person at a Windows PC with the real `hello.cmd` window. `PLAN.md` lists them as the release gate.
+- A two-window pass on a clean PC with the real install (Part 2 item 2): it needs a person at a Windows PC with the installed `hello.cmd`. `PLAN.md` lists it as the release gate.
