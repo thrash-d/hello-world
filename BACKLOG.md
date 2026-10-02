@@ -94,3 +94,7 @@ Changes considered and declined, with the reason.
 - Windows CI job, SHA-pinned Actions, checksum-verified tool downloads, Dependabot major-version gate: need CI and Windows runs I can't do here.
 - Skip repair when the run can't save or be seen (finding 5), retry on `os.replace` (6), let Ctrl+C escape `ask` (7), error log file (11): small behaviour changes the owner has not asked for.
 - Content override file, Python pin update check, organisation-owned repo: decisions for the owner.
+- Round 35 CI and installer items (Dependabot major merges, tool checksums, SHA-pinned actions, a Windows test job, installer progress lines, junction check in uninstall, sign-in window focus): need `.github/` edits or a Windows run I don't have here.
+- Round 35 product items (note to tomorrow, same-as-last-time, clear or finish a plan, option 1 without raw JSON, Ctrl+C quits, time-of-day content tags, `extra.txt`, `.prev` backup, renamed Start entry, a 101st thought): behaviour changes for the owner to weigh against the five-person pilot; the retention and accessibility changes this round came first.
+- Round 35 POSIX file modes (security finding 4): the program is for Windows, where the profile folder is per-user.
+

@@ -20,9 +20,9 @@ unless you ask for one.
 
 Open **hello-world** from the Start menu, or type "hello-world" in Windows
 Search. Read the screen, type a plan for the day if you want one, and press
-Enter to skip anything you don't want to answer. Press Enter again to close, or type `p` to set or change today's plan.
+Enter to skip anything you don't want to answer. Press Enter again to close, or type `plan` to set or change today's plan. Typing a word the prompt doesn't list gets a message, never a silent close. Everything works from the keyboard with plain text, in a single top-to-bottom flow, so a screen reader reads it in order.
 
-- To see the options, type `m` at the last prompt. You can see exactly what is
+- To see the options, type `menu` at the last prompt (`m` also works). You can see exactly what is
   saved, open hello-world once a day when you sign in, hide the "in a row"
   line, set or change today's plan (option 6), or delete everything saved
   (including any backup copy of a damaged file).
@@ -47,6 +47,10 @@ details. Choose option 1 in the menu to see what is saved (the same facts, tidie
 delete it. When the program is uninstalled, the file stays so you can keep it;
 delete the folder if you don't want it.
 
+- Coming back: if you type a plan, the next day it asks how it went. On
+  your second visit it asks once whether to open at sign-in (y/n). A no is
+  remembered, and option 2 in the menu turns it on later.
+
 ## For IT: install
 
 Run these in one PowerShell window opened as administrator, each line on its own. Change the
@@ -54,7 +58,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.9.7'
+$tag = 'v1.10.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
