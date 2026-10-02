@@ -71,11 +71,12 @@ The honest levers for retention are:
 - A long history of plans, or any score. At work that feels like being
   checked on. What it does keep is small and for the person alone: the file
   holds the dates you opened the program (the last 400), your current plan,
-  the plan before it, how many plans you marked done, and your last seven
-  finished plans (words and date). It also holds your in-a-row setting and
-  your answer to the sign-in question. Menu option 1 shows all of it, option
-  7 forgets one finished plan, and option 4 deletes everything. Uninstalling
-  leaves the file in place. Nothing reports any of it.
+  the plan before it, how many times you marked a plan done, and your last
+  seven finished plans (words and date). It also holds your in-a-row setting
+  and your answer to the sign-in question. Menu option 1 shows all of it,
+  option 7 forgets one finished plan, and option 4 deletes everything. After a
+  delete the file holds only a random marker, so another open window can't
+  write the notes back. Uninstalling leaves the file in place. Nothing reports any of it.
 - Any network access, usage reporting to IT or managers, and in-program
   surveys. Trust matters more than a dashboard. Ask the employees directly.
 - Translations and tone settings. Add a language file when someone asks.

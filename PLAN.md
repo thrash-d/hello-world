@@ -25,11 +25,13 @@ Ranked from a design review of the first version, then built:
   itself without the employee choosing it.
 - A long history of plans or a score. What it does keep is deliberate and
   small: the file holds the dates you opened the program (the last 400), your
-  current plan, the plan before it, how many plans you marked done, and your
-  last seven finished plans (words and date). It also holds your in-a-row
-  setting and your answer to the sign-in question. Menu option 1 shows all
-  of it, option 7 forgets one finished plan, and option 4 deletes everything.
-  Uninstalling leaves the file in place. The finished plans are shown after
+  current plan, the plan before it, how many times you marked a plan done,
+  and your last seven finished plans (words and date). It also holds your
+  in-a-row setting and your answer to the sign-in question. Menu option 1
+  shows all of it, option 7 forgets one finished plan, and option 4 deletes
+  everything. After a delete the file holds only a random marker, so another
+  open window can't write the notes back. Uninstalling leaves the file in
+  place. The finished plans are shown after
   each `done`, on welcome back, and in option 1. Nothing reports any of it.
 - Network access of any kind, and any report of use to IT or managers.
 
@@ -67,7 +69,11 @@ to type passwords or private details.
 
 The test suite was last run on Windows 11 for 1.16.0, with Python 3.13 and
 piped input. A real console, a screen reader and the real all-users install
-have not been tried. The first install should be one install, one
+have not been tried. The release gate is one clean PC: one install, one
+reinstall, an interrupted install and an uninstall, plus two real windows that
+both finish a plan while one of them uses Delete everything. Piped tests never
+leave a second process waiting at a prompt, so only that pass proves the
+two-window merge. The first install should be one install, one
 reinstall, an interrupted install and an uninstall on a clean PC. Check the
 shortcut icon, the window title, that Enter closes the window, that the
 sign-in launcher opens once, and that uninstall removes the launcher.

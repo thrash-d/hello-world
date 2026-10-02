@@ -67,8 +67,11 @@ try {
         if (Test-Path -LiteralPath $f) { Remove-Tree $f }
     }
     if (Test-Path -LiteralPath $dir) {
-        Get-ChildItem -LiteralPath $dir -Force | Where-Object Name -ne 'uninstall.ps1' |
-            Remove-Item -Recurse -Force
+        Assert-NotLink $dir
+        foreach ($c in Get-ChildItem -LiteralPath $dir -Force | Where-Object Name -ne 'uninstall.ps1') {
+            if ($c.PSIsContainer) { Remove-Tree $c.FullName }
+            else { Assert-NotLink $c.FullName; Remove-Item -LiteralPath $c.FullName -Force }
+        }
         # Antivirus can hold a file for a moment.
         for ($try = 1; ; $try++) {
             try { Remove-Item -LiteralPath $dir -Recurse -Force; break }

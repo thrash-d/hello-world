@@ -154,3 +154,7 @@ Changes considered and declined, with the reason.
 ## Round 41
 
 - Make the Dependabot check see the tests (Low 15): it already does. `python -m pytest -q` collects every `test_` function in `test_hello.py`, 115 of them, so a red suite blocks the merge.
+
+## Round 42
+
+- A real two-window console pass and a Narrator or NVDA pass (Part 2 items 2 and 6): they need a person at a Windows PC with the real `hello.cmd` window. `PLAN.md` lists them as the release gate.

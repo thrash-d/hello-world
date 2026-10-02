@@ -239,7 +239,9 @@ def test_reset_deletes_after_confirmation():
     run(["--reset"], text="n\n", home=first.home)
     assert os.path.exists(os.path.join(first.home, "notes.json"))
     run(["--reset"], text="y\n", home=first.home)
-    assert not os.path.exists(os.path.join(first.home, "notes.json"))
+    # Only the marker that tells other windows the notes were deleted is left.
+    saved = notes(first.home)
+    assert saved["intent"] is None and saved["visits"] == [] and saved["epoch"]
     assert run(["--reset"], home=first.home).returncode == 1
 
 
@@ -312,7 +314,8 @@ def test_reset_also_deletes_backup_and_temp_copies():
         with open(os.path.join(first.home, name), "w") as f:
             f.write("old plan")
     run(["--reset"], text="y\n", home=first.home)
-    assert os.listdir(first.home) == []
+    assert os.listdir(first.home) == ["notes.json"]
+    assert "Send the invoice" not in json.dumps(notes(first.home))
 
 
 def test_menu_does_not_save_over_a_file_it_could_not_read():
@@ -692,9 +695,9 @@ def test_plans_done_are_counted_and_shown_privately():
     first = run(text="One\n\n")
     run(text="y\nTwo\n\n", home=first.home, day="2026-10-02")
     p = run(text="y\n\n", home=first.home, day="2026-10-03")
-    assert "That is 2 plans you have finished." in p.stdout
+    assert "That is 2 times you have marked a plan done." in p.stdout
     p = run(text="m\n1\n\n\n", home=first.home, day="2026-10-03")
-    assert "Plans you marked as done: 2" in p.stdout
+    assert "Times you marked a plan done: 2" in p.stdout
     assert "IT staff, could read it" in p.stdout
     assert "Only you can see this" not in p.stdout
     assert '"visits"' not in p.stdout
@@ -944,7 +947,7 @@ def test_a_failed_done_save_is_not_celebrated():
     assert not mod.mark_done_now(state, True, mod.today())
     assert state["intent"] and state.get("done", 0) == 0
     assert any("still open" in t for t in shown)
-    assert not any("plans you have finished" in t or t in mod.DONE_LINES
+    assert not any("times you have marked" in t or t in mod.DONE_LINES
                    for t in shown)
 
 
@@ -1047,11 +1050,19 @@ def test_counts_only_add_and_skips_from_two_windows_both_count():
 
 def test_one_finished_plan_can_be_forgotten():
     first = run(text="A\ndone\nB\ndone\n\n")
-    p = run(text="m\n7\n1\n\n\n", home=first.home)
-    assert "Forgotten." in p.stdout
+    p = run(text="m\n7\n1\ny\n\n\n", home=first.home)
+    assert "Forgotten. That plan is no longer saved." in p.stdout
     saved = notes(first.home)
     assert [i["text"] for i in saved["finished"]] == ["A"]
     assert "previous" not in saved and saved["done"] == 2
+
+
+def test_forgetting_from_the_list_keeps_same_unless_asked():
+    first = run(text="A\ndone\n\n")
+    p = run(text="m\n7\n1\n\n\n\n", home=first.home)
+    assert "same still has it" in p.stdout
+    saved = notes(first.home)
+    assert "finished" not in saved and saved["previous"] == "A"
 
 
 def test_the_menu_says_enter_goes_back():
@@ -1095,15 +1106,126 @@ def test_the_launcher_is_not_written_from_a_folder_cmd_would_misread():
     mod = _load_hello()
     mod.STARTUP_DIR = tempfile.mkdtemp()
     mod.say = lambda text="": None
-    mod.__file__ = os.path.join(tempfile.mkdtemp(), "a&b", "hello.py")
-    assert not mod.remind(True)
-    assert os.listdir(mod.STARTUP_DIR) == []
+    for folder in ("a&b", "a!b"):
+        mod.__file__ = os.path.join(tempfile.mkdtemp(), folder, "hello.py")
+        assert not mod.remind(True)
+        assert os.listdir(mod.STARTUP_DIR) == []
 
 
 def test_help_names_same_the_finished_list_and_the_menu_enter():
     out = run(["--help"]).stdout
     assert "same reuses" in out and "finished plans" in out
+    assert "x and close" in " ".join(out.split())
     assert "Enter goes back" in out
+
+
+def test_a_delete_in_one_window_is_not_undone_by_another():
+    mod, copy, first, _, other, base = _two_windows()
+    first["intent"] = {"text": "Secret", "date": "2026-10-01"}
+    first["visits"] = ["2026-10-01"]
+    assert mod.save(first)
+    other, _ = mod.load()
+    base = copy.deepcopy(other)
+    deleter, _ = mod.load()
+    mod.ask = lambda prompt: "y"
+    assert mod.reset(deleter)
+    mod.finish_plan(other, "Secret", mod.today())
+    other["intent"] = None
+    assert not mod.commit(other, base, True)
+    assert other == base and other["intent"] is None
+    saved = notes(mod.HOME)
+    assert saved["intent"] is None and saved["visits"] == []
+    assert "finished" not in saved and "previous" not in saved
+    # The window that deleted can still save afterwards.
+    base = copy.deepcopy(deleter)
+    deleter["streak"] = False
+    assert mod.commit(deleter, base, True)
+    assert notes(mod.HOME)["streak"] is False
+
+
+def test_tidying_an_old_plan_does_not_overwrite_the_other_windows_plan():
+    mod = _load_hello()
+    home = mod.HOME = tempfile.mkdtemp()
+    mod.FORCE_INTERACTIVE = True
+    mod.say = lambda text="": None
+    state, _ = mod.load()
+    state["visits"] = ["2026-09-01"]
+    state["intent"] = {"text": "Old", "date": "2026-09-01"}
+    assert mod.save(state)
+
+    def ask(prompt):
+        if prompt.startswith("What is one thing"):
+            other, _ = mod.load()
+            other["intent"] = {"text": "New", "date": "2026-10-01"}
+            assert mod.save(other)
+        return ""
+
+    mod.ask = ask
+    mod.daily(startup=False)
+    saved = notes(home)
+    assert saved["intent"]["text"] == "New" and "2026-10-01" in saved["visits"]
+
+
+def test_the_same_finish_in_two_windows_counts_once():
+    mod, copy, first, base1, other, base2 = _two_windows()
+    mod.finish_plan(other, "A", mod.today())
+    assert mod.commit(other, base2, True)
+    mod.finish_plan(first, "A", mod.today())
+    assert mod.commit(first, base1, True)
+    saved = notes(mod.HOME)
+    assert saved["done"] == 1 and len(saved["finished"]) == 1
+
+
+def test_the_other_window_finishing_too_is_said():
+    mod, copy, first, base1, other, base2 = _two_windows()
+    mod.finish_plan(other, "B", mod.today())
+    assert mod.commit(other, base2, True)
+    shown = []
+    mod.say = lambda text="": shown.append(text)
+    mod.finish_plan(first, "A", mod.today())
+    assert mod.commit(first, base1, True)
+    assert "The other open window had also finished a plan." in shown
+
+
+def test_forgetting_a_plan_already_gone_keeps_same():
+    mod, copy, first, _, other, _ = _two_windows()
+    mod.finish_plan(first, "A", mod.today())
+    assert mod.save(first)
+
+    def ask(prompt):
+        if prompt.startswith("Also forget"):
+            gone, _ = mod.load()
+            base = copy.deepcopy(gone)
+            gone["finished"] = []
+            assert mod.commit(gone, base, True)
+            return "y"
+        return "1"
+
+    mod.ask = ask
+    mod.FORCE_INTERACTIVE = True
+    state, _ = mod.load()
+    mod.forget_finished(state, True)
+    assert notes(mod.HOME)["previous"] == "A"
+
+
+def test_a_wrong_number_at_forget_says_what_to_type():
+    first = run(text="A\ndone\n\n")
+    p = run(text="m\n7\n9\n\n\n\n", home=first.home)
+    assert 'There is no number "9" on the list. Type a number from 1 to 1' in p.stdout
+    assert "not one of the choices" not in p.stdout
+
+
+def test_the_file_never_holds_more_than_the_visit_limit():
+    import datetime
+    mod = _load_hello()
+    day = datetime.date(2026, 10, 1)
+    state = mod.new_state()
+    state["visits"] = [(day - datetime.timedelta(days=n)).isoformat()
+                       for n in range(mod.MAX_VISITS)]
+    state["future"] = [(day + datetime.timedelta(days=n)).isoformat()
+                       for n in range(1, mod.MAX_VISITS + 1)]
+    out = mod.file_form(state)["visits"]
+    assert len(out) == mod.MAX_VISITS and set(state["visits"]) <= set(out)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-10-02: delete everything sticks across windows, tidying a plan never overwrites the other window's, a repeated finish counts once
+
+Version 1.16.0, still. Round 42 review (`reviews/round-42.md`) of the unmerged Round 41 branch, one reviewer, no Critical, 2 High, 5 Medium, 6 Low, 6 Part 2 items. 1.16.0 was never tagged, so both rounds ship as one release.
+
+Delete everything. High 1, "'Delete everything' is undone by the other open window", and Part 2 item 1, "Make delete stick, then say what survived": Delete everything now leaves `notes.json` holding only an empty state and a new random `epoch`. `commit()` refuses to save when the file's epoch differs from the one this window read, says why, and leaves this window empty too. So a window left open at a prompt can't write deleted notes back. The delete ends with "Another open hello-world window cannot put it back.", or says to close the other windows when the marker could not be written. Tests: a delete in one window, then a save from the other, then a later save from the deleting window.
+
+Saves from two windows. High 2, "The opening screen records clock cleanup as this window's edit": a plan the opening screen only tidied (a future date made today, a plan over two weeks old cleared) is now a soft change. `commit()` applies it only when the other window has not changed the plan meanwhile, and says so when it keeps the other window's plan. Medium 3: `--streak` now saves through `commit()`. Medium 6: menu option 2 and the morning save call `undo()` when the save fails. Medium 7 and Part 2 item 5, "Identical same-day finishes inflate the count": a finish the other window already saved with the same words and date adds nothing to the count, and the count is now called "times you marked a plan done". Part 2 item 3, "Say when the other window changed the file": when both windows finished a plan it says "The other open window had also finished a plan." Low 8: option 1 re-reads the file before the summary and before the full file. Low 11: the file holds at most 400 dates, real visits first. Tests for each.
+
+Forget one finished plan. Medium 4, "Forgetting a line can still clear same after the line is already gone", and Part 2 item 4, "leave same only when they ask": option 7 now asks before also forgetting the words for `same`, with no as the default. When the line is already gone it says so and changes nothing. Low 9: a wrong number says "Type a number from 1 to N, or press Enter to keep them all." and asks again. Tests for each.
+
+Other fixes: Medium 5, "Uninstall still follows reparse points in the live install folder": `uninstall.ps1` checks the install folder and each file in it for a link, and removes each subfolder with `Remove-Tree`. Low 10: the launcher refuses a folder with `!`. Low 12: `--help` and the README list `x` and `close` as ways to close. Low 13: the README's run-on paragraph is now four short ones, and it says where Enter closes and that forgetting a plan leaves the count. Part 2 item 2: `PLAN.md` names the release gate, a clean-PC install pass with two real windows. README, `PLAN.md` and the why-doc say what the delete leaves behind.
+
+Not done: Part 2 items 2 and 6, a real two-window console pass and a screen-reader pass. Both need a person at a Windows PC.
+
+Tested here: all 123 tests pass on Windows 11, Python 3.13, under both pytest and the plain runner. `uninstall.ps1` parses in Windows PowerShell 5.1. I piped option 7 and Delete everything through and read the screens and the marker file. Not tested: a real console, two real windows, a screen reader, the installer and uninstaller themselves, and ruff.
+
 ## 2026-10-02: every save merges with the file, one finished plan can be forgotten, the menu says where Enter goes
 
 Version 1.16.0. Round 41 review (`reviews/round-41.md`), one reviewer, no Critical, 2 High, 6 Medium, 7 Low, 6 Part 2 items.
