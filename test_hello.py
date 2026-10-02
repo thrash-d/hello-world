@@ -243,7 +243,7 @@ def test_reset_deletes_after_confirmation():
 
 def test_menu_shows_saved_data_and_toggles_the_in_a_row_line():
     first = run(text="Send the invoice\n\n")
-    p = run(text="y\nBuy milk\nm\n1\n3\n\n", home=first.home, day="2026-10-02")
+    p = run(text="y\nBuy milk\nm\n1\n\n3\n\n", home=first.home, day="2026-10-02")
     assert "Options" in p.stdout and "Buy milk" in p.stdout
     assert notes(first.home)["streak"] is False
 
@@ -596,7 +596,8 @@ def test_sign_in_offer_yes_turns_it_on():
 
 def test_unknown_input_is_named_and_outcomes_are_echoed():
     p = run(text="\nbanana\n\n")
-    assert "That was not one of the choices." in p.stdout
+    assert 'That was not one of the choices: "banana".' in p.stdout
+    assert "Type plan or menu, or press Enter to close." in p.stdout
     p = run(["--nope"])
     assert "Unknown option: --nope" in p.stdout and p.returncode == 2
     p = run(["--remind"])
@@ -653,10 +654,79 @@ def test_result_of_plan_command_stays_until_enter():
     assert tail.endswith("Press Enter to close >")
 
 
-def test_second_wrong_answer_says_it_is_closing_and_waits():
-    p = run(text="\nbanana\napple\n\n")
-    assert "Closing now. Nothing was changed." in p.stdout
-    assert p.stdout.rstrip().splitlines()[-1].endswith("Press Enter to close >")
+def test_wrong_answers_never_close_the_window_and_the_choices_are_listed():
+    p = run(text="\nbanana\napple\nplan\nWrite it\n\n\n")
+    assert p.stdout.count("not one of the choices") == 2
+    assert "Closing now" not in p.stdout
+    assert "Done. Your plan for today is saved." in p.stdout
+
+
+def test_quit_and_help_words_work_at_the_last_prompt():
+    for word in ("q", "quit", "exit"):
+        p = run(text=f"\n{word}\n")
+        assert "not one of the choices" not in p.stdout, word
+    p = run(text="\n?\n5\n\n")
+    assert "Type a number from the menu" in p.stdout
+
+
+def test_same_brings_back_the_plan_before_this_one():
+    first = run(text="Send the invoice\n\n")
+    run(text="y\n\n", home=first.home, day="2026-10-02")
+    saved = notes(first.home)
+    assert saved["previous"] == "Send the invoice" and saved["done"] == 1
+    p = run(text="same\n\n", home=first.home, day="2026-10-03")
+    assert 'type same for: "Send the invoice"' in p.stdout
+    assert notes(first.home)["intent"]["text"] == "Send the invoice"
+    # The menu path takes it too.
+    p = run(text="\nplan\nsame\n\n", home=first.home, day="2026-10-03")
+    assert "Saved" in p.stdout or "Your plan for today: Send the invoice" in p.stdout
+
+
+def test_plans_done_are_counted_and_shown_privately():
+    first = run(text="One\n\n")
+    run(text="y\nTwo\n\n", home=first.home, day="2026-10-02")
+    p = run(text="y\n\n", home=first.home, day="2026-10-03")
+    assert "That is 2 plans you have finished." in p.stdout
+    p = run(text="m\n1\n\n\n", home=first.home, day="2026-10-03")
+    assert "Plans you marked as done: 2" in p.stdout
+    assert "Only you can see this" in p.stdout
+    assert '"visits"' not in p.stdout
+    p = run(text="m\n1\nfull\n\n\n", home=first.home, day="2026-10-03")
+    assert '"visits"' in p.stdout
+
+
+def test_an_unanswered_plan_is_still_shown_when_reopened_the_same_day():
+    first = run(text="Book travel\n\n")
+    run(text="\n\n\n", home=first.home, day="2026-10-02")
+    p = run(text="\n", home=first.home, day="2026-10-02")
+    assert "Still open from" in p.stdout and "Book travel" in p.stdout
+
+
+def test_an_expired_plan_is_announced_and_kept_as_same():
+    first = run(text="Old plan\n\n")
+    p = run(text="same\n\n", home=first.home, day="2026-10-30")
+    assert "over two weeks ago was cleared" in p.stdout
+    assert notes(first.home)["intent"]["text"] == "Old plan"
+
+
+def test_not_yet_at_the_sign_in_offer_is_not_a_final_no():
+    home, startup = tempfile.mkdtemp(), tempfile.mkdtemp()
+    run(text="Plan\nnot yet\n\n", home=home, startup=startup)
+    assert "offered" not in notes(home)
+
+
+def test_saved_file_is_private_on_posix():
+    if os.name != "posix":
+        raise unittest.SkipTest("POSIX permissions")
+    p = run(text="Plan\n\n")
+    mode = os.stat(os.path.join(p.home, "notes.json")).st_mode & 0o777
+    assert mode == 0o600, oct(mode)
+
+
+def test_delete_needs_a_clear_yes():
+    first = run(text="Plan\n\n")
+    run(["--reset"], text="done\n", home=first.home)
+    assert os.path.exists(os.path.join(first.home, "notes.json"))
 
 
 def test_menu_toggles_say_the_action_and_menu_help_is_for_employees():

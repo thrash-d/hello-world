@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-10-02: a plan you repeat is one word, errors list the choices, option 1 is a summary
+
+Version 1.12.0. Round 37 review (`reviews/round-37.md`), no Critical, 3 High, about 25 Medium, about 30 Low, about 25 Part 2 items across four reviewers.
+
+**Retention change.** Usability finding 5, "the second session is not faster than the first ... Retyping a recurring plan ... is the exact friction that kills habit", Critical 1, "no personal asset accrues", and lead 1, "nothing here pulls a person back": hello-world now remembers, privately and only in `notes.json`, the plan before the current one (`previous`) and how many plans were marked done (`done`). The plan prompt says `type same for: "..."`, and typing `same` reuses it, at the prompt and under `plan`. After a yes it says "That is N plans you have finished." from the second one on. Option 1 shows the count and the previous plan. Lead 9, "a plan left unanswered becomes invisible for the rest of the day": reopening the same day shows "Still open from ...". Lead 10 and usability 9, silent expiry: a plan over two weeks old is cleared with a message and kept as `same`. Tests: same at the prompt and under `plan`, done count and its privacy, same-day reopen, expiry.
+
+**Accessibility change.** Accessibility M1 and lead 15, "Error identification ... does not say what the choices are ... Two typos ending the session is harsh": a wrong word at the last prompt now names the word and lists the choices, and the prompt comes back until Enter; "Closing now" is gone. `q`, `quit`, `exit` close and `help` and `?` open the menu. Accessibility M3 and usability 11, raw JSON in option 1: option 1 now prints a short summary in sentences, and the whole file only when you type `full` (`--stats` still prints everything for scripts). Accessibility L1: prompts say what Enter does ("Enter = keep", "Enter = cancel"), and delete needs a clear yes, not "done". Tests for each.
+
+Other fixes: lead 11, "'not yet' at the sign-in offer counts as a permanent no" (it asks again now; test added); lead 12 and security 7, no fsync and a world-readable temp file: `save()` creates the file 0600, never through a link, and flushes it before replacing (test on POSIX). README, PLAN: the screen-reader claim now reads "designed for, not yet verified" (accessibility H1 wording). Removed from `BACKLOG.md`: same-as-last-time, option 1 without raw JSON, the 14-day expiry notice, POSIX file modes.
+
+Declined (see `BACKLOG.md`, Round 37): CI, workflow and repository-setting findings; installer, launcher and Windows-only findings; prompt endings, console-width wrapping, menu renumbering, `--version`, first-run shortening, the full multi-item "My list" and weekly look-back, content changes: need Windows, a real screen reader, or the owner's pilot. The review packet's developer notes came through empty; that is a packet-building slip in this routine, not a repository fault.
+
+Tested here: all tests pass with the plain runner on Linux, Python 3.11, and ruff is clean. I ran the retention path (done, then `same` on a later day, then option 1) and the accessibility path (wrong words, `q`, `?`, option 1 and `full`) through the test runner with piped input. Not tested: anything on Windows or Python 3.14, a real screen reader, whether the console reads the new prompts well, and pytest (not installed here).
+
 ## 2026-10-02: sign-in offer at the moment of commitment, results stay on screen until Enter
 
 Version 1.11.0. Round 36 review (`reviews/round-36.md`), no Critical, one High, about twenty Medium, about twenty Low, about twenty Part 2 items across four reviewers.
