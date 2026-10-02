@@ -6,7 +6,8 @@ On Windows the installer runs it through hello.cmd with its own pinned Python.
 It shows a thought and a small thing to try, and can keep one plan for the day.
 Everything it saves stays in one small file in the user's own folder, and
 nothing is sent anywhere. Exit 0 when the text was written, 1 when stdout
-could not be written, 2 for an unknown option.
+could not be written or a command (--reset, --stats, --remind, --streak)
+failed, 2 for an unknown option.
 """
 import datetime
 import json
@@ -374,6 +375,8 @@ def load(repair=True):
             os.replace(path, backup_name(path))
         except OSError:
             return state, False
+        say("Your saved file was damaged, so hello-world set it aside as a "
+            "backup copy in the same folder and started fresh.")
         return state, True
     if raw.get("streak") is False:
         state["streak"] = False
@@ -561,22 +564,28 @@ def reset(state):
         say("Nothing was deleted.")
         return None
     leftovers = [data_file()]
+    failed = []
     try:
         leftovers += [os.path.join(data_dir(), n)
                       for n in os.listdir(data_dir())
                       if n.startswith("notes.json.")
                       and (n.endswith(".tmp") or n.startswith("notes.json.bak"))]
-    except OSError:
+    except FileNotFoundError:
         pass
+    except OSError:
+        failed.append(data_dir())
     for path in leftovers:
         try:
             os.remove(path)
         except FileNotFoundError:
             pass
         except OSError:
-            say("Could not delete the file. Delete this file yourself:")
+            failed.append(path)
+    if failed:
+        say("Could not delete everything. Delete these yourself:")
+        for path in failed:
             say("  " + path)
-            return False
+        return False
     state.clear()
     state.update(new_state())
     say("Done. Everything saved was deleted.")
