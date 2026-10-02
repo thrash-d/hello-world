@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-10-02: finishing a plan leads to the next one, no prompt closes on typed text, two windows can't overwrite each other
+
+Version 1.14.0. Round 39 review (`reviews/round-39.md`), no Critical, 2 High, about 20 Medium, about 25 Low, about 25 Part 2 items across four reviewers (lead, security, usability and retention, accessibility).
+
+**Retention change.** Usability 6, "After `done` the session dead-ends ... Someone who finishes a task and wants to set the next one cannot do so", and the lead's "plan loop" direction: after `done` it now asks "Type the next plan, same to reuse the earlier plan, or Enter = close", so finishing one thing sets up the next in the same sitting, and Enter still closes. Lead 7, "All content repeats every 100 days, and the pairing repeats with it": there is now one more thought than tips, so the same thought and tip pair only returns after about 10,000 days. Lead 3, "Command words typed at the first plan prompt become the plan ... a bad second session": `menu`, `done`, `q`, `skip`, `no` and similar words are no longer saved as a plan, at either plan prompt; it says so. Tests: next plan after done, Enter closes, command words, pair length.
+
+**Accessibility change.** Accessibility H1, "After `done` or `plan` ... any typed text closes the window": after `done`, `plan` and the menu the full last prompt comes back below the result, so typing `plan`, `menu` or a typo no longer closes the window and the result stays on screen; the second "Press Enter to close" is gone. Accessibility M5 and lead 5, "Hard-wrapped lines at 72 columns do not reflow": wrapping follows the window width (30 to 72). Accessibility M6, "embeds the previous plan in the prompt string": the earlier plan is printed wrapped on its own line and the prompt is short. Accessibility M1, "Three wrong answers end in silence": it says "That was not understood. Your plan is left as it was." Accessibility M3, "`done` counts as a yes at Keep it for today?": `done` is now named as not a choice there. Tests for each.
+
+Other fixes: lead 1 (High), "Stale in-memory state overwrites newer saves": `done`, `plan` and menu option 3 re-read the file before changing it; tested with two states on one file. Lead 4, accessibility M4, usability 5, "success is printed before the save": the done line and count are shown only after the save works; a failed save says the plan is still open (and the follow-up path says "Your answer was not counted"); tested. Security 4, "privacy text inconsistent": `PLAN.md` now says the file lists the last 400 dates opened. `HELP` lists `done` and `q`. Removed from `BACKLOG.md`: stale-state overwrite from a second window.
+
+Declined (see `BACKLOG.md`, Round 39): the weekly "Finished this week" list, moving the sign-in offer and shortening the first run (wait for pilot feedback); CI, Dependabot, installer, signing and uninstall findings (`.github/`, Windows); screen-reader pass, Python 3.14 run and a real Windows install (need Windows); shorter visit history, forgetting the earlier plan, tip rewording, menu order (product decisions).
+
+Tested here: all tests pass with the plain runner on Linux, Python 3.11, and ruff is clean. I ran the retention path (plan, `done`, next plan, then `plan` and `menu` at the returning prompt) and the accessibility path (command word at the plan prompt, three wrong answers, a narrow-window wrap) through piped input and read the output. Not tested: anything on Windows or Python 3.14, a real screen reader, a real second window (simulated with two states on one file), and pytest (not installed here).
+
 ## 2026-10-02: done counts the moment you finish, every typo is named and asked again, the privacy line is true
 
 Version 1.13.0. Round 38 review (`reviews/round-38.md`), no Critical, 2 High, about 20 Medium, about 25 Low, about 20 Part 2 items across four reviewers (lead, security, usability and retention, accessibility).

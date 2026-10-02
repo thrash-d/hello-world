@@ -24,16 +24,19 @@ Enter to skip anything you don't want to answer. At the last prompt:
 
 - Press Enter, or type `q`, `quit` or `exit`, to close.
 - Type `done` to mark today's plan finished, right when you finish it. It is
-  offered only while a plan is on screen.
+  offered only while a plan is on screen. It then asks for your next plan,
+  and Enter closes, so finishing one thing leads straight to the next.
 - Type `plan` to set or change today's plan, and `same` there to reuse the
   earlier one.
 - Type `menu` (or `help`, or `?`) for the options.
 
-A word the prompt doesn't list gets a message that names it and lists the
+Typing a command word such as `menu` or `done` where a plan is asked does not
+save it as the plan; it says so. If two windows are open, each change reads
+the saved file first, so one window cannot overwrite the other. Lines wrap to
+the width of the window, down to 30 columns. A word the prompt doesn't list gets a message that names it and lists the
 choices, and the prompt comes back. The same goes for the yes/no questions and
 the menu: a mistyped answer is named and asked again, never taken as a choice.
-After `plan` or `done` the screen waits for Enter, so you can read the result
-before the window closes. Everything works from the keyboard with plain text,
+After `plan` or `done` the last prompt comes back below the result, so you can read it before the window closes. Everything works from the keyboard with plain text,
 in a single top-to-bottom flow, designed so a screen reader reads it in order.
 
 - To see the options, type `menu` at the last prompt (`m` also works). You can see a summary of what
@@ -85,7 +88,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.13.0'
+$tag = 'v1.14.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

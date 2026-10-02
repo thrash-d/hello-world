@@ -27,8 +27,10 @@ Ranked from a design review of the first version, then built:
   plan before the current one (so `same` is one word) and a bare count of
   plans marked done. That is a deliberate change: it makes the second day
   faster, it is shown only to the person, in menu option 1 and after they
-  finish a plan, and it leaves with Delete everything. It is not a record of
-  which days or which plans, and nothing reports it.
+  finish a plan, and it leaves with Delete everything. It keeps no history of
+  plans beyond that one, but the file does list the dates you opened the
+  program (the last 400), which the in-a-row line needs. It is shown only to
+  the person, and nothing reports it.
 - Network access of any kind, and any report of use to IT or managers.
 
 ## Trust

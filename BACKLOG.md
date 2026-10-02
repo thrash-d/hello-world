@@ -129,4 +129,15 @@ Changes considered and declined, with the reason.
 - A "Mark done" menu item and menu renumbering (lead 2): the `done` word at the last prompt covers it; renumbering breaks saved habits.
 - Screen-reader pass with NVDA and Narrator, installer smoke test of the interactive path, tip content for other senses (accessibility 1, lead 9, 10): need Windows, a real screen reader, or the owner.
 - `--stats --json`, prompt endings read as "greater than", skipping the second Enter after `plan` (accessibility 12, 1; usability L1): the second Enter is deliberate (round 36); the others need a screen reader to judge.
-- Stale-state overwrite from a second open window, unknown keys, `--reset` with no file, launcher from a source checkout (lead Low): rare; needs a design for two open windows (see Round 37 entry).
+- Unknown keys, `--reset` with no file, launcher from a source checkout (lead Low): rare; needs a design for two open windows (see Round 37 entry).
+
+## Round 39
+
+- "Finished this week" list of the last seven finished plans with dates (usability retention feature): it reverses the no-history stance and the privacy copy; the same-session next plan after `done` and the content-pair change ship instead. Revisit with pilot feedback.
+- Move the sign-in offer to the first `done`, shorten the first run, accept yes-words at the last prompt, a keep-by-default "not yet" (usability 2, 3, 7, 8): changes the taught prompts again right after round 38; wait for pilot feedback.
+- Screen-reader pass with NVDA and Narrator, Python 3.14 test run, a real Windows install (lead 2, accessibility H2): need Windows and a real screen reader; still scheduled, not dropped. The README keeps saying it has not been tried.
+- CI, Dependabot, SHA pins, checksummed downloads, uninstall junction walk, trimmed embedded Python, Authenticode signing (security 1, 2, 3, 5, 6, 7): `.github/`, Windows ACL behavior and signing, outside what this routine changes or can run. Same reasons as Round 38.
+- Cut `MAX_VISITS` to about 35 and age out plan text (security 4): the in-a-row line and weekly checks need a few weeks; the PLAN.md wording is corrected instead.
+- "Forget the earlier plan" menu item and not offering a finished plan as `same` (lead 6): same reason as Round 38; `same` after a finished plan is the recurring-task path.
+- Retry in `save()` on Windows file locks, a no-save notice before the first-run welcome (lead 2a, 10): needs Windows to test; rare.
+- Reword tips that assume sight or hearing, menu reorder, README split, delete-everything typo naming (lead 14, usability 13, 15, 11): content and layout decisions for the owner.
