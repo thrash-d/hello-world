@@ -26,7 +26,7 @@ written to install.log. The exit code is 0 on success and 1 on failure, so a
 management tool can run the installer unattended. It never asks questions.
 
 .EXAMPLE
-$tag = 'v1.9.1'
+$tag = 'v1.9.2'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

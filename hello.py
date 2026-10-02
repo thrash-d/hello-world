@@ -301,13 +301,29 @@ def new_state():
     return {"visits": [], "intent": None, "streak": True}
 
 
-def clean(text):
+MAX_PLAN = 120
+
+
+def tidy(text):
     """One printable line: tabs and odd spaces become spaces, controls go."""
     text = "".join(" " if c.isspace() else c for c in text)
     # ZWNJ and ZWJ are Cf, not printable, but Persian, Indic scripts and emoji
     # sequences need them.
     text = "".join(c for c in text if c.isprintable() or c in "\u200c\u200d")
-    return " ".join(text.split())[:120]
+    text = " ".join(text.split())
+    # Nothing but joiners would show as an empty plan.
+    return text if text.strip("\u200c\u200d ") else ""
+
+
+def clean(text):
+    return tidy(text)[:MAX_PLAN]
+
+
+def typed_plan(raw):
+    """Clean a typed plan, and say so when it is cut."""
+    if len(tidy(raw)) > MAX_PLAN:
+        say(f"Shortened to {MAX_PLAN} characters.")
+    return clean(raw)
 
 
 def day(value):
@@ -315,6 +331,15 @@ def day(value):
     if not isinstance(value, str):
         raise ValueError("not a date")
     return datetime.date.fromisoformat(value).isoformat()
+
+
+def backup_name(path):
+    """notes.json.bak, or a numbered name when an earlier backup exists."""
+    name, n = path + ".bak", 1
+    while os.path.exists(name):
+        n += 1
+        name = f"{path}.bak{n}"
+    return name
 
 
 def load():
@@ -343,7 +368,7 @@ def load():
             raise ValueError("not an object")
     except (ValueError, RecursionError, MemoryError):
         try:
-            os.replace(path, path + ".bak")
+            os.replace(path, backup_name(path))
         except OSError:
             return state, False
         return state, True
@@ -355,10 +380,12 @@ def load():
             visits.append(day(v))
         except ValueError:
             pass
-    # A visit dated after today (a wrong clock once) would sort last and hide
-    # every real visit from "welcome back" and the trim.
+    # A visit dated after today would sort last and hide every real visit from
+    # "welcome back" and the trim, so it is set aside, not counted.
     now = today().isoformat()
     state["visits"] = sorted(v for v in set(visits) if v <= now)[-MAX_VISITS:]
+    # Kept for save(): a clock that was wrong once must not erase real history.
+    state["future"] = sorted(v for v in set(visits) if v > now)[-MAX_VISITS:]
     intent = raw.get("intent")
     try:
         if isinstance(intent, dict) and isinstance(intent.get("text"), str):
@@ -370,12 +397,19 @@ def load():
     return state, True
 
 
+def file_form(state):
+    """What goes in the file: the state with set-aside future visits merged back."""
+    out = {k: v for k, v in state.items() if k != "future"}
+    out["visits"] = sorted(set(state["visits"]) | set(state.get("future", [])))
+    return out
+
+
 def save(state):
     try:
         os.makedirs(data_dir(), exist_ok=True)
         tmp = f"{data_file()}.{os.getpid()}.tmp"
         with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(state, f, indent=2)
+            json.dump(file_form(state), f, indent=2)
         os.replace(tmp, data_file())
         return True
     except OSError:
@@ -410,20 +444,22 @@ def interactive():
         return True
     # Windows calls the NUL device a terminal too. Only a real console has a
     # console mode, so ask for one.
-    import ctypes
-    import msvcrt
     try:
+        import ctypes
+        import msvcrt
+        from ctypes import wintypes
         handle = msvcrt.get_osfhandle(sys.stdin.fileno())
     except (OSError, ValueError):
         return False
-    from ctypes import wintypes
+    except Exception:
+        return True  # the check itself broke; trust isatty() rather than flash shut
     try:
         get_mode = ctypes.WinDLL("kernel32", use_last_error=True).GetConsoleMode
         get_mode.argtypes = [wintypes.HANDLE, wintypes.LPDWORD]
         get_mode.restype = wintypes.BOOL
         return bool(get_mode(handle, ctypes.byref(wintypes.DWORD())))
-    except (OSError, ctypes.ArgumentError, OverflowError, AttributeError):
-        return False
+    except Exception:
+        return True
 
 
 def ask(prompt):
@@ -432,7 +468,7 @@ def ask(prompt):
         return None
     try:
         return input(prompt).strip()
-    except (EOFError, KeyboardInterrupt, OSError):
+    except (EOFError, KeyboardInterrupt, OSError, UnicodeError):
         return None
 
 
@@ -506,7 +542,7 @@ def show_saved(state):
     if state["intent"]:
         say(wrapped("Your current plan: ", state["intent"]["text"]))
     say("After tidying, the file holds only this:")
-    say(json.dumps(state, indent=2, ensure_ascii=False))
+    say(json.dumps(file_form(state), indent=2, ensure_ascii=False))
 
 
 def reset(state):
@@ -541,7 +577,7 @@ def set_plan(state, can_save):
     iso = today().isoformat()
     if old and old["date"] == iso:
         say(wrapped("Your plan for today: ", old["text"]))
-    text = clean(ask("Type today's plan (Enter keeps it as it is) > ") or "")
+    text = typed_plan(ask("Type today's plan (Enter keeps it as it is) > ") or "")
     if not text:
         say("Nothing changed.")
         return
@@ -658,7 +694,7 @@ def daily(startup):
         text = ask("What is one thing you want to get done today?\n"
                    "(Press Enter to skip) > ")
         if text:
-            text = clean(text)
+            text = typed_plan(text)
             if text:
                 intent = {"text": text, "date": iso}
         say()
