@@ -88,3 +88,9 @@ Changes considered and declined, with the reason.
 - `-Wait` and exit code in `uninstall.ps1 -Quiet`, junction-safe profile cleanup, Domain Admins in the ACL check, fsync, tip wording for ability, README `$d` note (thirty-second review L4-L11): PowerShell I can't run here, or low impact; same as earlier entries.
 - Daily plan list, IT content file, rollout packaging, `--version`, roaming profiles, privacy grep test, pilot measure (thirty-second review Part 2): needs a decision from the owner, same as earlier entries.
 - Windows CI, action SHA pins, error log, `fsync`, launcher Known Folder and atomic rewrite, Ctrl-C, `uninstall.ps1 -Wait`, checksums for CI tools, concurrent runs, IT content file, multi-item plan, `--version`/`--doctor`, lighter packaging, pilot measure (thirty-third review M1, M2, M4, L6-L8, L11, L12, Part 2): same reasons as earlier entries; needs a Windows machine or a decision from the owner.
+
+## Round 34
+
+- Windows CI job, SHA-pinned Actions, checksum-verified tool downloads, Dependabot major-version gate: need CI and Windows runs I can't do here.
+- Skip repair when the run can't save or be seen (finding 5), retry on `os.replace` (6), let Ctrl+C escape `ask` (7), error log file (11): small behaviour changes the owner has not asked for.
+- Content override file, Python pin update check, organisation-owned repo: decisions for the owner.

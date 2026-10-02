@@ -54,7 +54,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.9.6'
+$tag = 'v1.9.7'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
@@ -106,7 +106,7 @@ If it fails when replacing the folder, close every open hello-world window
 
 - `hello.py`: the program. `hello.cmd --help` lists its options, such as `--plain`, which prints only the greeting and saves nothing.
 - `install.ps1`, `uninstall.ps1`: deploy and remove it.
-- `test_hello.py`: run with `python test_hello.py`.
+- `test_hello.py`: run with `python test_hello.py` (Python 3.11 or later).
 - `VERSION`: the release version; a new version on `main` gets a tag.
 - `CHANGELOG.md`, `BACKLOG.md`, `reviews/`: change history, declined changes
   with reasons, and the saved review of each round.

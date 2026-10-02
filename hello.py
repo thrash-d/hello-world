@@ -375,8 +375,9 @@ def load(repair=True):
             os.replace(path, backup_name(path))
         except OSError:
             return state, False
-        say("Your saved file was damaged, so hello-world set it aside as a "
-            "backup copy in the same folder and started fresh.")
+        say(textwrap.fill("Your saved file was damaged, so hello-world set it "
+                          "aside as a backup copy (notes.json.bak) in the same "
+                          "folder and started fresh. Menu option 4 deletes it.", 72))
         return state, True
     if raw.get("streak") is False:
         state["streak"] = False
@@ -565,6 +566,7 @@ def reset(state):
         return None
     leftovers = [data_file()]
     failed = []
+    listing_failed = False
     try:
         leftovers += [os.path.join(data_dir(), n)
                       for n in os.listdir(data_dir())
@@ -573,7 +575,7 @@ def reset(state):
     except FileNotFoundError:
         pass
     except OSError:
-        failed.append(data_dir())
+        listing_failed = True
     for path in leftovers:
         try:
             os.remove(path)
@@ -581,10 +583,15 @@ def reset(state):
             pass
         except OSError:
             failed.append(path)
-    if failed:
-        say("Could not delete everything. Delete these yourself:")
-        for path in failed:
-            say("  " + path)
+    if failed or listing_failed:
+        say("Could not delete everything.")
+        if failed:
+            say("Delete these yourself:")
+            for path in failed:
+                say("  " + path)
+        if listing_failed:
+            say("Could not list the folder, so backup copies may remain:")
+            say("  " + data_dir())
         return False
     state.clear()
     state.update(new_state())
