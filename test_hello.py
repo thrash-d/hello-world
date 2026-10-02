@@ -293,7 +293,7 @@ def test_menu_sets_or_changes_todays_plan():
 
 def test_reset_also_deletes_backup_and_temp_copies():
     first = run(text="Send the invoice\n\n")
-    for name in ("notes.json.bak", "notes.json.123.tmp"):
+    for name in ("notes.json.bak", "notes.json.bak2", "notes.json.123.tmp"):
         with open(os.path.join(first.home, name), "w") as f:
             f.write("old plan")
     run(["--reset"], text="y\n", home=first.home)
@@ -500,6 +500,11 @@ def test_documented_tag_matches_version():
     for name in ("README.md", "install.ps1"):
         with open(os.path.join(root, name), encoding="utf-8") as f:
             assert tag in f.read(), name
+
+
+def test_cut_plan_has_no_trailing_space():
+    import hello
+    assert hello.clean("a" * 119 + " b") == "a" * 119
 
 
 if __name__ == "__main__":
