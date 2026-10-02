@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-10-02: Failed `--reset` exits 1, read-only commands leave a damaged file alone
+
+Version 1.9.5. Round 32 review (`reviews/round-32.md`), no Critical, two High, six Medium, eleven Low, nine Part 2 items.
+
+- M2, "`--reset` exits 0 even when deletion fails": `reset()` now returns True (deleted), False (a delete failed) or None (declined); `--reset` exits 1 only on False. Answering no stays 0. Test added.
+- M3, "Read-only commands change files": `load(repair=False)` leaves a damaged `notes.json` where it is. `--stats` and `--reset` use it, and `--stats` says "The saved file can't be read right now, or it is damaged", exits 1 and changes nothing instead of printing an empty history. An unknown option no longer reads the file. Test added. This also removes the "make `--stats` read-only" and "failed `--reset` exit code" items from the backlog.
+- README and installer example tag are v1.9.5.
+
+Declined (see `BACKLOG.md`): H1, H2, M4, M5, M6 (CI and Windows, same reasons as before); M1 is wrong, the files it calls missing are committed (`CHANGELOG.md`, `BACKLOG.md`, `reviews/`, `.devkit/kit/*`; the reviewer was not given them by design). L3: the launcher uses `start`, which returns at once, so `|| pause` would not see a failure.
+
+Tested here: all tests pass with the plain runner on Linux, Python 3.11. Not tested: anything on Windows or Python 3.14, and pytest (not installed here).
+
 ## 2026-10-02: `--streak` exits 0 on success, failed `--remind` exits 1, no half-written launcher
 
 Version 1.9.4. Round 31 review (`reviews/round-31.md`), no Critical, no High, five Medium, twelve Low, nine Part 2 items.

@@ -342,12 +342,13 @@ def backup_name(path):
     return name
 
 
-def load():
+def load(repair=True):
     """Read the saved file. Returns (state, can_save).
 
     A missing file or a damaged one gives a fresh start; a damaged file is kept
     as notes.json.bak. A file that exists but can't be read right now is left
-    alone, so a locked file is never overwritten with an empty one.
+    alone, so a locked file is never overwritten with an empty one. With
+    repair=False a damaged file is left where it is and can_save is False.
     """
     state = new_state()
     path = data_file()
@@ -367,6 +368,8 @@ def load():
         if not isinstance(raw, dict):
             raise ValueError("not an object")
     except (ValueError, RecursionError, MemoryError):
+        if not repair:
+            return state, False
         try:
             os.replace(path, backup_name(path))
         except OSError:
@@ -552,10 +555,11 @@ def show_saved(state):
 
 
 def reset(state):
+    """True when deleted, False when a delete failed, None when declined."""
     answer = ask("Delete all saved notes and dates on this computer? (y/n) > ")
     if not is_yes(answer):
         say("Nothing was deleted.")
-        return False
+        return None
     leftovers = [data_file()]
     try:
         leftovers += [os.path.join(data_dir(), n)
@@ -740,19 +744,25 @@ def run(argv):
     if not argv:
         daily(startup=False)
         return 0
-    state, can_save = load()
     if argv == ["--stats"]:
+        state, readable = load(repair=False)
+        if not readable:
+            say("The saved file can't be read right now, or it is damaged.")
+            say("Nothing was changed. Saved in: " + data_dir())
+            return 1
         show_saved(state)
         return 0
     if argv == ["--reset"]:
         if not interactive():
             say("Deleting saved notes needs a person at the keyboard.")
             return 1
-        reset(state)
-        return 0
+        state, _ = load(repair=False)
+        # Answering no is the person's choice; only a failed delete is an error.
+        return 1 if reset(state) is False else 0
     if len(argv) == 2 and argv[0] == "--remind" and argv[1] in ("on", "off"):
         return 0 if remind(argv[1] == "on") else 1
     if len(argv) == 2 and argv[0] == "--streak" and argv[1] in ("on", "off"):
+        state, can_save = load()
         state["streak"] = argv[1] == "on"
         if can_save and save(state):
             say("Done. The in-a-row line is "

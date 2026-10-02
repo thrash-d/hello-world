@@ -515,6 +515,25 @@ def test_documented_tag_matches_version():
             assert tag in f.read(), name
 
 
+def test_failed_reset_exits_1_and_declining_exits_0():
+    first = run(text="Send the invoice\n\n")
+    assert run(["--reset"], text="n\n", home=first.home).returncode == 0
+    home = tempfile.mkdtemp()
+    os.mkdir(os.path.join(home, "notes.json"))  # a delete of this fails
+    p = run(["--reset"], text="y\n", home=home)
+    assert p.returncode == 1 and "Could not delete" in p.stdout
+
+
+def test_stats_does_not_move_a_damaged_file():
+    home = tempfile.mkdtemp()
+    with open(os.path.join(home, "notes.json"), "w") as f:
+        f.write('{"visits":["2026-10-0')
+    p = run(["--stats"], home=home)
+    assert p.returncode == 1 and "damaged" in p.stdout
+    assert os.path.exists(os.path.join(home, "notes.json"))
+    assert not os.path.exists(os.path.join(home, "notes.json.bak"))
+
+
 def test_cut_plan_has_no_trailing_space():
     import hello
     assert hello.clean("a" * 119 + " b") == "a" * 119
