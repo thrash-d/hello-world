@@ -26,36 +26,36 @@ MONTHS = ("January", "February", "March", "April", "May", "June", "July",
 # Chosen by date, so everyone sees the same line on the same day and the
 # lists repeat every 100 days (the pairing much later).
 TIPS = (
-    'Sip a glass of water slowly while you look out a window.',
+    'Sip a glass of water slowly, away from your screen.',
     'Roll your shoulders back five times, nice and slow.',
-    'Look at something far away for twenty seconds to rest your eyes.',
+    'Rest your eyes for twenty seconds: look far away, or close them.',
     'Stretch your arms overhead, seated or standing, and take a deep breath.',
     'Move to the farthest room or window you can reach, and back.',
     'Check your posture and let your shoulders drop away from your ears.',
     'Turn your neck gently side to side, only as far as feels easy.',
     'Open and close your hands ten times to loosen your fingers.',
-    'Blink slowly ten times to refresh your eyes.',
+    'Pin the one document you open most so it is one click away.',
     'Take a short walk or roll outside, whatever suits you.',
     'Pour a warm or cool drink and enjoy it away from your screen.',
     'Rest your attention on something calm, a view, a sound or a texture.',
-    'Circle your wrists a few times in each direction.',
+    'Write the next step on one task you left half done.',
     'Plant both feet flat and sit tall, or stand tall, for ten breaths.',
-    'Stretch your sides by leaning gently one way, then the other.',
+    'Mute one group chat you only ever skim.',
     'Unclench your jaw and relax your forehead for a moment.',
     'Move around for two minutes in whatever way feels good today.',
-    'Press your palms together and gently stretch your wrists.',
-    'Adjust your screen so it sits comfortably at eye level.',
+    'Block fifteen minutes in your calendar for the task you keep putting off.',
+    'Adjust your chair, screen or keyboard so one thing sits more comfortably.',
     'Take the long way to your next meeting or call, if you can.',
-    'Wiggle your toes and ankles under your desk for a minute.',
-    'Cup your palms over closed eyes for thirty seconds of calm dark.',
+    'Save a template for one email you write again and again.',
+    'Learn one keyboard shortcut for the program you use most.',
     'Drink a full glass of water before your next coffee or tea.',
     'Shrug your shoulders up to your ears, then let them melt down.',
-    'Step outside or to a window for a minute of fresh air and daylight.',
+    'Step outside or open a window for a minute of fresh air.',
     'Take five slow breaths, making each exhale a little longer.',
     'Pause for one quiet minute before you open your next message.',
     'Note one good thing that has happened so far today.',
     'Close your eyes for three breaths and notice how you feel.',
-    'Name three things you can see, hear, and feel right now.',
+    'Name three things you notice right now, with any sense.',
     'Write down one thing you are looking forward to this week.',
     'Set a timer for two minutes and simply sit with no screen.',
     'Enjoy something small nearby, like a plant or a favorite mug.',
@@ -162,11 +162,11 @@ THOUGHTS = (
     'Step away from the screen for five minutes. You will come back a little clearer.',
     'Eat lunch away from your desk today. The inbox can wait for a sandwich.',
     'A short walk around the building counts as real work for your head.',
-    'Looking out of a window for a minute is a fine use of a busy afternoon.',
+    'A minute away from the screen is a fine use of a busy afternoon.',
     'Stretch your shoulders and unclench your jaw. You have held them up all morning.',
     "Leave on time tonight if you can. Tomorrow's you will be glad of the evening.",
     'Rest is part of the job, because tired people tend to make the same slip twice.',
-    'Rest your eyes on something far away and let your shoulders drop.',
+    'Rest your eyes for a moment and let your shoulders drop.',
     'A proper break makes the second half of the day feel like a fresh start.',
     "Let the evening belong to you. Nothing in your inbox needs you at nine o'clock.",
     'Say thank you to someone today for a small thing they did without being asked.',
@@ -201,7 +201,7 @@ THOUGHTS = (
     'Someone down the corridor has probably solved this before. Go and find them.',
     'Keep a small note of things you figured out this week. It adds up to more than you think.',
     'Being a beginner at something new is a sign your work is still growing.',
-    'Watch how a colleague you admire handles a tricky call, and borrow one thing.',
+    'Notice how a colleague you admire handles a tricky call, and borrow one thing.',
     'Read one useful page on your break and call that a good day for your mind.',
     'Explaining a task to someone else is a surprisingly good way to learn it yourself.',
     'It is fine to say "I do not know that yet" and then go and find out.',
@@ -220,7 +220,7 @@ THOUGHTS = (
     'A clumsy day happens to careful people too, and it passes by evening.',
     "You will not remember most of today's small stumbles by next month.",
     'A quiet day with nothing on fire is a good day, even if no one mentions it.',
-    'Notice the small pleasures: a warm mug, a clear inbox, a sunny patch on the desk.',
+    'Notice the small pleasures: a warm mug, a clear inbox, a quiet minute.',
     'Not every day needs a big win. Steady and pleasant is a fine way to work.',
     'Enjoy the meeting that ends five minutes early and spend the time as you like.',
     'An ordinary day done well is something quietly to be proud of.',
@@ -280,7 +280,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return HELP + "\n\nhello.cmd is in this folder:\n  " + here
 
-VERSION = "1.18.0"
+VERSION = "1.19.0"
 MAX_VISITS = 400
 MAX_FILE = 1_000_000
 YES = ("y", "yes", "yep", "ya", "yeah", "done")
@@ -337,7 +337,9 @@ def new_state():
 
 
 MAX_PLAN = 120
+SAVED_PLAN = "Saved. Type done when you finish it, or it asks tomorrow."
 MAX_FINISHED = 7
+SHOWN_AFTER_DONE = 3
 
 
 def tidy(text):
@@ -443,18 +445,19 @@ def load(repair=True):
             visits.append(day(v))
         except ValueError:
             pass
-    # A visit dated after today would sort last and hide every real visit from
-    # "welcome back" and the trim, so it is set aside, not counted.
+    # A visit dated after today comes from a clock that was wrong once. It
+    # would sort last and hide every real visit, so it is dropped.
     now = today().isoformat()
     state["visits"] = sorted(v for v in set(visits) if v <= now)[-MAX_VISITS:]
-    # Kept for save(): a clock that was wrong once must not erase real history.
-    state["future"] = sorted(v for v in set(visits) if v > now)[-MAX_VISITS:]
     intent = raw.get("intent")
     try:
         if isinstance(intent, dict) and isinstance(intent.get("text"), str):
             text = clean(intent["text"])
             if text:
                 state["intent"] = {"text": text, "date": day(intent.get("date"))}
+                waits = intent.get("waits")
+                if isinstance(waits, int) and not isinstance(waits, bool) and 0 < waits < 10:
+                    state["intent"]["waits"] = waits
     except ValueError:
         pass
     finished = []
@@ -476,16 +479,9 @@ def load(repair=True):
 
 
 def file_form(state):
-    """What goes in the file: the state with set-aside future visits merged back.
-
-    The file holds at most MAX_VISITS dates. Real visits come first, then the
-    future ones nearest to today.
-    """
-    out = {k: v for k, v in state.items()
-           if k != "future" and not (k == "epoch" and not v)}
-    current = sorted(set(state["visits"]))[-MAX_VISITS:]
-    later = sorted(set(state.get("future", [])))[:MAX_VISITS - len(current)]
-    out["visits"] = current + later
+    """What goes in the file: the state, holding at most MAX_VISITS dates."""
+    out = {k: v for k, v in state.items() if not (k == "epoch" and not v)}
+    out["visits"] = sorted(set(state["visits"]))[-MAX_VISITS:]
     return out
 
 
@@ -647,6 +643,12 @@ def ask_choice(prompt, yes, no, hint, tries=3):
     return None
 
 
+def para(text):
+    """Say a paragraph wrapped to the window, never broken by hand."""
+    say(textwrap.fill(text, width(), break_on_hyphens=False,
+                      break_long_words=False))
+
+
 def wrapped(prefix, text):
     return textwrap.fill(prefix + text, width(), subsequent_indent="  ",
                          break_on_hyphens=False, break_long_words=False)
@@ -737,7 +739,7 @@ def show_saved(state, full=True):
 def reset(state):
     """True when deleted, False when a delete failed, None when declined."""
     answer = ask("Delete all saved notes, dates and plans on this computer? "
-                 "(y/n, Enter = cancel) > ")
+                 "(y or n, Enter to cancel) > ")
     if (answer or "").lower().strip(" .!") not in STRICT_YES:
         say("Nothing was deleted.")
         return None
@@ -828,7 +830,7 @@ def commit(state, base, can_save, soft=()):
             and state.get("done", 0) > base.get("done", 0)):
         say("The other open window had also finished a plan.")
     for key in set(state) | set(base):
-        if key in ("visits", "future", "done", "offer_skips", "finished"):
+        if key in ("visits", "done", "offer_skips", "finished"):
             continue
         if state.get(key) == base.get(key):
             continue
@@ -892,15 +894,22 @@ def is_command(text, again="Type plan at the last prompt to set one."):
     return False
 
 
-def show_finished(state):
-    """The last few finished plans, so finishing has a visible payoff."""
+def show_finished(state, limit=MAX_FINISHED):
+    """The last few finished plans, so finishing has a visible payoff.
+
+    After done and on welcome back only the last few are read out; option 1
+    lists every one kept.
+    """
     items = state.get("finished") or []
     if not items:
         return
     say()
-    say(f"Finished lately (the last {MAX_FINISHED} are kept, only on this "
-        "computer):")
-    for item in reversed(items):
+    if len(items) > limit:
+        say("Finished lately (menu option 1 lists all of them):")
+    else:
+        say(f"Finished lately (the last {MAX_FINISHED} are kept, only on this "
+            "computer):")
+    for item in list(reversed(items))[:limit]:
         say(wrapped("  " + long_date(datetime.date.fromisoformat(
             item["date"])) + ": ", item["text"]))
 
@@ -926,9 +935,10 @@ def set_plan(state, can_save, iso=None, after_done=False):
     if state.get("previous"):
         say(wrapped("Earlier plan: ", state["previous"]))
     hint = ", same to reuse the earlier plan" if state.get("previous") else ""
-    typed = ask("Type the next plan" + hint + ", or Enter = close > "
+    typed = ask("Type the next plan" + hint + ", or Enter to close > "
                 if after_done else
-                "Type today's plan" + hint + ", or Enter = keep > ")
+                "Type today's plan" + hint
+                + (", or Enter to keep it > " if old else ", or Enter to go back > "))
     word = (typed or "").lower().strip(" .!")
     if after_done and (not word or word in ("q", "quit", "exit", "x", "close")):
         say("Closing.")
@@ -950,8 +960,7 @@ def set_plan(state, can_save, iso=None, after_done=False):
         state["previous"] = old["text"]
     state["intent"] = {"text": text, "date": iso}
     if commit(state, base, can_save):
-        say("Saved. Your plan for today is in. Finished it later? Open this "
-            "again and type done.")
+        say(SAVED_PLAN)
     else:
         undo(state, base)
         say("Could not save that on this computer. Your plan is unchanged.")
@@ -971,7 +980,7 @@ def forget_finished(state, can_save):
     numbers = [str(n) for n in range(1, len(shown) + 1)]
     for _ in range(3):
         choice = ask(f"Type the number to forget (1 to {len(shown)}), "
-                     "or Enter = keep them all > ")
+                     "or Enter to keep them all > ")
         if not choice or choice in numbers:
             break
         say(f'There is no number "{tidy(choice)[:30]}" on the list. Type a '
@@ -981,7 +990,8 @@ def forget_finished(state, can_save):
         return
     item = shown[int(choice) - 1]
     also_same = state.get("previous") == item["text"] and ask_choice(
-        "Also forget it as the earlier plan for same? (y/n, Enter = no) > ",
+        "Also forget it as the earlier plan for same? "
+        "(y or n, Enter to keep it for same) > ",
         STRICT_YES, ("n", "no", "nope"),
         "Type y or n, or press Enter to keep it for same.") == "yes"
     refresh(state, can_save)
@@ -1018,7 +1028,7 @@ def menu(state, can_save=True, iso=None):
         say("  6  Set or change today's plan")
         say("  7  Forget one finished plan")
         say("  Enter  Back to the last prompt")
-        choice = ask("Choose 1 to 7, or Enter = back > ")
+        choice = ask("Choose 1 to 7, or Enter to go back > ")
         if not choice or choice.lower() in ("q", "quit", "exit"):
             return
         if choice.lower() in ("help", "?", "h"):
@@ -1028,8 +1038,8 @@ def menu(state, can_save=True, iso=None):
                 say("The saved file could not be read just now, so this may "
                     "be out of date.")
             show_saved(state, full=False)
-            if (ask("Press Enter to go on, or type full to see the whole "
-                    "file > ") or "").lower() == "full":
+            if (ask("Type full to see the whole file, or Enter to go on > ")
+                    or "").lower() == "full":
                 refresh(state, can_save)
                 say(json.dumps(file_form(state), indent=2, ensure_ascii=False))
         elif choice == "2":
@@ -1075,7 +1085,7 @@ def offer_reminder(state, can_save, planned=False):
         return
     answer = ask_choice(
         "Want it to open once a day when you sign in so it can ask about "
-        "your plan? (y, n, or Enter = ask me later) > ",
+        "your plan? (y or n, Enter to ask later) > ",
         STRICT_YES, ("n", "no", "nope", "no thanks", "never", "stop"),
         "Type y or n, or press Enter to be asked later.")
     if answer is None:
@@ -1139,7 +1149,7 @@ def mark_done_now(state, can_save, d):
         return False
     for line in done_lines(state, d):
         say(line)
-    show_finished(state)
+    show_finished(state, SHOWN_AFTER_DONE)
     return True
 
 
@@ -1169,25 +1179,30 @@ def daily(startup):
     say()
 
     if expired:
-        say("Your plan from over two weeks ago was cleared. Type same at the")
-        say("plan prompt to bring it back.")
+        para("Your plan from over two weeks ago was cleared. Type same at the "
+             "plan prompt to bring it back.")
         say()
 
     if first:
-        say("Welcome. Each day this gives you one thought and one small thing")
-        say("to try. If you type a plan for today, it asks tomorrow how it")
-        say("went. It saves a few notes on this computer, in your own user")
-        say("folder, and sends nothing anywhere. Do not type passwords or")
-        say("private details. Others who can read this computer's files, such")
-        say("as IT staff, could read the notes.")
-        say("Type plan or menu at the last prompt for the options.")
+        para("Press Enter at each question to skip it, and once more to "
+             "close. That's it.")
+        say()
+        para("Welcome. Each day this gives you one thought and one small "
+             "thing to try. Everyone sees the same ones on the same day. If "
+             "you type a plan for today, it asks tomorrow how it went.")
+        say()
+        para("It saves a few notes on this computer, in your own user folder, "
+             "and sends nothing anywhere. Do not type passwords or private "
+             "details. Others who can read this computer's files, such as IT "
+             "staff, could read the notes. Type menu at the last prompt for "
+             "the options.")
         say()
     elif not seen_today:
         last = datetime.date.fromisoformat(state["visits"][-1])
         row = in_a_row(state["visits"], d)
         if (d - last).days > 7:
             say("Welcome back. Glad you are here.")
-            show_finished(state)
+            show_finished(state, SHOWN_AFTER_DONE)
             say()
         elif state["streak"] and (row in (3, 7, 14) or row % 30 == 0):
             say(f"You have opened this {row} times in a row. Nice to see you.")
@@ -1196,16 +1211,23 @@ def daily(startup):
     if not seen_today and intent and intent["date"] < iso:
         say(wrapped("Last time you planned: ", intent["text"]))
         answer = ask_choice(
-            "Did you do it? (y = yes, n = not yet, Enter = skip) > ",
+            "Did you do it? (y for yes, n for not yet, Enter to skip) > ",
             YES, NO, "Type y or n, or press Enter to skip.")
         if answer == "yes":
             finish_plan(state, intent["text"], d)
             finished_now = True
             intent = None
+        elif answer == "no" and intent.get("waits", 0) >= 1:
+            answered = True
+            state["previous"] = intent["text"]
+            intent = None
+            para("That plan has waited a while, so it is put away and won't be "
+                 "asked about again. Type same at the plan prompt to bring it "
+                 "back.")
         elif answer == "no":
             answered = True
             keep = ask_choice(
-                "That is fine. Keep it for today? (y/n, Enter = keep) > ",
+                "That is fine. Keep it for today? (y or n, Enter to keep it) > ",
                 STRICT_YES + ("not yet",), ("n", "no", "nope"),
                 "Type y to keep it, n to clear it, or press Enter to keep it.")
             if keep == "no":
@@ -1213,7 +1235,8 @@ def daily(startup):
                 intent = None
                 say("Cleared. It stays as same until you delete everything.")
             else:
-                intent = {"text": intent["text"], "date": iso}
+                intent = {"text": intent["text"], "date": iso,
+                          "waits": intent.get("waits", 0) + 1}
                 say("Kept for today.")
         elif answer is None and person:
             say("That was not understood. Your plan is left as it was.")
@@ -1237,11 +1260,11 @@ def daily(startup):
         say(wrapped(f"Still open from {when}: ", intent["text"]))
         say()
     elif not seen_today:
-        skip = ("(Press Enter to skip)" if not intent else
-                "(Press Enter to skip; a plan typed here replaces the old one)")
+        skip = ("(Enter to skip)" if not intent else
+                "(A plan typed here replaces the old one. Enter to skip)")
         if state.get("previous") and not intent:
             say(wrapped("Earlier plan: ", state["previous"]))
-            skip = "(Press Enter to skip, or type same to reuse it)"
+            skip = "(Type same to reuse it, or Enter to skip)"
         text = ask("What is one thing you want to get done today?\n"
                    + skip + " > ")
         if (text or "").lower() == "same" and not state.get("previous"):
@@ -1281,7 +1304,7 @@ def daily(startup):
                 for line in done_lines(state, d):
                     say(line)
             if typed_new:
-                say("Saved. Tomorrow it will ask how this went.")
+                say(SAVED_PLAN)
                 say()
             if not seen_today:
                 offer_reminder(state, can_save, planned=typed_new)
@@ -1290,9 +1313,9 @@ def daily(startup):
     # it, because the window closes as soon as the program exits.
     while True:
         planned = bool(intent and person and state["intent"] is intent)
-        prompt = ("Press Enter to close, or type done, plan, menu or q > "
+        prompt = ("Type done, plan, menu or q, or Enter to close > "
                   if planned else
-                  "Press Enter to close, or type plan, menu or q > ")
+                  "Type plan, menu or q, or Enter to close > ")
         answer = (ask(prompt) or "").lower().strip()
         if answer == "done" and person:
             closing = False

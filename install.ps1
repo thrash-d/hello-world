@@ -26,7 +26,7 @@ written to install.log. The exit code is 0 on success and 1 on failure, so a
 management tool can run the installer unattended. It never asks questions.
 
 .EXAMPLE
-$tag = 'v1.18.0'
+$tag = 'v1.19.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
@@ -66,8 +66,8 @@ Employees open hello-world from the Start menu or by typing "hello-world" in Win
 To uninstall, use Settings > Apps > Installed apps > hello-world > Uninstall.
 That also removes folders named .new and .old left by an interrupted run.
 
-The setup folder can be deleted after a successful install. Copy install.log first
-if you need a record of the installation steps.
+The setup folder can be deleted after a successful install. A copy of
+install.log is kept in the install folder.
 #>
 #Requires -RunAsAdministrator
 param([Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$Commit, [switch]$Quiet)
@@ -205,7 +205,13 @@ function Remove-Tree([string]$Path) {
 function Rename-Retry([string]$Path, [string]$NewName) {
     for ($try = 1; ; $try++) {
         try { Rename-Item -LiteralPath $Path -NewName $NewName; return }
-        catch { if ($try -ge 5) { throw }; Start-Sleep -Seconds 1 }
+        catch {
+            if ($try -lt 5) { Start-Sleep -Seconds 1; continue }
+            # An open hello-world window runs the install's own python.exe.
+            $open = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path -like "$dir\*" })
+            if ($open) { throw "Couldn't rename $Path because $($open.Count) hello-world window(s) are open. Close them and run the installer again." }
+            throw
+        }
     }
 }
 
@@ -334,7 +340,9 @@ try {
 
     # Swap in the new folder, and put the old one back if that fails.
     $hadOld = Test-Path -LiteralPath $dir
-    $prevVersion = (Get-ItemProperty -LiteralPath $key -ErrorAction SilentlyContinue).DisplayVersion
+    # Kept so a failed step 6 can put the old Apps entry back.
+    $prevEntry = Get-ItemProperty -LiteralPath $key -ErrorAction SilentlyContinue
+    $prevVersion = $prevEntry.DisplayVersion
     # Only administrators can plant a link here, but never delete through one.
     if ($hadOld) { Assert-NotLink $dir }
     if ($hadOld) { Rename-Retry $dir (Split-Path $old -Leaf) }
@@ -343,11 +351,8 @@ try {
         if ($hadOld) { Rename-Retry $old (Split-Path $dir -Leaf) }
         throw
     }
-    # The new install is live now, so a leftover .old is only a warning.
-    if ($hadOld) {
-        try { Remove-Tree $old }
-        catch { Write-Warning "Installed, but couldn't remove $old. The next run clears it." }
-    }
+    # The old install stays as .old until step 6 has worked, so a failure
+    # there can put it back.
 }
 finally {
     Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
@@ -359,14 +364,21 @@ Write-Step '[6/6] Adding the Start menu shortcut and the Settings > Apps entry'
 # Added only after the checks pass. The entry in Settings > Apps, whose Uninstall button runs uninstall.ps1.
 $version = (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'VERSION')).Trim()
 $pyExe = Join-Path $dir 'python\python.exe'
+$lnk = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'hello-world.lnk'
+try {
 New-Item $key -Force | Out-Null
+$uninstall = "`"$(Join-Path $sys32 'WindowsPowerShell\v1.0\powershell.exe')`" -NoProfile -ExecutionPolicy Bypass -File `"$dir\uninstall.ps1`""
+# Commit and InstallDate let an admin read what code is on a PC remotely.
 $entry = @{
-    DisplayName     = 'hello-world'
-    DisplayVersion  = $version
-    Publisher       = 'IT Department'
-    DisplayIcon     = "$pyExe,0"
-    InstallLocation = $dir
-    UninstallString = "`"$(Join-Path $sys32 'WindowsPowerShell\v1.0\powershell.exe')`" -NoProfile -ExecutionPolicy Bypass -File `"$dir\uninstall.ps1`""
+    DisplayName          = 'hello-world'
+    DisplayVersion       = $version
+    Publisher            = 'IT Department'
+    DisplayIcon          = "$pyExe,0"
+    InstallLocation      = $dir
+    InstallDate          = (Get-Date -Format 'yyyyMMdd')
+    Commit               = $Commit
+    UninstallString      = $uninstall
+    QuietUninstallString = "$uninstall -Quiet"
 }
 foreach ($name in $entry.Keys) { New-ItemProperty $key -Name $name -Value $entry[$name] -Force | Out-Null }
 # Settings > Apps shows the size in KB.
@@ -378,7 +390,6 @@ foreach ($name in $dwords.Keys) { New-ItemProperty $key -Name $name -Value $dwor
 # Start menu, and after the Apps entry, so a half-finished install still has
 # an Uninstall button. hello.py waits for Enter before it closes its window; the
 # shortcut adds a pause only when hello.cmd fails, so an error message stays readable.
-$lnk = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'hello-world.lnk'
 $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk)
 $shortcut.TargetPath = Join-Path $sys32 'cmd.exe'
 $shortcut.Arguments = "/d /c `"title hello-world & `"$dir\hello.cmd`" & if errorlevel 1 pause`""
@@ -393,12 +404,44 @@ $shortcut.Save()
 # A shortcut that fails the check is removed, not left in every Start menu.
 try { Assert-AdminOnly $lnk $edit }
 catch { Remove-Item -LiteralPath $lnk -Force -ErrorAction SilentlyContinue; throw }
+}
+catch {
+    # An upgrade that fails here puts the old install and its Apps entry back,
+    # so the PC keeps a working install. A first install keeps its new files,
+    # and running the installer again finishes it.
+    if ($hadOld -and (Test-Path -LiteralPath $old)) {
+        Write-Warning "Step 6 failed, so the previous install is put back: $($_.Exception.Message)"
+        Remove-Tree $dir
+        Rename-Retry $old (Split-Path $dir -Leaf)
+        Remove-Item -LiteralPath $key -Recurse -Force -ErrorAction SilentlyContinue
+        if ($prevEntry) {
+            New-Item $key -Force | Out-Null
+            foreach ($p in $prevEntry.PSObject.Properties | Where-Object Name -notlike 'PS*') {
+                $type = if ($p.Value -is [int]) { 'DWord' } else { 'String' }
+                New-ItemProperty $key -Name $p.Name -Value $p.Value -PropertyType $type -Force | Out-Null
+            }
+        }
+    }
+    throw
+}
+# Step 6 worked, so the old install can go. A leftover .old is only a warning.
+if ($hadOld) {
+    try { Remove-Tree $old }
+    catch { Write-Warning "Installed, but couldn't remove $old. The next run clears it." }
+}
+$installed = $true
 
 $how = if ($prevVersion -and $prevVersion -ne $version) { "upgraded from $prevVersion" } elseif ($prevVersion) { 'reinstalled' } else { 'new install' }
 Write-Host "Installed hello-world $version to $dir ($how)." -ForegroundColor Green
 Write-Host "hello.py SHA-256: $hash"
-Write-Info 'Next: open hello-world from the Start menu to check it. The setup folder can be deleted; copy install.log first if you want the record.'
+Write-Info 'Next: open hello-world from the Start menu to check it. The setup folder can be deleted. A copy of install.log stays in the install folder.'
 }
 # The host prints a script's error only after the finally below, so write it to the log first.
 catch { Write-Host "FAILED: $($_.Exception.Message)" -ForegroundColor Red; Write-Host 'The steps above and this message are in install.log in the setup folder.'; exit 1 }
-finally { Stop-Transcript -ErrorAction SilentlyContinue | Out-Null; Restore-Window }
+finally {
+    Stop-Transcript -ErrorAction SilentlyContinue | Out-Null
+    # The README says the setup folder can be deleted, so keep a copy of the
+    # log in the install folder, which only administrators can change.
+    if ($installed) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'install.log') -Destination $dir -Force -ErrorAction SilentlyContinue }
+    Restore-Window
+}

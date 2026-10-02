@@ -24,15 +24,8 @@ Ranked from a design review of the first version, then built:
 - A reminder that is on by default, pop-ups, sounds or anything that opens by
   itself without the employee choosing it.
 - A long history of plans or a score. What it does keep is deliberate and
-  small: the file holds the dates you opened the program (the last 400), your
-  current plan, the plan before it, how many times you marked a plan done,
-  and your last seven finished plans (words and date). It also holds your
-  in-a-row setting and your answer to the sign-in question. Menu option 1
-  shows all of it, option 7 forgets one finished plan, and option 4 deletes
-  everything. After a delete the file holds only a random marker, so another
-  open window can't write the notes back. Uninstalling leaves the file in
-  place. The finished plans are shown after
-  each `done`, on welcome back, and in option 1. Nothing reports any of it.
+  small, and the README's "What is saved, and who can see it" section is the
+  one list of it. Nothing reports any of it.
 - Network access of any kind, and any report of use to IT or managers.
 
 ## Trust
@@ -82,11 +75,25 @@ or the uninstaller. Not recorded as checked: console input outside ASCII, the
 shortcut's `if errorlevel 1 pause` line, and removing launchers from several
 user profiles.
 
+## Pilot
+
+Five employees use it for 30 days, and at least one of them uses NVDA,
+Magnifier or voice control.
+
+- Before the clock starts, write down what counts as success. The floor is the
+  kill metric below.
+- On day 14 and day 30, ask each person in person, never through the program,
+  how often they opened it and what annoyed them. Ask the assistive-tech user
+  whether anything was read twice, out of order, or too long.
+- Kill metric: if fewer than three of the five open it most days by day 30,
+  freeze the program as it is. No new features, only fixes for real reports.
+- After the pilot, build only what the five ask for.
+
 ## Later
 
 - If employees ask for it: a second language file, a different tone, or a
   desktop icon. Each is a small change to `hello.py` or the installer.
 - If a second tool is added, split the payload from the installer then, with
   both tools in hand and a Windows test run.
-- The installer's review rounds can pause until the code changes again. The
-  schedule that runs them is outside this repo.
+- Review rounds stop. The next one runs only after a code change or a report
+  from a real user, never on a schedule.

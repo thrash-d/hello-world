@@ -19,91 +19,60 @@ unless you ask for one.
 ## For employees
 
 Open **hello-world** from the Start menu, or type "hello-world" in Windows
-Search. Read the screen, type a plan for the day if you want one, and press
-Enter to skip anything you don't want to answer. At the last prompt:
+Search. Press Enter at each question to skip it, and once more to close.
+That's all you need. Everyone sees the same thought and tip on the same day,
+so you can compare notes with a coworker.
 
-- Press Enter, or type `q`, `quit`, `exit`, `x` or `close`, to close.
-- Type `done` to mark today's plan finished, right when you finish it. It is
-  offered only while a plan is on screen. It lists the last seven plans you
-  finished, then asks for your next plan, so finishing one thing leads
-  straight to the next. There, one Enter or `q` closes, and `no` or `skip`
-  goes back to the last prompt.
-- Type `plan` to set or change today's plan, and `same` there to reuse the
-  earlier one.
-- Type `menu` (or `help`, or `?`) for the options.
+At the last prompt:
 
-Typing a command word such as `menu` or `done` where a plan is asked does not
-save it as the plan. It says so. `no`, `none` and `skip` just mean no plan.
+- Press Enter to close. `q`, `quit`, `exit`, `x` and `close` also close.
+- Type `done` when you finish today's plan. It shows your last three finished
+  plans, then asks for the next one. Enter there closes.
+- Type `plan` to set or change today's plan. At any plan prompt, `same`
+  reuses the earlier plan.
+- Type `menu` (or `m`) for the options: see what is saved, open once a day at
+  sign-in, hide the "in a row" line, delete everything, help, set today's plan,
+  and forget one finished plan. Enter at the menu goes back.
 
-Enter at the menu goes back to the last prompt, and the menu says so. Enter at
-the last prompt closes the window. After `plan` or `done` the last prompt comes
-back below the result, so you can read it before the window closes.
+If you don't type `done`, the next day asks "Did you do it?". Answering "not
+yet" once keeps the plan for today. The second time, it puts the plan away
+without asking again, and `same` brings it back. A plan older than two weeks is
+put away the same way.
 
-A word the prompt doesn't list gets a message that names it and lists the
-choices, and the prompt comes back. The same goes for the yes/no questions and
-the menu. A mistyped answer is named and asked again, never taken as a choice.
+The "in a row" line shows only on your 3rd, 7th and 14th visit in a row, then
+every 30th. A visit within three days of the last one counts, so weekends and
+days off don't break it. You can turn it off in the menu.
 
-If two windows are open, each change reads the saved file again just before
-it saves and keeps only what that window changed. Finished plans and the dates
-you opened it are merged, so one window does not undo the other. When the
-other window had also finished a plan, it says so. Delete everything in one
-window can't be undone by the other.
+Everything works from the keyboard with plain text, in one top-to-bottom flow,
+so a screen reader reads it in order. Each prompt ends by saying what Enter
+does. It was checked with Narrator in a real console for version 1.16.0. If
+two windows are open, each one keeps the other's changes.
 
-Lines wrap to the width of the window, down to 30 columns. Everything works
-from the keyboard with plain text, in a single top-to-bottom flow, designed so
-a screen reader reads it in order.
-
-- To see the options, type `menu` at the last prompt (`m` also works). You can see a summary of what
-  is saved (and the whole file with `full`), open hello-world once a day when you sign in, hide the "in a row"
-  line, set or change today's plan (option 6), forget one finished plan
-  (option 7), or delete everything saved (including any backup copy of a
-  damaged file). Forgetting a plan takes it off the list but leaves the count
-  of times you marked a plan done. It asks before also forgetting it for
-  `same`.
-- The "in a row" line shows only on your 3rd, 7th and 14th visit in a row, and
-  then every 30th. It counts a visit within three days of the last one, so
-  weekends and days off don't break it. Turn it off in the options if you
-  don't like it.
-- To remove the program, use Settings > Apps > Installed apps > hello-world >
-  Uninstall. Windows asks for an administrator password, and the prompt says
-  "Windows PowerShell". That is expected. If you don't have the password, ask
-  IT.
+To remove the program, use Settings > Apps > Installed apps > hello-world >
+Uninstall. Windows asks for an administrator password. If you don't have it,
+ask IT.
 
 ### What is saved, and who can see it
+
+This is the one place that lists what is saved. `PLAN.md` and the why-doc link
+here.
 
 hello-world saves one small file, `notes.json`, in the `hello-world` folder
 under `AppData\Local` in your own user folder. It holds the dates you opened
 the program (the last 400), your current plan, the plan before it, how many
 times you marked a plan done, and your last seven finished plans (words and
 date). It also holds your in-a-row setting and your answer to the sign-in
-question. Menu option 1 shows all of it, option 7 forgets one finished plan,
-and option 4 deletes everything. After a delete the file holds only a random
-marker, so another open window can't write the notes back. Uninstalling
-leaves the file in place. It saves nothing
-else: no name, no computer name, no times.
-It makes no network connections and sends nothing to anyone. It does not report
-use to IT or to managers. Other people who can read the files on your computer,
-such as IT staff, could read that file, so don't type passwords or private
-details. Choose option 1 in the menu to see what is saved: a short summary first, and the whole file if you type `full` (the same facts, tidied; a damaged file is kept as `notes.json.bak` (or `.bak2` and so on) until you delete everything), or option 4 to
-delete it. When the program is uninstalled, the file stays so you can keep it;
-delete the folder if you don't want it.
+question. Nothing else: no name, no computer name, no times.
 
-- Coming back: the last seven finished plans, with their dates, are kept only in `notes.json`, listed after you finish a plan, on "Welcome back" after a week away, and in option 1. Menu option 7 forgets one, and option 4 removes them all. When you finish a plan, or it is replaced or cleared, hello-world remembers it privately. Next time the plan prompt shows it as "Earlier plan", and typing `same` reuses it, so a plan you repeat is one word, not a retype. It also counts the plans you marked done (shown only in menu option 1 and after you finish one). Clearing a plan does not erase these words: they stay as `same` until you delete everything (menu option 4). A plan you left open stays visible if you reopen the program the same day, and one older than two weeks is cleared with a message and kept as `same`.
-- Finishing is counted the moment you say so: type `done` at the last prompt.
-  If you do not, the next day asks "Did you do it?". A plan already marked
-  done is not asked about again.
-- Sign-in reminder: if you type a plan, the next day it asks how it went.
-  Right after you save your first plan, and on later visits if you have not
-  answered yet, it asks whether to open at sign-in (y/n). Only a clear no is
-  final. Enter means "ask me later", and it stops asking after three Enters.
-  A mistyped answer is named and asked again, and does not count. Option 2 in
-  the menu turns it on later.
-- Without a mouse or sight: every prompt is plain text and Enter alone always
-  works. Ctrl+C at a prompt skips that prompt. Prompts say what Enter does where it matters, such as "Enter = keep" and "Enter = cancel". `--stats` still prints the whole saved file. Menu option 5 explains each
-  option, and `hello.cmd --help` prints the folder `hello.cmd` is in. It was
-  checked with Narrator in a real console for version 1.16.0.
-- English only. A plan in another script is saved, but a console that cannot
-  show it prints `?`.
+It makes no network connections and reports nothing to IT or managers. Other
+people who can read your computer's files, such as IT staff, could read the
+file, so don't type passwords or private details.
+
+Menu option 1 shows all of it, option 7 forgets one finished plan, and option 4
+deletes everything. After a delete the file holds only a random marker, so
+another open window can't write the notes back. A damaged file is kept as
+`notes.json.bak` until you delete everything. Uninstalling leaves the file in
+place, so delete the folder if you don't want it.
 
 ## For IT: install
 
@@ -112,7 +81,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.18.0'
+$tag = 'v1.19.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
@@ -136,7 +105,8 @@ from an earlier version.
 
 For an unattended run, add `-Quiet`. It prints only warnings, errors and the
 result line, never asks a question, and exits 0 on success and 1 on failure.
-Everything is also written to `install.log` in the setup folder.
+Everything is also written to `install.log` in the setup folder, and a copy
+is kept in the install folder.
 
 ### Update to a new release
 
@@ -154,11 +124,19 @@ deliberate: it keeps the reviewed commit the only source.
 ### If something fails
 
 The last line starts with `FAILED:` and says what to fix. The full record is in
-`install.log` in the setup folder. A failed run before the final
-step leaves any working install as it was. If it fails at step 6 (the Apps entry
-or the shortcut), the new files are already in place, so run the installer again.
-If it fails when replacing the folder, close every open hello-world window
-(they hold files open) and run it again.
+`install.log` in the setup folder. A failed run leaves any working install as
+it was. An upgrade that fails at step 6 (the Apps entry or the shortcut) puts
+the previous install back. A first install that fails there keeps its files,
+so run the installer again. If it fails when replacing the folder, it says how
+many hello-world windows are open. Close them and run it again.
+
+Each PC's Apps entry records the installed version, the commit and the
+install date, and has a `QuietUninstallString` for unattended removal. This
+shows what is installed:
+
+```powershell
+Get-ItemProperty HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\hello-world
+```
 
 ## Files
 
