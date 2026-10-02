@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-10-02: Delete-everything removes every backup, cut plans end cleanly, failed --streak exits 1
+
+Version 1.9.3. Round 30 review (`reviews/round-30.md`), no Critical, one High, three Medium, five Low, seven Part 2 items.
+
+- M2, "'Delete everything' does not delete the numbered backups": `reset()` now removes `notes.json`, every `notes.json.bak*` and the `.tmp` copies. The test now has a `.bak2` present.
+- L6, "Truncating to 120 characters ... can leave a trailing space or joiner": `clean()` strips spaces and joiners after the cut. Test added.
+- L6, "`--streak on|off` ... return 0 even when they fail": returns 1 when the choice can't be saved. `--remind` still returns 0; its messages are unchanged.
+- README and installer example tag are v1.9.3.
+
+Declined (see `BACKLOG.md`): the rest.
+
+Tested here: all tests pass with the plain runner on Linux, Python 3.11. Not tested: anything on Windows or Python 3.14, and pytest (not installed here).
+
 ## 2026-10-02: Windows console check fails open, future-dated visits kept, plan cut notice, numbered backups
 
 Version 1.9.2. Round 29 review (`reviews/round-29.md`), one High, five Medium, fourteen Low, eight Part 2 items.

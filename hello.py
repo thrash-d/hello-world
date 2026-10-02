@@ -316,7 +316,7 @@ def tidy(text):
 
 
 def clean(text):
-    return tidy(text)[:MAX_PLAN]
+    return tidy(tidy(text)[:MAX_PLAN].rstrip(" \u200c\u200d"))
 
 
 def typed_plan(raw):
@@ -550,11 +550,12 @@ def reset(state):
     if not is_yes(answer):
         say("Nothing was deleted.")
         return False
-    leftovers = [data_file(), data_file() + ".bak"]
+    leftovers = [data_file()]
     try:
         leftovers += [os.path.join(data_dir(), n)
                       for n in os.listdir(data_dir())
-                      if n.startswith("notes.json.") and n.endswith(".tmp")]
+                      if n.startswith("notes.json.")
+                      and (n.endswith(".tmp") or n.startswith("notes.json.bak"))]
     except OSError:
         pass
     for path in leftovers:
@@ -753,7 +754,7 @@ def run(argv):
                 + ("on." if state["streak"] else "off."))
         else:
             say("Could not save that choice on this computer.")
-        return 0
+        return 1
     say("Unknown option. Here are the options.")
     say()
     say(HELP)
