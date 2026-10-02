@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-10-02: say what tomorrow holds, offer the sign-in reminder once, plain-word prompts
+
+Version 1.10.0. Round 35 review (`reviews/round-35.md`), no Critical, no High, ten Medium, about fifteen Low, nine Part 2 items.
+
+**Retention change.** Usability finding 1, "The hook is never explained at first run", and finding 3, "The sign-in reminder is the retention lever and is buried": the first-run screen now says a typed plan gets asked about tomorrow, and a first saved plan prints "Saved. Tomorrow it will ask how this went." On the second visit it asks once, "Want it to open once a day when you sign in? (y/n)". The answer is remembered in `notes.json` (`offered`), so a no is never asked again, and it still starts nothing without a yes. Tests added for first run, ask-once, yes and no.
+
+**Accessibility change.** Accessibility M1, "The damaged-file notice names the wrong file": the notice now names the real backup (`notes.json.bak2` and so on), shows the folder, says in plain words that earlier days and plan could not be read, and is followed by a blank line before the greeting. M5, "single letters": the closing prompt and first-run line now say "type plan or menu" (`p` and `m` still work). M2, "silently does something": an unrecognised answer at the closing prompt says so and asks once more; "Did you do it?" and "Keep it for today?" now echo "Kept for today.", "Cleared." or "Left as it was." L1, HELP wrapped to 72 columns, with a test. L2, an unknown option is named, and `--remind` or `--streak` alone says it needs on or off. L10, wrapping no longer splits "hello-world" or long words.
+
+Declined (see `BACKLOG.md`): workflow and installer findings (CI, Dependabot, checksums, SHA pins, installer progress, junction checks, focus at sign-in) need Windows or `.github/` changes I can't run here; a note to tomorrow, same-as-last-time, clearing a plan, raw JSON in option 1, Ctrl+C quits, time-of-day content tags, `extra.txt`, `.prev` backup and a renamed Start entry are product decisions for the owner.
+
+Tested here: all tests pass with the plain runner on Linux, Python 3.11, including the sign-in offer with a temporary startup folder. Not tested: anything on Windows or Python 3.14, a real screen reader, and pytest (not installed here).
+
 ## 2026-10-02: damaged-file notice wrapped and named, `--reset` folder-listing message
 
 Version 1.9.7. Round 34 review (`reviews/round-34.md`), no Critical, no High, three Medium, ten Low, eight Part 2 items.

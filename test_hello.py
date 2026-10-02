@@ -559,6 +559,54 @@ def test_cut_plan_has_no_trailing_space():
     assert hello.clean("a" * 119 + " b") == "a" * 119
 
 
+def test_second_damaged_file_notice_names_the_real_backup():
+    home = tempfile.mkdtemp()
+    for _ in range(2):
+        with open(os.path.join(home, "notes.json"), "w") as f:
+            f.write("{")
+        p = run(text="\n", home=home)
+    assert "notes.json.bak2" in p.stdout and home in p.stdout
+    assert "\n\nHello, world!" in p.stdout
+
+
+def test_first_run_explains_tomorrow_and_confirms_the_plan():
+    p = run(text="write the report\n\n")
+    assert "asks tomorrow" in p.stdout
+    assert "Saved. Tomorrow it will ask how this went." in p.stdout
+    assert "type plan or menu" in p.stdout
+
+
+def test_sign_in_offer_is_made_once_on_the_second_visit():
+    home, startup = tempfile.mkdtemp(), tempfile.mkdtemp()
+    run(text="\n\n", home=home, startup=startup, day="2026-10-01")
+    p = run(text="\nn\n\n", home=home, startup=startup, day="2026-10-02")
+    assert "open once a day when you sign in? (y/n)" in p.stdout
+    assert notes(home)["offered"] is True
+    p = run(text="\n\n", home=home, startup=startup, day="2026-10-03")
+    assert "sign in? (y/n)" not in p.stdout
+    assert os.listdir(startup) == []
+
+
+def test_sign_in_offer_yes_turns_it_on():
+    home, startup = tempfile.mkdtemp(), tempfile.mkdtemp()
+    run(text="\n\n", home=home, startup=startup, day="2026-10-01")
+    run(text="\ny\n\n", home=home, startup=startup, day="2026-10-02")
+    assert os.listdir(startup) == ["hello-world-daily.cmd"]
+
+
+def test_unknown_input_is_named_and_outcomes_are_echoed():
+    p = run(text="\nbanana\n\n")
+    assert "That was not one of the choices." in p.stdout
+    p = run(["--nope"])
+    assert "Unknown option: --nope" in p.stdout and p.returncode == 2
+    p = run(["--remind"])
+    assert "needs on or off" in p.stdout
+
+
+def test_help_lines_fit_72_columns():
+    assert all(len(l) <= 72 for l in run(["--help"]).stdout.splitlines())
+
+
 if __name__ == "__main__":
     import traceback
     failed = []

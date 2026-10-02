@@ -239,8 +239,8 @@ DONE_LINES = (
 
 HELP = """hello-world prints a greeting, a thought, and a small thing to try.
 
-At the end of the screen, type p for today's plan or m for options. You can also run hello.cmd
-with one of these:
+At the end of the screen, type plan for today's plan or menu for
+options. You can also run hello.cmd with one of these:
   --plain         Print only the greeting
   --stats         Show what is saved on this computer
   --reset         Delete everything saved (asks first)
@@ -371,16 +371,24 @@ def load(repair=True):
     except (ValueError, RecursionError, MemoryError):
         if not repair:
             return state, False
+        backup = backup_name(path)
         try:
-            os.replace(path, backup_name(path))
+            os.replace(path, backup)
         except OSError:
             return state, False
         say(textwrap.fill("Your saved file was damaged, so hello-world set it "
-                          "aside as a backup copy (notes.json.bak) in the same "
-                          "folder and started fresh. Menu option 4 deletes it.", 72))
+                          "aside as a backup copy and started fresh. Your "
+                          "earlier days and plan could not be read. Menu "
+                          "option 4 deletes the backup.", 72,
+                          break_on_hyphens=False, break_long_words=False))
+        say("Backup copy: " + os.path.basename(backup))
+        say("In the folder: " + data_dir())
+        say()
         return state, True
     if raw.get("streak") is False:
         state["streak"] = False
+    if raw.get("offered") is True:
+        state["offered"] = True
     visits = []
     for v in raw["visits"] if isinstance(raw.get("visits"), list) else []:
         try:
@@ -488,7 +496,8 @@ def is_no(text):
 
 
 def wrapped(prefix, text):
-    return textwrap.fill(prefix + text, 72, subsequent_indent="  ")
+    return textwrap.fill(prefix + text, 72, subsequent_indent="  ",
+                         break_on_hyphens=False, break_long_words=False)
 
 
 def in_a_row(visits, d):
@@ -655,6 +664,25 @@ def menu(state, can_save=True):
             say("Please type a number from 1 to 6, or press Enter.")
 
 
+def offer_reminder(state, can_save):
+    """On the second visit, ask once whether to open at sign-in."""
+    path = startup_file()
+    if (not path or state.get("offered") or len(state["visits"]) != 2
+            or os.path.exists(path)):
+        return
+    answer = ask("Want it to open once a day when you sign in? (y/n) > ")
+    if answer is None:
+        return
+    state["offered"] = True  # a no is remembered, so it is asked only once
+    if is_yes(answer):
+        remind(True)
+    else:
+        say("No problem. Menu option 2 turns it on later.")
+    if not (can_save and save(state)):
+        say("Could not save that choice on this computer.")
+    say()
+
+
 def daily(startup):
     d = today()
     iso = d.isoformat()
@@ -676,11 +704,12 @@ def daily(startup):
 
     if first:
         say("Welcome. Each day this gives you one thought and one small thing")
-        say("to try. It saves a few notes on this computer, in your own user")
+        say("to try. If you type a plan for today, it asks tomorrow how it")
+        say("went. It saves a few notes on this computer, in your own user")
         say("folder, and sends nothing anywhere. Do not type passwords or")
         say("private details. Others who can read this computer's files, such")
         say("as IT staff, could read the notes.")
-        say("Type m at the end of this screen to see the options.")
+        say("Type menu at the end of this screen to see the options.")
         say()
     elif not seen_today:
         last = datetime.date.fromisoformat(state["visits"][-1])
@@ -703,8 +732,12 @@ def daily(startup):
                 keep = ask("That is fine. Keep it for today? (y/n) > ")
                 if is_no(keep):
                     intent = None
+                    say("Cleared.")
                 else:
                     intent = {"text": intent["text"], "date": iso}
+                    say("Kept for today.")
+            else:
+                say("Left as it was.")
         say()
 
     say("Thought for today:")
@@ -735,13 +768,24 @@ def daily(startup):
         if not can_save or not save(state):
             say("Your notes could not be saved on this computer. This screen "
                 "still works.")
+        elif first and intent:
+            say("Saved. Tomorrow it will ask how this went.")
+            say()
+        elif not seen_today:
+            offer_reminder(state, can_save)
 
-    answer = (ask("Press Enter to close, p for today's plan, m for options > ")
-              or "").lower()
-    if answer in ("p", "plan") and person:
-        set_plan(state, can_save)
-    elif answer in ("m", "menu"):
-        menu(state, can_save)
+    prompt = "Press Enter to close, or type plan or menu > "
+    for _ in range(2):
+        answer = (ask(prompt) or "").lower()
+        if answer in ("p", "plan") and person:
+            set_plan(state, can_save)
+        elif answer in ("m", "menu"):
+            menu(state, can_save)
+        elif answer:
+            say("That was not one of the choices.")
+            prompt = "Press Enter to close, or type plan or menu > "
+            continue
+        break
 
 
 def run(argv):
@@ -786,7 +830,10 @@ def run(argv):
             return 0
         say("Could not save that choice on this computer.")
         return 1
-    say("Unknown option. Here are the options.")
+    if len(argv) == 1 and argv[0] in ("--remind", "--streak"):
+        say(f"{argv[0]} needs on or off. Here are the options.")
+    else:
+        say("Unknown option: " + tidy(" ".join(argv))[:60] + ". Here are the options.")
     say()
     say(HELP)
     return 2
