@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-10-02: the sign-in launcher works from a folder with brackets, stale temp copies are swept
+
+Version 1.17.0. Round 43 review (`reviews/round-43.md`), one reviewer, 2 High, 1 Medium, 1 Low, 3 Part 2 items.
+
+Launcher. Finding 1.2, "If the directory path where hello-world is installed contains characters like ) or , (e.g., C:\Tools (x86)\hello-world), execution of hello-world-daily.cmd inside cmd.exe fails": true, though not for the reason given. `start` runs a `.cmd` through `cmd /k`, and `cmd` strips the outer quotes from a command line with `(` or `@` in it, so the path broke at its first space. A test on Windows 11 confirmed it: the old launcher never opened hello from `Tools (x86), a=b @~ c`, and the new one does. The launcher now passes the folder with `start /d` and runs `hello.cmd` by name, so the folder never reaches `cmd /k`. The installed copy under `Program Files` was never affected. The suggested fix (`start ""` and doubled quotes) was not used, because quotes are already refused and were not the problem. A `.lnk` would need COM, which the bundled Python does not have. Test: the launcher line for a folder with brackets, a comma, `=`, `@` and `~`.
+
+Temp copies. Finding 1.4, "standard startup and normal operations do not prune stale .tmp files": every save now removes `notes.json.*.tmp` copies over a day old first. A younger one may belong to another window's save in progress, so it is left. Test: a two-day-old copy goes and a new one stays.
+
+Finding 1.1, "unknown or arbitrary JSON keys present in notes.json are loaded into state": not so. `load()` builds a fresh state and copies in only the keys it knows, each type-checked, so an unknown key never reaches `commit()`. No code change. A new test feeds a file with an unknown nested key and a wrong type for every known key, and checks that the program runs, `--stats` works, and the unknown key is gone from the file.
+
+Part 2 item 3, "Provide explicit status warnings when active plan state changes are made by another background window": already done in Round 42. A save says "The other open window had also finished a plan." or "The other open window changed the plan, so its plan is kept."
+
+Declined (see `BACKLOG.md`, Round 43): finding 1.3 and Part 2 items 1 and 2.
+
+Tested here: all 126 tests pass on Windows 11, Python 3.13, under both pytest and the plain runner. The launcher was also run for real from `Tools (x86), a=b @~ c` and from a plain folder, old line and new. Not tested: the installed copy at a real sign-in, and ruff.
+
 ## 2026-10-02: record the install and two-window pass on 1.16.0
 
 No code change, so the version stays 1.16.0. Round 42 Part 2 item 2, "Prove the two-window story on a real console": the owner ran 1.16.0 in a sandbox through an install, a reinstall, an interrupted install, an uninstall, and two real windows that both finished a plan while one used Delete everything. All passed. It is out of `BACKLOG.md`. `PLAN.md` now has a "Tested" section with the gate to run again before a release that changes saving or the installer, and the why-doc matches. Three checks are not recorded either way: console input outside ASCII, the shortcut's pause line, and removing launchers from several user profiles.

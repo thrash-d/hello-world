@@ -1228,6 +1228,47 @@ def test_the_file_never_holds_more_than_the_visit_limit():
     assert len(out) == mod.MAX_VISITS and set(state["visits"]) <= set(out)
 
 
+def test_the_launcher_keeps_a_folder_with_brackets_out_of_cmd():
+    mod = _load_hello()
+    mod.STARTUP_DIR = tempfile.mkdtemp()
+    mod.say = lambda text="": None
+    folder = os.path.join(tempfile.mkdtemp(), "Tools (x86), a=b @~")
+    mod.__file__ = os.path.join(folder, "hello.py")
+    assert mod.remind(True)
+    with open(os.path.join(mod.STARTUP_DIR, "hello-world-daily.cmd")) as f:
+        text = f.read()
+    assert f'start "hello-world" /d "{folder}" hello.cmd --startup' in text
+
+
+def test_unknown_keys_and_wrong_types_in_the_file_are_dropped():
+    home = tempfile.mkdtemp()
+    with open(os.path.join(home, "notes.json"), "w") as f:
+        json.dump({"visits": "2026-09-30", "intent": 5, "done": "7",
+                   "finished": {"text": "x"}, "streak": "no", "previous": [1],
+                   "offered": "yes", "epoch": {"a": 1},
+                   "unknown": {"nested": "data"}}, f)
+    p = run(text="\n\n", home=home)
+    assert p.returncode == 0 and "Traceback" not in p.stderr
+    saved = notes(home)
+    assert "unknown" not in saved and saved["visits"] == ["2026-10-01"]
+    assert saved["intent"] is None and saved["streak"] is True
+    assert run(["--stats"], home=home).returncode == 0
+
+
+def test_a_day_old_temp_copy_is_swept_and_a_new_one_is_left():
+    import time
+    mod = _load_hello()
+    mod.HOME = tempfile.mkdtemp()
+    old = os.path.join(mod.HOME, "notes.json.111.tmp")
+    new = os.path.join(mod.HOME, "notes.json.222.tmp")
+    for path in (old, new):
+        with open(path, "w") as f:
+            f.write("{}")
+    os.utime(old, (time.time() - 2 * 86400,) * 2)
+    assert mod.save(mod.new_state())
+    assert not os.path.exists(old) and os.path.exists(new)
+
+
 if __name__ == "__main__":
     import traceback
     failed = []
