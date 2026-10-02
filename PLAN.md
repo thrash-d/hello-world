@@ -24,13 +24,13 @@ Ranked from a design review of the first version, then built:
 - A reminder that is on by default, pop-ups, sounds or anything that opens by
   itself without the employee choosing it.
 - Any record of whether a plan was done. The program saves the current plan and
-  the dates opened, and nothing else.
+  the dates opened, and the in-a-row on/off setting.
 - Network access of any kind, and any report of use to IT or managers.
 
 ## Trust
 
 Saved data is one small file in the user's own folder. Option 1 in the menu
-shows its exact contents, and option 4 deletes it. The README says plainly that
+shows what is saved (a cleaned copy, not the raw file), and option 4 deletes it. The README says plainly that
 IT staff who can read the computer's files could read it, and tells people not
 to type passwords or private details.
 
@@ -58,7 +58,7 @@ to type passwords or private details.
 
 ## Not tested
 
-The program and its tests have run on Windows (see the changelog), but the real
+The tests were run on Windows for 1.7.1 only (see the changelog); 1.8.0 and later were tested on Linux, and the real
 all-users install has not. The first install should be one install, one
 reinstall, an interrupted install and an uninstall on a clean PC. Check the
 shortcut icon, the window title, that Enter closes the window, that the

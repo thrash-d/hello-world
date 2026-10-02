@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-10-02: Plan shortcut on the first screen, byte-order-mark files, tests that can fail, docs made accurate
+
+Version 1.9.0. Round 27 review (`reviews/round-27.md`), no Critical or High findings.
+
+- Part 2 item 4, "Add a set-or-change-plan shortcut and mention it on screen": the last prompt reads "Press Enter to close, p for today's plan, m for options". `p` runs the same step as menu option 6.
+- Part 1 item 2, "Two regression tests pass whether or not the bug exists": both now use a visit that would be the 3rd in a row, so they fail if `--streak off` is ignored. Checked by hand: the old tests could not see this.
+- Part 1 item 7, "Some pairs of 'thought' and 'try this' lines are duplicates": the thought that repeated the water tip is reworded, and a test checks every pairing for it.
+- Low, "UTF-8 BOM": `notes.json` is read as `utf-8-sig`, so a file saved by Notepad is no longer moved to `.bak`.
+- Low, "`isatty()` raises ValueError": a closed stdin counts as no person at the keyboard.
+- Low, "Failed saves can leave a temp file": removed on failure.
+- Low, "test touches the real data folder": that test now points `HOME`, `LOCALAPPDATA`, `APPDATA` and `XDG_DATA_HOME` at a temp folder.
+- Part 1 item 3 and Low, "README tag": README, PLAN and the WHY doc now mention the in-a-row setting, say option 1 shows a tidied copy, and say the tests last ran on Windows for 1.7.1. The example tag is v1.9.0 in README and the installer help (comment text only).
+- New tests: `p` at the last prompt, BOM file, thought/tip pairing. The first two fail against 1.8.0's `hello.py`.
+
+Declined (see `BACKLOG.md`).
+
+Tested here: all 43 tests pass with the plain runner and with pytest, on Linux, Python 3.11. Not tested: anything on Windows, including the console check and PowerShell.
+
 ## 2026-10-02: Keep the plan on Enter, honour the unreadable-file rule in the menu, make reset complete, add a plan option
 
 Version 1.8.0. Round 26 review (`reviews/round-26.md`), no Critical or High findings.

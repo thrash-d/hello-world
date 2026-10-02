@@ -20,7 +20,7 @@ unless you ask for one.
 
 Open **hello-world** from the Start menu, or type "hello-world" in Windows
 Search. Read the screen, type a plan for the day if you want one, and press
-Enter to skip anything you don't want to answer. Press Enter again to close.
+Enter to skip anything you don't want to answer. Press Enter again to close, or type `p` to set or change today's plan.
 
 - To see the options, type `m` at the last prompt. You can see exactly what is
   saved, open hello-world once a day when you sign in, hide the "in a row"
@@ -39,11 +39,11 @@ Enter to skip anything you don't want to answer. Press Enter again to close.
 
 hello-world saves the dates you opened it and your current plan, in one small
 file, `notes.json`, in the `hello-world` folder under `AppData\Local` in your
-own user folder. It saves nothing else: no name, no computer name, no times.
+own user folder. It saves nothing else (apart from your in-a-row setting): no name, no computer name, no times.
 It makes no network connections and sends nothing to anyone. It does not report
 use to IT or to managers. Other people who can read the files on your computer,
 such as IT staff, could read that file, so don't type passwords or private
-details. Choose option 1 in the menu to see the file's contents, or option 4 to
+details. Choose option 1 in the menu to see what is saved (the same facts, tidied; a damaged file is kept as `notes.json.bak` until you delete everything), or option 4 to
 delete it. When the program is uninstalled, the file stays so you can keep it;
 delete the folder if you don't want it.
 
@@ -54,7 +54,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.7.1'
+$tag = 'v1.9.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
