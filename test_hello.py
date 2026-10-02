@@ -649,9 +649,11 @@ def test_plan_typed_on_a_later_day_is_confirmed():
 
 def test_result_of_plan_command_stays_until_enter():
     p = run(text="\nplan\nWrite the report\n\n")
-    tail = p.stdout.rstrip().splitlines()[-1]
     assert "Done. Your plan for today is saved." in p.stdout
-    assert tail.endswith("Press Enter to close >")
+    # The same prompt comes back, so the result stays on screen and the
+    # person can go on, instead of any typed word closing the window.
+    after = p.stdout.split("Done. Your plan for today is saved.")[1]
+    assert "Press Enter to close, or type done, plan, menu or q >" in after
 
 
 def test_wrong_answers_never_close_the_window_and_the_choices_are_listed():
@@ -675,7 +677,8 @@ def test_same_brings_back_the_plan_before_this_one():
     saved = notes(first.home)
     assert saved["previous"] == "Send the invoice" and saved["done"] == 1
     p = run(text="same\n\n", home=first.home, day="2026-10-03")
-    assert 'type same for: "Send the invoice"' in p.stdout
+    assert "Earlier plan: Send the invoice" in p.stdout
+    assert "type same to reuse it" in p.stdout
     assert notes(first.home)["intent"]["text"] == "Send the invoice"
     # The menu path takes it too.
     p = run(text="\nplan\nsame\n\n", home=first.home, day="2026-10-03")
@@ -758,14 +761,107 @@ def test_help_lines_fit_72_columns():
 def test_done_at_the_last_prompt_counts_the_plan_the_same_day():
     first = run(text="Send the invoice\ndone\n\n")
     assert "type done, plan, menu or q" in first.stdout
-    assert "Good" in first.stdout or "Nice" in first.stdout or "done" in first.stdout
+    assert "Type the next plan" in first.stdout
     saved = notes(first.home)
     assert saved["intent"] is None and saved["done"] == 1
     assert saved["previous"] == "Send the invoice"
     # Tomorrow it does not ask about a plan that is already finished.
     p = run(text="\n\n", home=first.home, day="2026-10-02")
     assert "Did you do it?" not in p.stdout
-    assert 'Type a plan' not in p.stdout and "same for" in p.stdout
+    assert "Earlier plan: Send the invoice" in p.stdout
+
+
+def test_after_done_the_next_plan_is_asked_in_the_same_session():
+    p = run(text="Send the invoice\ndone\nCall the bank\n\n")
+    saved = notes(p.home)
+    assert saved["done"] == 1 and saved["previous"] == "Send the invoice"
+    assert saved["intent"]["text"] == "Call the bank"
+
+
+def test_after_done_enter_just_closes_and_nothing_is_lost():
+    p = run(text="Send the invoice\ndone\n\n\n")
+    assert notes(p.home)["intent"] is None and notes(p.home)["done"] == 1
+
+
+def test_plan_with_no_plan_to_finish_does_not_close_the_window():
+    p = run(text="\ndone\nplan\nWrite it\n\n")
+    assert "There is no plan to mark as done." in p.stdout
+    assert notes(p.home)["intent"]["text"] == "Write it"
+
+
+def test_command_words_are_not_saved_as_the_plan():
+    for word in ("menu", "done", "q", "skip"):
+        p = run(text=word + "\n\n")
+        assert "looks like a command" in p.stdout
+        assert notes(p.home)["intent"] is None
+    p = run(text="\nplan\nmenu\n\n")
+    assert "looks like a command" in p.stdout
+    assert notes(p.home)["intent"] is None
+
+
+def test_done_is_named_not_taken_at_keep_it_for_today():
+    first = run(text="Send the invoice\n\n")
+    p = run(text="n\ndone\n\n\n", home=first.home, day="2026-10-02")
+    assert 'not one of the choices: "done"' in p.stdout
+    assert notes(first.home)["intent"]["text"] == "Send the invoice"
+
+
+def test_three_misunderstood_answers_say_what_happened():
+    first = run(text="Send the invoice\n\n")
+    p = run(text="a\nb\nc\n\n", home=first.home, day="2026-10-02")
+    assert "That was not understood. Your plan is left as it was." in p.stdout
+    assert notes(first.home)["intent"]["text"] == "Send the invoice"
+
+
+def test_a_second_window_cannot_overwrite_what_the_first_saved():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("hello_mod2", HELLO)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    home = tempfile.mkdtemp()
+    mod.HOME, mod.TODAY = home, "2026-10-01"
+    mod.FORCE_INTERACTIVE = True
+    stale, _ = mod.load()
+    stale["intent"] = {"text": "Old plan", "date": "2026-10-01"}
+    assert mod.save(stale)
+    newer, _ = mod.load()
+    newer["intent"] = {"text": "New plan", "date": "2026-10-01"}
+    newer["previous"] = "Before"
+    assert mod.save(newer)
+    mod.say = lambda text="": None
+    assert mod.mark_done_now(stale, True, mod.today())
+    saved = notes(home)
+    assert saved["previous"] == "New plan" and saved["done"] == 1
+
+
+def test_a_failed_done_save_is_not_celebrated():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("hello_mod3", HELLO)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    mod.HOME, mod.TODAY = tempfile.mkdtemp(), "2026-10-01"
+    shown = []
+    mod.say = lambda text="": shown.append(text)
+    state, _ = mod.load()
+    state["intent"] = {"text": "Plan", "date": "2026-10-01"}
+    assert mod.save(state)
+    mod.save = lambda s: False
+    assert not mod.mark_done_now(state, True, mod.today())
+    assert state["intent"] and state.get("done", 0) == 0
+    assert any("still open" in t for t in shown)
+    assert not any("plans you have finished" in t or t in mod.DONE_LINES
+                   for t in shown)
+
+
+def test_thoughts_and_tips_do_not_repeat_as_a_pair_every_100_days():
+    import hello
+    assert len(hello.THOUGHTS) != len(hello.TIPS)
+
+
+def test_wrapping_follows_a_narrow_window():
+    import hello
+    hello.shutil.get_terminal_size = lambda fallback=(80, 24): os.terminal_size((40, 24))
+    assert all(len(x) <= 38 for x in hello.wrapped("Earlier plan: ", "word " * 30).splitlines())
 
 
 def test_done_with_no_plan_says_so_and_done_is_not_offered():
