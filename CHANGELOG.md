@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-10-02: backlog sweep, tests in CI on Windows, --version, a blocked save is tried again
+
+Version 1.18.0. The owner asked for every backlog entry to be fixed. The backlog had about 150 entries from 43 rounds, many repeated. Each was checked against the current code. Fixed now:
+
+- A save that Windows refuses for a moment, because antivirus or another window has the file open, is tried again up to five times (Round 39 lead 2a, "Retry in `save()` on Windows file locks"). Test: a replace that fails twice, then works.
+- `--version` and `-v` print the version (Rounds 32, 33 and 37, "`--version`"). The version lives in `hello.py`, and a test keeps it equal to `VERSION`.
+- `--help` lists the exit codes (Round 40 lead 15, "`HELP` exit codes").
+- Menu option 1 says when the file could not be read and the summary may be out of date (Round 28 L1, "Say 'could not read' in option 1 when the file is locked").
+- The sign-in launcher is written to a temp file and moved into place, so a sign-in never runs half of one (Round 33, "launcher atomic rewrite").
+- Four tips no longer assume sight or hearing (Rounds 39 to 41, "Tips that assume sight or hearing"). The glance at something green, the smile at a plant, the pleasant sound and the wave on a video call now offer other senses or plain words.
+- `uninstall.ps1` waits for its elevated copy and exits with its code, so a `-Quiet` run from a management tool sees a failure (Rounds 31 to 33, "uninstall `-Wait` and exit code"). It also skips a user's Startup folder that is a link (Round 38, "Junction-safe delete of the sign-in launcher").
+- A test that changed `shutil.get_terminal_size` for every later test now puts it back (Round 40 lead 16, "test hygiene for `get_terminal_size`").
+- New `.github/workflows/tests.yml` runs both test runners on Windows and Linux with Python 3.11 and 3.14. It also parses both scripts under Windows PowerShell 5.1 and runs PSScriptAnalyzer at error level. Its actions are pinned to a commit. This answers the Windows CI, Python 3.14, PSScriptAnalyzer and SHA-pin entries from Rounds 26 to 40. Those entries were declined only because the scheduled routine could not change `.github/`.
+- Ruff flagged a `zip()` without `strict=` in the in-a-row count. Both lists always have the same length, so `strict=True` is right.
+
+Taken out as already done by a later round: the temp-file sweep, `fsync`, re-reading before a menu save, unknown keys, two-window saving, the cut-plan notice, non-zero exit codes, wrapping to the window, `GetConsoleMode` argument types, Windows test isolation, the `interactive()` check on Windows, the 101st thought, the finished-plans list, the screen-reader pass and the Windows install pass.
+
+What is left in `BACKLOG.md` is grouped by why it stays: against the design on purpose (no network, no scores, no default reminder), claims that were wrong, GitHub settings and owner process, and installer changes that need an administrator test run on a spare PC. Two entries still need someone else's hands. The dev-kit workflows need their pins changed in `dev-kit/repo-files/`. The installer items need an admin test run.
+
+Tested here: all 131 tests pass on Windows 11, Python 3.13, under both pytest and the plain runner, and ruff is clean. `uninstall.ps1` parses in Windows PowerShell 5.1. The new workflow is checked by its first run on this branch. Not tested: `uninstall.ps1` elevated for real.
+
 ## 2026-10-02: the sign-in launcher works from a folder with brackets, stale temp copies are swept
 
 Version 1.17.0. Round 43 review (`reviews/round-43.md`), one reviewer, 2 High, 1 Medium, 1 Low, 3 Part 2 items.
