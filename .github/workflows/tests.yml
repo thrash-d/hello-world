@@ -42,5 +42,5 @@ jobs:
             if ($errors) { $errors | Out-String | Write-Host; throw "$f does not parse." }
           }
           Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
-          $found = Invoke-ScriptAnalyzer -Path install.ps1, uninstall.ps1 -Severity Error
+          $found = foreach ($f in 'install.ps1', 'uninstall.ps1') { Invoke-ScriptAnalyzer -Path $f -Severity Error }
           if ($found) { $found | Format-Table -AutoSize | Out-String | Write-Host; throw 'PSScriptAnalyzer found errors.' }
