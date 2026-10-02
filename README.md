@@ -25,14 +25,17 @@ Enter to skip anything you don't want to answer. At the last prompt:
 - Press Enter, or type `q`, `quit` or `exit`, to close.
 - Type `done` to mark today's plan finished, right when you finish it. It is
   offered only while a plan is on screen. It then asks for your next plan,
-  and Enter closes, so finishing one thing leads straight to the next.
+  and one Enter closes, so finishing one thing leads straight to the next.
+  After a second finished plan it lists the last seven you finished.
 - Type `plan` to set or change today's plan, and `same` there to reuse the
   earlier one.
 - Type `menu` (or `help`, or `?`) for the options.
 
 Typing a command word such as `menu` or `done` where a plan is asked does not
-save it as the plan; it says so. If two windows are open, each change reads
-the saved file first, so one window cannot overwrite the other. Lines wrap to
+save it as the plan; it says so. `no`, `none` and `skip` just mean no plan.
+Enter at the menu goes back to the last prompt; Enter there closes. If two windows are open, each change reads
+the saved file again just before it saves and keeps only what that window
+changed, so one window does not undo the other. Lines wrap to
 the width of the window, down to 30 columns. A word the prompt doesn't list gets a message that names it and lists the
 choices, and the prompt comes back. The same goes for the yes/no questions and
 the menu: a mistyped answer is named and asked again, never taken as a choice.
@@ -64,7 +67,7 @@ details. Choose option 1 in the menu to see what is saved: a short summary first
 delete it. When the program is uninstalled, the file stays so you can keep it;
 delete the folder if you don't want it.
 
-- Coming back: when you finish a plan, or it is replaced or cleared, hello-world remembers it privately. Next time the plan prompt shows it as "Earlier plan", and typing `same` reuses it, so a plan you repeat is one word, not a retype. It also counts the plans you marked done (shown only in menu option 1 and after you finish one). Clearing a plan does not erase these words: they stay as `same` until you delete everything (menu option 4). A plan you left open stays visible if you reopen the program the same day, and one older than two weeks is cleared with a message and kept as `same`.
+- Coming back: the last seven finished plans, with their dates, are kept only in `notes.json`, listed after you finish a plan, on "Welcome back" after a week away, and in option 1. They are removed by menu option 4. When you finish a plan, or it is replaced or cleared, hello-world remembers it privately. Next time the plan prompt shows it as "Earlier plan", and typing `same` reuses it, so a plan you repeat is one word, not a retype. It also counts the plans you marked done (shown only in menu option 1 and after you finish one). Clearing a plan does not erase these words: they stay as `same` until you delete everything (menu option 4). A plan you left open stays visible if you reopen the program the same day, and one older than two weeks is cleared with a message and kept as `same`.
 - Finishing is counted the moment you say so: type `done` at the last prompt.
   If you do not, the next day asks "Did you do it?". A plan already marked
   done is not asked about again.
@@ -88,7 +91,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.14.0'
+$tag = 'v1.15.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
