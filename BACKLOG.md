@@ -97,4 +97,10 @@ Changes considered and declined, with the reason.
 - Round 35 CI and installer items (Dependabot major merges, tool checksums, SHA-pinned actions, a Windows test job, installer progress lines, junction check in uninstall, sign-in window focus): need `.github/` edits or a Windows run I don't have here.
 - Round 35 product items (note to tomorrow, same-as-last-time, clear or finish a plan, option 1 without raw JSON, Ctrl+C quits, time-of-day content tags, `extra.txt`, `.prev` backup, renamed Start entry, a 101st thought): behaviour changes for the owner to weigh against the five-person pilot; the retention and accessibility changes this round came first.
 - Round 35 POSIX file modes (security finding 4): the program is for Windows, where the profile folder is per-user.
+- Round 36: dependabot auto-merge gate, SHA-pinned actions, checksums for CI tools, base-branch gate config (security M1, L1, L2; lead 12, 22): all in `.github/`, which this routine does not change.
+- Round 36: README bootstrap runs git before the installer's Git check, Authenticode on bundled Python, junction check in uninstall, installer colour and progress, `-CloseOpen` (security M2, L3, L4, L6; accessibility M3, M6; lead 14, 20, 21): PowerShell I can't run here.
+- Round 36: same-day "Is this done yet?", multi-item plans, `extra.txt`, content time tags, 365-day content, rename Start entry, yesterday's thought (usability 9, 14, 15; lead part 2): product decisions for the owner.
+- Round 36: make the sign-in `--startup` window not count as a visit or spend the plan question (usability 6): changes what "in a row" means; revisit with Windows evidence of how often it fires.
+- Round 36: `q` / Ctrl+C quit, error log, plain-words option 1, save-failure folder and remedy text, Windows CI job and test isolation (lead 5, 6, 13, 23; accessibility L3): behaviour or CI changes weighed in earlier rounds; the Windows test isolation needs a Windows run to verify.
+- Round 36: NVDA and Narrator pass (accessibility M5): needs a person with the tools; the README says it is untested.
 
