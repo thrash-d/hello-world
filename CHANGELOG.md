@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-10-02: `--reset` tries every file, a set-aside file is announced
+
+Version 1.9.6. Round 33 review (`reviews/round-33.md`), no Critical, no High, four Medium, eight Low, ten Part 2 items.
+
+- L5, "`reset()` is incomplete... stops at the first failed delete": it now tries every file, lists every failure, and returns False (exit 1) if listing the folder failed too. The unused `load` call in `--reset` was already gone in 1.9.5, so nothing to drop. Test added.
+- M3 and Part 2 item 7, "When `load()` moves a file aside, print one line": a damaged file moved to a backup now prints one plain line saying so. Test added. The `fsync` and first-run-screen parts stay declined.
+- L10, "docstring lists exit codes 0, 1 and 2": the `hello.py` docstring now says 1 also covers a failed command.
+- README and installer example tag are v1.9.6.
+
+Declined (see `BACKLOG.md`): M1, M2, M4, L6, L7, L8, L11, L12 and the rest of Part 2, same reasons as earlier rounds (CI and Windows, PowerShell I can't run here, or a decision for the owner). L9, wording: not changed this round.
+
+Tested here: all tests pass with the plain runner on Linux, Python 3.11. Not tested: anything on Windows or Python 3.14, and pytest (not installed here).
+
 ## 2026-10-02: Failed `--reset` exits 1, read-only commands leave a damaged file alone
 
 Version 1.9.5. Round 32 review (`reviews/round-32.md`), no Critical, two High, six Medium, eleven Low, nine Part 2 items.

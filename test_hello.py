@@ -524,6 +524,25 @@ def test_failed_reset_exits_1_and_declining_exits_0():
     assert p.returncode == 1 and "Could not delete" in p.stdout
 
 
+def test_reset_still_deletes_the_other_copies_when_one_delete_fails():
+    home = tempfile.mkdtemp()
+    os.mkdir(os.path.join(home, "notes.json"))  # a delete of this fails
+    bak = os.path.join(home, "notes.json.bak")
+    with open(bak, "w") as f:
+        f.write("old plan")
+    p = run(["--reset"], text="y\n", home=home)
+    assert p.returncode == 1 and not os.path.exists(bak)
+
+
+def test_a_repaired_file_is_announced():
+    home = tempfile.mkdtemp()
+    with open(os.path.join(home, "notes.json"), "w") as f:
+        f.write("{")
+    p = run(text="\n", home=home)
+    assert "set it aside" in p.stdout
+    assert os.path.exists(os.path.join(home, "notes.json.bak"))
+
+
 def test_stats_does_not_move_a_damaged_file():
     home = tempfile.mkdtemp()
     with open(os.path.join(home, "notes.json"), "w") as f:
