@@ -17,7 +17,7 @@ Version 1.18.0. The owner asked for every backlog entry to be fixed. The backlog
 
 Taken out as already done by a later round: the temp-file sweep, `fsync`, re-reading before a menu save, unknown keys, two-window saving, the cut-plan notice, non-zero exit codes, wrapping to the window, `GetConsoleMode` argument types, Windows test isolation, the `interactive()` check on Windows, the 101st thought, the finished-plans list, the screen-reader pass and the Windows install pass.
 
-What is left in `BACKLOG.md` is grouped by why it stays: against the design on purpose (no network, no scores, no default reminder), claims that were wrong, GitHub settings and owner process, and installer changes that need an administrator test run on a spare PC. Two entries still need someone else's hands. The dev-kit workflows need their pins changed in `dev-kit/repo-files/`. The installer items need an admin test run.
+What is left in `BACKLOG.md` is grouped by why it stays: against the design on purpose (no network, no scores, no default reminder), claims that were wrong, GitHub settings and owner process, and installer changes that need an administrator test run on a spare PC. Two entries still need someone else's hands. The three shared kit workflows need their pins changed where the kit is kept. The installer items need an admin test run.
 
 Tested here: all 131 tests pass on Windows 11, Python 3.13, under both pytest and the plain runner, and ruff is clean. `uninstall.ps1` parses in Windows PowerShell 5.1. The new workflow is checked by its first run on this branch. Not tested: `uninstall.ps1` elevated for real.
 

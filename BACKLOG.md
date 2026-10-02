@@ -39,9 +39,9 @@ Changes considered and declined, with the reason. On 2 October 2026 the list fro
 
 ## Settings and process, not code in this repo
 
-- Branch protection, 2FA, required checks, signed tags, `CODEOWNERS`, `LICENSE`, and where the reviewed commit hash is published: GitHub settings and owner decisions. Decide them in github-mog. `SECURITY.md` comes from the account's `.github` repo.
+- Branch protection, 2FA, required checks, signed tags, `CODEOWNERS`, `LICENSE`, and where the reviewed commit hash is published: GitHub settings and owner decisions, made outside this repo.
 - AppLocker or WDAC rules, Authenticode signing, Intune or MSI packaging, a scoped allow rule and patch reminders for the bundled Python: Group Policy and deployment work.
-- Pinning the actions and checksums in `devkit-quality.yml`, `dependabot-automerge.yml` and `auto-tag.yml`, patch-only Dependabot merges, and tagging only after the tests pass: dev-kit owns those files and `devkit.ps1 update` overwrites them, so change them in `dev-kit/repo-files/`. This repo's own `tests.yml` is pinned.
+- Pinning the actions and checksums in `devkit-quality.yml`, `dependabot-automerge.yml` and `auto-tag.yml`, patch-only Dependabot merges, and tagging only after the tests pass: those three come from a shared kit and are overwritten when it updates, so they change where the kit is kept, not here. This repo's own `tests.yml` is pinned.
 - Pilot questions: success criteria, a content file for IT, editable or more content, weekday or time-of-day tips, languages, a rename, a desktop icon, a shorter first run, when the sign-in offer comes, "another one", and UK or US spelling. Wait for what the five pilot employees ask for, as `PLAN.md` says.
 
 ## Installer changes that need an administrator test run
