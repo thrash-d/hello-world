@@ -105,6 +105,7 @@ def test_hello_variables_in_the_environment_are_ignored():
     p = subprocess.run([sys.executable, HELLO, "--stats"], capture_output=True,
                        text=True, stdin=subprocess.DEVNULL, env=env)
     assert p.returncode == 0 and home not in p.stdout
+    assert "2000" not in p.stdout
     assert not os.listdir(home)
 
 
@@ -423,6 +424,49 @@ def _load_hello(day="2026-10-01"):
     spec.loader.exec_module(mod)
     mod.TODAY = day
     return mod
+
+
+def test_future_visits_are_kept_in_the_file_but_not_counted():
+    home = tempfile.mkdtemp()
+    path = os.path.join(home, "notes.json")
+    with open(path, "w") as f:
+        json.dump({"visits": ["2026-09-30", "2030-01-01"]}, f)
+    p = run(text="\n", day="2026-10-01", home=home)
+    assert "opened this" not in p.stdout
+    with open(path) as f:
+        saved = json.load(f)["visits"]
+    assert saved == ["2026-09-30", "2026-10-01", "2030-01-01"]
+
+
+def test_a_plan_of_only_joiners_is_empty_and_a_long_plan_says_it_was_cut():
+    hello = _load_hello()
+    assert hello.clean("\u200d \u200c") == ""
+    p = run(text="x" * 130 + "\n\n")
+    assert "Shortened to 120 characters." in p.stdout
+
+
+def test_a_second_damaged_file_does_not_overwrite_the_first_backup():
+    hello = _load_hello()
+    hello.HOME = tempfile.mkdtemp()
+    os.makedirs(os.path.dirname(hello.data_file()), exist_ok=True)
+    for text in ("first", "second"):
+        with open(hello.data_file(), "w") as f:
+            f.write(text)
+        hello.load()
+    with open(hello.data_file() + ".bak") as f:
+        assert f.read() == "first"
+    with open(hello.data_file() + ".bak2") as f:
+        assert f.read() == "second"
+
+
+def test_a_decode_error_at_the_prompt_counts_as_no_answer():
+    hello = _load_hello()
+    hello.FORCE_INTERACTIVE = True
+
+    def bad(_prompt):
+        raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "bad")
+    hello.input = bad
+    assert hello.ask("> ") is None
 
 
 def test_joiner_characters_survive_cleaning():

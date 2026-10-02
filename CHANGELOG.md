@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-10-02: Windows console check fails open, future-dated visits kept, plan cut notice, numbered backups
+
+Version 1.9.2. Round 29 review (`reviews/round-29.md`), one High, five Medium, fourteen Low, eight Part 2 items.
+
+- H1, "`interactive()` ... imports outside any `try`": the imports and the `GetConsoleMode` call now sit inside `try`, and an unexpected failure falls back to the `isatty()` answer ("yes") instead of "something went wrong" or a screen that closes at once. A real "no console" answer (a NUL device) is unchanged. Add a mocked test for it only when a Windows run exists; a test of the fallback needs `os.name == "nt"`.
+- M1, "Dropping future-dated visits on load destroys real history": they are still left out of every count, but `save()` writes them back, so a clock that was wrong once loses nothing.
+- M2, "A plan longer than 120 characters is cut silently, and a plan of only joiners can be saved": the screen now says "Shortened to 120 characters.", and text with nothing but joiners counts as empty.
+- Low 1, "A second damaged file overwrites the earlier `.bak`": the second becomes `notes.json.bak2`, and so on. The read-only `--stats` still moves a damaged file aside, which is what lets option 1 show a clean state.
+- Low 3, "Uncaught decode error": `ask()` treats it as no answer.
+- Low 10, "The environment variables are ignored test proves little": it also checks the output for the ignored date.
+- README and installer example tag are v1.9.2.
+
+Declined (see `BACKLOG.md`).
+
+Tested here: all 51 tests pass with the plain runner on Linux, Python 3.11. Not tested: anything on Windows, including the new `interactive()` fallback, and pytest (not installed here).
+
 ## 2026-10-02: Console check made safe, joiner characters kept, future-dated visits dropped, honest wording
 
 Version 1.9.1. Round 28 review (`reviews/round-28.md`), one High, five Medium, nine Low.
