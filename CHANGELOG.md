@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-10-02: damaged-file notice wrapped and named, `--reset` folder-listing message
+
+Version 1.9.7. Round 34 review (`reviews/round-34.md`), no Critical, no High, three Medium, ten Low, eight Part 2 items.
+
+- Finding 4, "the new damaged-file notice breaks the program's own screen rules": the notice is wrapped to 72 columns, names `notes.json.bak` and says menu option 4 deletes it. Test now checks the name and line width. (Moving it after the greeting is not done: `load()` runs before the greeting is printed.)
+- Finding 8, "`reset()` handles a folder-listing failure poorly": a failed listing now says "Could not list the folder, so backup copies may remain" instead of offering the whole folder as something to delete. Still exits 1.
+- Finding 10, "Python version requirement isn't stated": README says Python 3.11 or later for the tests.
+- Installer example tag in README and `install.ps1` is v1.9.7.
+
+Declined (see `BACKLOG.md`): findings 1, 2, 3, 13 and Part 2 items 2 and 4 (CI, Windows or workflow work I can't run here); 5, 6, 7, 9, 11, 12 (behaviour changes weighed in earlier rounds or low value: Ctrl+C handling, save retry, error log, race note, launcher pause); Part 2 items 1, 3, 5, 6, 8 (owner decisions or already covered). Part 2 item 7, a content count test, is already covered by existing content tests.
+
+Tested here: all tests pass with the plain runner on Linux, Python 3.11. Not tested: anything on Windows or Python 3.14, and pytest (not installed here).
+
 ## 2026-10-02: `--reset` tries every file, a set-aside file is announced
 
 Version 1.9.6. Round 33 review (`reviews/round-33.md`), no Critical, no High, four Medium, eight Low, ten Part 2 items.

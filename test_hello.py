@@ -539,7 +539,8 @@ def test_a_repaired_file_is_announced():
     with open(os.path.join(home, "notes.json"), "w") as f:
         f.write("{")
     p = run(text="\n", home=home)
-    assert "set it aside" in p.stdout
+    assert "set it" in p.stdout and "notes.json.bak" in p.stdout
+    assert all(len(line) <= 72 for line in p.stdout.splitlines() if "> " not in line)
     assert os.path.exists(os.path.join(home, "notes.json.bak"))
 
 
