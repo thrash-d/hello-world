@@ -133,7 +133,6 @@ Changes considered and declined, with the reason.
 
 ## Round 39
 
-- "Finished this week" list of the last seven finished plans with dates (usability retention feature): it reverses the no-history stance and the privacy copy; the same-session next plan after `done` and the content-pair change ship instead. Revisit with pilot feedback.
 - Move the sign-in offer to the first `done`, shorten the first run, accept yes-words at the last prompt, a keep-by-default "not yet" (usability 2, 3, 7, 8): changes the taught prompts again right after round 38; wait for pilot feedback.
 - Screen-reader pass with NVDA and Narrator, Python 3.14 test run, a real Windows install (lead 2, accessibility H2): need Windows and a real screen reader; still scheduled, not dropped. The README keeps saying it has not been tried.
 - CI, Dependabot, SHA pins, checksummed downloads, uninstall junction walk, trimmed embedded Python, Authenticode signing (security 1, 2, 3, 5, 6, 7): `.github/`, Windows ACL behavior and signing, outside what this routine changes or can run. Same reasons as Round 38.
@@ -141,3 +140,13 @@ Changes considered and declined, with the reason.
 - "Forget the earlier plan" menu item and not offering a finished plan as `same` (lead 6): same reason as Round 38; `same` after a finished plan is the recurring-task path.
 - Retry in `save()` on Windows file locks, a no-save notice before the first-run welcome (lead 2a, 10): needs Windows to test; rare.
 - Reword tips that assume sight or hearing, menu reorder, README split, delete-everything typo naming (lead 14, usability 13, 15, 11): content and layout decisions for the owner.
+
+## Round 40
+
+- Sign-in launcher that pauses on error (accessibility M3), launcher only from the install folder (security 8): needs a Windows run, and an earlier entry explains `start` returns at once. Revisit with the first Windows trial.
+- README clone-step Git hardening, Dependabot, SHA pins, checksummed tool downloads, auto-tag gate, bundled Python tracking, junction-safe uninstall, installer colours (security 1-5, 7, lead 5, 7, accessibility M4): `.github/` and Windows PowerShell I can't run here; same as the Round 39 entry.
+- A simple numbered mode, one `normalize()` for every prompt, `say_wrapped()` for all prose and a 30/40/72-column test, a "where I left off" note, a bigger or refreshable content pool, `clear` for today's plan, delete counts, menu reorder (lead Part 2, accessibility M2, usability 2, 7): each changes what the person is taught or needs a design pass; the finished-plans list is this round's retention change and the rest wait for the pilot.
+- Shorter first run, one-key plan from the tip, re-offering sign-in at the first `done`, dropping a plan after two skips, a pilot pass bar (usability 1, 3, 6, 10): same reason as Round 39; the pass bar belongs to the owner.
+- `refresh()` and `can_save` after a damaged or reset file, `.tmp` sweep, save retry, a distinct Ctrl+C answer at yes/no prompts, grapheme-safe cut, test hygiene for `get_terminal_size` (lead 12, 13, 15, 16, accessibility M7, L11): rare or needs Windows; not worth the risk of changing save.
+- Tips that assume sight or hearing, regional wording, `HELP` exit codes (accessibility L1, L6, lead 15): content decisions for the owner, as in Round 39.
+- A switch to turn the finished-plans list off (usability trust note): the list is seven short plans, shown only to the person and removed by Delete everything; revisit if a pilot user objects.

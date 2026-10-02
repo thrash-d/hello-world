@@ -649,10 +649,10 @@ def test_plan_typed_on_a_later_day_is_confirmed():
 
 def test_result_of_plan_command_stays_until_enter():
     p = run(text="\nplan\nWrite the report\n\n")
-    assert "Done. Your plan for today is saved." in p.stdout
+    assert "Your plan for today is in." in p.stdout
     # The same prompt comes back, so the result stays on screen and the
     # person can go on, instead of any typed word closing the window.
-    after = p.stdout.split("Done. Your plan for today is saved.")[1]
+    after = p.stdout.split("Your plan for today is in.")[1]
     assert "Press Enter to close, or type done, plan, menu or q >" in after
 
 
@@ -660,7 +660,7 @@ def test_wrong_answers_never_close_the_window_and_the_choices_are_listed():
     p = run(text="\nbanana\napple\nplan\nWrite it\n\n\n")
     assert p.stdout.count("not one of the choices") == 2
     assert "Closing now" not in p.stdout
-    assert "Done. Your plan for today is saved." in p.stdout
+    assert "Your plan for today is in." in p.stdout
 
 
 def test_quit_and_help_words_work_at_the_last_prompt():
@@ -778,8 +778,11 @@ def test_after_done_the_next_plan_is_asked_in_the_same_session():
     assert saved["intent"]["text"] == "Call the bank"
 
 
-def test_after_done_enter_just_closes_and_nothing_is_lost():
-    p = run(text="Send the invoice\ndone\n\n\n")
+def test_after_done_one_enter_really_closes():
+    p = run(text="Send the invoice\ndone\n\n")
+    assert "Closing. See you tomorrow." in p.stdout
+    # The last prompt is shown once before done and never again.
+    assert p.stdout.count("Press Enter to close, or type") == 1
     assert notes(p.home)["intent"] is None and notes(p.home)["done"] == 1
 
 
@@ -790,13 +793,120 @@ def test_plan_with_no_plan_to_finish_does_not_close_the_window():
 
 
 def test_command_words_are_not_saved_as_the_plan():
-    for word in ("menu", "done", "q", "skip"):
+    for word in ("menu", "done", "q"):
         p = run(text=word + "\n\n")
         assert "looks like a command" in p.stdout
+        assert "at the last prompt" in p.stdout
         assert notes(p.home)["intent"] is None
     p = run(text="\nplan\nmenu\n\n")
-    assert "looks like a command" in p.stdout
+    assert "Type your plan, or press Enter to go back." in p.stdout
     assert notes(p.home)["intent"] is None
+
+
+def test_declining_to_plan_is_not_lectured():
+    for word in ("no", "none", "skip"):
+        p = run(text=word + "\n\n")
+        assert "looks like a command" not in p.stdout
+        assert notes(p.home)["intent"] is None
+
+
+def test_closing_the_menu_returns_to_the_last_prompt():
+    p = run(text="Pay rent\nm\n\ndone\n\n")
+    assert notes(p.home)["done"] == 1
+    assert "Press Enter to close" in p.stdout.split("Options")[-1]
+
+
+def test_a_window_left_at_a_prompt_cannot_undo_a_newer_save():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("hello_mod4", HELLO)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    home = tempfile.mkdtemp()
+    mod.HOME, mod.TODAY, mod.FORCE_INTERACTIVE = home, "2026-10-01", True
+    mod.say = lambda text="": None
+    first, _ = mod.load()
+    first["intent"] = {"text": "Old", "date": "2026-09-30"}
+    first["visits"] = ["2026-09-30"]
+    assert mod.save(first)
+    answers = iter(["y", "Mine", ""])
+
+    def ask(prompt):
+        # While this window waits at its first prompt, another one finishes
+        # a plan and saves.
+        if prompt.startswith("Did you do it"):
+            other, _ = mod.load()
+            other["done"] = 5
+            other["previous"] = "Other window"
+            assert mod.save(other)
+        return next(answers)
+
+    mod.ask = ask
+    mod.daily(startup=False)
+    saved = notes(home)
+    assert saved["done"] == 6, saved
+    assert saved["intent"]["text"] == "Mine", saved
+    assert "2026-10-01" in saved["visits"]
+
+
+def test_set_plan_rereads_the_file_after_the_prompt():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("hello_mod5", HELLO)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    home = tempfile.mkdtemp()
+    mod.HOME, mod.TODAY, mod.FORCE_INTERACTIVE = home, "2026-10-01", True
+    mod.say = lambda text="": None
+    state, _ = mod.load()
+    assert mod.save(state)
+
+    def ask(prompt):
+        other, _ = mod.load()
+        other["done"] = 3
+        assert mod.save(other)
+        return "Mine"
+
+    mod.ask = ask
+    mod.set_plan(state, True)
+    assert notes(home)["done"] == 3 and notes(home)["intent"]["text"] == "Mine"
+
+
+def test_finished_plans_are_listed_after_done_and_kept_to_seven():
+    p = run(text="A\ndone\nB\ndone\n\n")
+    assert "Finished lately" in p.stdout
+    assert "A" in p.stdout.split("Finished lately")[1]
+    assert [i["text"] for i in notes(p.home)["finished"]] == ["A", "B"]
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("hello_mod6", HELLO)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    state = mod.new_state()
+    import datetime
+    for i in range(10):
+        mod.finish_plan(state, f"Plan {i}", datetime.date(2026, 10, 1))
+    assert len(state["finished"]) == 7 and state["finished"][-1]["text"] == "Plan 9"
+
+
+def test_finished_plans_come_back_after_a_gap_and_in_the_summary():
+    first = run(text="A\ndone\nB\ndone\n\n")
+    p = run(text="\n\n", home=first.home, day="2026-10-20")
+    assert "Welcome back" in p.stdout and "Finished lately" in p.stdout
+    assert "Finished lately" in run(["--stats"], home=first.home).stdout
+
+
+def test_a_damaged_finished_list_is_ignored():
+    home = tempfile.mkdtemp()
+    with open(os.path.join(home, "notes.json"), "w") as f:
+        json.dump({"visits": ["2026-09-30"], "finished": [1, {"text": 5},
+                   {"text": "ok", "date": "2026-09-30"}, {"text": "x", "date": "bad"}]}, f)
+    p = run(text="\n\n", home=home)
+    assert "Traceback" not in p.stderr
+    assert [i["text"] for i in notes(home).get("finished", [])] == ["ok"]
+
+
+def test_turning_the_reminder_on_from_the_menu_ends_the_offer():
+    home, startup = tempfile.mkdtemp(), tempfile.mkdtemp()
+    run(text="\nm\n2\n\n\n", home=home, startup=startup)
+    assert notes(home)["offered"] is True
 
 
 def test_done_is_named_not_taken_at_keep_it_for_today():

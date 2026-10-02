@@ -13,7 +13,7 @@ Ranked from a design review of the first version, then built:
 | It costs nothing to open: under a second, readable in under 20 seconds | One short screen, about 14 lines, plain words, ASCII only, no colour, no waiting except for Enter | Done |
 | A small, concrete benefit each day | 100 original "small things to try" (a stretch, a glass of water, closing extra tabs, thanking a colleague), chosen by date | Done |
 | Something fresh and warm | 100 original short thoughts, chosen by date; they repeat every 100 days | Done |
-| One thing with real personal use: a plan, then a follow-up | One optional plan a day. Next day: "Did you do it?" with y, n or Enter. "Not yet" offers to keep it for today, so nothing is retyped | Done |
+| One thing with real personal use: a plan, then a follow-up | One optional plan a day, and more after `done`. Next day: "Did you do it?" with y, n or Enter. "Not yet" offers to keep it for today, so nothing is retyped | Done |
 | Welcome, never guilt | After a gap of more than a week it says "Welcome back". No word like missed, lost or broke appears. Skipping everything is normal | Done |
 | A quiet sense of continuity | An "in a row" line at the 3rd, 7th and 14th visit, then every 30th, counting any visit within three days of the last. Off with one menu choice | Done |
 | It is easy to find | Start menu entry with an icon and description, and an optional once-a-day sign-in launcher that the employee turns on and off themselves | Done |
@@ -23,7 +23,9 @@ Ranked from a design review of the first version, then built:
 - Visit counts, "best streak" and scores. A count is not value.
 - A reminder that is on by default, pop-ups, sounds or anything that opens by
   itself without the employee choosing it.
-- A history of plans or a score. Since version 1.12 the program does save the
+- A long history of plans or a score. Since version 1.15 it keeps the last
+  seven finished plans (words and date) and shows them after `done`, on
+  welcome back, and in menu option 1; they leave with Delete everything. Since version 1.12 the program does save the
   plan before the current one (so `same` is one word) and a bare count of
   plans marked done. That is a deliberate change: it makes the second day
   faster, it is shown only to the person, in menu option 1 and after they
