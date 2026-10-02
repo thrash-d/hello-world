@@ -65,6 +65,25 @@ Why: asking every morning about a plan someone gave up on is a guilt engine, whi
 - An offline install path that takes a pre-downloaded Python zip and source folder.
 - Ctrl+C stays as it is, and the screen never mentions it. The engineer first wanted Ctrl+C to end the visit, then conceded. The accessibility user would accept two presses in a row ending it, so a stray single press only skips one prompt.
 
+## Ways the tool could earn money
+
+A separate profit-minded review assumed all labor is free, so the tool itself has to earn. All figures are its estimates. It ranked these:
+
+1. An org site license, free up to 10 seats and about $3 per seat per year above that, checked offline by a license file the installer reads. It needs a `LICENSE` and signed MSI or Intune packaging. It touches no privacy promise.
+2. Paid support and deployment help for IT, about $1,000 to $3,000 per org per year.
+3. The hardened installer sold as its own kit to people who ship small Python tools to Windows, about $299 to $999 one-time. It needs the payload split from the installer, which `PLAN.md` "Later" already describes.
+4. Content packs that ship inside the installer (more or branded tips, a second language), about $500 to $2,000 per org per year. They need a content-file loader.
+5. Audience-funded content: sponsors or a crowdfund pay for the next 100 tips or a translation.
+6. Sponsored tips, worth nothing until there's an install base, since a sponsor can't measure anything. They break the "nothing artificial" spirit.
+7. An opt-in HR usage dashboard, listed only to price it. It breaks "no network" and "nothing reported", and the review expects 30 to 60 percent of users to opt out.
+
+Its pick is the site license with support alongside. In the first 30 days: write the license and a price sheet, build the signed package, run the admin test, and pitch 30 IT or HR buyers on a free 60-day pilot. It counts as working if at least 3 of 30 sign a letter of intent for 100 or more seats.
+
+Two assumptions it says could make it wrong, each with a cheap test:
+
+- Employees keep opening it. Ask the five pilot users on day 14 and day 30. If fewer than 3 still open it weekly, sell the installer kit instead.
+- Buyers will pay per seat with no usage data. Send the price sheet to 15 buyers before building anything. If most say no, price per org instead, and sell "your staff won't feel watched" as the feature.
+
 ## Raised and dropped by the panel
 
 These confirm the backlog's "against the design" section.
