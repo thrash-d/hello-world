@@ -24,7 +24,8 @@ Enter to skip anything you don't want to answer. Press Enter again to close.
 
 - To see the options, type `m` at the last prompt. You can see exactly what is
   saved, open hello-world once a day when you sign in, hide the "in a row"
-  line, or delete everything saved.
+  line, set or change today's plan (option 6), or delete everything saved
+  (including any backup copy of a damaged file).
 - The "in a row" line shows only on your 3rd, 7th and 14th visit in a row, and
   then every 30th. It counts a visit within three days of the last one, so
   weekends and days off don't break it. Turn it off in the options if you
@@ -53,7 +54,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.6.0'
+$tag = 'v1.7.1'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
@@ -95,8 +96,11 @@ deliberate: it keeps the reviewed commit the only source.
 ### If something fails
 
 The last line starts with `FAILED:` and says what to fix. The full record is in
-`install.log` in the setup folder. A failed run leaves any working install as
-it was.
+`install.log` in the setup folder. A failed run before the final
+step leaves any working install as it was. If it fails at step 6 (the Apps entry
+or the shortcut), the new files are already in place, so run the installer again.
+If it fails when replacing the folder, close every open hello-world window
+(they hold files open) and run it again.
 
 ## Files
 

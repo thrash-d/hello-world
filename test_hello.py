@@ -244,6 +244,41 @@ def test_follow_up_keeps_the_plan_unless_the_answer_is_clear():
     assert notes(first.home)["intent"]["text"] == "Book travel"
 
 
+def test_enter_at_keep_for_today_keeps_the_plan_and_n_drops_it():
+    first = run(text="Book travel\n\n")
+    run(text="n\n\n\n", day="2026-10-02", home=first.home)  # Enter at keep
+    assert notes(first.home)["intent"] == {"text": "Book travel",
+                                           "date": "2026-10-02"}
+    run(text="n\nn\n\n", day="2026-10-03", home=first.home)
+    assert notes(first.home)["intent"] is None
+
+
+def test_menu_sets_or_changes_todays_plan():
+    first = run(text="\n\n")  # skipped the plan on the first visit
+    run(text="m\n6\nCall the bank\n\n", home=first.home)
+    assert notes(first.home)["intent"] == {"text": "Call the bank",
+                                           "date": "2026-10-01"}
+    run(text="m\n6\n\n\n", home=first.home)  # Enter keeps it
+    assert notes(first.home)["intent"]["text"] == "Call the bank"
+
+
+def test_reset_also_deletes_backup_and_temp_copies():
+    first = run(text="Send the invoice\n\n")
+    for name in ("notes.json.bak", "notes.json.123.tmp"):
+        with open(os.path.join(first.home, name), "w") as f:
+            f.write("old plan")
+    run(["--reset"], text="y\n", home=first.home)
+    assert os.listdir(first.home) == []
+
+
+def test_menu_does_not_save_over_a_file_it_could_not_read():
+    home = tempfile.mkdtemp()
+    os.mkdir(os.path.join(home, "notes.json"))  # opening it fails
+    p = run(text="\nm\n3\n6\nCall the bank\n\n", home=home)
+    assert p.stdout.count("Could not save") == 2
+    assert os.path.isdir(os.path.join(home, "notes.json"))
+
+
 def test_friendly_yes_words_count():
     for word in ("yep", "Yes!", "done", "ya"):
         first = run(text="Book travel\n\n")

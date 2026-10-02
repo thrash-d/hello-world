@@ -58,7 +58,8 @@ to type passwords or private details.
 
 ## Not tested
 
-Nothing here has run on Windows. The first install should be one install, one
+The program and its tests have run on Windows (see the changelog), but the real
+all-users install has not. The first install should be one install, one
 reinstall, an interrupted install and an uninstall on a clean PC. Check the
 shortcut icon, the window title, that Enter closes the window, that the
 sign-in launcher opens once, and that uninstall removes the launcher.
