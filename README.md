@@ -20,7 +20,7 @@ unless you ask for one.
 
 Open **hello-world** from the Start menu, or type "hello-world" in Windows
 Search. Read the screen, type a plan for the day if you want one, and press
-Enter to skip anything you don't want to answer. Press Enter again to close, or type `plan` to set or change today's plan. Typing a word the prompt doesn't list gets a message, never a silent close. After `plan`, or after a second wrong word, the screen waits for Enter, so you can read the result before the window closes. Everything works from the keyboard with plain text, in a single top-to-bottom flow, so a screen reader reads it in order.
+Enter to skip anything you don't want to answer. Press Enter again to close, or type `plan` to set or change today's plan. Typing a word the prompt doesn't list gets a message that names it and lists the choices, never a silent close, and the prompt comes back until you press Enter (`q`, `quit` and `exit` also close; `help` and `?` open the menu). After `plan` the screen waits for Enter, so you can read the result before the window closes. Everything works from the keyboard with plain text, in a single top-to-bottom flow, so a screen reader reads it in order.
 
 - To see the options, type `menu` at the last prompt (`m` also works). You can see exactly what is
   saved, open hello-world once a day when you sign in, hide the "in a row"
@@ -39,21 +39,22 @@ Enter to skip anything you don't want to answer. Press Enter again to close, or 
 
 hello-world saves the dates you opened it and your current plan, in one small
 file, `notes.json`, in the `hello-world` folder under `AppData\Local` in your
-own user folder. It saves nothing else (apart from your in-a-row setting, whether you have been asked about the sign-in opening, and how many times you answered that with Enter): no name, no computer name, no times.
+own user folder. It saves nothing else (apart from the plan you had before this one, how many plans you marked done, your in-a-row setting, whether you have been asked about the sign-in opening, and how many times you answered that with Enter): no name, no computer name, no times.
 It makes no network connections and sends nothing to anyone. It does not report
 use to IT or to managers. Other people who can read the files on your computer,
 such as IT staff, could read that file, so don't type passwords or private
-details. Choose option 1 in the menu to see what is saved (the same facts, tidied; a damaged file is kept as `notes.json.bak` (or `.bak2` and so on) until you delete everything), or option 4 to
+details. Choose option 1 in the menu to see what is saved: a short summary first, and the whole file if you type `full` (the same facts, tidied; a damaged file is kept as `notes.json.bak` (or `.bak2` and so on) until you delete everything), or option 4 to
 delete it. When the program is uninstalled, the file stays so you can keep it;
 delete the folder if you don't want it.
 
+- Coming back: when you finish a plan, or it is replaced or cleared, hello-world remembers it privately. Next time the plan prompt says `type same for: "..."`, so a plan you repeat is one word, not a retype. It also counts the plans you marked done (shown only in menu option 1 and after you answer yes). A plan you left open stays visible if you reopen the program the same day, and one older than two weeks is cleared with a message and kept as `same`.
 - Coming back: if you type a plan, the next day it asks how it went. On
   right after you save your first plan, and on later visits if you haven't
   answered yet, it asks whether to open at sign-in (y/n). Only a clear no is
   final. Enter means "ask me later", and it stops asking after three Enters.
   Option 2 in the menu turns it on later.
 - Without a mouse or sight: every prompt is plain text and Enter alone always
-  works. Ctrl+C at a prompt skips that prompt. Menu option 5 explains each
+  works. Ctrl+C at a prompt skips that prompt. Prompts say what Enter does where it matters, such as "Enter = keep" and "Enter = cancel". `--stats` still prints the whole saved file. Menu option 5 explains each
   option, and `hello.cmd --help` prints the folder `hello.cmd` is in. It has
   not been tried with a real screen reader yet.
 - English only. A plan in another script is saved, but a console that cannot
@@ -66,7 +67,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.11.0'
+$tag = 'v1.12.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

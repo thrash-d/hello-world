@@ -95,8 +95,7 @@ Changes considered and declined, with the reason.
 - Skip repair when the run can't save or be seen (finding 5), retry on `os.replace` (6), let Ctrl+C escape `ask` (7), error log file (11): small behaviour changes the owner has not asked for.
 - Content override file, Python pin update check, organisation-owned repo: decisions for the owner.
 - Round 35 CI and installer items (Dependabot major merges, tool checksums, SHA-pinned actions, a Windows test job, installer progress lines, junction check in uninstall, sign-in window focus): need `.github/` edits or a Windows run I don't have here.
-- Round 35 product items (note to tomorrow, same-as-last-time, clear or finish a plan, option 1 without raw JSON, Ctrl+C quits, time-of-day content tags, `extra.txt`, `.prev` backup, renamed Start entry, a 101st thought): behaviour changes for the owner to weigh against the five-person pilot; the retention and accessibility changes this round came first.
-- Round 35 POSIX file modes (security finding 4): the program is for Windows, where the profile folder is per-user.
+- Round 35 product items (note to tomorrow, Ctrl+C quits, time-of-day content tags, `extra.txt`, `.prev` backup, renamed Start entry, a 101st thought): behaviour changes for the owner to weigh against the five-person pilot; the retention and accessibility changes this round came first.
 - Round 36: dependabot auto-merge gate, SHA-pinned actions, checksums for CI tools, base-branch gate config (security M1, L1, L2; lead 12, 22): all in `.github/`, which this routine does not change.
 - Round 36: README bootstrap runs git before the installer's Git check, Authenticode on bundled Python, junction check in uninstall, installer colour and progress, `-CloseOpen` (security M2, L3, L4, L6; accessibility M3, M6; lead 14, 20, 21): PowerShell I can't run here.
 - Round 36: same-day "Is this done yet?", multi-item plans, `extra.txt`, content time tags, 365-day content, rename Start entry, yesterday's thought (usability 9, 14, 15; lead part 2): product decisions for the owner.
@@ -104,3 +103,17 @@ Changes considered and declined, with the reason.
 - Round 36: `q` / Ctrl+C quit, error log, plain-words option 1, save-failure folder and remedy text, Windows CI job and test isolation (lead 5, 6, 13, 23; accessibility L3): behaviour or CI changes weighed in earlier rounds; the Windows test isolation needs a Windows run to verify.
 - Round 36: NVDA and Narrator pass (accessibility M5): needs a person with the tools; the README says it is untested.
 
+## Round 37
+
+- Prompts end in `:` instead of ` > ` (accessibility H1, lead 8): wants a real NVDA and Narrator pass to show it helps, and every test and doc quotes the current prompts.
+- Wrap to the console width (accessibility M2): the width can't be read reliably when output is piped; revisit with a Windows run.
+- Installer progress lines, restoring `$ProgressPreference`, colour contrast, `SUCCESS:` prefix, `NO_COLOR` (accessibility M4, M5): `install.ps1` can't be run here.
+- `.lnk` launcher instead of `.cmd`, junction-safe uninstall, README Git check before clone, smoke test with `< NUL` (lead 4, 5, 6; security 8, 9): Windows-only work.
+- Pinned Actions, checksummed CI tools, Dependabot gate, CODEOWNERS, signed tags, required checks (security 1-6, lead 7): `.github/` and repository settings, which this routine does not change.
+- Pruning the bundled Python, scheduled Python version check (security 5, lead 20): needs Windows and an owner decision.
+- Carry unknown keys through `save()`, re-read before saving, a locked file shown as a first run (lead 13, 14): rare, and needs a design for two open windows.
+- Full "My list" with up to three items and a weekly look-back (usability retention feature): the larger version of this round's `same` memory; weighed against the five-person pilot, and the single plan stays until employees ask for more.
+- Shorter first run, later sign-in offer, shortened screen after the third visit, tip follow-up, content for other senses, weekday content, own lines, `--today` (usability 3, 4, 5, 12; lead 18, Part 2 items 2 and 3): changes what the first minute is, decided by the pilot.
+- Menu order, one name for the sign-in feature, `--version` (lead 17, accessibility L6): renumbering menu options breaks every saved habit and test; revisit with the pilot.
+- Missing `CHANGELOG.md`, `BACKLOG.md` and `.devkit/` in the packet (lead 3): the packet leaves them out on purpose; they are in the repository.
+- Lifetime visit count past 400 days (lead 19): the file keeps a bounded history on purpose; the summary says "last 7 days" beside it.

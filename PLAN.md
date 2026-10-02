@@ -36,8 +36,9 @@ to type passwords or private details.
 
 ## Accessibility and inclusion
 
-- Linear plain text a screen reader reads top to bottom, with no art, no
-  progress bars and no redrawing.
+- Linear plain text laid out for a screen reader to read top to bottom, with
+  no art, no progress bars and no redrawing. Designed for, not yet verified
+  with a real screen reader.
 - No reliance on colour, short lines, short sentences, an unambiguous date
   ("Thursday, 1 October 2026").
 - Everything works with the keyboard and with Enter alone. Typed letters other
