@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-10-02: `--streak` exits 0 on success, failed `--remind` exits 1, no half-written launcher
+
+Version 1.9.4. Round 31 review (`reviews/round-31.md`), no Critical, no High, five Medium, twelve Low, nine Part 2 items.
+
+- M1, "`--streak on|off` always exits 1, even on success": a regression from 1.9.3. Confirmed by reading the code: `return 1` sat after the if/else. It now returns 0 on success and 1 only when the choice can't be saved. Tests added for both.
+- M1 (related), "`--remind` returns 0 even when it prints 'Could not set up the reminder.'": `remind()` now returns True or False and `--remind` exits 1 on failure. Test added for the success case.
+- L7, "`remind(True)` can leave a partial launcher": the file is removed if writing it fails.
+- README and installer example tag are v1.9.4.
+
+Declined (see `BACKLOG.md`): the rest. `--reset` keeps exit 0 when the person answers no, since that is their choice.
+
+Tested here: all tests pass with the plain runner on Linux, Python 3.11. Not tested: anything on Windows or Python 3.14, the failed-write launcher cleanup, and pytest (not installed here).
+
 ## 2026-10-02: Delete-everything removes every backup, cut plans end cleanly, failed --streak exits 1
 
 Version 1.9.3. Round 30 review (`reviews/round-30.md`), no Critical, one High, three Medium, five Low, seven Part 2 items.

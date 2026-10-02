@@ -501,24 +501,29 @@ def remind(on):
     path = startup_file()
     if not path:
         say("The sign-in reminder works on Windows only.")
-        return
+        return False
     if on:
         target = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                               "hello.cmd")
         if '"' in target or "%" in target:
             say("The reminder cannot be set up from this folder.")
-            return
+            return False
         try:
             os.makedirs(os.path.dirname(path), exist_ok=True)
             with open(path, "w", encoding="ascii", newline="") as f:
                 f.write(f'@echo off\r\nstart "hello-world" "{target}" '
                         "--startup\r\n")
         except (OSError, UnicodeEncodeError):
+            try:
+                os.remove(path)
+            except OSError:
+                pass
             say("Could not set up the reminder.")
-            return
+            return False
         say("Done. hello-world will open once a day when you sign in.")
         say("To stop it, choose the reminder option again, or delete this file:")
         say("  " + path)
+        return True
     else:
         try:
             os.remove(path)
@@ -527,8 +532,9 @@ def remind(on):
         except OSError:
             say("Could not remove the reminder. Delete this file:")
             say("  " + path)
-            return
+            return False
         say("Done. The sign-in reminder is off.")
+    return True
 
 
 def show_saved(state):
@@ -745,15 +751,14 @@ def run(argv):
         reset(state)
         return 0
     if len(argv) == 2 and argv[0] == "--remind" and argv[1] in ("on", "off"):
-        remind(argv[1] == "on")
-        return 0
+        return 0 if remind(argv[1] == "on") else 1
     if len(argv) == 2 and argv[0] == "--streak" and argv[1] in ("on", "off"):
         state["streak"] = argv[1] == "on"
         if can_save and save(state):
             say("Done. The in-a-row line is "
                 + ("on." if state["streak"] else "off."))
-        else:
-            say("Could not save that choice on this computer.")
+            return 0
+        say("Could not save that choice on this computer.")
         return 1
     say("Unknown option. Here are the options.")
     say()

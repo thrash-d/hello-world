@@ -154,6 +154,19 @@ def test_in_a_row_line_appears_at_milestones_only():
     assert "in a row" not in run(text="\n\n", day="2026-10-03", home=home).stdout
 
 
+def test_streak_option_exit_codes():
+    assert run(["--streak", "off"]).returncode == 0
+    blocker = tempfile.NamedTemporaryFile()
+    bad = run(["--streak", "off"], home=os.path.join(blocker.name, "sub"))
+    assert bad.returncode == 1 and "Could not save" in bad.stdout
+
+
+def test_remind_exit_code_follows_the_result():
+    startup = tempfile.mkdtemp()
+    assert run(["--remind", "on"], startup=startup).returncode == 0
+    assert run(["--remind", "off"], startup=startup).returncode == 0
+
+
 def test_p_at_the_last_prompt_sets_the_plan():
     home = tempfile.mkdtemp()
     run(text="\np\nWrite the report\n", home=home)
