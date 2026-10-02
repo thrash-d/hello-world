@@ -68,8 +68,11 @@ The honest levers for retention are:
 - Visit counts, "best streak" and scores. A count is not value.
 - A reminder that is on by default, and anything that opens by itself without
   the person choosing it.
-- Any record of whether plans were done. At work that feels like being
-  checked on, so only the dates opened and the current plan are saved.
+- A history of which plans were done, or any score. At work that feels like
+  being checked on. Since 1.12 two small things are saved for the person
+  alone: the plan before this one, so a repeated plan is one word, and a bare
+  count of plans marked done. Neither is reported to anyone, and Delete
+  everything removes both.
 - Any network access, usage reporting to IT or managers, and in-program
   surveys. Trust matters more than a dashboard. Ask the employees directly.
 - Translations and tone settings. Add a language file when someone asks.
@@ -78,7 +81,7 @@ The honest levers for retention are:
 
 - One small file, `notes.json`, in the user's own folder under `AppData\Local`.
   No name, no computer name, no times.
-- Menu option 1 shows what is saved, tidied; it is not the raw file. Option 4 deletes it.
+- Menu option 1 shows a summary of what is saved, and the tidied file on request. Option 4 deletes it.
 - The README says plainly that other people who can read the computer's files,
   such as IT staff, could read it, and to avoid passwords and private details.
 - Uninstalling removes each user's sign-in launcher but leaves their notes.

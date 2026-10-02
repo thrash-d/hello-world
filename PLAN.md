@@ -23,14 +23,18 @@ Ranked from a design review of the first version, then built:
 - Visit counts, "best streak" and scores. A count is not value.
 - A reminder that is on by default, pop-ups, sounds or anything that opens by
   itself without the employee choosing it.
-- Any record of whether a plan was done. The program saves the current plan and
-  the dates opened, and the in-a-row on/off setting.
+- A history of plans or a score. Since version 1.12 the program does save the
+  plan before the current one (so `same` is one word) and a bare count of
+  plans marked done. That is a deliberate change: it makes the second day
+  faster, it is shown only to the person, in menu option 1 and after they
+  finish a plan, and it leaves with Delete everything. It is not a record of
+  which days or which plans, and nothing reports it.
 - Network access of any kind, and any report of use to IT or managers.
 
 ## Trust
 
 Saved data is one small file in the user's own folder. Option 1 in the menu
-shows what is saved (a cleaned copy, not the raw file), and option 4 deletes it. The README says plainly that
+shows a short summary of what is saved (the tidied file if you type `full`), and option 4 deletes it. The README says plainly that
 IT staff who can read the computer's files could read it, and tells people not
 to type passwords or private details.
 

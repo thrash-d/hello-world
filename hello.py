@@ -252,12 +252,13 @@ Saved notes stay on this computer, in your user folder. Nothing is sent
 anywhere. IT staff who can read this computer's files could read them."""
 
 MENU_HELP = """Type a number from the menu:
-  1  shows exactly what is saved on this computer
+  1  shows a short summary of what is saved, and the whole file if you
+     type full
   2  turns the once-a-day sign-in opening on or off
   3  shows or hides the in-a-row line
   4  deletes everything saved (it asks first)
   6  sets or changes today's plan
-Press Enter at the menu to close it. Nothing is sent anywhere."""
+Press Enter, or type q, at the menu to close it. Nothing is sent anywhere."""
 
 
 def help_text():
@@ -534,6 +535,35 @@ def is_no(text):
     return (text or "").lower().strip(" .!") in NO
 
 
+def not_a_choice(word, choices):
+    """Name what was typed, and say what would have worked."""
+    shown = tidy(word)
+    if len(shown) > 30:
+        shown = shown[:30] + "..."
+    say(f'That was not one of the choices: "{shown}". {choices}')
+
+
+def ask_choice(prompt, yes, no, hint, tries=3):
+    """Ask until the answer is recognised. Returns "yes", "no", "" or None.
+
+    "" means Enter, None means nobody could answer or the answers were not
+    understood three times, so the caller treats it as no answer.
+    """
+    for _ in range(tries):
+        answer = ask(prompt)
+        if answer is None:
+            return None
+        text = answer.lower().strip(" .!")
+        if not text:
+            return ""
+        if text in yes:
+            return "yes"
+        if text in no:
+            return "no"
+        not_a_choice(answer, hint)
+    return None
+
+
 def wrapped(prefix, text):
     return textwrap.fill(prefix + text, 72, subsequent_indent="  ",
                          break_on_hyphens=False, break_long_words=False)
@@ -607,7 +637,8 @@ def show_saved(state, full=True):
     if state.get("previous"):
         say(wrapped("Your plan before that: ", state["previous"]))
     say("In-a-row line: " + ("shown." if state["streak"] else "hidden."))
-    say("Only you can see this. It never leaves this computer.")
+    say("It never leaves this computer. Others who can read this computer's")
+    say("files, such as IT staff, could read it.")
     if full:
         say("After tidying, the file holds only this:")
         say(json.dumps(file_form(state), indent=2, ensure_ascii=False))
@@ -669,10 +700,14 @@ def set_plan(state, can_save, iso=None):
     iso = iso or today().isoformat()
     if old and old["date"] == iso:
         say(wrapped("Your plan for today: ", old["text"]))
-    hint = (f' (type same for: "{state["previous"]}")'
-            if state.get("previous") else "")
-    text = typed_plan(reuse(state, ask(
-        "Type today's plan (Enter keeps it as it is)" + hint + " > ")) or "")
+    if state.get("previous"):
+        say(wrapped("Earlier plan: ", state["previous"]))
+    hint = ", same to reuse the earlier plan" if state.get("previous") else ""
+    typed = ask("Type today's plan" + hint + ", or Enter = keep > ")
+    if (typed or "").lower() == "same" and not state.get("previous"):
+        say("There is no earlier plan to reuse yet. Nothing changed.")
+        return
+    text = typed_plan(reuse(state, typed) or "")
     if not text:
         say("Nothing changed.")
         return
@@ -707,9 +742,11 @@ def menu(state, can_save=True, iso=None):
         say("  5  Help")
         say("  6  Set or change today's plan")
         say("  Enter  Close")
-        choice = ask("Choose 1 to 6 > ")
-        if not choice:
+        choice = ask("Choose 1 to 6, or Enter = close > ")
+        if not choice or choice.lower() in ("q", "quit", "exit"):
             return
+        if choice.lower() in ("help", "?", "h"):
+            choice = "5"
         if choice == "1":
             show_saved(state, full=False)
             if (ask("Press Enter to go on, or type full to see the whole "
@@ -732,7 +769,7 @@ def menu(state, can_save=True, iso=None):
         elif choice == "6":
             set_plan(state, can_save, iso)
         else:
-            say("Please type a number from 1 to 6, or press Enter.")
+            not_a_choice(choice, "Type 1 to 6, or press Enter to close.")
 
 
 def offer_reminder(state, can_save, planned=False):
@@ -745,15 +782,17 @@ def offer_reminder(state, can_save, planned=False):
     if (not path or state.get("offered") or os.path.exists(path)
             or not (planned or len(state["visits"]) >= 2)):
         return
-    answer = ask("Want it to open once a day when you sign in so it can ask "
-                 "about your plan? (y, n, or Enter to ask me later) > ")
+    answer = ask_choice(
+        "Want it to open once a day when you sign in so it can ask about "
+        "your plan? (y, n, or Enter = ask me later) > ",
+        STRICT_YES, ("n", "no", "nope", "no thanks", "never", "stop"),
+        "Type y or n, or press Enter to be asked later.")
     if answer is None:
         return
-    text = answer.lower().strip(" .!")
-    if text in STRICT_YES:
+    if answer == "yes":
         state["offered"] = True
         remind(True)
-    elif is_no(text) and text != "not yet" or text == "no thanks":
+    elif answer == "no":
         state["offered"] = True
         say("No problem. Menu option 2 turns it on later.")
     else:
@@ -761,10 +800,38 @@ def offer_reminder(state, can_save, planned=False):
         state["offer_skips"] = skips
         if skips >= MAX_OFFER_SKIPS:
             state["offered"] = True
-        say("Okay. Menu option 2 turns it on any time.")
+            say("Okay. It will not ask again. Menu option 2 turns it on.")
+        else:
+            say("Okay. It will ask again on a later visit. Type n to stop it.")
     if not (can_save and save(state)):
         say("Could not save that choice on this computer.")
     say()
+
+
+def finish_plan(state, text, d):
+    """Count a finished plan and keep its words for `same`."""
+    say(DONE_LINES[d.toordinal() % len(DONE_LINES)])
+    state["previous"] = text
+    state["done"] = min(state.get("done", 0) + 1, 99999)
+    if state["done"] > 1:
+        say(f"That is {state['done']} plans you have finished.")
+
+
+def mark_done_now(state, can_save, d):
+    """Same-day done: the plan on screen is finished, so say so at once."""
+    plan = state["intent"]
+    if not plan:
+        say("There is no plan to mark as done. Type plan to set one.")
+        return
+    before = (state.get("previous"), state.get("done", 0))
+    finish_plan(state, plan["text"], d)
+    state["intent"] = None
+    if not (can_save and save(state)):
+        state["intent"] = plan
+        state["previous"], state["done"] = before
+        if before[0] is None:
+            state.pop("previous", None)
+        say("Could not save that on this computer.")
 
 
 def daily(startup):
@@ -790,8 +857,8 @@ def daily(startup):
     say()
 
     if expired:
-        say("Your plan from over two weeks ago was cleared. Menu option 6 can")
-        say("bring it back: type same.")
+        say("Your plan from over two weeks ago was cleared. Type same at the")
+        say("plan prompt to bring it back.")
         say()
 
     if first:
@@ -815,27 +882,26 @@ def daily(startup):
 
     if not seen_today and intent and intent["date"] < iso:
         say(wrapped("Last time you planned: ", intent["text"]))
-        answer = ask("Did you do it? (y = yes, n = not yet, Enter = skip) > ")
-        if answer is not None:
-            if is_yes(answer):
-                say(DONE_LINES[d.toordinal() % len(DONE_LINES)])
+        answer = ask_choice(
+            "Did you do it? (y = yes, n = not yet, Enter = skip) > ",
+            YES, NO, "Type y or n, or press Enter to skip.")
+        if answer == "yes":
+            finish_plan(state, intent["text"], d)
+            intent = None
+        elif answer == "no":
+            keep = ask_choice(
+                "That is fine. Keep it for today? (y/n, Enter = keep) > ",
+                YES + ("not yet",), ("n", "no", "nope"),
+                "Type y to keep it, n to clear it, or press Enter to keep it.")
+            if keep == "no":
                 state["previous"] = intent["text"]
-                state["done"] = min(state.get("done", 0) + 1, 99999)
-                if state["done"] > 1:
-                    say(f"That is {state['done']} plans you have finished.")
                 intent = None
-            elif is_no(answer):
-                keep = ask("That is fine. Keep it for today? "
-                           "(y/n, Enter = keep) > ")
-                if is_no(keep):
-                    state["previous"] = intent["text"]
-                    intent = None
-                    say("Cleared.")
-                else:
-                    intent = {"text": intent["text"], "date": iso}
-                    say("Kept for today.")
+                say("Cleared. It stays as same until you delete everything.")
             else:
-                say("Left as it was.")
+                intent = {"text": intent["text"], "date": iso}
+                say("Kept for today.")
+        elif answer is not None:
+            say("Left as it was.")
         say()
 
     say("Thought for today:")
@@ -861,6 +927,9 @@ def daily(startup):
                     f'"{state["previous"]}")')
         text = ask("What is one thing you want to get done today?\n"
                    + skip + " > ")
+        if (text or "").lower() == "same" and not state.get("previous"):
+            say("There is no earlier plan to reuse yet. Nothing was saved.")
+            text = ""
         if text:
             text = typed_plan(reuse(state, text))
             if text:
@@ -888,19 +957,28 @@ def daily(startup):
 
     # A message at the very end must stay on screen until the person has read
     # it, because the window closes as soon as the program exits.
-    prompt = "Press Enter to close, or type plan or menu > "
     while True:
+        planned = bool(intent and person and state["intent"] is intent)
+        prompt = ("Press Enter to close, or type done, plan, menu or q > "
+                  if planned else
+                  "Press Enter to close, or type plan, menu or q > ")
         answer = (ask(prompt) or "").lower().strip()
-        if answer in ("p", "plan") and person:
+        if answer == "done" and person:
+            mark_done_now(state, can_save, d)
+            intent = state["intent"]
+            ask("Press Enter to close > ")
+        elif answer in ("p", "plan") and person:
             set_plan(state, can_save, iso)
+            intent = state["intent"]
             ask("Press Enter to close > ")
         elif answer in ("m", "menu", "h", "help", "?"):
             menu(state, can_save, iso)
+            intent = state["intent"]
         elif answer in ("q", "quit", "exit", "x", "close"):
             pass
         elif answer:
-            say(f'That was not one of the choices: "{tidy(answer)[:30]}". '
-                "Type plan or menu, or press Enter to close.")
+            not_a_choice(answer, "Type " + ("done, " if planned else "")
+                         + "plan, menu or q, or press Enter to close.")
             continue
         break
 

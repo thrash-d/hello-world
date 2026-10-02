@@ -20,10 +20,24 @@ unless you ask for one.
 
 Open **hello-world** from the Start menu, or type "hello-world" in Windows
 Search. Read the screen, type a plan for the day if you want one, and press
-Enter to skip anything you don't want to answer. Press Enter again to close, or type `plan` to set or change today's plan. Typing a word the prompt doesn't list gets a message that names it and lists the choices, never a silent close, and the prompt comes back until you press Enter (`q`, `quit` and `exit` also close; `help` and `?` open the menu). After `plan` the screen waits for Enter, so you can read the result before the window closes. Everything works from the keyboard with plain text, in a single top-to-bottom flow, so a screen reader reads it in order.
+Enter to skip anything you don't want to answer. At the last prompt:
 
-- To see the options, type `menu` at the last prompt (`m` also works). You can see exactly what is
-  saved, open hello-world once a day when you sign in, hide the "in a row"
+- Press Enter, or type `q`, `quit` or `exit`, to close.
+- Type `done` to mark today's plan finished, right when you finish it. It is
+  offered only while a plan is on screen.
+- Type `plan` to set or change today's plan, and `same` there to reuse the
+  earlier one.
+- Type `menu` (or `help`, or `?`) for the options.
+
+A word the prompt doesn't list gets a message that names it and lists the
+choices, and the prompt comes back. The same goes for the yes/no questions and
+the menu: a mistyped answer is named and asked again, never taken as a choice.
+After `plan` or `done` the screen waits for Enter, so you can read the result
+before the window closes. Everything works from the keyboard with plain text,
+in a single top-to-bottom flow, designed so a screen reader reads it in order.
+
+- To see the options, type `menu` at the last prompt (`m` also works). You can see a summary of what
+  is saved (and the whole file with `full`), open hello-world once a day when you sign in, hide the "in a row"
   line, set or change today's plan (option 6), or delete everything saved
   (including any backup copy of a damaged file).
 - The "in a row" line shows only on your 3rd, 7th and 14th visit in a row, and
@@ -47,12 +61,16 @@ details. Choose option 1 in the menu to see what is saved: a short summary first
 delete it. When the program is uninstalled, the file stays so you can keep it;
 delete the folder if you don't want it.
 
-- Coming back: when you finish a plan, or it is replaced or cleared, hello-world remembers it privately. Next time the plan prompt says `type same for: "..."`, so a plan you repeat is one word, not a retype. It also counts the plans you marked done (shown only in menu option 1 and after you answer yes). A plan you left open stays visible if you reopen the program the same day, and one older than two weeks is cleared with a message and kept as `same`.
-- Coming back: if you type a plan, the next day it asks how it went. On
-  right after you save your first plan, and on later visits if you haven't
+- Coming back: when you finish a plan, or it is replaced or cleared, hello-world remembers it privately. Next time the plan prompt shows it as "Earlier plan", and typing `same` reuses it, so a plan you repeat is one word, not a retype. It also counts the plans you marked done (shown only in menu option 1 and after you finish one). Clearing a plan does not erase these words: they stay as `same` until you delete everything (menu option 4). A plan you left open stays visible if you reopen the program the same day, and one older than two weeks is cleared with a message and kept as `same`.
+- Finishing is counted the moment you say so: type `done` at the last prompt.
+  If you do not, the next day asks "Did you do it?". A plan already marked
+  done is not asked about again.
+- Sign-in reminder: if you type a plan, the next day it asks how it went.
+  Right after you save your first plan, and on later visits if you have not
   answered yet, it asks whether to open at sign-in (y/n). Only a clear no is
   final. Enter means "ask me later", and it stops asking after three Enters.
-  Option 2 in the menu turns it on later.
+  A mistyped answer is named and asked again, and does not count. Option 2 in
+  the menu turns it on later.
 - Without a mouse or sight: every prompt is plain text and Enter alone always
   works. Ctrl+C at a prompt skips that prompt. Prompts say what Enter does where it matters, such as "Enter = keep" and "Enter = cancel". `--stats` still prints the whole saved file. Menu option 5 explains each
   option, and `hello.cmd --help` prints the folder `hello.cmd` is in. It has
@@ -67,7 +85,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.12.0'
+$tag = 'v1.13.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

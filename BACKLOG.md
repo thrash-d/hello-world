@@ -117,3 +117,16 @@ Changes considered and declined, with the reason.
 - Menu order, one name for the sign-in feature, `--version` (lead 17, accessibility L6): renumbering menu options breaks every saved habit and test; revisit with the pilot.
 - Missing `CHANGELOG.md`, `BACKLOG.md` and `.devkit/` in the packet (lead 3): the packet leaves them out on purpose; they are in the repository.
 - Lifetime visit count past 400 days (lead 19): the file keeps a bounded history on purpose; the summary says "last 7 days" beside it.
+
+## Round 38
+
+- Dependabot gate, SHA-pinned Actions, checksummed CI downloads, gitleaks config from the base branch, blocking default (security M2, M3, M4, lead CI note): `.github/` and repository settings, which this routine does not change; same reason as earlier rounds.
+- Junction-safe delete of the sign-in launcher in `uninstall.ps1` (security L1, lead Low): PowerShell and Windows ACL behavior I can't run here. Revisit with a Windows run.
+- chmod an existing data folder and old files, explicit Windows ACL, cap on `.bak` copies (security L2, L6): POSIX-only hardening on a Windows product; the README already says IT staff can read the file.
+- Expire `previous` after 30 days, hide it on request, make `done` opt-in or switchable (security M1, L3; lead 5, 6): this round says plainly that clearing keeps the words as `same`; a switch is a product decision for the pilot.
+- Weekly recap and a private list of finished plans, last five plans, `s` for same, Enter-keeps-yesterday setting (usability retention feature, lead Part 2 1): the larger version of this round's same-day `done`; the pilot decides how much history people want.
+- Shorter first run with the plan prompt first, sign-in offer on visit two, tip line on the 3rd and 7th visit, text at the last prompt offered as a plan, skipped-follow-up clear offer, warning before day 14 (usability H3, M1, M3, M6; lead 6): changes what the first minute is; decided by the pilot.
+- A "Mark done" menu item and menu renumbering (lead 2): the `done` word at the last prompt covers it; renumbering breaks saved habits.
+- Screen-reader pass with NVDA and Narrator, installer smoke test of the interactive path, tip content for other senses (accessibility 1, lead 9, 10): need Windows, a real screen reader, or the owner.
+- `--stats --json`, prompt endings read as "greater than", skipping the second Enter after `plan` (accessibility 12, 1; usability L1): the second Enter is deliberate (round 36); the others need a screen reader to judge.
+- Stale-state overwrite from a second open window, unknown keys, `--reset` with no file, launcher from a source checkout (lead Low): rare; needs a design for two open windows (see Round 37 entry).
