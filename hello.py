@@ -220,7 +220,7 @@ THOUGHTS = (
     'Notice the small pleasures: a warm mug, a clear inbox, a sunny patch on the desk.',
     'Not every day needs a big win. Steady and pleasant is a fine way to work.',
     'Enjoy the meeting that ends five minutes early and spend the time as you like.',
-    'An ordinary Tuesday done well is something quietly to be proud of.',
+    'An ordinary day done well is something quietly to be proud of.',
     'Good work often looks unremarkable from the outside, and that is all right.',
     'Let a pleasant afternoon be pleasant without waiting for it to be productive.',
     'The small routines of the day, the first coffee and the familiar faces, are worth noticing.',
@@ -251,9 +251,25 @@ options. You can also run hello.cmd with one of these:
 Saved notes stay on this computer, in your user folder. Nothing is sent
 anywhere. IT staff who can read this computer's files could read them."""
 
+MENU_HELP = """Type a number from the menu:
+  1  shows exactly what is saved on this computer
+  2  turns the once-a-day sign-in opening on or off
+  3  shows or hides the in-a-row line
+  4  deletes everything saved (it asks first)
+  6  sets or changes today's plan
+Press Enter at the menu to close it. Nothing is sent anywhere."""
+
+
+def help_text():
+    here = os.path.dirname(os.path.abspath(__file__))
+    return HELP + "\n\nhello.cmd is in this folder:\n  " + here
+
 MAX_VISITS = 400
 MAX_FILE = 1_000_000
 YES = ("y", "yes", "yep", "ya", "yeah", "done")
+# The sign-in offer starts something, so a stray "done" must not count.
+STRICT_YES = ("y", "yes", "yep", "ya", "yeah")
+MAX_OFFER_SKIPS = 3
 NO = ("n", "no", "nope", "not yet")
 
 # The tests set these after importing the module, to run against a fixed date,
@@ -389,6 +405,9 @@ def load(repair=True):
         state["streak"] = False
     if raw.get("offered") is True:
         state["offered"] = True
+    skips = raw.get("offer_skips")
+    if isinstance(skips, int) and not isinstance(skips, bool) and skips > 0:
+        state["offer_skips"] = min(skips, MAX_OFFER_SKIPS)
     visits = []
     for v in raw["visits"] if isinstance(raw.get("visits"), list) else []:
         try:
@@ -421,7 +440,7 @@ def file_form(state):
 
 def save(state):
     try:
-        os.makedirs(data_dir(), exist_ok=True)
+        os.makedirs(data_dir(), mode=0o700, exist_ok=True)
         tmp = f"{data_file()}.{os.getpid()}.tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(file_form(state), f, indent=2)
@@ -444,7 +463,9 @@ def say(text=""):
 
 def indent(text):
     return "\n".join(textwrap.wrap(text, 68, initial_indent="  ",
-                                   subsequent_indent="  "))
+                                   subsequent_indent="  ",
+                                   break_on_hyphens=False,
+                                   break_long_words=False))
 
 
 def interactive():
@@ -483,7 +504,10 @@ def ask(prompt):
         return None
     try:
         return input(prompt).strip()
-    except (EOFError, KeyboardInterrupt, OSError, UnicodeError):
+    except KeyboardInterrupt:
+        say()  # the prompt is still on this line; start the next one cleanly
+        return None
+    except (EOFError, OSError, UnicodeError):
         return None
 
 
@@ -608,9 +632,11 @@ def reset(state):
     return True
 
 
-def set_plan(state, can_save):
+def set_plan(state, can_save, iso=None):
     old = state["intent"]
-    iso = today().isoformat()
+    # daily() passes its own date, so a window left open past midnight
+    # doesn't date a plan to the next day.
+    iso = iso or today().isoformat()
     if old and old["date"] == iso:
         say(wrapped("Your plan for today: ", old["text"]))
     text = typed_plan(ask("Type today's plan (Enter keeps it as it is) > ") or "")
@@ -625,16 +651,18 @@ def set_plan(state, can_save):
         say("Could not save that on this computer.")
 
 
-def menu(state, can_save=True):
+def menu(state, can_save=True, iso=None):
     while True:
         say()
         say("Options")
         say("  1  Show what is saved on this computer")
         reminding = startup_file() and os.path.exists(startup_file())
-        say("  2  Open once a day at sign-in: "
-            + ("on" if reminding else "off") + " (change it)")
-        say("  3  Show the in-a-row line: "
-            + ("on" if state["streak"] else "off") + " (change it)")
+        say("  2  " + ("Turn off: open once a day at sign-in (now on)"
+                       if reminding else
+                       "Turn on: open once a day at sign-in (now off)"))
+        say("  3  " + ("Hide the in-a-row line (now shown)"
+                       if state["streak"] else
+                       "Show the in-a-row line (now hidden)"))
         say("  4  Delete everything saved")
         say("  5  Help")
         say("  6  Set or change today's plan")
@@ -657,27 +685,40 @@ def menu(state, can_save=True):
         elif choice == "4":
             reset(state)
         elif choice == "5":
-            say(HELP)
+            say(MENU_HELP)
         elif choice == "6":
-            set_plan(state, can_save)
+            set_plan(state, can_save, iso)
         else:
             say("Please type a number from 1 to 6, or press Enter.")
 
 
-def offer_reminder(state, can_save):
-    """On the second visit, ask once whether to open at sign-in."""
+def offer_reminder(state, can_save, planned=False):
+    """Ask whether to open at sign-in, right after a plan or from visit two on.
+
+    Only a clear no is final. Enter or an unclear answer asks again on a later
+    visit, up to MAX_OFFER_SKIPS times in all.
+    """
     path = startup_file()
-    if (not path or state.get("offered") or len(state["visits"]) != 2
-            or os.path.exists(path)):
+    if (not path or state.get("offered") or os.path.exists(path)
+            or not (planned or len(state["visits"]) >= 2)):
         return
-    answer = ask("Want it to open once a day when you sign in? (y/n) > ")
+    answer = ask("Want it to open once a day when you sign in so it can ask "
+                 "about your plan? (y, n, or Enter to ask me later) > ")
     if answer is None:
         return
-    state["offered"] = True  # a no is remembered, so it is asked only once
-    if is_yes(answer):
+    text = answer.lower().strip(" .!")
+    if text in STRICT_YES:
+        state["offered"] = True
         remind(True)
-    else:
+    elif is_no(text) or text == "no thanks":
+        state["offered"] = True
         say("No problem. Menu option 2 turns it on later.")
+    else:
+        skips = state.get("offer_skips", 0) + 1
+        state["offer_skips"] = skips
+        if skips >= MAX_OFFER_SKIPS:
+            state["offered"] = True
+        say("Okay. Menu option 2 turns it on any time.")
     if not (can_save and save(state)):
         say("Could not save that choice on this computer.")
     say()
@@ -689,6 +730,7 @@ def daily(startup):
     state, can_save = load()
     person = interactive()
     seen_today = iso in state["visits"]
+    typed_new = False
     if startup and seen_today:
         return
     first = not state["visits"]
@@ -709,7 +751,7 @@ def daily(startup):
         say("folder, and sends nothing anywhere. Do not type passwords or")
         say("private details. Others who can read this computer's files, such")
         say("as IT staff, could read the notes.")
-        say("Type menu at the end of this screen to see the options.")
+        say("Type plan or menu at the end of this screen for the options.")
         say()
     elif not seen_today:
         last = datetime.date.fromisoformat(state["visits"][-1])
@@ -751,12 +793,15 @@ def daily(startup):
         say(wrapped("Your plan for today: ", intent["text"]))
         say()
     elif not seen_today:
+        skip = ("(Press Enter to skip)" if not intent else
+                "(Press Enter to skip; a plan typed here replaces the old one)")
         text = ask("What is one thing you want to get done today?\n"
-                   "(Press Enter to skip) > ")
+                   + skip + " > ")
         if text:
             text = typed_plan(text)
             if text:
                 intent = {"text": text, "date": iso}
+                typed_new = True
         say()
 
     # With nobody at the keyboard, such as a launch with no console, show the
@@ -768,22 +813,29 @@ def daily(startup):
         if not can_save or not save(state):
             say("Your notes could not be saved on this computer. This screen "
                 "still works.")
-        elif first and intent:
-            say("Saved. Tomorrow it will ask how this went.")
-            say()
-        elif not seen_today:
-            offer_reminder(state, can_save)
+        else:
+            if typed_new:
+                say("Saved. Tomorrow it will ask how this went.")
+                say()
+            if not seen_today:
+                offer_reminder(state, can_save, planned=typed_new)
 
+    # A message at the very end must stay on screen until the person has read
+    # it, because the window closes as soon as the program exits.
     prompt = "Press Enter to close, or type plan or menu > "
-    for _ in range(2):
+    for attempt in range(2):
         answer = (ask(prompt) or "").lower()
         if answer in ("p", "plan") and person:
-            set_plan(state, can_save)
+            set_plan(state, can_save, iso)
+            ask("Press Enter to close > ")
         elif answer in ("m", "menu"):
-            menu(state, can_save)
+            menu(state, can_save, iso)
         elif answer:
             say("That was not one of the choices.")
-            prompt = "Press Enter to close, or type plan or menu > "
+            if attempt == 1:
+                say("Closing now. Nothing was changed.")
+                ask("Press Enter to close > ")
+                break
             continue
         break
 
@@ -796,7 +848,7 @@ def run(argv):
         say("Hello, world!")
         return 0
     if argv == ["--help"] or argv == ["-h"]:
-        say(HELP)
+        say(help_text())
         return 0
     if argv == ["--startup"]:
         daily(startup=True)
@@ -835,7 +887,7 @@ def run(argv):
     else:
         say("Unknown option: " + tidy(" ".join(argv))[:60] + ". Here are the options.")
     say()
-    say(HELP)
+    say(help_text())
     return 2
 
 

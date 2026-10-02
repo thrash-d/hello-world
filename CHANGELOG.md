@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-10-02: sign-in offer at the moment of commitment, results stay on screen until Enter
+
+Version 1.11.0. Round 36 review (`reviews/round-36.md`), no Critical, one High, about twenty Medium, about twenty Low, about twenty Part 2 items across four reviewers.
+
+**Retention change.** Usability finding 1, "The return mechanism is offered after the moment it is needed", findings 2 and 3 ("A reflexive Enter ... is recorded as a permanent no", "Users who already have the app never get the offer"), and lead finding 1, "the sign-in offer never reaches existing users": the opt-in sign-in offer now comes right after the first plan is saved, and also on any later visit from the second on, so people already using 1.9 or earlier are asked too. Only a clear no is final. Enter or an unclear answer asks again on a later visit, three times at most (`offer_skips` in `notes.json`). "done" no longer counts as yes there (security L7). Nothing starts without a clear yes. Tests: first-plan offer, existing user with five visits, Enter then no, "done".
+
+**Accessibility change.** Accessibility H1, "Confirmations and errors vanish because the window closes right after them": after `plan` and after a second wrong answer the screen now waits at "Press Enter to close >", and the second wrong answer says "Closing now. Nothing was changed." Also M1 (a plan typed on any day is now confirmed with "Saved. Tomorrow it will ask how this went."), M4 and lead 8 (menu option 5 now explains the menu in employee terms; `--help` prints the folder `hello.cmd` is in), lead 7 (menu toggles say the action: "Turn on: ... (now off)"), L2 (Ctrl+C starts a clean line), L4 (first-run line says "plan or menu"). Tests added for each.
+
+Other fixes: lead 16 (`plan` uses the date the window opened, not midnight-crossed), lead 17 (thought no longer names Tuesday), lead 18 (content no longer splits on hyphens), lead 4 (the plan prompt says a new plan replaces the old one when yesterday's was left as it was), lead 9 (README now lists every saved field), security L5 (data folder created 0700 on POSIX), README: backup names, English-only and untested-with-a-screen-reader notes.
+
+Declined (see `BACKLOG.md`): dependabot, CI, SHA-pin, checksum and workflow findings (`.github/`, which this routine does not change); installer colour, progress, bootstrap and junction findings (need Windows); same-day "done yet?", multi-item plans, Start entry rename, `q` to quit, plain-words option 1, error log, sign-in startup-mode visit counting, content tags: product decisions for the owner.
+
+Tested here: all tests pass with the plain runner on Linux, Python 3.11, including the first-plan offer, the existing-user offer, the Enter-then-no sequence and the Enter-to-close waits. Not tested: anything on Windows or Python 3.14, a real screen reader, whether the Startup folder launcher fires after sleep, and pytest (not installed here).
+
 ## 2026-10-02: say what tomorrow holds, offer the sign-in reminder once, plain-word prompts
 
 Version 1.10.0. Round 35 review (`reviews/round-35.md`), no Critical, no High, ten Medium, about fifteen Low, nine Part 2 items.

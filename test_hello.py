@@ -580,10 +580,10 @@ def test_sign_in_offer_is_made_once_on_the_second_visit():
     home, startup = tempfile.mkdtemp(), tempfile.mkdtemp()
     run(text="\n\n", home=home, startup=startup, day="2026-10-01")
     p = run(text="\nn\n\n", home=home, startup=startup, day="2026-10-02")
-    assert "open once a day when you sign in? (y/n)" in p.stdout
+    assert "when you sign in so it can ask" in p.stdout
     assert notes(home)["offered"] is True
     p = run(text="\n\n", home=home, startup=startup, day="2026-10-03")
-    assert "sign in? (y/n)" not in p.stdout
+    assert "when you sign in so it can ask" not in p.stdout
     assert os.listdir(startup) == []
 
 
@@ -601,6 +601,83 @@ def test_unknown_input_is_named_and_outcomes_are_echoed():
     assert "Unknown option: --nope" in p.stdout and p.returncode == 2
     p = run(["--remind"])
     assert "needs on or off" in p.stdout
+
+
+def test_existing_user_with_many_visits_is_offered_the_reminder():
+    home, startup = tempfile.mkdtemp(), tempfile.mkdtemp()
+    with open(os.path.join(home, "notes.json"), "w") as f:
+        json.dump({"visits": ["2026-09-25", "2026-09-26", "2026-09-28",
+                              "2026-09-29", "2026-09-30"]}, f)
+    p = run(text="\ny\n\n", home=home, startup=startup)
+    assert "when you sign in so it can ask" in p.stdout
+    assert os.listdir(startup) == ["hello-world-daily.cmd"]
+
+
+def test_offer_comes_right_after_the_first_plan():
+    home, startup = tempfile.mkdtemp(), tempfile.mkdtemp()
+    p = run(text="Send the invoice\ny\n\n", home=home, startup=startup)
+    assert p.stdout.index("Saved. Tomorrow") < p.stdout.index("so it can ask")
+    assert os.listdir(startup) == ["hello-world-daily.cmd"]
+
+
+def test_enter_at_the_offer_asks_again_but_a_no_is_final():
+    home, startup = tempfile.mkdtemp(), tempfile.mkdtemp()
+    run(text="Plan one\n\n\n", home=home, startup=startup, day="2026-10-01")
+    saved = notes(home)
+    assert "offered" not in saved and saved["offer_skips"] == 1
+    p = run(text="\n\n\n", home=home, startup=startup, day="2026-10-02")
+    assert "so it can ask" in p.stdout
+    p = run(text="\nn\n\n", home=home, startup=startup, day="2026-10-03")
+    assert notes(home)["offered"] is True
+    p = run(text="\n\n", home=home, startup=startup, day="2026-10-04")
+    assert "so it can ask" not in p.stdout
+    assert os.listdir(startup) == []
+
+
+def test_done_does_not_turn_on_the_sign_in_reminder():
+    home, startup = tempfile.mkdtemp(), tempfile.mkdtemp()
+    run(text="Plan one\ndone\n\n", home=home, startup=startup)
+    assert os.listdir(startup) == []
+
+
+def test_plan_typed_on_a_later_day_is_confirmed():
+    first = run(text="\n\n")
+    p = run(text="Write the report\n\n", home=first.home, day="2026-10-02")
+    assert "Saved. Tomorrow it will ask how this went." in p.stdout
+
+
+def test_result_of_plan_command_stays_until_enter():
+    p = run(text="\nplan\nWrite the report\n\n")
+    tail = p.stdout.rstrip().splitlines()[-1]
+    assert "Done. Your plan for today is saved." in p.stdout
+    assert tail.endswith("Press Enter to close >")
+
+
+def test_second_wrong_answer_says_it_is_closing_and_waits():
+    p = run(text="\nbanana\napple\n\n")
+    assert "Closing now. Nothing was changed." in p.stdout
+    assert p.stdout.rstrip().splitlines()[-1].endswith("Press Enter to close >")
+
+
+def test_menu_toggles_say_the_action_and_menu_help_is_for_employees():
+    p = run(text="\nm\n5\n\n")
+    assert "Turn on: open once a day at sign-in (now off)" in p.stdout
+    assert "Type a number from the menu" in p.stdout
+    assert "hello.cmd" not in p.stdout.split("Type a number")[1]
+
+
+def test_help_says_where_hello_cmd_is():
+    p = run(["--help"])
+    assert "hello.cmd is in this folder:" in p.stdout
+
+
+def test_hyphenated_words_in_content_do_not_split():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("hello_mod", HELLO)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    assert mod.indent("x " * 33 + "ten-minute").count("-") == 1
+    assert "ten-\n" not in mod.indent("a " * 31 + "ten-minute start")
 
 
 def test_help_lines_fit_72_columns():
