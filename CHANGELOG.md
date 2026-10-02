@@ -17,7 +17,7 @@ Version 1.8.0. Round 26 review (`reviews/round-26.md`), no Critical or High find
 
 Declined (see `BACKLOG.md`): the other items, with reasons there.
 
-Tested here: all 39 tests pass with the plain runner on Linux, Python 3. pytest isn't installed here, so the pytest runner was not run. Not tested: anything on Windows (the console, PowerShell, the installer, the uninstaller, the reset on a locked file), and the installer code is unchanged apart from the help example.
+Tested here: all 40 tests pass with the plain runner on Linux, Python 3. pytest isn't installed here, so the pytest runner was not run. Not tested: anything on Windows (the console, PowerShell, the installer, the uninstaller, the reset on a locked file), and the installer code is unchanged apart from the help example.
 
 ## 2026-10-01: Fix the console check on Windows and leave the admin's window as it was
 
