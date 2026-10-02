@@ -65,18 +65,22 @@ to type passwords or private details.
 - Rollout success: installs that finish without error, out of five, from
   `install.log` and the exit code.
 
-## Not tested
+## Tested
 
 The test suite was last run on Windows 11 for 1.16.0, with Python 3.13 and
-piped input. For 1.16.0 the owner also ran it in a real console with Narrator
-in a sandbox, and it passed.
+piped input. For 1.16.0 the owner also ran the release gate by hand in a
+sandbox, and it passed:
 
-Still to confirm on one clean PC: one install, one reinstall, an interrupted
-install and an uninstall, plus two real windows that both finish a plan while
-one of them uses Delete everything. Piped tests never leave a second process
-waiting at a prompt, so only that pass proves the two-window merge. Check the
-shortcut icon, the window title, that Enter closes the window, that the
-sign-in launcher opens once, and that uninstall removes the launcher.
+- A real console with Narrator.
+- One install, one reinstall, an interrupted install and an uninstall.
+- Two real windows that both finish a plan while one of them uses Delete
+  everything. Piped tests never leave a second process waiting at a prompt,
+  so only this pass proves the two-window merge.
+
+Run the same gate again before a release that changes saving, the installer
+or the uninstaller. Not recorded as checked: console input outside ASCII, the
+shortcut's `if errorlevel 1 pause` line, and removing launchers from several
+user profiles.
 
 ## Later
 

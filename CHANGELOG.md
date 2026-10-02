@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-02: record the install and two-window pass on 1.16.0
+
+No code change, so the version stays 1.16.0. Round 42 Part 2 item 2, "Prove the two-window story on a real console": the owner ran 1.16.0 in a sandbox through an install, a reinstall, an interrupted install, an uninstall, and two real windows that both finished a plan while one used Delete everything. All passed. It is out of `BACKLOG.md`. `PLAN.md` now has a "Tested" section with the gate to run again before a release that changes saving or the installer, and the why-doc matches. Three checks are not recorded either way: console input outside ASCII, the shortcut's pause line, and removing launchers from several user profiles.
+
 ## 2026-10-02: delete everything sticks across windows, tidying a plan never overwrites the other window's, a repeated finish counts once
 
 Version 1.16.0, still. Round 42 review (`reviews/round-42.md`) of the unmerged Round 41 branch, one reviewer, no Critical, 2 High, 5 Medium, 6 Low, 6 Part 2 items. 1.16.0 was never tagged, so both rounds ship as one release.

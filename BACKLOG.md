@@ -154,7 +154,3 @@ Changes considered and declined, with the reason.
 ## Round 41
 
 - Make the Dependabot check see the tests (Low 15): it already does. `python -m pytest -q` collects every `test_` function in `test_hello.py`, 115 of them, so a red suite blocks the merge.
-
-## Round 42
-
-- A two-window pass on a clean PC with the real install (Part 2 item 2): it needs a person at a Windows PC with the installed `hello.cmd`. `PLAN.md` lists it as the release gate.

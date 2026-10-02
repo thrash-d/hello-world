@@ -118,11 +118,12 @@ The tester's findings were fixed and each has a test. The ones that mattered:
 
 ## 8. Limits and what is untested
 
-- The test suite was last run on Windows 11 for 1.16.0, with piped input, and
-  the owner checked it in a real console with Narrator. The real install has
-  not been run. Untested there: console Unicode input, the
-  sign-in launcher, the shortcut's `if errorlevel 1 pause` line, removing
-  launchers across profiles, the icon and the window title.
+- The test suite was last run on Windows 11 for 1.16.0, with piped input.
+  The owner also ran 1.16.0 in a sandbox: a real console with Narrator, an
+  install, a reinstall, an interrupted install, an uninstall, and two real
+  windows at once. All passed. Not recorded as checked: console input outside
+  ASCII, the shortcut's `if errorlevel 1 pause` line, and removing launchers
+  from several user profiles.
 - No program can guarantee retention. These are the honest levers. Whether
   people come back is measured by asking them, since the program reports
   nothing by design.
