@@ -152,7 +152,7 @@ THOUGHTS = (
     'Close the tabs you are not using. Your attention will thank you within minutes.',
     'One task, one window, twenty-five minutes. See how far a quiet stretch can go.',
     'Write down the stray thought that pops up, then return to what you were doing.',
-    'Silence your phone for one hour and let the work have your full attention.',
+    'If you can, silence your phone for an hour and give the work your full attention.',
     'Decide the one thing that would make today a good day, and protect time for it.',
     'Doing things one at a time is usually faster than it feels.',
     'A tidy list of three things beats a scattered list of twenty.',
@@ -163,7 +163,7 @@ THOUGHTS = (
     'Eat lunch away from your desk today. The inbox can wait for a sandwich.',
     'A short walk around the building counts as real work for your head.',
     'A minute away from the screen is a fine use of a busy afternoon.',
-    'Stretch your shoulders and unclench your jaw. You have held them up all morning.',
+    'Stretch your shoulders and unclench your jaw. You may have held them up for hours.',
     "Leave on time tonight if you can. Tomorrow's you will be glad of the evening.",
     'Rest is part of the job, because tired people tend to make the same slip twice.',
     'Rest your eyes for a moment and let your shoulders drop.',
@@ -264,29 +264,44 @@ could not be written, 2 for an unknown option.
 Saved notes stay on this computer, in your user folder. Nothing is sent
 anywhere. IT staff who can read this computer's files could read them."""
 
-MENU_HELP = """Type a number from the menu:
-  1  shows a short summary of what is saved, and the whole file if you
-     type full
-  2  turns the once-a-day sign-in opening on or off
-  3  shows or hides the in-a-row line
-  4  deletes everything saved (it asks first)
-  6  sets or changes today's plan
-  7  forgets one finished plan and leaves everything else; the count
-     of times you marked a plan done stays as it was
-Press Enter, or type q, at the menu to go back to the last prompt. Nothing is sent anywhere."""
+MENU_HELP = """Words you can type at the last prompt:
+  done  marks today's plan finished, then asks for the next one
+  plan  sets or changes today's plan
+  menu  opens these options
+  q     closes the window, and so does Enter
+At a plan prompt, same brings back your earlier unfinished plan.
+When it asks "Did you do it?", n means not yet, and you can keep the
+plan for today. q closes from any question.
+In this menu, 1 shows what is saved and 7 forgets one finished plan.
+Type m to hear the options again. Nothing is sent anywhere."""
+
+
+# A thought that shares one of these with the day's tip moves on by one, so
+# one screen never has two lines about the same body part.
+TOPICS = ("shoulder", "jaw", "neck", "eye", "water", "breath", "posture",
+          "stretch", "wrist")
+
+
+def todays_pair(d):
+    """The day's thought and tip. Everyone gets the same pair on the same day."""
+    tip = TIPS[d.toordinal() % len(TIPS)]
+    i = (d.toordinal() + 37) % len(THOUGHTS)
+    while any(w in tip.lower() and w in THOUGHTS[i].lower() for w in TOPICS):
+        i = (i + 1) % len(THOUGHTS)
+    return THOUGHTS[i], tip
 
 
 def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return HELP + "\n\nhello.cmd is in this folder:\n  " + here
 
-VERSION = "1.19.0"
+VERSION = "1.20.0"
 MAX_VISITS = 400
 MAX_FILE = 1_000_000
 YES = ("y", "yes", "yep", "ya", "yeah", "done")
 # The sign-in offer starts something, so a stray "done" must not count.
 STRICT_YES = ("y", "yes", "yep", "ya", "yeah")
-MAX_OFFER_SKIPS = 3
+MAX_OFFER_SKIPS = 1
 NO = ("n", "no", "nope", "not yet")
 
 # The tests set these after importing the module, to run against a fixed date,
@@ -295,6 +310,13 @@ TODAY = None
 HOME = None
 STARTUP_DIR = None
 FORCE_INTERACTIVE = False
+
+
+class Quit(Exception):
+    """The person typed q at a question, so the window closes."""
+
+
+QUIT_WORDS = ("q", "quit", "exit")
 
 
 class OutputClosed(Exception):
@@ -337,7 +359,7 @@ def new_state():
 
 
 MAX_PLAN = 120
-SAVED_PLAN = "Saved. Type done when you finish it, or it asks tomorrow."
+SAVED_PLAN = "Saved. Type done when you finish it, or it asks next time you open this."
 MAX_FINISHED = 7
 SHOWN_AFTER_DONE = 3
 
@@ -455,9 +477,13 @@ def load(repair=True):
             text = clean(intent["text"])
             if text:
                 state["intent"] = {"text": text, "date": day(intent.get("date"))}
-                waits = intent.get("waits")
-                if isinstance(waits, int) and not isinstance(waits, bool) and 0 < waits < 10:
-                    state["intent"]["waits"] = waits
+                # The day it was first set, kept while it is carried over.
+                try:
+                    since = day(intent.get("since"))
+                    if since < state["intent"]["date"]:
+                        state["intent"]["since"] = since
+                except ValueError:
+                    pass
     except ValueError:
         pass
     finished = []
@@ -635,6 +661,8 @@ def ask_choice(prompt, yes, no, hint, tries=3):
         text = answer.lower().strip(" .!")
         if not text:
             return ""
+        if text in QUIT_WORDS:
+            raise Quit
         if text in yes:
             return "yes"
         if text in no:
@@ -655,13 +683,16 @@ def wrapped(prefix, text):
 
 
 def in_a_row(visits, d):
-    """Count visits back from today where each is within 3 days of the next."""
+    """Count visits back from today where each is within 4 days of the next.
+
+    Four days lets a Friday off and a weekend pass without breaking it.
+    """
     days = [datetime.date.fromisoformat(v) for v in visits]
     days = [x for x in days if x <= d] + [d]
     days = sorted(set(days))
     n = 1
     for later, earlier in zip(days[:0:-1], days[-2::-1], strict=True):
-        if (later - earlier).days > 3:
+        if (later - earlier).days > 4:
             break
         n += 1
     return n
@@ -697,8 +728,7 @@ def remind(on):
             say("Could not set up the reminder.")
             return False
         say("Done. hello-world will open once a day when you sign in.")
-        say("To stop it, choose the reminder option again, or delete this file:")
-        say("  " + path)
+        say("To stop it, choose option 2 in the menu.")
         return True
     else:
         try:
@@ -717,8 +747,11 @@ def show_saved(state, full=True):
     d = today()
     recent = [v for v in state["visits"]
               if 0 <= (d - datetime.date.fromisoformat(v)).days <= 6]
-    say("Saved on this computer in:")
-    say("  " + data_file())
+    if full:
+        say("Saved on this computer in:")
+        say("  " + data_file())
+    else:
+        say("Saved in your own user folder on this computer.")
     say(f"Days you opened hello-world: {len(state['visits'])}"
         f" (last 7 days: {len(recent)})")
     if state.get("done"):
@@ -726,7 +759,7 @@ def show_saved(state, full=True):
     if state["intent"]:
         say(wrapped("Your current plan: ", state["intent"]["text"]))
     if state.get("previous"):
-        say(wrapped("Your plan before that: ", state["previous"]))
+        say(wrapped("Earlier plan (for same): ", state["previous"]))
     show_finished(state)
     say("In-a-row line: " + ("shown." if state["streak"] else "hidden."))
     say("It never leaves this computer. Others who can read this computer's")
@@ -1012,25 +1045,36 @@ def forget_finished(state, can_save):
 
 
 def menu(state, can_save=True, iso=None):
+    # The options are read out once. After that only the prompt comes back,
+    # and m lists them again.
+    listed = False
     while True:
         say()
-        say("Options")
-        say("  1  Show what is saved on this computer")
         reminding = startup_file() and os.path.exists(startup_file())
-        say("  2  " + ("Turn off: open once a day at sign-in (now on)"
-                       if reminding else
-                       "Turn on: open once a day at sign-in (now off)"))
-        say("  3  " + ("Hide the in-a-row line (now shown)"
-                       if state["streak"] else
-                       "Show the in-a-row line (now hidden)"))
-        say("  4  Delete everything saved")
-        say("  5  Help")
-        say("  6  Set or change today's plan")
-        say("  7  Forget one finished plan")
-        say("  Enter  Back to the last prompt")
-        choice = ask("Choose 1 to 7, or Enter to go back > ")
+        if not listed:
+            say("Options")
+            say("  1  Show what is saved on this computer")
+            say("  2  " + ("Turn off: open once a day at sign-in (now on)"
+                           if reminding else
+                           "Turn on: open once a day at sign-in (now off)"))
+            say("  3  " + ("Hide the in-a-row line (now shown)"
+                           if state["streak"] else
+                           "Show the in-a-row line (now hidden)"))
+            say("  4  Delete everything saved")
+            say("  5  Help")
+            say("  6  Set or change today's plan")
+            say("  7  Forget one finished plan")
+            say("  Enter  Back to the last prompt")
+            listed = True
+            choice = ask("Choose 1 to 7, or Enter to go back > ")
+        else:
+            choice = ask("Choose 1 to 7, m to list the options, or Enter to "
+                         "go back > ")
         if not choice or choice.lower() in ("q", "quit", "exit"):
             return
+        if choice.lower() in ("m", "menu", "list"):
+            listed = False
+            continue
         if choice.lower() in ("help", "?", "h"):
             choice = "5"
         if choice == "1":
@@ -1076,8 +1120,8 @@ def menu(state, can_save=True, iso=None):
 def offer_reminder(state, can_save, planned=False):
     """Ask whether to open at sign-in, right after a plan or from visit two on.
 
-    Only a clear no is final. Enter or an unclear answer asks again on a later
-    visit, up to MAX_OFFER_SKIPS times in all.
+    It is asked once. Enter is final too, and an unclear answer asks again on
+    a later visit.
     """
     path = startup_file()
     if (not path or state.get("offered") or os.path.exists(path)
@@ -1085,9 +1129,9 @@ def offer_reminder(state, can_save, planned=False):
         return
     answer = ask_choice(
         "Want it to open once a day when you sign in so it can ask about "
-        "your plan? (y or n, Enter to ask later) > ",
+        "your plan? (y or n, Enter for not now) > ",
         STRICT_YES, ("n", "no", "nope", "no thanks", "never", "stop"),
-        "Type y or n, or press Enter to be asked later.")
+        "Type y or n, or press Enter for not now.")
     if answer is None:
         say("That was not understood. It will ask again on a later visit.")
         return
@@ -1108,7 +1152,7 @@ def offer_reminder(state, can_save, planned=False):
         state["offer_skips"] = skips
         if skips >= MAX_OFFER_SKIPS:
             state["offered"] = True
-            say("Okay. It will not ask again. Menu option 2 turns it on.")
+            say("Okay. It won't ask again. Menu option 2 turns it on.")
         else:
             say("Okay. It will ask again on a later visit. Type n to stop it.")
     if not commit(state, base, can_save):
@@ -1117,8 +1161,9 @@ def offer_reminder(state, can_save, planned=False):
 
 
 def finish_plan(state, text, d):
-    """Count a finished plan and keep its words for `same`."""
-    state["previous"] = text
+    """Count a finished plan, dated d. `same` only ever holds unfinished plans."""
+    if state.get("previous") == text:
+        state.pop("previous")
     state["done"] = min(state.get("done", 0) + 1, 99999)
     state["finished"] = (state.get("finished", [])
                          + [{"text": text, "date": d.isoformat()}])[-MAX_FINISHED:]
@@ -1161,7 +1206,6 @@ def daily(startup):
     person = interactive()
     seen_today = iso in state["visits"]
     typed_new = False
-    finished_now = False
     answered = False
     if startup and seen_today:
         return
@@ -1170,7 +1214,9 @@ def daily(startup):
     if intent and intent["date"] > iso:
         intent["date"] = iso  # the clock moved back; it is today's plan now
     expired = False
-    if intent and (d - datetime.date.fromisoformat(intent["date"])).days > 14:
+    # A plan kept day after day still counts from the day it was first set.
+    since = intent.get("since", intent["date"]) if intent else None
+    if intent and (d - datetime.date.fromisoformat(since)).days > 14:
         state["previous"] = intent["text"]
         intent, expired = None, True
 
@@ -1179,8 +1225,8 @@ def daily(startup):
     say()
 
     if expired:
-        para("Your plan from over two weeks ago was cleared. Type same at the "
-             "plan prompt to bring it back.")
+        para("Your plan from over two weeks ago was put away. Type same at "
+             "the plan prompt to bring it back.")
         say()
 
     if first:
@@ -1189,7 +1235,7 @@ def daily(startup):
         say()
         para("Welcome. Each day this gives you one thought and one small "
              "thing to try. Everyone sees the same ones on the same day. If "
-             "you type a plan for today, it asks tomorrow how it went.")
+             "you type a plan for today, it asks next time how it went.")
         say()
         para("It saves a few notes on this computer, in your own user folder, "
              "and sends nothing anywhere. Do not type passwords or private "
@@ -1208,78 +1254,91 @@ def daily(startup):
             say(f"You have opened this {row} times in a row. Nice to see you.")
             say()
 
-    if not seen_today and intent and intent["date"] < iso:
-        say(wrapped("Last time you planned: ", intent["text"]))
-        answer = ask_choice(
-            "Did you do it? (y for yes, n for not yet, Enter to skip) > ",
-            YES, NO, "Type y or n, or press Enter to skip.")
-        if answer == "yes":
-            finish_plan(state, intent["text"], d)
-            finished_now = True
-            intent = None
-        elif answer == "no" and intent.get("waits", 0) >= 1:
-            answered = True
-            state["previous"] = intent["text"]
-            intent = None
-            para("That plan has waited a while, so it is put away and won't be "
-                 "asked about again. Type same at the plan prompt to bring it "
-                 "back.")
-        elif answer == "no":
-            answered = True
-            keep = ask_choice(
-                "That is fine. Keep it for today? (y or n, Enter to keep it) > ",
-                STRICT_YES + ("not yet",), ("n", "no", "nope"),
-                "Type y to keep it, n to clear it, or press Enter to keep it.")
-            if keep == "no":
-                state["previous"] = intent["text"]
-                intent = None
-                say("Cleared. It stays as same until you delete everything.")
-            else:
-                intent = {"text": intent["text"], "date": iso,
-                          "waits": intent.get("waits", 0) + 1}
-                say("Kept for today.")
-        elif answer is None and person:
-            say("That was not understood. Your plan is left as it was.")
-        elif answer is not None:
-            say("Left as it was.")
-        say()
-
-    say("Thought for today:")
-    say(indent(THOUGHTS[(d.toordinal() + 37) % len(THOUGHTS)]))
-    say()
-    say("Try this today:")
-    say(indent(TIPS[d.toordinal() % len(TIPS)]))
-    say()
-
-    if intent and intent["date"] == iso:
-        say(wrapped("Your plan for today: ", intent["text"]))
-        say()
-    elif seen_today and intent:
-        # Left unanswered this morning; it must not vanish on a second open.
-        when = long_date(datetime.date.fromisoformat(intent["date"]))
-        say(wrapped(f"Still open from {when}: ", intent["text"]))
-        say()
-    elif not seen_today:
-        skip = ("(Enter to skip)" if not intent else
-                "(A plan typed here replaces the old one. Enter to skip)")
-        if state.get("previous") and not intent:
-            say(wrapped("Earlier plan: ", state["previous"]))
-            skip = "(Type same to reuse it, or Enter to skip)"
-        text = ask("What is one thing you want to get done today?\n"
-                   + skip + " > ")
-        if (text or "").lower() == "same" and not state.get("previous"):
-            say("There is no earlier plan to reuse yet. Nothing was saved.")
-            text = ""
-        elif is_command(text):
-            text = ""
-        if text:
-            text = typed_plan(reuse(state, text))
-            if text:
-                if intent and intent["text"] != text:
+    quitting = False
+    try:
+        if not seen_today and intent and intent["date"] < iso:
+            say(wrapped("Last time you planned: ", intent["text"]))
+            answer = ask_choice(
+                "Did you do it? (y for yes, n for not yet, Enter to skip) > ",
+                YES, NO, "Type y or n, or press Enter to skip.")
+            if answer == "yes":
+                answered = True
+                # Dated to the day it was planned for, which is when it was
+                # most likely done, and saved now so the answer is heard now.
+                finish_plan(state, intent["text"],
+                            datetime.date.fromisoformat(intent["date"]))
+                state["intent"] = None
+                if commit(state, base, can_save):
+                    base = copy.deepcopy(state)
+                    intent = None
+                    for line in done_lines(state, d):
+                        say(line)
+                    show_finished(state, SHOWN_AFTER_DONE)
+                else:
+                    undo(state, base)
+                    say("Could not save that on this computer. Your answer was "
+                        "not counted.")
+            elif answer == "no":
+                answered = True
+                keep = ask_choice(
+                    "That is fine. Keep it for today? (y or n, Enter to keep it) > ",
+                    STRICT_YES + ("not yet",), ("n", "no", "nope"),
+                    "Type y to keep it, n to clear it, or press Enter to keep it.")
+                if keep == "no":
                     state["previous"] = intent["text"]
-                intent = {"text": text, "date": iso}
-                typed_new = True
+                    intent = None
+                    say("Cleared. Type same at a plan prompt if you want it back.")
+                else:
+                    intent = {"text": intent["text"], "date": iso,
+                              "since": intent.get("since", intent["date"])}
+                    say("Kept for today.")
+            elif answer is None and person:
+                say("That was not understood. Your plan is left as it was.")
+            elif answer is not None:
+                say("Left as it was.")
+            say()
+
+        thought, tip = todays_pair(d)
+        say("Thought for today:")
+        say(indent(thought))
         say()
+        say("Try this today:")
+        say(indent(tip))
+        say()
+
+        if intent and intent["date"] == iso:
+            say(wrapped("Your plan for today: ", intent["text"]))
+            say()
+        elif seen_today and intent:
+            # Left unanswered this morning; it must not vanish on a second open.
+            when = long_date(datetime.date.fromisoformat(intent["date"]))
+            say(wrapped(f"Still open from {when}: ", intent["text"]))
+            say()
+        elif not seen_today:
+            skip = ("(Enter to skip)" if not intent else
+                    "(A plan typed here replaces the old one. Enter to skip)")
+            if state.get("previous") and not intent:
+                say(wrapped("Earlier plan: ", state["previous"]))
+                skip = "(Type same to reuse it, or Enter to skip)"
+            text = ask("What is one thing you want to get done today?\n"
+                       + skip + " > ")
+            if (text or "").lower().strip(" .!") in QUIT_WORDS:
+                raise Quit
+            if (text or "").lower() == "same" and not state.get("previous"):
+                say("There is no earlier plan to reuse yet. Nothing was saved.")
+                text = ""
+            elif is_command(text):
+                text = ""
+            if text:
+                text = typed_plan(reuse(state, text))
+                if text:
+                    if intent and intent["text"] != text:
+                        state["previous"] = intent["text"]
+                    intent = {"text": text, "date": iso}
+                    typed_new = True
+            say()
+    except Quit:
+        quitting = True
 
     # With nobody at the keyboard, such as a launch with no console, show the
     # screen but keep today's questions for the next real visit.
@@ -1289,25 +1348,27 @@ def daily(startup):
         state["intent"] = intent
         # A plan only tidied here (a future date made today, an old plan
         # cleared) must not overwrite one the other window saved meanwhile.
-        soft = () if finished_now or answered or typed_new else ("intent",
-                                                                 "previous")
+        soft = () if answered or typed_new else ("intent", "previous")
         if not commit(state, base, can_save, soft):
             undo(state, base)
             intent = state["intent"]
             say("Your notes could not be saved on this computer. This screen "
                 "still works.")
-            if finished_now:
-                say("Your answer was not counted.")
         else:
             intent = state["intent"]
-            if finished_now:
-                for line in done_lines(state, d):
-                    say(line)
             if typed_new:
                 say(SAVED_PLAN)
                 say()
-            if not seen_today:
-                offer_reminder(state, can_save, planned=typed_new)
+            if not seen_today and not quitting:
+                try:
+                    offer_reminder(state, can_save, planned=typed_new)
+                except Quit:
+                    quitting = True
+                # The offer re-reads the file, so pick up the plan it read.
+                intent = state["intent"]
+    if quitting:
+        say("Closing.")
+        return
 
     # A message at the very end must stay on screen until the person has read
     # it, because the window closes as soon as the program exits.
@@ -1331,7 +1392,11 @@ def daily(startup):
             intent = state["intent"]
             continue
         elif answer in ("m", "menu", "h", "help", "?"):
-            menu(state, can_save, iso)
+            try:
+                menu(state, can_save, iso)
+            except Quit:
+                say("Closing.")
+                break
             intent = state["intent"]
             continue
         elif answer in ("q", "quit", "exit", "x", "close"):

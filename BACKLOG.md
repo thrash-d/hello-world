@@ -14,12 +14,14 @@ Changes considered and declined, with the reason. On 2 October 2026 the list fro
 - Not counting the sign-in `--startup` window as a visit: it would change what "in a row" means.
 - Skip repairing a damaged file when nobody can see the screen: the file is set aside as a backup, never deleted.
 - Ctrl+C ending the whole visit: Ctrl+C skips one prompt, which is safer for someone who pressed it by accident.
-- Prompts that end in `:` instead of ` > `: the Narrator pass on 1.16.0 passed with the current prompts.
+- Prompts that end in `:` instead of ` > `: the Narrator pass on 1.16.0 passed with the current prompts. The simulated pilot's NVDA user said `>` is spoken as "greater". It's unclear whether NVDA does that at its default punctuation level, so a real NVDA check decides it before every prompt changes.
 - Renumbering the menu or a "Mark done" menu item: renumbering breaks saved habits, and `done` at the last prompt covers it.
 - Keeping direction marks in plan text: they can reorder text on screen.
 - Forcing UTF-8 output: Python already writes Unicode to a Windows console whatever the code page, and forcing it would change the bytes piped output and the tests read.
 - Stopping the review rounds, or freezing the program after a weak pilot (Round 44 panel): the project exists for steady improvement through review, and the rounds cost nothing. A weak pilot steers what the next rounds work on.
 - Python 2, or Python before 3.6: f-strings fail closed with a `SyntaxError`.
+
+- Reaching people on their laptop on site days (simulated pilot): installing it on the laptop is IT's call, not a program change.
 
 ## Claims that turned out wrong or already true
 

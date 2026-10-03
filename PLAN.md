@@ -15,7 +15,7 @@ Ranked from a design review of the first version, then built:
 | Something fresh and warm | 100 original short thoughts, chosen by date; they repeat every 100 days | Done |
 | One thing with real personal use: a plan, then a follow-up | One optional plan a day, and more after `done`. Next day: "Did you do it?" with y, n or Enter. "Not yet" offers to keep it for today, so nothing is retyped | Done |
 | Welcome, never guilt | After a gap of more than a week it says "Welcome back". No word like missed, lost or broke appears. Skipping everything is normal | Done |
-| A quiet sense of continuity | An "in a row" line at the 3rd, 7th and 14th visit, then every 30th, counting any visit within three days of the last. Off with one menu choice | Done |
+| A quiet sense of continuity | An "in a row" line at the 3rd, 7th and 14th visit, then every 30th, counting any visit within four days of the last. Off with one menu choice | Done |
 | It is easy to find | Start menu entry with an icon and description, and an optional once-a-day sign-in launcher that the employee turns on and off themselves | Done |
 
 ## What was kept out on purpose
@@ -67,8 +67,13 @@ sandbox, and it passed:
 - A real console with Narrator.
 - One install, one reinstall, an interrupted install and an uninstall.
 - Two real windows that both finish a plan while one of them uses Delete
-  everything. Piped tests never leave a second process waiting at a prompt,
-  so only this pass proves the two-window merge.
+  everything. Since 1.19.0 an automated test also runs two real processes at
+  once.
+
+For 1.19.0 the owner ran the spare-PC gate, and it passed: an install of
+1.18.0, an upgrade to 1.19.0 with the commit and install date in the Apps
+entry, a forced step 6 failure that put the old install back, and a smoke run
+as a standard user.
 
 Run the same gate again before a release that changes saving, the installer
 or the uninstaller. Not recorded as checked: console input outside ASCII, the
@@ -76,6 +81,10 @@ shortcut's `if errorlevel 1 pause` line, and removing launchers from several
 user profiles.
 
 ## Pilot
+
+A simulated 30-day pilot ran on 1.19.0, and 1.20.0 answers what it found.
+`docs/PILOT.md` has the method, the findings and the changes. A pilot with
+real employees can still follow, run the same way:
 
 Five employees use it for 30 days, and at least one of them uses NVDA,
 Magnifier or voice control.

@@ -29,19 +29,26 @@ At the last prompt:
 - Type `done` when you finish today's plan. It shows your last three finished
   plans, then asks for the next one. Enter there closes.
 - Type `plan` to set or change today's plan. At any plan prompt, `same`
-  reuses the earlier plan.
+  brings back your earlier plan if you didn't finish it. A finished plan is
+  never offered back.
 - Type `menu` (or `m`) for the options: see what is saved, open once a day at
   sign-in, hide the "in a row" line, delete everything, help, set today's plan,
-  and forget one finished plan. Enter at the menu goes back.
+  and forget one finished plan. The options are read once; type `m` to hear
+  them again. Enter at the menu goes back.
 
-If you don't type `done`, the next day asks "Did you do it?". Answering "not
-yet" once keeps the plan for today. The second time, it puts the plan away
-without asking again, and `same` brings it back. A plan older than two weeks is
-put away the same way.
+`q` closes the window from any question, and today's visit still counts.
+
+If you don't type `done`, the next day asks "Did you do it?". A yes is
+counted on the spot, dated the day the plan was for. "Not yet" lets you keep
+the plan for today, as many days as you need. A plan first set more than two
+weeks ago is put away, and `same` brings it back.
 
 The "in a row" line shows only on your 3rd, 7th and 14th visit in a row, then
-every 30th. A visit within three days of the last one counts, so weekends and
-days off don't break it. You can turn it off in the menu.
+every 30th. A visit within four days of the last one counts, so weekends and
+a day off don't break it. You can turn it off in the menu.
+
+The first time you open it, it asks once whether to open by itself when you
+sign in. Whatever you answer, menu option 2 changes it later.
 
 Everything works from the keyboard with plain text, in one top-to-bottom flow,
 so a screen reader reads it in order. Each prompt ends by saying what Enter
@@ -81,7 +88,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.19.0'
+$tag = 'v1.20.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
@@ -149,3 +156,4 @@ Get-ItemProperty HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\hello
 - `PLAN.md`: the value and rollout plan.
 - `TODO.md`: what a six-voice panel agreed should be done next.
 - `docs/WHY-DAILY-ACTIONS.md`: why it changed from a greeting to a daily program.
+- `docs/PILOT.md`: the simulated 30-day pilot and what it changed.

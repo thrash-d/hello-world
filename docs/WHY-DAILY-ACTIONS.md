@@ -58,7 +58,7 @@ The honest levers for retention are:
 | 100 original thoughts and 100 small actions, chosen by date | Everyone sees the same line on the same day; the lists repeat every 100 days. Actions are safe, take under five minutes, and don't assume a desk, a car or a level of ability. |
 | An optional daily plan with a next-day follow-up | The only feature with real personal use. Only a clear yes or no changes the plan, and "not yet" offers to keep it for today so nothing is retyped. |
 | "Welcome back" after a gap; no word like missed, lost or broke | Returning feels good. Skipping everything is normal. |
-| An in-a-row line at the 3rd, 7th and 14th visit, then every 30th | Quiet continuity without a number that climbs daily. A visit within three days of the last keeps it going, so weekends and days off don't matter. One menu choice turns it off. |
+| An in-a-row line at the 3rd, 7th and 14th visit, then every 30th | Quiet continuity without a number that climbs daily. A visit within four days of the last keeps it going, so weekends and days off don't matter. One menu choice turns it off. |
 | A menu on `m`: see saved data, sign-in launcher on or off, in-a-row line, delete everything | People who never type commands can still reach every option. |
 | An opt-in sign-in launcher in the user's own Startup folder | Helps people who want it, with no administrator rights, and is never on by default. |
 | First-run welcome with a plain statement of what is saved | Honest from the first screen. |
