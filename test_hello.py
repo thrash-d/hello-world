@@ -1028,7 +1028,7 @@ def test_done_with_no_plan_says_so_and_done_is_not_offered():
 
 def test_menu_accepts_q_and_help_and_names_a_wrong_word():
     p = run(text="\nm\nbanana\nhelp\nq\n")
-    assert 'Sorry, "banana" is not one of the choices. Type 1 to 10' in p.stdout
+    assert 'Sorry, "banana" is not one of the choices. Type 1 to 11' in p.stdout
     assert "Words you can type at the last prompt" in p.stdout
     assert p.returncode == 0
 
@@ -1980,9 +1980,10 @@ def _screen_keys():
     hello = _load_hello()
     with open(HELLO, encoding="utf-8") as f:
         tree = ast.parse(f.read())
+    # t() is tr() in content_problems() and check_content() under --local.
     keys = [n.args[0].value for n in ast.walk(tree)
-            if isinstance(n, ast.Call) and getattr(n.func, "id", "") == "tr"
-            and isinstance(n.args[0], ast.Constant)]
+            if isinstance(n, ast.Call) and getattr(n.func, "id", "") in ("tr", "t")
+            and n.args and isinstance(n.args[0], ast.Constant)]
     keys += [hello.HELP, hello.MENU_HELP, hello.SAVED_PLAN, hello.GREETING]
     # say() doesn't wrap, so what it prints as is must fit 72 columns, less
     # the "  2  " in front of a menu line.
@@ -2005,7 +2006,8 @@ def test_every_language_translates_every_screen_string():
         # A key no call uses is a translation nobody sees.
         assert set(text) == keys, (code, sorted(keys ^ set(text))[:3])
         for en, t in text.items():
-            assert re.findall(r"\{\w+\}", en) == re.findall(r"\{\w+\}", t), (code, en)
+            # Word order differs between languages, so only the set must match.
+            assert sorted(re.findall(r"\{\w+\}", en)) == sorted(re.findall(r"\{\w+\}", t)), (code, en)
             assert en.endswith("> ") == t.endswith("> "), (code, en)
         for en, prefixed in raw.items():
             for t in (en, text[en]):
@@ -2716,3 +2718,86 @@ def test_each_user_has_their_own_reminder_task_name():
     hello = _load_hello()
     assert hello.TASK_NAME.startswith("hello-world reminder ")
     assert hello.TASK_NAME != "hello-world reminder "
+
+
+def test_a_longer_history_numbers_week_and_export():
+    first = run(["--set", "long_history", "on"])
+    run(["--set", "numbers", "on"], home=first.home)
+    for n in range(1, 10):
+        run(text=f"Plan {n}\ndone\n\n", home=first.home, day=f"2026-10-0{n}")
+    saved = notes(first.home)
+    assert len(saved["finished"]) == 9 and saved["opens"] == 9
+    assert saved["best_run"] == 9
+    p = run(["--numbers"], home=first.home, day="2026-10-09")
+    assert "Days you opened hello-world: 9" in p.stdout
+    p = run(["--week"], home=first.home, day="2026-10-09")
+    assert "This week you finished 5:" in p.stdout and "Plan 5" in p.stdout
+    hello = _load_hello("2026-10-09")
+    hello.HOME, hello.EXPORT_DIR = first.home, mkdtemp()
+    path = hello.export_plans(hello.load()[0])
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    assert text.startswith("# hello-world") and "- 2026-10-09: Plan 9" in text
+
+
+def test_the_done_count_and_finished_list_can_be_switched_off():
+    first = run(["--set", "no_count", "on"])
+    run(["--set", "hide_finished", "on"], home=first.home)
+    p = run(text="Call Ana\ndone\n\n", home=first.home)
+    assert "Finished lately" not in p.stdout
+    assert "done" not in notes(first.home) and notes(first.home)["finished"]
+    assert run(["--set", "nonsense", "on"], home=first.home).returncode == 2
+
+
+def test_same_can_expire_after_30_days():
+    first = run(["--set", "expire_same", "on"])
+    run(text="Old plan\n\n", home=first.home, day="2026-10-01")
+    run(text="n\nn\n\n\n", home=first.home, day="2026-10-02")
+    assert notes(first.home)["previous"] == "Old plan"
+    assert notes(first.home)["previous_date"] == "2026-10-02"
+    p = run(text="\n\n", home=first.home, day="2026-11-15")
+    assert "Earlier plan" not in p.stdout and "previous" not in notes(first.home)
+
+
+def test_prompts_can_end_in_a_colon_and_close_after_the_next_plan():
+    first = run(["--set", "colon_prompts", "on"])
+    p = run(text="\n\n", home=first.home)
+    assert "Enter to close:" in p.stdout and "close >" not in p.stdout
+    first = run(["--set", "close_after_done", "on"])
+    p = run(text="Plan A\ndone\nPlan B\n", home=first.home)
+    assert p.returncode == 0 and notes(first.home)["intent"]["text"] == "Plan B"
+    assert p.stdout.count("Type done, plan or menu, or Enter to close") == 1
+
+
+def test_direction_marks_stay_and_overrides_go():
+    hello = _load_hello()
+    assert hello.tidy("a\u200fb") == "a\u200fb"
+    assert hello.tidy("a\u202eb") == "ab"
+
+
+def test_check_content_can_answer_in_the_persons_language():
+    path = os.path.join(mkdtemp(), "content.json")
+    with open(path, "w") as f:
+        f.write("not json")
+    assert "isn't valid JSON" in run(["--check-content", path], lang="es").stdout
+    p = run(["--check-content", path, "--local"], lang="es")
+    assert "no es JSON válido" in p.stdout
+    assert run(["--plain-local"], lang="es").stdout.strip() == "¡Hola, mundo!"
+    assert run(["--plain"], lang="es").stdout.strip() == "Hello, world!"
+
+
+def test_the_text_menu_marks_todays_plan_done():
+    first = run(text="Plan A\n\n")
+    p = run(text="m\n11\n\n\n", home=first.home)
+    assert "Mark today's plan done" in p.stdout
+    assert notes(first.home)["done"] == 1
+
+
+def test_an_old_sign_in_value_is_rewritten():
+    startup = mkdtemp()
+    path = os.path.join(startup, "hello-world-daily.cmd")
+    with open(path, "w") as f:
+        f.write('@echo off\r\ncmd /d /c if exist "x\\hello.cmd" start "" hello.cmd --startup\r\n')
+    run(text="\n\n", startup=startup)
+    with open(path) as f:
+        assert "hello.cmd" not in f.read()

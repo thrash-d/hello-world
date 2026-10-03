@@ -61,7 +61,8 @@ The lines are meant to be timeless, so the rules keep the file from becoming
 an announcement channel: no links or email addresses, no dates or month
 names, no control characters. The build stops on a file that breaks a rule
 and lists each problem. To check a file first, run
-`hello.cmd --check-content <file>`.
+`hello.cmd --check-content <file>`, or add `--local` for the answer in the
+Windows display language.
 
 The file becomes `content.json` in the package, covered by `SHA256SUMS` and
 the package hash, so the content is reviewed and signed off with the rest of

@@ -10,27 +10,11 @@ opt-in setting or policy with the safe default kept.
 
 Employees:
 - Built-in tips for shift and floor work, as a second list people can choose.
-- A longer history of finished plans, a weekly recap, and a Markdown export.
-- A switch to hide the finished list, `same` that expires after 30 days, and
-  the done count as an opt-in.
-- Visit counts, a best run of days, and a total, as opt-in "my numbers".
-- Closing the text screen after `done` and the next plan, as an option.
-- Window messages announced to screen readers as they change (UI Automation
-  live region).
-- `same` that knows which parts of an earlier plan were finished.
-- Prompts ending in `:` instead of ` > `, as a setting.
-- A "Mark done" item in the text menu.
-- Left-to-right and right-to-left marks kept in plan text, with the override
-  characters still removed.
-- `--utf8` to force UTF-8 output.
-- `--plain` and `--check-content` in the person's language, behind an option.
-- `retomar` as a second Spanish word for `same`.
 - Organization content per language: `content.es.json` and the rest.
 - Regional variants: Canadian French, European Portuguese.
 - Chinese, Japanese, Korean, Arabic and Hebrew in the window, which draws
   them, with the text screen staying in English for those.
 - Translations in their own files next to `hello.py`.
-- Rewriting a 1.23.0 to 1.27.0 sign-in value to the current one.
 
 For IT:
 - Removing the program for one person without an administrator: hiding it
