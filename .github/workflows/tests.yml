@@ -1,6 +1,6 @@
 # Runs the test suite on Windows, where the program ships, and on Linux, with
-# the oldest and newest Python it supports. Actions are pinned to a commit so
-# a moved tag can't change what runs.
+# the oldest and newest Python it supports. Actions are pinned to a commit and
+# tools to a version, so a moved tag or a new release can't change what runs.
 name: tests
 
 on:
@@ -18,20 +18,26 @@ jobs:
         os: [windows-latest, ubuntu-latest]
         python: ["3.11", "3.14"]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python }}
       - run: python test_hello.py
       - run: |
-          python -m pip install pytest
+          python -m pip install pytest==9.1.1
           python -m pytest -q test_hello.py
 
   powershell:
     runs-on: windows-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Parse and lint the scripts under Windows PowerShell 5.1
         shell: powershell
         run: |
@@ -41,6 +47,25 @@ jobs:
             [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f), [ref]$null, [ref]$errors)
             if ($errors) { $errors | Out-String | Write-Host; throw "$f does not parse." }
           }
-          Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
+          Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser -Force
           $found = foreach ($f in 'install.ps1', 'uninstall.ps1') { Invoke-ScriptAnalyzer -Path $f -Severity Error }
           if ($found) { $found | Format-Table -AutoSize | Out-String | Write-Host; throw 'PSScriptAnalyzer found errors.' }
+      # A dead URL or a wrong hash would pass every other check and fail every
+      # real install at step 4, so run what the installer will run.
+      - name: Check the pinned Python and run hello.py on it
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $src = Get-Content -Raw install.ps1
+          $url = [regex]::Match($src, "(?m)^\`$pyUrl = '([^']+)'").Groups[1].Value
+          $sha = [regex]::Match($src, "(?m)^\`$pySha256 = '([0-9A-Fa-f]{64})'").Groups[1].Value
+          if (-not $url -or -not $sha) { throw 'Could not read $pyUrl and $pySha256 from install.ps1.' }
+          $zip = Join-Path $env:RUNNER_TEMP 'python-embed.zip'
+          Invoke-WebRequest $url -OutFile $zip -UseBasicParsing
+          if ((Get-FileHash -LiteralPath $zip).Hash -ne $sha) { throw "The download from $url doesn't match the pinned SHA-256." }
+          $py = Join-Path $env:RUNNER_TEMP 'python'
+          Expand-Archive -LiteralPath $zip -DestinationPath $py
+          $out = & (Join-Path $py 'python.exe') -I hello.py --plain
+          if ($LASTEXITCODE -or "$out" -ne 'Hello, world!') { throw "hello.py --plain on the pinned Python gave exit $LASTEXITCODE`: $out" }
+          $version = & (Join-Path $py 'python.exe') -I hello.py --version
+          if ($version -ne "hello-world $((Get-Content VERSION).Trim())") { throw "--version gave '$version'." }

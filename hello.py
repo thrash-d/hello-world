@@ -10,6 +10,7 @@ could not be written or a command (--reset, --stats, --remind, --streak)
 failed, 2 for an unknown option.
 """
 import collections
+import contextlib
 import copy
 import datetime
 import json
@@ -17,6 +18,7 @@ import os
 import shutil
 import sys
 import textwrap
+import unicodedata
 import time
 
 DAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
@@ -65,15 +67,15 @@ TIPS = (
     'Breathe in for four counts and out for six, three times.',
     'Take one breath before reacting to the next small annoyance.',
     'Jot down one thing that made you laugh recently.',
-    'Notice one pleasant sound, scent or texture around you for a minute.',
+    'For one minute, notice something pleasant: a sound, a smell or something you touch.',
     'Recall a place you love and picture it for thirty seconds.',
     'Say "good enough for now" about one small task and move on.',
     'Write one sentence about something you are grateful for.',
     'Savor the next sip of your drink and notice the taste.',
-    'Give yourself a mini break between two tasks before jumping in.',
+    'Take a short break between two tasks before you start the next one.',
     'Look for one thing today that turns out better than you expected.',
     'Choose one word for how you want the afternoon to feel.',
-    'Let your thoughts drift for sixty seconds, then return to what is next.',
+    'Let your mind rest for sixty seconds, then go back to your next task.',
     'Notice your feet on the floor and feel steady for a moment.',
     'Remember one kind thing someone did for you and enjoy the memory.',
     'Jot down one idea you want to revisit later and let it rest.',
@@ -179,16 +181,16 @@ THOUGHTS = (
     'When a newcomer asks something obvious, remember that you once asked it too.',
     "Give credit out loud when a teammate's idea made your work better.",
     'Reply to a message with a bit of warmth. It costs nothing and lands softly.',
-    'Check in with the person who has gone quiet in meetings lately.',
+    'Talk to a colleague who has been quiet in meetings lately and ask how they are.',
     'Finish the thing that is nearly done before you start something new.',
-    'Done and good enough usually serves people better than perfect and still pending.',
+    'Finished and good enough is usually more useful than perfect and not finished.',
     'Close one open loop today and notice the small relief that follows.',
     'The last ten percent is often just a few careful minutes. Give them today.',
-    'Send the email that has been sitting in your drafts. It is probably fine as written.',
-    'Mark it complete, take a breath, and let it count for something.',
+    'Send the email that is waiting in your drafts. It is probably fine as it is.',
+    'Mark it complete, take a breath, and be pleased that it is done.',
     'A finished small thing is worth more than a half-finished big one.',
-    "Before you log off, jot tomorrow's first step on a note so you can leave lighter.",
-    'Reread once, fix what you spot, and then let it go out into the world.',
+    "Before you log off, write tomorrow's first step on a note so you don't have to remember it.",
+    'Read it once more, fix what you find, and then send it.',
     'Ending the day with one tidy result makes the evening feel lighter.',
     'Asking a question early usually saves an hour of quiet struggling later.',
     'Most people enjoy being asked for their knowledge. Ask without apologizing.',
@@ -234,12 +236,12 @@ THOUGHTS = (
 )
 
 DONE_LINES = (
-    "Good. That is one less thing to hold in your head.",
-    "Nice. It is good to finish a thing.",
-    "Well done. Take a moment before the next one.",
-    "Good. Small finished things add up.",
-    "That is done, and that is enough to be pleased about.",
-    "Good. You can put that one down now.",
+    "Good. That one is finished.",
+    "Nice. It is good to finish something.",
+    "Well done. Take a short break before the next one.",
+    "Good. Small finished tasks add up.",
+    "That is done. You can be pleased about it.",
+    "Good. That one is off your list.",
 )
 
 HELP = """hello-world prints a greeting, a thought, and a small thing to try.
@@ -255,7 +257,7 @@ You can also run hello.cmd with one of these:
   --stats         Show what is saved on this computer
   --reset         Delete everything saved (asks first)
   --remind on     Open once a day when you sign in (off to stop)
-  --streak off    Hide the in-a-row line (on to show it)
+  --streak off    Hide the days-in-a-row message (on to show it)
   --version       Show the version
   --help          Show this text
 
@@ -297,8 +299,9 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return HELP + "\n\nhello.cmd is in this folder:\n  " + here
 
-VERSION = "1.21.0"
+VERSION = "1.22.0"
 MAX_VISITS = 400
+KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
 YES = ("y", "yes", "yep", "ya", "yeah", "done")
 # The sign-in offer starts something, so a stray "done" must not count.
@@ -366,13 +369,29 @@ MAX_FINISHED = 7
 SHOWN_AFTER_DONE = 3
 
 
+# Controls, format marks such as bidi overrides, private-use and surrogate
+# code points go. Unassigned ones (Cn) stay, so emoji newer than the bundled
+# Python's Unicode tables survive.
+DROPPED = {"Cc", "Cf", "Co", "Cs", "Zl", "Zp"}
+MAX_MARKS = 4
+
+
 def tidy(text):
     """One printable line: tabs and odd spaces become spaces, controls go."""
     text = "".join(" " if c.isspace() else c for c in text)
-    # ZWNJ and ZWJ are Cf, not printable, but Persian, Indic scripts and emoji
-    # sequences need them.
-    text = "".join(c for c in text if c.isprintable() or c in "\u200c\u200d")
-    text = " ".join(text.split())
+    kept, marks = [], 0
+    for c in text:
+        kind = unicodedata.category(c)
+        # ZWNJ and ZWJ are format marks, but Persian, Indic scripts and emoji
+        # sequences need them.
+        if kind in DROPPED and c not in "\u200c\u200d":
+            continue
+        # A pile of combining marks on one letter draws over the lines above.
+        marks = marks + 1 if kind in ("Mn", "Me") else 0
+        if marks > MAX_MARKS:
+            continue
+        kept.append(c)
+    text = " ".join("".join(kept).split())
     # Nothing but joiners would show as an empty plan.
     return text if text.strip("\u200c\u200d ") else ""
 
@@ -455,7 +474,8 @@ def load(repair=True):
     # Changes only when everything is deleted. commit() compares it, so a
     # window opened before a delete can't write its old notes back.
     epoch = raw.get("epoch")
-    state["epoch"] = epoch if isinstance(epoch, str) and len(epoch) <= 64 else ""
+    state["epoch"] = (epoch if isinstance(epoch, str) and len(epoch) <= 64
+                      and all(c in "0123456789abcdef" for c in epoch) else "")
     skips = raw.get("offer_skips")
     if isinstance(skips, int) and not isinstance(skips, bool) and skips > 0:
         state["offer_skips"] = min(skips, MAX_OFFER_SKIPS)
@@ -474,7 +494,10 @@ def load(repair=True):
     # A visit dated after today comes from a clock that was wrong once. It
     # would sort last and hide every real visit, so it is dropped.
     now = today().isoformat()
-    state["visits"] = sorted(v for v in set(visits) if v <= now)[-MAX_VISITS:]
+    # Only recent visits are kept: enough for "welcome back" and the
+    # days-in-a-row count, and too few to read as an attendance record.
+    oldest = (today() - datetime.timedelta(days=KEEP_VISIT_DAYS)).isoformat()
+    state["visits"] = sorted(v for v in set(visits) if oldest <= v <= now)[-MAX_VISITS:]
     intent = raw.get("intent")
     try:
         if isinstance(intent, dict) and isinstance(intent.get("text"), str):
@@ -627,11 +650,21 @@ def interactive():
 
 
 def ask(prompt):
-    """Return the typed text, or None when nobody can answer."""
+    """Return the typed text, or None when nobody can answer.
+
+    A prompt longer than the window is wrapped, and only its last line is
+    left for the answer, so the choices never run off a magnified screen.
+    """
     if not interactive():
         return None
+    lines = []
+    for part in prompt.split("\n"):
+        lines += textwrap.wrap(part, width(), break_on_hyphens=False,
+                               break_long_words=False) or [""]
+    for line in lines[:-1]:
+        say(line)
     try:
-        return input(prompt).strip()
+        return input(lines[-1] + " ").strip()
     except KeyboardInterrupt:
         say()  # the prompt is still on this line; start the next one cleanly
         return None
@@ -705,6 +738,21 @@ def in_a_row(visits, d):
     return n
 
 
+def clear_launcher_temps(path):
+    """Remove temp copies a killed launcher write left in the Startup folder."""
+    folder, name = os.path.split(path)
+    try:
+        names = os.listdir(folder)
+    except OSError:
+        return
+    for n in names:
+        if n.startswith(name + ".") and n.endswith(".tmp"):
+            try:
+                os.remove(os.path.join(folder, n))
+            except OSError:
+                pass
+
+
 def remind(on):
     path = startup_file()
     if not path:
@@ -717,7 +765,8 @@ def remind(on):
             return False
         # Written whole and then moved into place, so a sign-in never runs a
         # half-written launcher.
-        tmp = path + ".tmp"
+        clear_launcher_temps(path)
+        tmp = f"{path}.{os.getpid()}.tmp"
         try:
             os.makedirs(os.path.dirname(path), exist_ok=True)
             with open(tmp, "w", encoding="ascii", newline="") as f:
@@ -738,6 +787,7 @@ def remind(on):
         say("To stop it, choose option 2 in the menu.")
         return True
     else:
+        clear_launcher_temps(path)
         try:
             os.remove(path)
         except FileNotFoundError:
@@ -759,8 +809,8 @@ def show_saved(state, full=True):
         say("  " + data_file())
     else:
         say("Saved in your own user folder on this computer.")
-    say(f"Days you opened hello-world: {len(state['visits'])}"
-        f" (last 7 days: {len(recent)})")
+    say(f"Days you opened it in the last {KEEP_VISIT_DAYS} days: "
+        f"{len(state['visits'])} (last 7 days: {len(recent)})")
     if state.get("done"):
         say(f"Times you marked a plan done: {state['done']}")
     if state["intent"]:
@@ -768,7 +818,11 @@ def show_saved(state, full=True):
     if state.get("previous"):
         say(wrapped("Earlier plan (for same): ", state["previous"]))
     show_finished(state)
-    say("In-a-row line: " + ("shown." if state["streak"] else "hidden."))
+    say("Days-in-a-row message: " + ("shown." if state["streak"] else "hidden."))
+    path = startup_file()
+    if path:
+        say("Opens by itself at sign-in: "
+            + ("on." if os.path.exists(path) else "off."))
     say("It never leaves this computer. Others who can read this computer's")
     say("files, such as IT staff, could read it.")
     if full:
@@ -786,6 +840,12 @@ def reset(state):
         if word in QUIT_WORDS:
             raise Quit
         return None
+    with file_lock():
+        return delete_everything(state)
+
+
+def delete_everything(state):
+    """The body of reset() once confirmed, run while holding the lock."""
     leftovers = [data_file()]
     failed = []
     listing_failed = False
@@ -829,6 +889,53 @@ def reset(state):
     return True
 
 
+@contextlib.contextmanager
+def file_lock():
+    """Hold notes.lock while a change reads and writes the file.
+
+    Without it, a delete in one window could land between another window's
+    read and write, and that write would bring the deleted notes back.
+    """
+    try:
+        os.makedirs(data_dir(), mode=0o700, exist_ok=True)
+        fd = os.open(os.path.join(data_dir(), "notes.lock"),
+                     os.O_RDWR | os.O_CREAT, 0o600)
+    except OSError:
+        yield
+        return
+    locked = False
+    try:
+        # ponytail: gives up after about 5 seconds and goes ahead unlocked,
+        # so a stuck window can never freeze another one.
+        for _ in range(50):
+            try:
+                os.lseek(fd, 0, os.SEEK_SET)
+                if os.name == "nt":
+                    import msvcrt
+                    msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                locked = True
+                break
+            except OSError:
+                time.sleep(0.1)
+        yield
+    finally:
+        if locked:
+            try:
+                os.lseek(fd, 0, os.SEEK_SET)
+                if os.name == "nt":
+                    import msvcrt
+                    msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+                else:
+                    import fcntl
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+            except OSError:
+                pass
+        os.close(fd)
+
+
 def refresh(state, can_save):
     """Re-read the file before a change, so a second open window can't
     overwrite what the first one saved. Returns False when it could not."""
@@ -858,10 +965,18 @@ def commit(state, base, can_save, soft=()):
     """
     if not can_save:
         return False
+    with file_lock():
+        return merge_and_save(state, base, soft)
+
+
+def merge_and_save(state, base, soft):
+    """The body of commit(), run while holding the lock."""
     fresh, ok = load(repair=False)
     if not ok:
         return False
-    if "epoch" in base and fresh.get("epoch") != base["epoch"]:
+    # A missing file has no marker at all: deleted by hand or set aside as
+    # damaged, not by Delete everything, which always writes a new marker.
+    if "epoch" in base and "epoch" in fresh and fresh["epoch"] != base["epoch"]:
         say("Everything saved was deleted in another window, so this was not")
         say("saved.")
         state.clear()
@@ -1077,9 +1192,9 @@ def menu(state, can_save=True, iso=None):
             say("  2  " + ("Turn off: open once a day at sign-in (now on)"
                            if reminding else
                            "Turn on: open once a day at sign-in (now off)"))
-            say("  3  " + ("Hide the in-a-row line (now shown)"
+            say("  3  " + ("Hide the days-in-a-row message (now shown)"
                            if state["streak"] else
-                           "Show the in-a-row line (now hidden)"))
+                           "Show the days-in-a-row message (now hidden)"))
             say("  4  Delete everything saved")
             say("  5  Help")
             say("  6  Set or change today's plan")
@@ -1125,7 +1240,7 @@ def menu(state, can_save=True, iso=None):
             base = copy.deepcopy(state)
             state["streak"] = not state["streak"]
             if commit(state, base, can_save):
-                say("Done. The in-a-row line is "
+                say("Done. The days-in-a-row message is "
                     + ("on." if state["streak"] else "off."))
             else:
                 undo(state, base)
@@ -1210,10 +1325,7 @@ def finish_plan(state, text, d):
 def done_lines(state, d):
     """Shown only once the save has worked, and with the merged count, so
     nobody is congratulated for something that was not recorded."""
-    lines = [DONE_LINES[d.toordinal() % len(DONE_LINES)]]
-    if state.get("done", 0) > 1:
-        lines.append(f"That is {state['done']} done so far.")
-    return lines
+    return [DONE_LINES[d.toordinal() % len(DONE_LINES)]]
 
 
 def finish_day(plan_day, d):
@@ -1221,21 +1333,26 @@ def finish_day(plan_day, d):
     since the next morning almost always means the plan's own day."""
     if (d - plan_day).days <= 1:
         return plan_day
-    yesterday = d - datetime.timedelta(days=1)
+    days = [plan_day + datetime.timedelta(days=n)
+            for n in range((d - plan_day).days + 1)]
+    if len(days) > 7:
+        days = days[:1] + days[-6:]
+    # Numbers, like the menu: a letter here would clash with the y just typed.
+    say("When did you finish it?")
+    for n, when in enumerate(days, 1):
+        say(f"  {n}  " + ("Today" if when == d else long_date(when)))
+    numbers = [str(n) for n in range(1, len(days) + 1)]
     for _ in range(3):
-        answer = ask(f"When did you finish it? (Enter for {long_date(plan_day)}, "
-                     "y for yesterday, t for today) > ")
+        answer = ask(f"Type a number from 1 to {len(days)}, or Enter for 1 > ")
         word = (answer or "").lower().strip(" .!")
         if not word:
-            return plan_day
+            return days[0]
         if word in QUIT_WORDS:
             raise Quit
-        if word in ("y", "yes", "yesterday"):
-            return yesterday
-        if word in ("t", "today"):
-            return d
-        not_a_choice(answer, "Press Enter, or type y or t.")
-    return plan_day
+        if word in numbers:
+            return days[int(word) - 1]
+        not_a_choice(answer, f"Type a number from 1 to {len(days)}, or press Enter.")
+    return days[0]
 
 
 def nudge_if_several(text):
@@ -1363,7 +1480,7 @@ def daily(startup):
                 say("That was not understood. Your plan is left as it was.")
             elif answer is not None:
                 intent = dict(intent, skips=intent.get("skips", 0) + 1)
-                say("Left as it was.")
+                say("Your plan is still open.")
             say()
 
         if state.get("tips", True):
@@ -1381,7 +1498,8 @@ def daily(startup):
         elif intent:
             # Not answered, or skipped twice; it must not vanish.
             when = long_date(datetime.date.fromisoformat(intent["date"]))
-            say(wrapped(f"Still open from {when}: ", intent["text"]))
+            say(f"Still open since {when}:")
+            say(indent(intent["text"]))
             say()
         if not seen_today and not (intent and intent["date"] == iso):
             skip = ("(Enter to skip)" if not intent else
@@ -1526,7 +1644,7 @@ def run(argv):
         base = copy.deepcopy(state)
         state["streak"] = argv[1] == "on"
         if commit(state, base, can_save):
-            say("Done. The in-a-row line is "
+            say("Done. The days-in-a-row message is "
                 + ("on." if state["streak"] else "off."))
             return 0
         say("Could not save that choice on this computer.")

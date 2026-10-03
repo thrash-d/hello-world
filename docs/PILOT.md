@@ -90,6 +90,37 @@ All five would keep using it.
 Their notes starting fresh was part of how the simulation was run, not
 something the program does: an update keeps `notes.json`.
 
+## Third round, on 1.21.0, with three new people
+
+Three new simulated people used 1.21.0 from 18 November to 1 December:
+
+- Amara, a new operations assistant whose first language isn't English.
+- Glenn, a purchasing officer with low vision who uses Windows Magnifier at
+  200 to 300 percent.
+- Priya, the operations manager, who would decide whether to roll it out to
+  all 40 people.
+
+All three would keep using it. Priya would roll it out as optional, after the
+changes below.
+
+| Finding | Who | In 1.22.0 |
+|---|---|---|
+| The file kept up to 400 dates someone opened it, which reads as an attendance record if anyone pulled it | Priya | Only the last 60 days are kept |
+| "That is 4 done so far" after each finish felt like scoring | Priya | The tally is gone; the count stays in option 1 |
+| Option 1 didn't show whether the sign-in opening is on | Priya | It does |
+| Uninstalling left everyone's notes | Priya | It asks the administrator whether to delete them, and `-RemoveNotes` does it unattended |
+| Long prompts ran past a magnified window, with the choices at the far end | Glenn | Prompts wrap to the window, and only the last line waits for the answer |
+| In "When did you finish it?", `y` meant yesterday right after `y` meant yes | Glenn, Amara | The days since the plan are listed by number |
+| The plan sat after a long date label | Glenn | "Still open since ..." puts the plan on its own line |
+| About fifteen idioms were hard to follow, such as "put that one down", "leave lighter" and "Left as it was" | Amara | The praise lines, that reply and the nine quoted thoughts and tips are in plain words |
+| "In-a-row line" didn't say what it was | Amara | It's called the days-in-a-row message |
+
+Not changed: the days-in-a-row message stays on by default, and removing the
+program still needs an administrator. `BACKLOG.md` has the reasons. Two of
+Glenn's points, an answer and the next question sharing a line, came from how
+the simulation fed in answers without echoing them; a real console starts a
+new line after Enter.
+
 ## Not changed, and why
 
 - NVDA saying "greater" at the end of every prompt (Ruth). It's unclear

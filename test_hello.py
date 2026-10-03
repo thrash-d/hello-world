@@ -1,11 +1,27 @@
+import atexit
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
 
 HELLO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hello.py")
+_MADE = []
+
+
+def mkdtemp():
+    """A temp folder that is removed when the test run ends."""
+    path = tempfile.mkdtemp(prefix="hello-test-")
+    _MADE.append(path)
+    return path
+
+
+@atexit.register
+def _remove_temp_folders():
+    for path in _MADE:
+        shutil.rmtree(path, ignore_errors=True)
 
 # Imports hello.py, sets its test values from argv[2], and runs it with the
 # remaining arguments. hello.py itself reads no test settings from anywhere.
@@ -34,7 +50,7 @@ def run(args=(), text=None, day="2026-10-01", home=None, startup=None):
     Without text, stdin is the null device, so the result doesn't depend on
     what the test runner's own stdin is.
     """
-    home = home or tempfile.mkdtemp()
+    home = home or mkdtemp()
     # "" means no Startup folder, so on Windows a test never writes the real
     # one. The sign-in offer then appears only where a test asks for it.
     values = {"TODAY": day, "HOME": home,
@@ -57,7 +73,7 @@ def dead_pipe(args=(), dead_stderr=False):
     r, w = os.pipe()
     os.close(r)
     try:
-        return subprocess.run(launch(args, HOME=tempfile.mkdtemp()), stdout=w,
+        return subprocess.run(launch(args, HOME=mkdtemp()), stdout=w,
                               stderr=w if dead_stderr else subprocess.PIPE,
                               stdin=subprocess.DEVNULL)
     finally:
@@ -99,8 +115,8 @@ def test_no_prompts_and_no_waiting_without_a_person():
 
 
 def test_hello_variables_in_the_environment_are_ignored():
-    home = tempfile.mkdtemp()
-    other = tempfile.mkdtemp()
+    home = mkdtemp()
+    other = mkdtemp()
     env = dict(os.environ, HELLO_HOME=home, HELLO_TODAY="2000-01-01",
                HELLO_INTERACTIVE="1", HOME=other, LOCALAPPDATA=other,
                APPDATA=other, XDG_DATA_HOME=other)
@@ -144,13 +160,13 @@ def test_next_day_not_done_can_be_kept():
 
 
 def test_in_a_row_line_appears_at_milestones_only():
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     outs = [run(text="\n\n", day=f"2026-10-0{n}", home=home).stdout
             for n in range(1, 8)]
     shown = [n for n, out in enumerate(outs, 1) if "in a row" in out]
     assert shown == [3, 7]
     assert "3 times in a row" in outs[2]
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     for n in (1, 2):
         run(text="\n\n", day=f"2026-10-0{n}", home=home)
     run(["--streak", "off"], home=home)
@@ -165,19 +181,19 @@ def test_streak_option_exit_codes():
 
 
 def test_remind_exit_code_follows_the_result():
-    startup = tempfile.mkdtemp()
+    startup = mkdtemp()
     assert run(["--remind", "on"], startup=startup).returncode == 0
     assert run(["--remind", "off"], startup=startup).returncode == 0
 
 
 def test_p_at_the_last_prompt_sets_the_plan():
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     run(text="\np\nWrite the report\n", home=home)
     assert notes(home)["intent"]["text"] == "Write the report"
 
 
 def test_a_notes_file_with_a_byte_order_mark_is_read_not_moved_aside():
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     with open(os.path.join(home, "notes.json"), "w", encoding="utf-8-sig") as f:
         json.dump({"visits": ["2026-09-30"], "intent": None}, f)
     run(text="\n\n", home=home)
@@ -194,7 +210,7 @@ def test_thought_and_tip_never_repeat_each_other_on_one_screen():
 
 
 def test_welcome_back_after_a_long_gap_and_no_shaming():
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     run(text="\n\n", home=home)
     p = run(text="\n\n", day="2026-10-20", home=home)
     assert "Welcome back" in p.stdout
@@ -209,7 +225,7 @@ def test_content_changes_from_day_to_day():
 
 
 def test_damaged_notes_file_gives_a_fresh_start():
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     with open(os.path.join(home, "notes.json"), "w") as f:
         f.write('{"visits": [1, "nope"], "intent": 5')
     p = run(text="\n\n", home=home)
@@ -254,7 +270,7 @@ def test_menu_shows_saved_data_and_toggles_the_in_a_row_line():
 
 
 def test_reminder_writes_and_removes_only_the_launcher():
-    startup = tempfile.mkdtemp()
+    startup = mkdtemp()
     path = os.path.join(startup, "hello-world-daily.cmd")
     run(["--remind", "on"], startup=startup)
     with open(path) as f:
@@ -316,12 +332,14 @@ def test_reset_also_deletes_backup_and_temp_copies():
         with open(os.path.join(first.home, name), "w") as f:
             f.write("old plan")
     run(["--reset"], text="y\n", home=first.home)
-    assert os.listdir(first.home) == ["notes.json"]
+    # notes.lock is the empty lock file; it holds nothing.
+    assert sorted(os.listdir(first.home)) == ["notes.json", "notes.lock"]
+    assert os.path.getsize(os.path.join(first.home, "notes.lock")) == 0
     assert "Send the invoice" not in json.dumps(notes(first.home))
 
 
 def test_menu_does_not_save_over_a_file_it_could_not_read():
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     os.mkdir(os.path.join(home, "notes.json"))  # opening it fails
     p = run(text="\nm\n3\n6\nCall the bank\n\n", home=home)
     assert p.stdout.count("Could not save") == 2
@@ -337,7 +355,7 @@ def test_friendly_yes_words_count():
 
 
 def test_a_hostile_notes_file_cannot_write_controls_to_the_screen():
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     bad = {"visits": ["2026-09-30"],
            "intent": {"text": "\x1b[31mEVIL\r\nFAKE", "date": "2026-09-30"}}
     with open(os.path.join(home, "notes.json"), "w") as f:
@@ -354,7 +372,7 @@ def test_pasted_tabs_and_odd_spaces_become_spaces():
 
 
 def test_very_deep_json_gives_a_fresh_start_and_keeps_a_copy():
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     with open(os.path.join(home, "notes.json"), "w") as f:
         f.write("[" * 200000)
     p = run(text="\n\n", home=home)
@@ -363,7 +381,7 @@ def test_very_deep_json_gives_a_fresh_start_and_keeps_a_copy():
 
 
 def test_a_damaged_file_is_kept_as_a_backup():
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     with open(os.path.join(home, "notes.json"), "w") as f:
         f.write('{"visits":["2026-10-0')
     run(text="\n\n", home=home)
@@ -372,7 +390,7 @@ def test_a_damaged_file_is_kept_as_a_backup():
 
 
 def test_a_bad_plan_date_does_not_turn_the_in_a_row_line_back_on():
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     bad = {"visits": ["2026-10-01", "2026-10-02"],
            "intent": {"text": "x", "date": "junk"}, "streak": False}
     with open(os.path.join(home, "notes.json"), "w") as f:
@@ -383,7 +401,7 @@ def test_a_bad_plan_date_does_not_turn_the_in_a_row_line_back_on():
 
 
 def test_odd_date_spellings_are_normalised():
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     with open(os.path.join(home, "notes.json"), "w") as f:
         json.dump({"visits": ["20261001"], "intent": None}, f)
     run(text="\n\n", home=home)
@@ -397,7 +415,7 @@ def test_long_plans_wrap_within_72_columns():
 
 
 def test_a_plan_dated_in_the_future_becomes_todays_plan():
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     with open(os.path.join(home, "notes.json"), "w") as f:
         json.dump({"visits": ["2026-12-01"],
                    "intent": {"text": "Pay rent", "date": "2026-12-01"}}, f)
@@ -421,7 +439,7 @@ def test_dead_stdout_and_stderr_exits_1():
 def test_closed_stdout_exits_1():
     if os.name != "posix":
         raise unittest.SkipTest("needs preexec_fn, posix only")
-    p = subprocess.run(launch(HOME=tempfile.mkdtemp()), stdout=subprocess.DEVNULL,
+    p = subprocess.run(launch(HOME=mkdtemp()), stdout=subprocess.DEVNULL,
                        stderr=subprocess.PIPE, stdin=subprocess.DEVNULL,
                        preexec_fn=lambda: os.close(1))
     assert p.returncode == 1
@@ -431,7 +449,7 @@ def test_closed_stdout_exits_1():
 def test_stdout_closed_after_start_exits_1():
     # sys.stdout.close() makes print() raise ValueError, not OSError
     p = subprocess.run(launch(prelude="sys_ = __import__('sys'); sys_.stdout.close()\n",
-                              HOME=tempfile.mkdtemp()),
+                              HOME=mkdtemp()),
                        stderr=subprocess.PIPE, stdin=subprocess.DEVNULL)
     assert p.returncode == 1
     assert p.stderr.startswith(b"hello.py: cannot write to stdout:")
@@ -448,7 +466,7 @@ def _load_hello(day="2026-10-01"):
 
 
 def test_visits_dated_after_today_are_dropped_from_the_file():
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     path = os.path.join(home, "notes.json")
     with open(path, "w") as f:
         json.dump({"visits": ["2026-09-30", "2030-01-01"]}, f)
@@ -468,7 +486,7 @@ def test_a_plan_of_only_joiners_is_empty_and_a_long_plan_says_it_was_cut():
 
 def test_a_second_damaged_file_does_not_overwrite_the_first_backup():
     hello = _load_hello()
-    hello.HOME = tempfile.mkdtemp()
+    hello.HOME = mkdtemp()
     os.makedirs(os.path.dirname(hello.data_file()), exist_ok=True)
     for text in ("first", "second"):
         with open(hello.data_file(), "w") as f:
@@ -498,7 +516,7 @@ def test_joiner_characters_survive_cleaning():
 
 def test_visits_dated_after_today_are_dropped_on_load():
     hello = _load_hello()
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     hello.HOME = home
     os.makedirs(os.path.dirname(hello.data_file()), exist_ok=True)
     with open(hello.data_file(), "w", encoding="utf-8") as f:
@@ -526,14 +544,14 @@ def test_documented_tag_matches_version():
 def test_failed_reset_exits_1_and_declining_exits_0():
     first = run(text="Send the invoice\n\n")
     assert run(["--reset"], text="n\n", home=first.home).returncode == 0
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     os.mkdir(os.path.join(home, "notes.json"))  # a delete of this fails
     p = run(["--reset"], text="y\n", home=home)
     assert p.returncode == 1 and "Could not delete" in p.stdout
 
 
 def test_reset_still_deletes_the_other_copies_when_one_delete_fails():
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     os.mkdir(os.path.join(home, "notes.json"))  # a delete of this fails
     bak = os.path.join(home, "notes.json.bak")
     with open(bak, "w") as f:
@@ -543,7 +561,7 @@ def test_reset_still_deletes_the_other_copies_when_one_delete_fails():
 
 
 def test_a_repaired_file_is_announced():
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     with open(os.path.join(home, "notes.json"), "w") as f:
         f.write("{")
     p = run(text="\n", home=home)
@@ -553,7 +571,7 @@ def test_a_repaired_file_is_announced():
 
 
 def test_stats_does_not_move_a_damaged_file():
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     with open(os.path.join(home, "notes.json"), "w") as f:
         f.write('{"visits":["2026-10-0')
     p = run(["--stats"], home=home)
@@ -568,7 +586,7 @@ def test_cut_plan_has_no_trailing_space():
 
 
 def test_second_damaged_file_notice_names_the_real_backup():
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     for _ in range(2):
         with open(os.path.join(home, "notes.json"), "w") as f:
             f.write("{")
@@ -585,7 +603,7 @@ def test_first_run_explains_tomorrow_and_confirms_the_plan():
 
 
 def test_sign_in_offer_is_made_once_on_the_second_visit():
-    home, startup = tempfile.mkdtemp(), tempfile.mkdtemp()
+    home, startup = mkdtemp(), mkdtemp()
     run(text="\n\n", home=home, startup=startup, day="2026-10-01")
     p = run(text="\nn\n\n", home=home, startup=startup, day="2026-10-02")
     assert "when you sign in so it can ask" in p.stdout
@@ -596,7 +614,7 @@ def test_sign_in_offer_is_made_once_on_the_second_visit():
 
 
 def test_sign_in_offer_yes_turns_it_on():
-    home, startup = tempfile.mkdtemp(), tempfile.mkdtemp()
+    home, startup = mkdtemp(), mkdtemp()
     run(text="\n\n", home=home, startup=startup, day="2026-10-01")
     run(text="\ny\n\n", home=home, startup=startup, day="2026-10-02")
     assert os.listdir(startup) == ["hello-world-daily.cmd"]
@@ -613,7 +631,7 @@ def test_unknown_input_is_named_and_outcomes_are_echoed():
 
 
 def test_existing_user_with_many_visits_is_offered_the_reminder():
-    home, startup = tempfile.mkdtemp(), tempfile.mkdtemp()
+    home, startup = mkdtemp(), mkdtemp()
     with open(os.path.join(home, "notes.json"), "w") as f:
         json.dump({"visits": ["2026-09-25", "2026-09-26", "2026-09-28",
                               "2026-09-29", "2026-09-30"]}, f)
@@ -623,7 +641,7 @@ def test_existing_user_with_many_visits_is_offered_the_reminder():
 
 
 def test_offer_comes_right_after_the_first_plan():
-    home, startup = tempfile.mkdtemp(), tempfile.mkdtemp()
+    home, startup = mkdtemp(), mkdtemp()
     p = run(text="Send the invoice\ny\n\n", home=home, startup=startup)
     assert p.stdout.index("Saved. Type done") < p.stdout.index("so it can ask")
     assert os.listdir(startup) == ["hello-world-daily.cmd"]
@@ -631,7 +649,7 @@ def test_offer_comes_right_after_the_first_plan():
 
 
 def test_the_sign_in_question_is_asked_once():
-    home, startup = tempfile.mkdtemp(), tempfile.mkdtemp()
+    home, startup = mkdtemp(), mkdtemp()
     run(text="Plan one\n\n\n\n", home=home, startup=startup, day="2026-10-01")
     saved = notes(home)
     assert saved["offered"] is True and saved["offer_skips"] == 1
@@ -641,7 +659,7 @@ def test_the_sign_in_question_is_asked_once():
 
 
 def test_done_does_not_turn_on_the_sign_in_reminder():
-    home, startup = tempfile.mkdtemp(), tempfile.mkdtemp()
+    home, startup = mkdtemp(), mkdtemp()
     run(text="Plan one\ndone\n\n", home=home, startup=startup)
     assert os.listdir(startup) == []
 
@@ -696,7 +714,8 @@ def test_plans_done_are_counted_and_shown_privately():
     first = run(text="One\n\n")
     run(text="y\nTwo\n\n", home=first.home, day="2026-10-02")
     p = run(text="y\n\n", home=first.home, day="2026-10-03")
-    assert "That is 2 done so far." in p.stdout
+    # No running tally after a finish; the count is only in option 1.
+    assert "done so far" not in p.stdout
     p = run(text="m\n1\n\n\n", home=first.home, day="2026-10-03")
     assert "Times you marked a plan done: 2" in p.stdout
     assert "IT staff, could read it" in p.stdout
@@ -710,7 +729,7 @@ def test_an_unanswered_plan_is_still_shown_when_reopened_the_same_day():
     first = run(text="Book travel\n\n")
     run(text="\n\n\n", home=first.home, day="2026-10-02")
     p = run(text="\n", home=first.home, day="2026-10-02")
-    assert "Still open from" in p.stdout and "Book travel" in p.stdout
+    assert "Still open since" in p.stdout and "Book travel" in p.stdout
 
 
 def test_an_expired_plan_is_announced_and_kept_as_same():
@@ -721,7 +740,7 @@ def test_an_expired_plan_is_announced_and_kept_as_same():
 
 
 def test_not_yet_at_the_sign_in_offer_is_not_a_final_no():
-    home, startup = tempfile.mkdtemp(), tempfile.mkdtemp()
+    home, startup = mkdtemp(), mkdtemp()
     run(text="Plan\nnot yet\n\n", home=home, startup=startup)
     assert "offered" not in notes(home)
 
@@ -823,7 +842,7 @@ def test_closing_the_menu_returns_to_the_last_prompt():
 
 def test_a_window_left_at_a_prompt_cannot_undo_a_newer_save():
     mod = _load_hello()
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     mod.HOME, mod.TODAY, mod.FORCE_INTERACTIVE = home, "2026-10-01", True
     mod.say = lambda text="": None
     first, _ = mod.load()
@@ -852,7 +871,7 @@ def test_a_window_left_at_a_prompt_cannot_undo_a_newer_save():
 
 def test_set_plan_rereads_the_file_after_the_prompt():
     mod = _load_hello()
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     mod.HOME, mod.TODAY, mod.FORCE_INTERACTIVE = home, "2026-10-01", True
     mod.say = lambda text="": None
     state, _ = mod.load()
@@ -890,7 +909,7 @@ def test_finished_plans_come_back_after_a_gap_and_in_the_summary():
 
 
 def test_a_damaged_finished_list_is_ignored():
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     with open(os.path.join(home, "notes.json"), "w") as f:
         json.dump({"visits": ["2026-09-30"], "finished": [1, {"text": 5},
                    {"text": "ok", "date": "2026-09-30"}, {"text": "x", "date": "bad"}]}, f)
@@ -900,7 +919,7 @@ def test_a_damaged_finished_list_is_ignored():
 
 
 def test_turning_the_reminder_on_from_the_menu_ends_the_offer():
-    home, startup = tempfile.mkdtemp(), tempfile.mkdtemp()
+    home, startup = mkdtemp(), mkdtemp()
     run(text="\nm\n2\n\n\n", home=home, startup=startup)
     assert notes(home)["offered"] is True
 
@@ -921,7 +940,7 @@ def test_three_misunderstood_answers_say_what_happened():
 
 def test_a_second_window_cannot_overwrite_what_the_first_saved():
     mod = _load_hello()
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     mod.HOME, mod.TODAY = home, "2026-10-01"
     mod.FORCE_INTERACTIVE = True
     stale, _ = mod.load()
@@ -940,7 +959,7 @@ def test_a_second_window_cannot_overwrite_what_the_first_saved():
 
 def test_a_failed_done_save_is_not_celebrated():
     mod = _load_hello()
-    mod.HOME, mod.TODAY = tempfile.mkdtemp(), "2026-10-01"
+    mod.HOME, mod.TODAY = mkdtemp(), "2026-10-01"
     shown = []
     mod.say = lambda text="": shown.append(text)
     state, _ = mod.load()
@@ -955,8 +974,12 @@ def test_a_failed_done_save_is_not_celebrated():
 
 
 def test_thoughts_and_tips_do_not_repeat_as_a_pair_every_100_days():
-    import hello
-    assert len(hello.THOUGHTS) != len(hello.TIPS)
+    import datetime
+    mod = _load_hello()
+    start = datetime.date(2026, 1, 1)
+    pairs = {mod.todays_pair(start + datetime.timedelta(days=n))
+             for n in range(len(mod.TIPS) * 2)}
+    assert len(pairs) == len(mod.TIPS) * 2
 
 
 def test_wrapping_follows_a_narrow_window():
@@ -998,7 +1021,7 @@ def test_a_mistyped_yes_or_no_is_named_and_asked_again():
 
 
 def test_a_mistyped_sign_in_answer_is_named_and_not_counted_as_a_skip():
-    home, startup = tempfile.mkdtemp(), tempfile.mkdtemp()
+    home, startup = mkdtemp(), mkdtemp()
     run(text="\n\n", home=home, startup=startup, day="2026-10-01")
     p = run(text="\nyse\nn\n\n", home=home, startup=startup, day="2026-10-02")
     assert 'not one of the choices: "yse"' in p.stdout
@@ -1026,7 +1049,7 @@ def test_not_yet_at_the_keep_prompt_keeps_the_plan():
 def _two_windows():
     import copy
     mod = _load_hello()
-    mod.HOME = tempfile.mkdtemp()
+    mod.HOME = mkdtemp()
     mod.say = lambda text="": None
     first, _ = mod.load()
     other, _ = mod.load()
@@ -1070,7 +1093,7 @@ def test_one_finished_plan_can_be_forgotten():
 def test_forgetting_from_the_list_keeps_same_unless_asked():
     # Older versions kept a finished plan as same, so the question still
     # comes up for files they wrote.
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     with open(os.path.join(home, "notes.json"), "w") as f:
         json.dump({"visits": ["2026-10-01"], "previous": "A", "done": 1,
                    "finished": [{"text": "A", "date": "2026-10-01"}]}, f)
@@ -1107,7 +1130,7 @@ def test_the_first_finished_plan_is_listed():
 
 
 def test_finished_dates_far_off_are_dropped():
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     with open(os.path.join(home, "notes.json"), "w") as f:
         json.dump({"visits": ["2026-09-30"], "finished": [
             {"text": "far", "date": "9999-01-01"},
@@ -1119,10 +1142,10 @@ def test_finished_dates_far_off_are_dropped():
 
 def test_the_launcher_is_not_written_from_a_folder_cmd_would_misread():
     mod = _load_hello()
-    mod.STARTUP_DIR = tempfile.mkdtemp()
+    mod.STARTUP_DIR = mkdtemp()
     mod.say = lambda text="": None
     for folder in ("a&b", "a!b"):
-        mod.__file__ = os.path.join(tempfile.mkdtemp(), folder, "hello.py")
+        mod.__file__ = os.path.join(mkdtemp(), folder, "hello.py")
         assert not mod.remind(True)
         assert os.listdir(mod.STARTUP_DIR) == []
 
@@ -1161,7 +1184,7 @@ def test_a_delete_in_one_window_is_not_undone_by_another():
 
 def test_tidying_an_old_plan_does_not_overwrite_the_other_windows_plan():
     mod = _load_hello()
-    home = mod.HOME = tempfile.mkdtemp()
+    home = mod.HOME = mkdtemp()
     mod.FORCE_INTERACTIVE = True
     mod.say = lambda text="": None
     state, _ = mod.load()
@@ -1245,9 +1268,9 @@ def test_the_file_never_holds_more_than_the_visit_limit():
 
 def test_the_launcher_keeps_a_folder_with_brackets_out_of_cmd():
     mod = _load_hello()
-    mod.STARTUP_DIR = tempfile.mkdtemp()
+    mod.STARTUP_DIR = mkdtemp()
     mod.say = lambda text="": None
-    folder = os.path.join(tempfile.mkdtemp(), "Tools (x86), a=b @~")
+    folder = os.path.join(mkdtemp(), "Tools (x86), a=b @~")
     mod.__file__ = os.path.join(folder, "hello.py")
     assert mod.remind(True)
     with open(os.path.join(mod.STARTUP_DIR, "hello-world-daily.cmd")) as f:
@@ -1256,7 +1279,7 @@ def test_the_launcher_keeps_a_folder_with_brackets_out_of_cmd():
 
 
 def test_unknown_keys_and_wrong_types_in_the_file_are_dropped():
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     with open(os.path.join(home, "notes.json"), "w") as f:
         json.dump({"visits": "2026-09-30", "intent": 5, "done": "7",
                    "finished": {"text": "x"}, "streak": "no", "previous": [1],
@@ -1273,7 +1296,7 @@ def test_unknown_keys_and_wrong_types_in_the_file_are_dropped():
 def test_a_day_old_temp_copy_is_swept_and_a_new_one_is_left():
     import time
     mod = _load_hello()
-    mod.HOME = tempfile.mkdtemp()
+    mod.HOME = mkdtemp()
     old = os.path.join(mod.HOME, "notes.json.111.tmp")
     new = os.path.join(mod.HOME, "notes.json.222.tmp")
     for path in (old, new):
@@ -1300,7 +1323,7 @@ def test_help_lists_the_exit_codes():
 
 def test_a_save_blocked_for_a_moment_is_tried_again():
     mod = _load_hello()
-    mod.HOME = tempfile.mkdtemp()
+    mod.HOME = mkdtemp()
     real, calls = mod.os.replace, []
 
     def flaky(src, dst):
@@ -1318,28 +1341,28 @@ def test_a_save_blocked_for_a_moment_is_tried_again():
 
 
 def test_option_1_says_when_the_file_could_not_be_read():
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     os.mkdir(os.path.join(home, "notes.json"))  # opening it fails
     p = run(text="\nm\n1\n\n\n\n", home=home)
     assert "could not be read just now" in p.stdout
 
 
 def test_the_launcher_leaves_no_temp_copy():
-    startup = tempfile.mkdtemp()
+    startup = mkdtemp()
     assert run(["--remind", "on"], startup=startup).returncode == 0
     assert os.listdir(startup) == ["hello-world-daily.cmd"]
 
 
 def test_two_real_windows_merge_their_saves():
     import threading
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     with open(os.path.join(home, "notes.json"), "w") as f:
         json.dump({"visits": ["2026-10-01"],
                    "intent": {"text": "Send it", "date": "2026-10-01"}}, f)
     values = {"TODAY": "2026-10-02", "HOME": home, "STARTUP_DIR": "",
               "FORCE_INTERACTIVE": True}
     a = subprocess.Popen(launch(**values), stdin=subprocess.PIPE,
-                         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                          encoding="utf-8")
     seen, waiting = [], threading.Event()
 
@@ -1382,7 +1405,7 @@ def test_the_saved_keys_are_frozen():
             "finished": [{"text": "f", "date": "2026-09-30"}]}
     assert set(full) == keys
     mod = _load_hello()
-    mod.HOME = tempfile.mkdtemp()
+    mod.HOME = mkdtemp()
     with open(mod.data_file(), "w") as f:
         json.dump(full, f)
     state, _ = mod.load()
@@ -1422,7 +1445,7 @@ def test_no_prompt_uses_an_equals_sign_for_enter():
 
 
 def test_done_is_still_offered_after_the_sign_in_question():
-    home, startup = tempfile.mkdtemp(), tempfile.mkdtemp()
+    home, startup = mkdtemp(), mkdtemp()
     p = run(text="Send the invoices\nn\ndone\n\n", home=home, startup=startup)
     assert "Type done, plan, menu or q, or Enter to close >" in p.stdout
     assert notes(home)["done"] == 1
@@ -1476,7 +1499,7 @@ def test_the_menu_is_listed_once_and_m_lists_it_again():
 
 
 def test_option_1_reads_no_file_path():
-    home = tempfile.mkdtemp()
+    home = mkdtemp()
     p = run(text="\nm\n1\n\n\n\n", home=home)
     assert "Saved in your own user folder" in p.stdout
     assert home not in p.stdout
@@ -1485,7 +1508,7 @@ def test_option_1_reads_no_file_path():
 
 def test_a_yes_after_a_delete_in_another_window_does_not_bring_the_plan_back():
     mod = _load_hello()
-    home = mod.HOME = tempfile.mkdtemp()
+    home = mod.HOME = mkdtemp()
     mod.FORCE_INTERACTIVE = True
     mod.say = lambda text="": None
     state, _ = mod.load()
@@ -1533,8 +1556,8 @@ def test_a_plan_corrected_the_same_day_is_not_kept_for_same():
 
 def test_a_late_yes_asks_which_day_it_was_finished():
     first = run(text="Send the invoice\n\n")
-    p = run(text="y\nt\n\n\n", home=first.home, day="2026-10-05")
-    assert "When did you finish it?" in p.stdout
+    p = run(text="y\n5\n\n\n", home=first.home, day="2026-10-05")
+    assert "When did you finish it?" in p.stdout and "  5  Today" in p.stdout
     assert notes(first.home)["finished"][0]["date"] == "2026-10-05"
     first = run(text="Send the invoice\n\n")
     run(text="y\n\n\n\n", home=first.home, day="2026-10-05")
@@ -1550,7 +1573,7 @@ def test_two_skips_stop_the_question_and_the_plan_stays_open():
     run(text="\n\n\n", home=first.home, day="2026-10-03")
     p = run(text="\ndone\n\n", home=first.home, day="2026-10-04")
     assert "Did you do it?" not in p.stdout
-    assert "Still open from Thursday, 1 October 2026: Write it" in p.stdout
+    assert "Still open since Thursday, 1 October 2026:\n  Write it" in p.stdout
     assert notes(first.home)["done"] == 1
 
 
@@ -1574,6 +1597,112 @@ def test_a_plan_of_several_things_gets_one_gentle_nudge():
     p = run(text="Write the deck and fix the banner\n\n")
     assert p.stdout.count("more than one thing") == 1
     assert "more than one thing" not in run(text="Write the deck\n\n").stdout
+
+
+def test_ctrl_c_at_a_prompt_skips_only_that_prompt():
+    mod = _load_hello()
+    mod.FORCE_INTERACTIVE = True
+    mod.say = lambda text="": None
+
+    def interrupted(_prompt):
+        raise KeyboardInterrupt
+    mod.input = interrupted
+    assert mod.ask("Did you do it? > ") is None
+
+
+def test_visits_older_than_60_days_are_not_kept():
+    home = mkdtemp()
+    with open(os.path.join(home, "notes.json"), "w") as f:
+        json.dump({"visits": ["2025-01-05", "2026-07-01", "2026-09-30"]}, f)
+    run(text="\n\n", home=home)
+    assert notes(home)["visits"] == ["2026-09-30", "2026-10-01"]
+
+
+def test_the_delete_marker_must_be_hex():
+    home = mkdtemp()
+    with open(os.path.join(home, "notes.json"), "w") as f:
+        json.dump({"visits": [], "epoch": "\u202eevil\u009b31m"}, f)
+    out = run(["--stats"], home=home).stdout
+    assert "\u202e" not in out and "\u009b" not in out
+
+
+def test_a_file_deleted_by_hand_does_not_block_the_next_save():
+    mod = _load_hello()
+    mod.HOME = mkdtemp()
+    mod.say = lambda text="": None
+    assert mod.save(mod.new_state())
+    state, _ = mod.load()  # has an empty epoch, like any older file
+    import copy
+    base = copy.deepcopy(state)
+    os.remove(mod.data_file())
+    state["intent"] = {"text": "Mine", "date": "2026-10-01"}
+    assert mod.commit(state, base, True)
+    assert notes(mod.HOME)["intent"]["text"] == "Mine"
+
+
+def test_the_lock_keeps_a_second_window_out_while_a_change_is_saved():
+    # A delete in one window can't land between another window's read and
+    # write: while one holds notes.lock, a second process can't take it.
+    mod = _load_hello()
+    mod.HOME = mkdtemp()
+    probe = (
+        "import os, sys" + chr(10)
+        + "fd = os.open(sys.argv[1], os.O_RDWR)" + chr(10)
+        + "try:" + chr(10)
+        + "    if os.name == 'nt':" + chr(10)
+        + "        import msvcrt; msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)" + chr(10)
+        + "    else:" + chr(10)
+        + "        import fcntl; fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)" + chr(10)
+        + "    print('got it')" + chr(10)
+        + "except OSError:" + chr(10)
+        + "    print('kept out')" + chr(10)
+    )
+    lock = os.path.join(mod.HOME, "notes.lock")
+    with mod.file_lock():
+        held = subprocess.run([sys.executable, "-c", probe, lock],
+                              capture_output=True, text=True).stdout.strip()
+    free = subprocess.run([sys.executable, "-c", probe, lock],
+                          capture_output=True, text=True).stdout.strip()
+    assert (held, free) == ("kept out", "got it")
+
+
+def test_new_emoji_are_kept_and_mark_floods_are_capped():
+    mod = _load_hello()
+    assert mod.clean("Finish \U0001FAE9 report") == "Finish \U0001FAE9 report"
+    assert mod.clean("e" + "\u0301" * 50).count("\u0301") == mod.MAX_MARKS
+
+
+def test_a_stale_launcher_temp_file_is_cleared():
+    startup = mkdtemp()
+    stale = os.path.join(startup, "hello-world-daily.cmd.99.tmp")
+    with open(stale, "w") as f:
+        f.write("x")
+    run(["--remind", "on"], startup=startup)
+    assert os.listdir(startup) == ["hello-world-daily.cmd"]
+
+
+def test_a_long_prompt_wraps_and_keeps_its_choices_visible():
+    import shutil as sh
+    mod = _load_hello()
+    mod.FORCE_INTERACTIVE = True
+    shown, asked = [], []
+    mod.say = lambda text="": shown.append(text)
+    mod.input = lambda prompt: asked.append(prompt) or ""
+    real = sh.get_terminal_size
+    sh.get_terminal_size = lambda fallback=(80, 24): os.terminal_size((40, 24))
+    try:
+        mod.ask("Want it to open once a day when you sign in so it can ask "
+                "about your plan? (y or n, Enter for not now) > ")
+    finally:
+        sh.get_terminal_size = real
+    assert all(len(line) <= 38 for line in shown + asked)
+    assert asked[0].rstrip().endswith(">")
+
+
+def test_option_1_says_whether_sign_in_opening_is_on():
+    home, startup = mkdtemp(), mkdtemp()
+    p = run(text="\nm\n1\n\n\n\n", home=home, startup=startup)
+    assert "Opens by itself at sign-in: off." in p.stdout
 
 
 if __name__ == "__main__":
