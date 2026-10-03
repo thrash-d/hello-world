@@ -34,6 +34,13 @@ Se desabilitada ou não configurada, cada pessoa pode digitar um plano opcional 
 Se desabilitada ou não configurada, o hello-world mostra as telas em espanhol, francês, português ou alemão quando o idioma de exibição do Windows é um deles, e em inglês nos demais casos. As palavras de comando de cada idioma, como feito e sair, funcionam em todos os idiomas.
 
 Um arquivo de conteúdo da organização substitui os pensamentos e as dicas em todos os idiomas.</string>
+      <string id="SUPPORTED_1_28">hello-world 1.28.0 ou posterior</string>
+      <string id="UseTextScreen">Abrir o hello-world como tela de texto</string>
+      <string id="UseTextScreen_Help">Se habilitada, o atalho do menu Iniciar abre o hello-world como tela de texto em uma janela de console, como nas versões anteriores à 1.28, e o iniciador ao entrar também o abre assim. Ninguém pode mudar para a janela.
+
+Se desabilitada ou não configurada, o hello-world abre em uma janela com botões, e cada pessoa pode mudar para a tela de texto em Opções ou com a opção 9 do menu da tela de texto. Com o iniciador ao entrar ativado, a versão em janela mostra uma notificação do Windows ao entrar quando há um plano para acompanhar, em vez de abrir.
+
+Use esta política quando os usuários de leitores de tela tiverem testado apenas a tela de texto, ou quando notificações do Windows não forem desejadas.</string>
     </stringTable>
   </resources>
 </policyDefinitionResources>

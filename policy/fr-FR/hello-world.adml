@@ -34,6 +34,13 @@ Si ce paramètre est désactivé ou non configuré, chaque personne peut saisir 
 Si ce paramètre est désactivé ou non configuré, hello-world affiche ses écrans en espagnol, français, portugais ou allemand lorsque la langue d'affichage de Windows est l'une d'elles, et en anglais sinon. Les mots de commande de chaque langue, comme fait et quitter, fonctionnent dans toutes les langues.
 
 Un fichier de contenu de l'organisation remplace les pensées et les astuces dans toutes les langues.</string>
+      <string id="SUPPORTED_1_28">hello-world 1.28.0 ou version ultérieure</string>
+      <string id="UseTextScreen">Ouvrir hello-world en écran texte</string>
+      <string id="UseTextScreen_Help">Si ce paramètre est activé, le raccourci du menu Démarrer ouvre hello-world en écran texte dans une fenêtre de console, comme les versions antérieures à 1.28, et le lanceur l'ouvre aussi ainsi à l'ouverture de session. Personne ne peut passer à la fenêtre.
+
+Si ce paramètre est désactivé ou non configuré, hello-world s'ouvre dans une fenêtre avec des boutons, et chaque personne peut passer à l'écran texte sous Options, ou avec l'option 9 du menu de l'écran texte. Si le lanceur est activé, la version fenêtre affiche une notification Windows à l'ouverture de session lorsqu'il y a un plan à suivre, au lieu de s'ouvrir.
+
+Utilisez ce paramètre lorsque les utilisateurs de lecteurs d'écran n'ont testé que l'écran texte, ou lorsque les notifications Windows ne sont pas souhaitées.</string>
     </stringTable>
   </resources>
 </policyDefinitionResources>

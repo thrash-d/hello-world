@@ -34,6 +34,13 @@ Si se deshabilita o no se configura, cada persona puede escribir un plan opciona
 Si se deshabilita o no se configura, hello-world muestra sus pantallas en español, francés, portugués o alemán cuando el idioma de presentación de Windows es uno de ellos, y en inglés en los demás casos. Las palabras de comando de cada idioma, como hecho y salir, funcionan en todos los idiomas.
 
 Un archivo de contenido de la organización sustituye las ideas y sugerencias en todos los idiomas.</string>
+      <string id="SUPPORTED_1_28">hello-world 1.28.0 o posterior</string>
+      <string id="UseTextScreen">Abrir hello-world como pantalla de texto</string>
+      <string id="UseTextScreen_Help">Si se habilita, el acceso directo del menú Inicio abre hello-world como pantalla de texto en una ventana de consola, como hacían las versiones anteriores a la 1.28, y el inicio al iniciar sesión también lo abre así. Nadie puede cambiar a la ventana.
+
+Si se deshabilita o no se configura, hello-world se abre en una ventana con botones, y cada persona puede cambiar a la pantalla de texto en Opciones o con la opción 9 del menú de la pantalla de texto. Con el inicio al iniciar sesión activado, la versión en ventana muestra una notificación de Windows al iniciar sesión cuando hay un plan sobre el que preguntar, en lugar de abrirse.
+
+Use esta directiva cuando los usuarios de lectores de pantalla solo hayan probado la pantalla de texto, o cuando no se quieran notificaciones de Windows.</string>
     </stringTable>
   </resources>
 </policyDefinitionResources>

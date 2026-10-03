@@ -2,17 +2,19 @@
 # -*- coding: utf-8 -*-
 """Print "Hello, world!" and one small useful thing each day.
 
-On Windows the installer runs it through hello.cmd with its own pinned Python.
+On Windows the Start menu opens it as a window, through pythonw.exe from its
+own pinned Python, and hello.cmd runs the same screens as text in a console.
 It shows a thought and a small thing to try, and can keep one plan for the day.
 Everything it saves stays in one small file in the user's own folder, and
 nothing is sent anywhere. Exit 0 when the text was written, 1 when stdout
 could not be written or a command (--reset, --stats, --remind, --streak)
-failed, 2 for an unknown option.
+failed, 2 for an unknown option or a reminder link it doesn't know.
 """
 import collections
 import contextlib
 import copy
 import datetime
+import io
 import json
 import os
 import shutil
@@ -375,7 +377,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.27.0"
+VERSION = "1.28.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -417,7 +419,15 @@ FORCE_INTERACTIVE = False
 POLICY = None
 # "en" or "es" in tests; None follows the Windows display language.
 LANGUAGE = None
+# A list in tests: the sign-in reminder's XML goes here instead of to Windows.
+SHOWN = None
+# Milliseconds after which tests close the window by itself.
+CLOSE_WINDOW_AFTER = None
+# True while the window runs, so nothing waits for typed input.
+WINDOW = False
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+# Where the reminder's name and its answer links are registered for the user.
+CLASSES_KEY = r"Software\Classes"
 RUN_VALUE = "hello-world"
 POLICY_KEY = r"SOFTWARE\Policies\hello-world"
 
@@ -671,6 +681,13 @@ def load(repair=True):
         state["tips"] = False
     if raw.get("offered") is True:
         state["offered"] = True
+    if raw.get("text") is True:
+        state["text"] = True
+    try:
+        if day(raw.get("notified")) <= today().isoformat():
+            state["notified"] = day(raw["notified"])
+    except ValueError:
+        pass
     # Changes only when everything is deleted. commit() compares it, so a
     # window opened before a delete can't write its old notes back.
     epoch = raw.get("epoch")
@@ -829,6 +846,8 @@ def indent(text):
 
 
 def interactive():
+    if WINDOW:
+        return False
     if FORCE_INTERACTIVE:
         return True
     try:
@@ -954,18 +973,16 @@ def in_a_row(visits, d):
 
 
 def launcher_command():
-    """The command the launcher runs, or None for a folder cmd would misread.
+    """The command the launcher runs, or None for a folder it can't quote.
 
-    It checks hello.cmd still exists, so a launcher left behind after an
-    uninstall, or roamed to a PC without the program, does nothing.
+    It runs pythonw.exe, so no console opens at sign-in. A launcher left
+    behind after an uninstall names a program that is gone, and Windows
+    skips it.
     """
-    target = os.path.dirname(os.path.abspath(__file__))
-    if any(c in target for c in '"%&^<>|!'):
+    script = os.path.abspath(__file__)
+    if any(c in script + window_python() for c in '"%'):
         return None
-    # start runs a .cmd through cmd /k, which strips the quotes from a path
-    # with ( or @ in it. /d keeps the folder out of that command line.
-    return (f'if exist "{target}\\hello.cmd" start "hello-world" /d "{target}" '
-            "hello.cmd --startup")
+    return f'"{window_python()}" -I "{script}" --startup'
 
 
 def remove_legacy_launcher():
@@ -1015,12 +1032,10 @@ def remind(on, quiet=False):
                 write_launcher_file(where, command)
             else:
                 import winreg
-                cmd = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"),
-                                   "System32", "cmd.exe")
                 with winreg.CreateKey(winreg.HKEY_CURRENT_USER, where) as key:
-                    winreg.SetValueEx(key, RUN_VALUE, 0, winreg.REG_SZ,
-                                      f'"{cmd}" /d /c {command}')
+                    winreg.SetValueEx(key, RUN_VALUE, 0, winreg.REG_SZ, command)
                 remove_legacy_launcher()
+                reminder_keys(True)
         except (OSError, UnicodeEncodeError):
             say(tr("Could not set up the reminder."))
             return False
@@ -1043,6 +1058,7 @@ def remind(on, quiet=False):
                     winreg.DeleteValue(key, RUN_VALUE)
             except FileNotFoundError:
                 pass
+            reminder_keys(False)
     except OSError:
         say(tr("Could not turn off the sign-in reminder."))
         return False
@@ -1509,11 +1525,16 @@ def menu(state, can_save=True, iso=None):
                            tr("Hide the thought and tip (now shown)")
                            if state.get("tips", True) else
                            tr("Show the thought and tip (now hidden)")))
+            say("  9  " + (tr("Window or text screen (set by your organization)")
+                           if policy("UseTextScreen") else
+                           tr("Use a window with buttons (now this text screen)")
+                           if state.get("text") else
+                           tr("Use this text screen (now a window with buttons)")))
             say("  " + tr("Enter") + "  " + tr("Back to the last prompt"))
             listed = True
-            choice = ask(tr("Choose 1 to 8, or Enter to go back > "))
+            choice = ask(tr("Choose 1 to 9, or Enter to go back > "))
         else:
-            choice = ask(tr("Choose 1 to 8, m to list the options, or Enter to "
+            choice = ask(tr("Choose 1 to 9, m to list the options, or Enter to "
                             "go back > "))
         if not choice:
             return
@@ -1581,8 +1602,23 @@ def menu(state, can_save=True, iso=None):
             else:
                 undo(state, base)
                 say(tr("Could not save that choice on this computer."))
+        elif choice == "9" and policy("UseTextScreen"):
+            say(tr("Your organization has set hello-world to open as a text "
+                   "screen."))
+        elif choice == "9":
+            refresh(state, can_save)
+            base = copy.deepcopy(state)
+            if state.pop("text", None) is None:
+                state["text"] = True
+            if commit(state, base, can_save):
+                say(tr("Done. The Start menu opens this text screen.")
+                    if state.get("text") else
+                    tr("Done. The Start menu opens a window with buttons."))
+            else:
+                undo(state, base)
+                say(tr("Could not save that choice on this computer."))
         else:
-            not_a_choice(choice, tr("Type 1 to 8, or press Enter to go back."))
+            not_a_choice(choice, tr("Type 1 to 9, or press Enter to go back."))
 
 
 def offer_reminder(state, can_save, planned=False):
@@ -1705,6 +1741,71 @@ def mark_done_now(state, can_save, d):
     return True
 
 
+def tidy_launcher():
+    """Apply the launcher policy, and move a pre-1.23 launcher to the Run value."""
+    if policy("DisableSignInLauncher"):
+        if launcher_on() or legacy_launcher() and os.path.isfile(legacy_launcher()):
+            remind(False, quiet=True)
+    elif remove_legacy_launcher():
+        # An old Startup .cmd becomes the Run value, keeping the person's choice.
+        remind(True)
+
+
+def plan_on_open(state, d):
+    """The plan as it stands on day d, and whether an old one was put away.
+
+    A plan dated after d becomes d's plan. One set over two weeks ago moves
+    to "previous", for same. Nothing is saved here.
+    """
+    intent = state["intent"]
+    if intent and intent["date"] > d.isoformat():
+        intent["date"] = d.isoformat()  # the clock moved back; it is today's plan now
+    # A plan kept day after day still counts from the day it was first set.
+    since = intent.get("since", intent["date"]) if intent else None
+    if intent and (d - datetime.date.fromisoformat(since)).days > 14:
+        state["previous"] = intent["text"]
+        return None, True
+    return intent, False
+
+
+def asks_followup(intent, d):
+    """True when "Did you do it?" is due: a plan from an earlier day, skipped
+    fewer than two times, with plans allowed."""
+    return bool(intent and intent["date"] < d.isoformat()
+                and intent.get("skips", 0) < 2 and not plans_off())
+
+
+def answer_plan(state, can_save, d, choice, text):
+    """Answer "Did you do it?" for the plan `text` from the window or the
+    sign-in reminder: "yes", "no" (not yet, kept for today) or "skip".
+
+    Returns (saved, message). Finishing counts on the plan's own day, the
+    same as Enter at the text screen's "When did you finish it?".
+    """
+    refresh(state, can_save)
+    intent = state["intent"]
+    if not (intent and intent["text"] == text and asks_followup(intent, d)):
+        return False, tr("The other open window changed the plan, so its plan "
+                         "is kept.")
+    base = copy.deepcopy(state)
+    if choice == "yes":
+        finish_plan(state, text, datetime.date.fromisoformat(intent["date"]))
+        state["intent"] = None
+    elif choice == "no":
+        state["intent"] = {"text": text, "date": d.isoformat(),
+                           "since": intent.get("since", intent["date"])}
+    else:
+        state["intent"] = dict(intent, skips=intent.get("skips", 0) + 1)
+    if not commit(state, base, can_save):
+        undo(state, base)
+        return False, tr("Could not save that on this computer. Your answer "
+                         "was not counted.")
+    if choice == "yes":
+        return True, done_lines(state, d)[0]
+    return True, tr("Kept for today.") if choice == "no" else tr(
+        "Your plan is still open.")
+
+
 def daily(startup):
     d = today()
     iso = d.isoformat()
@@ -1716,22 +1817,9 @@ def daily(startup):
     answered = False
     if startup and seen_today:
         return
-    if policy("DisableSignInLauncher"):
-        if launcher_on() or legacy_launcher() and os.path.isfile(legacy_launcher()):
-            remind(False, quiet=True)
-    elif remove_legacy_launcher():
-        # An old Startup .cmd becomes the Run value, keeping the person's choice.
-        remind(True)
+    tidy_launcher()
     first = not state["visits"]
-    intent = state["intent"]
-    if intent and intent["date"] > iso:
-        intent["date"] = iso  # the clock moved back; it is today's plan now
-    expired = False
-    # A plan kept day after day still counts from the day it was first set.
-    since = intent.get("since", intent["date"]) if intent else None
-    if intent and (d - datetime.date.fromisoformat(since)).days > 14:
-        state["previous"] = intent["text"]
-        intent, expired = None, True
+    intent, expired = plan_on_open(state, d)
 
     say(tr(GREETING))
     header = long_date(d)
@@ -1966,6 +2054,19 @@ def run(argv):
     if len(argv) == 2 and argv[0].lower() == "--check-content":
         return check_content(argv[1])
     argv = [a.lower() for a in argv]
+    if argv[:1] == ["--console"]:
+        # The window opens the text screens with this, in a console of their own.
+        if os.name == "nt":
+            import ctypes
+            ctypes.windll.kernel32.SetConsoleTitleW("hello-world")
+        argv = argv[1:]
+    if argv == ["--menu"]:
+        state, can_save = load()
+        try:
+            menu(state, can_save, today().isoformat())
+        except Quit:
+            pass
+        return 0
     if argv in (["/?"], ["-?"], ["/help"], ["-help"], ["help"]):
         argv = ["--help"]
     if argv == ["--plain"]:
@@ -2046,6 +2147,14 @@ def check_content(path):
 
 
 def main():
+    args = [a.lower() for a in sys.argv[1:]]
+    # pythonw.exe has no stdout, so the window and the sign-in run start here.
+    if (args == ["--window"] or args[:1] == ["--answer"] and len(args) == 2
+            or args == ["--startup"] and sys.stdout is None):
+        try:
+            return gui(args)
+        except Exception:
+            return 1
     try:
         # print() silently does nothing when stdout is None (fd 1 closed at start).
         # A stdout object that was closed later raises ValueError instead.
@@ -2079,6 +2188,700 @@ def main():
         except Exception:
             pass
         return 1
+
+
+# ==== Window ====
+# The Start menu runs hello.py --window through pythonw.exe, so there is no
+# console. The window is built from standard Windows controls, which screen
+# readers and high contrast already know. The text screens above stay for
+# anyone who prefers them, behind menu option 9 and the UseTextScreen policy.
+
+
+def text_screen(state):
+    """True when this person or the organization chose the text screen."""
+    return policy("UseTextScreen") or state.get("text") is True
+
+
+def console_python():
+    folder, name = os.path.split(sys.executable)
+    return (os.path.join(folder, "python.exe") if name.lower() == "pythonw.exe"
+            else sys.executable)
+
+
+def window_python():
+    folder, name = os.path.split(sys.executable)
+    return (os.path.join(folder, "pythonw.exe")
+            if os.name == "nt" and name.lower() == "python.exe" else sys.executable)
+
+
+def open_console(*args):
+    """Show the text screens in a console window of their own."""
+    import subprocess
+    subprocess.Popen([console_python(), "-I", os.path.abspath(__file__),
+                      "--console", *args],
+                     creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0))
+
+
+def quietly(fn, *args):
+    """Run fn and return (its result, what it said) for the window to show."""
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        result = fn(*args)
+    return result, " ".join(out.getvalue().split())
+
+
+def gui(args):
+    """--window, --answer and a sign-in run under pythonw.exe."""
+    global WINDOW
+    WINDOW = True
+    # pythonw.exe has no stdout, and anything said goes to the window instead.
+    with contextlib.redirect_stdout(io.StringIO()):
+        if args[0] == "--answer":
+            return answer_reminder(args[1])
+        if args == ["--startup"]:
+            return sign_in()
+        return show_window()
+
+
+def show_window():
+    state, _ = load(repair=False)
+    if os.name != "nt" or text_screen(state):
+        open_console()
+        return 0
+    try:
+        Window(Visit()).run()
+    except Exception:
+        # A PC where the window can't be drawn still gets the text screens.
+        open_console()
+    return 0
+
+
+# Reminders show under this name. Answering one opens hello-world:done,
+# hello-world:notyet or hello-world:open, which run hello.py --answer.
+APP_ID = "hello-world"
+
+
+def reminder_keys(on):
+    """Register, or remove, the reminder's name and its answer links for this
+    user. Neither needs administrator rights."""
+    if launcher_place()[0] != "run":
+        return
+    import winreg
+    classes = CLASSES_KEY
+    names = (classes + "\\" + APP_ID + r"\shell\open\command",
+             classes + "\\" + APP_ID + r"\shell\open",
+             classes + "\\" + APP_ID + r"\shell", classes + "\\" + APP_ID,
+             classes + r"\AppUserModelId" + "\\" + APP_ID)
+    if not on:
+        for name in names:
+            try:
+                winreg.DeleteKey(winreg.HKEY_CURRENT_USER, name)
+            except OSError:
+                pass
+        return
+    command = (f'"{window_python()}" -I "{os.path.abspath(__file__)}" '
+               '--answer "%1"')
+    for name, values in ((names[4], {"DisplayName": "hello-world"}),
+                         (names[3], {"": "URL:hello-world", "URL Protocol": ""}),
+                         (names[0], {"": command})):
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, name) as key:
+            for value, data in values.items():
+                winreg.SetValueEx(key, value, 0, winreg.REG_SZ, data)
+
+
+def reminder_due(state, d):
+    """The plan the sign-in reminder asks about, or None.
+
+    Only a plan waiting for "Did you do it?", once a day, and not after
+    hello-world was opened that day. With no plan it stays quiet.
+    """
+    iso = d.isoformat()
+    if iso in state["visits"] or state.get("notified") == iso:
+        return None
+    intent, expired = plan_on_open(copy.deepcopy(state), d)
+    return intent["text"] if asks_followup(intent, d) and not expired else None
+
+
+def sign_in():
+    """The launcher's run at sign-in, in pythonw.exe."""
+    d = today()
+    state, can_save = load()
+    if text_screen(state):
+        open_console("--startup")
+        return 0
+    text = reminder_due(state, d)
+    if not text:
+        return 0
+    base = copy.deepcopy(state)
+    state["notified"] = d.isoformat()
+    # Unsaved, it would come again at the next sign-in today.
+    if commit(state, base, can_save) and not show_reminder(text):
+        show_window()
+    return 0
+
+
+def show_reminder(text):
+    """Show a Windows notification with the plan and two answers. False when
+    Windows would not show it, such as where PowerShell is locked down."""
+    from xml.sax.saxutils import escape as plain
+
+    def escape(text):
+        return plain(text, {'"': "&quot;"})
+
+    xml = ('<toast activationType="protocol" launch="hello-world:open">'
+           '<visual><binding template="ToastGeneric">'
+           f'<text>{escape(tr("Last time you planned: ") + text)}</text>'
+           f'<text>{escape(tr("Did you do it?"))}</text></binding></visual>'
+           '<actions>'
+           f'<action content="{escape(tr("&Done").replace("&", ""))}" '
+           'activationType="protocol" arguments="hello-world:done"/>'
+           f'<action content="{escape(tr("&Not yet").replace("&", ""))}" '
+           'activationType="protocol" arguments="hello-world:notyet"/>'
+           '</actions></toast>')
+    if SHOWN is not None:
+        SHOWN.append(xml)
+        return True
+    if os.name != "nt":
+        return False
+    import base64
+    import subprocess
+    # The XML goes in as base64, so no plan text can break out of the script.
+    data = base64.b64encode(xml.encode("utf-8")).decode("ascii")
+    script = (
+        "$ErrorActionPreference='Stop'\n"
+        f"$x=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{data}'))\n"
+        "$null=[Windows.UI.Notifications.ToastNotificationManager,"
+        "Windows.UI.Notifications,ContentType=WindowsRuntime]\n"
+        "$null=[Windows.Data.Xml.Dom.XmlDocument,"
+        "Windows.Data.Xml.Dom.XmlDocument,ContentType=WindowsRuntime]\n"
+        "$d=New-Object Windows.Data.Xml.Dom.XmlDocument\n$d.LoadXml($x)\n"
+        "[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("
+        f"'{APP_ID}').Show([Windows.UI.Notifications.ToastNotification]::new($d))")
+    exe = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32",
+                       "WindowsPowerShell", "v1.0", "powershell.exe")
+    try:
+        return subprocess.run(
+            [exe, "-NoProfile", "-NonInteractive", "-EncodedCommand",
+             base64.b64encode(script.encode("utf-16-le")).decode("ascii")],
+            capture_output=True, timeout=60,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def answer_reminder(link):
+    """hello-world:done or :notyet from the reminder, answered with no window;
+    :open opens the window. Anything else is refused."""
+    link = link.strip().lower().rstrip("/")
+    word = link[len(APP_ID) + 1:] if link.startswith(APP_ID + ":") else ""
+    if word == "open":
+        return show_window()
+    if word not in ("done", "notyet"):
+        return 2
+    d = today()
+    state, can_save = load()
+    intent = state["intent"]
+    if asks_followup(intent, d):
+        answer_plan(state, can_save, d, "yes" if word == "done" else "no",
+                    intent["text"])
+    return 0
+
+
+class Visit:
+    """One opening of the window: what it shows, and what its buttons do.
+    The window only draws this, so the tests drive it directly."""
+
+    def __init__(self):
+        self.d = today()
+        self.iso = self.d.isoformat()
+        (self.state, self.can_save), said = quietly(load)
+        state, d = self.state, self.d
+        base = copy.deepcopy(state)
+        seen = self.iso in state["visits"]
+        first = not state["visits"]
+        quietly(tidy_launcher)
+        intent, expired = plan_on_open(state, d)
+        notes = [said] if said else []
+        if expired:
+            notes.append(tr("Your plan from over two weeks ago was put away. "
+                            "Type same at the plan prompt to bring it back."))
+        if first:
+            notes.append(tr("Welcome."))
+            if not policy("HideThoughtAndTip"):
+                notes.append(tr("Each day you get one thought and one small "
+                                "thing to try, the same for everyone."))
+            if not plans_off():
+                notes.append(tr("If you type a plan, it asks next time how it "
+                                "went. Your notes stay on this computer and are "
+                                "never sent anywhere. Like any work file they "
+                                "are not secret, so keep them to everyday "
+                                "tasks."))
+        elif not seen:
+            row = in_a_row(state["visits"], d)
+            if (d - datetime.date.fromisoformat(state["visits"][-1])).days > 7:
+                notes.append(tr("Welcome back. Glad you are here."))
+            elif (state["streak"] and not policy("HideDaysInARow")
+                  and (row in (3, 7, 14) or row % 30 == 0)):
+                notes.append(tr("You have opened this {row} times in a row. "
+                                "Nice to see you.").format(row=row))
+        state["intent"] = intent
+        if not seen:
+            state["visits"] = (state["visits"] + [self.iso])[-MAX_VISITS:]
+        saved, said = quietly(commit, state, base, self.can_save,
+                              ("intent", "previous"))
+        if not saved:
+            undo(state, base)
+            notes.append(said or tr("Your notes could not be saved on this "
+                                    "computer. This screen still works."))
+        self.note = " ".join(notes)
+        intent = state["intent"]
+        self.followup = intent["text"] if asks_followup(intent, d) else None
+        self.pair = (todays_pair(d) if state.get("tips", True)
+                     and not policy("HideThoughtAndTip") else None)
+
+    def plan(self):
+        """Today's plan, or "" when there is none for today."""
+        intent = self.state["intent"]
+        return intent["text"] if intent and intent["date"] == self.iso else ""
+
+    def answer(self, choice):
+        """"yes", "no" or "skip" to "Did you do it?". Returns the message."""
+        (saved, message), _ = quietly(answer_plan, self.state, self.can_save,
+                                      self.d, choice, self.followup)
+        if saved:
+            self.followup = None
+        return message
+
+    def save(self, typed):
+        """The plan typed in the box. Returns (close, message): a refused
+        plan keeps the window open to say why."""
+        if plans_off():
+            return True, ""
+        quietly(refresh, self.state, self.can_save)
+        if not tidy(typed) or clean(typed) == self.plan():
+            return True, ""
+        if is_same(typed) and not self.state.get("previous"):
+            return False, tr("There is no earlier plan to reuse yet. Nothing "
+                             "was saved.")
+        command, said = quietly(is_command, typed, tr("Type your plan in the box."))
+        if command:
+            # A word like "skip" or "none" is a choice to plan nothing.
+            return not said, said
+        text = clean(reuse(self.state, typed))
+        state = self.state
+        base = copy.deepcopy(state)
+        old = state["intent"]
+        if old and old["text"] != text and old["date"] != self.iso:
+            state["previous"] = old["text"]
+        state["intent"] = {"text": text, "date": self.iso}
+        saved, said = quietly(commit, state, base, self.can_save)
+        if not saved:
+            undo(state, base)
+            return False, said or tr("Could not save that on this computer. "
+                                     "Your plan is unchanged.")
+        self.followup = None
+        return True, ""
+
+    def did_it(self):
+        """Today's plan is finished. Returns the message."""
+        _, said = quietly(mark_done_now, self.state, self.can_save, self.d)
+        # The finished list after it is for the text screen.
+        return said.split(tr("Finished lately:"))[0].strip()
+
+    def offer_due(self):
+        """True when the window should ask once about the sign-in reminder."""
+        return bool(launcher_place()[0] and not policy("DisableSignInLauncher")
+                    and not plans_off() and not self.state.get("offered")
+                    and not launcher_on())
+
+    def set_reminder(self, on):
+        """Turn the sign-in reminder on or off. Returns the message."""
+        worked, said = quietly(remind, on)
+        quietly(refresh, self.state, self.can_save)
+        base = copy.deepcopy(self.state)
+        self.state["offered"] = True
+        quietly(commit, self.state, base, self.can_save)
+        if not worked:
+            return said
+        return (tr("Done. A reminder comes when you sign in, if there is a "
+                   "plan to ask about.") if on else
+                tr("Done. The sign-in reminder is off."))
+
+    def toggle(self, key):
+        """Flip "tips" (shown unless False) or "text" (the text screen).
+        Returns False when it could not be saved."""
+        quietly(refresh, self.state, self.can_save)
+        base = copy.deepcopy(self.state)
+        if key == "tips":
+            if self.state.get("tips", True):
+                self.state["tips"] = False
+            else:
+                self.state.pop("tips", None)
+        elif self.state.pop("text", None) is None:
+            self.state["text"] = True
+        saved, _ = quietly(commit, self.state, base, self.can_save)
+        if not saved:
+            undo(self.state, base)
+        return saved
+
+
+class Window:
+    """The Visit drawn as a standard Windows dialog, through ctypes."""
+
+    # Dialog units: one across is a quarter of an average character, one
+    # down an eighth of a line. Windows scales them with the font and DPI.
+    WIDTH, MARGIN, LINE = 300, 12, 10
+    TITLE, DATE, NOTE, PLANNED, ASK, DONE, NOT_YET, SKIP = range(100, 108)
+    THOUGHT_LABEL, THOUGHT, TIP_LABEL, TIP = range(110, 114)
+    PLAN_LABEL, PLAN, STATUS, OPTIONS, DID_IT = range(120, 125)
+    SAVE, CLOSE = 1, 2  # IDOK and IDCANCEL, so Enter and Esc work
+
+    def __init__(self, visit):
+        self.visit = visit
+        self.error = None
+        self.fonts = []
+
+    def lines(self, text):
+        per_line = int(self.WIDTH / 4.2)
+        return max(1, len(textwrap.wrap(text, per_line)))
+
+    def layout(self):
+        """The controls, as (class, id, text, style, x, y, w, h), and the height."""
+        v, m, w, line = self.visit, self.MARGIN, self.WIDTH, self.LINE
+        static, button, edit = 0x82, 0x80, 0x81
+        text_style, tab = 0x80, 0x10000  # SS_NOPREFIX, WS_TABSTOP
+        items, y = [], 10
+
+        def add(cls, cid, text, style, x, h, width=w):
+            items.append((cls, cid, text, style, x, y, width, h))
+
+        def para(cid, text, gap=6):
+            nonlocal y
+            h = self.lines(text) * line
+            add(static, cid, text, text_style, m, h)
+            y += h + gap
+
+        add(static, self.TITLE, tr(GREETING), text_style, m, 20)
+        y += 24
+        header = long_date(v.d)
+        para(self.DATE, header[0].upper() + header[1:], 8)
+        if v.note:
+            para(self.NOTE, v.note, 8)
+        if v.followup:
+            para(self.PLANNED, tr("Last time you planned: ") + v.followup, 2)
+            para(self.ASK, tr("Did you do it?"), 4)
+            for n, (cid, label) in enumerate(((self.DONE, tr("&Done")),
+                                              (self.NOT_YET, tr("&Not yet")),
+                                              (self.SKIP, tr("S&kip")))):
+                add(button, cid, label, tab, m + n * 70, 16, 64)
+            y += 26
+        if v.pair:
+            para(self.THOUGHT_LABEL, tr("Thought for today:"), 1)
+            para(self.THOUGHT, v.pair[0], 6)
+            para(self.TIP_LABEL, tr("Try this today:"), 1)
+            para(self.TIP, v.pair[1], 8)
+        if not plans_off():
+            para(self.PLAN_LABEL, self.plan_label(), 2)
+            add(edit, self.PLAN, v.plan(), tab | 0x800000 | 0x80, m, 15)
+            y += 19
+        add(static, self.STATUS, "", text_style, m, 2 * line)
+        y += 2 * line + 6
+        add(button, self.OPTIONS, tr("&Options"), tab, m, 16, 64)
+        right = m + w
+        if not plans_off():
+            add(button, self.CLOSE, self.close_label(), tab, right - 64, 16, 64)
+            add(button, self.SAVE, tr("&Save"), tab | 1, right - 134, 16, 64)
+            add(button, self.DID_IT, tr("&I did it"), tab, right - 204, 16, 64)
+        else:
+            add(button, self.CLOSE, tr("Close"), tab | 1, right - 64, 16, 64)
+        return items, y + 26
+
+    def plan_label(self):
+        return (tr("Your plan for today: ").strip() if self.visit.plan() else
+                tr("What is one thing you want to get done today?"))
+
+    def close_label(self):
+        return tr("Close") if self.visit.plan() else tr("Not today")
+
+    def template(self):
+        import struct
+
+        def text(s):
+            return (s + "\0").encode("utf-16-le")
+
+        items, height = self.layout()
+        self.ids = [item[1] for item in items]
+        # WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, and DS_SETFONT,
+        # DS_MODALFRAME and DS_CENTER. WS_EX_APPWINDOW puts it on the taskbar.
+        data = struct.pack("<IIH4h", 0x80CA08C0, 0x40000, len(items), 0, 0,
+                           self.WIDTH + 2 * self.MARGIN, height)
+        data += b"\0\0\0\0" + text("hello-world") + struct.pack("<H", 12)
+        data += text("Segoe UI")
+        for cls, cid, label, style, x, y, w, h in items:
+            data += b"\0" * (-len(data) % 4)
+            # WS_CHILD | WS_VISIBLE; the box gets WS_EX_CLIENTEDGE.
+            data += struct.pack("<IIhhhhH", 0x50000000 | style,
+                                0x200 if cls == 0x81 else 0, x, y, w, h, cid)
+            data += struct.pack("<HH", 0xFFFF, cls) + text(label) + b"\0\0"
+        return data
+
+    def run(self):
+        import ctypes
+        from ctypes import wintypes as wt
+        self.user = user = ctypes.WinDLL("user32", use_last_error=True)
+        self.gdi = gdi = ctypes.WinDLL("gdi32")
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        lresult = ctypes.c_ssize_t
+        for fn, args, res in (
+                ("SendMessageW", [wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM], lresult),
+                ("GetDlgItem", [wt.HWND, ctypes.c_int], wt.HWND),
+                ("SetWindowTextW", [wt.HWND, wt.LPCWSTR], wt.BOOL),
+                ("GetWindowTextW", [wt.HWND, wt.LPWSTR, ctypes.c_int], ctypes.c_int),
+                ("EndDialog", [wt.HWND, lresult], wt.BOOL),
+                ("ShowWindow", [wt.HWND, ctypes.c_int], wt.BOOL),
+                ("MessageBoxW", [wt.HWND, wt.LPCWSTR, wt.LPCWSTR, wt.UINT], ctypes.c_int),
+                ("CreatePopupMenu", [], wt.HMENU),
+                ("AppendMenuW", [wt.HMENU, wt.UINT, ctypes.c_size_t, wt.LPCWSTR], wt.BOOL),
+                ("TrackPopupMenu", [wt.HMENU, wt.UINT, ctypes.c_int, ctypes.c_int,
+                                    ctypes.c_int, wt.HWND, ctypes.c_void_p], wt.BOOL),
+                ("DestroyMenu", [wt.HMENU], wt.BOOL),
+                ("GetWindowRect", [wt.HWND, ctypes.POINTER(wt.RECT)], wt.BOOL),
+                ("GetSysColor", [ctypes.c_int], wt.DWORD),
+                ("GetSysColorBrush", [ctypes.c_int], wt.HBRUSH),
+                ("SetTimer", [wt.HWND, ctypes.c_size_t, wt.UINT, ctypes.c_void_p],
+                 ctypes.c_size_t),
+                ("DialogBoxIndirectParamW", [wt.HINSTANCE, ctypes.c_void_p, wt.HWND,
+                                             ctypes.c_void_p, wt.LPARAM], lresult)):
+            getattr(user, fn).argtypes, getattr(user, fn).restype = args, res
+        gdi.CreateFontW.argtypes = [ctypes.c_int] * 5 + [wt.DWORD] * 8 + [wt.LPCWSTR]
+        gdi.CreateFontW.restype = wt.HFONT
+        gdi.SetTextColor.argtypes = gdi.SetBkColor.argtypes = [wt.HDC, wt.DWORD]
+        gdi.DeleteObject.argtypes = [wt.HGDIOBJ]
+        kernel.GetModuleHandleW.restype = wt.HMODULE
+        # Sharp text on scaled displays, and the current look for buttons,
+        # which pythonw.exe's own manifest doesn't ask for.
+        try:
+            user.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))
+        except AttributeError:
+            pass
+        self.visual_styles(ctypes, wt, kernel)
+        proc_type = ctypes.WINFUNCTYPE(lresult, wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM)
+        self.proc = proc_type(self.dialog_proc)
+        data = self.template()
+        buffer = ctypes.create_string_buffer(data, len(data) + 4)
+        result = user.DialogBoxIndirectParamW(
+            kernel.GetModuleHandleW(None), buffer, None,
+            ctypes.cast(self.proc, ctypes.c_void_p), 0)
+        for font in self.fonts:
+            gdi.DeleteObject(font)
+        if self.error:
+            raise self.error
+        if result == -1:
+            raise ctypes.WinError(ctypes.get_last_error())
+
+    @staticmethod
+    def visual_styles(ctypes, wt, kernel):
+        """Activate common controls 6 from the manifest inside shell32.dll."""
+        class ACTCTXW(ctypes.Structure):
+            _fields_ = [("cbSize", wt.ULONG), ("dwFlags", wt.DWORD),
+                        ("lpSource", wt.LPCWSTR), ("wProcessorArchitecture", wt.USHORT),
+                        ("wLangId", wt.USHORT), ("lpAssemblyDirectory", wt.LPCWSTR),
+                        ("lpResourceName", ctypes.c_void_p),
+                        ("lpApplicationName", wt.LPCWSTR), ("hModule", wt.HMODULE)]
+        system = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32")
+        # ACTCTX_FLAG_RESOURCE_NAME_VALID | ACTCTX_FLAG_ASSEMBLY_DIRECTORY_VALID
+        ctx = ACTCTXW(ctypes.sizeof(ACTCTXW), 0x0C, os.path.join(system, "shell32.dll"),
+                      0, 0, system, 124, None, None)
+        kernel.CreateActCtxW.restype = wt.HANDLE
+        kernel.ActivateActCtx.argtypes = [wt.HANDLE, ctypes.POINTER(ctypes.c_size_t)]
+        handle = kernel.CreateActCtxW(ctypes.byref(ctx))
+        if handle and handle != wt.HANDLE(-1).value:
+            kernel.ActivateActCtx(handle, ctypes.byref(ctypes.c_size_t()))
+            ctypes.WinDLL("comctl32").InitCommonControls()
+
+    def dialog_proc(self, hwnd, msg, wparam, lparam):
+        try:
+            return self.handle(hwnd, msg, wparam, lparam)
+        except Exception as e:
+            self.error = e
+            self.user.EndDialog(hwnd, 2)
+            return 1
+
+    def item(self, cid):
+        return self.user.GetDlgItem(self.hwnd, cid)
+
+    def set_text(self, cid, text):
+        self.user.SetWindowTextW(self.item(cid), text)
+
+    def show(self, cid, visible):
+        self.user.ShowWindow(self.item(cid), 5 if visible else 0)
+
+    def focus(self, cid):
+        self.user.SendMessageW(self.hwnd, 0x28, self.item(cid), 1)  # WM_NEXTDLGCTL
+
+    def handle(self, hwnd, msg, wparam, lparam):
+        user = self.user
+        if msg == 0x110:  # WM_INITDIALOG
+            self.hwnd = hwnd
+            self.init_dialog()
+            return 0
+        if msg in (0x136, 0x138, 0x135):  # WM_CTLCOLORDLG, STATIC, BTN
+            # The system's window colours, so high contrast themes still apply.
+            self.gdi.SetTextColor(wparam, user.GetSysColor(8))
+            self.gdi.SetBkColor(wparam, user.GetSysColor(5))
+            return user.GetSysColorBrush(5)
+        if msg == 0x113:  # WM_TIMER, from CLOSE_WINDOW_AFTER
+            user.EndDialog(hwnd, 2)
+            return 1
+        if msg == 0x111 and (wparam >> 16) == 0:  # WM_COMMAND, BN_CLICKED
+            self.command(wparam & 0xFFFF)
+            return 1
+        return 0
+
+    def init_dialog(self):
+        user, gdi = self.user, self.gdi
+        try:
+            dpi = user.GetDpiForWindow(self.hwnd) or 96
+        except AttributeError:
+            dpi = 96
+        for cids, points, weight in (((self.TITLE,), 20, 600),
+                                     ((self.THOUGHT_LABEL, self.TIP_LABEL,
+                                       self.PLAN_LABEL, self.ASK), 12, 600)):
+            font = gdi.CreateFontW(-(points * dpi // 72), 0, 0, 0, weight,
+                                   0, 0, 0, 1, 0, 0, 5, 0, "Segoe UI")
+            self.fonts.append(font)
+            for cid in cids:
+                if self.item(cid):
+                    user.SendMessageW(self.item(cid), 0x30, font, 1)  # WM_SETFONT
+        if self.item(self.PLAN):
+            user.SendMessageW(self.item(self.PLAN), 0xC5, MAX_PLAN, 0)  # EM_LIMITTEXT
+        self.show(self.DID_IT, bool(self.visit.plan()))
+        self.focus(self.DONE if self.visit.followup else
+                   self.PLAN if self.item(self.PLAN) else self.CLOSE)
+        if CLOSE_WINDOW_AFTER:
+            user.SetTimer(self.hwnd, 1, CLOSE_WINDOW_AFTER, None)
+
+    def command(self, cid):
+        v = self.visit
+        if cid in (self.DONE, self.NOT_YET, self.SKIP):
+            message = v.answer({self.DONE: "yes", self.NOT_YET: "no"}.get(cid, "skip"))
+            if v.followup:
+                self.set_text(self.STATUS, message)
+                return
+            for hidden in (self.ASK, self.DONE, self.NOT_YET, self.SKIP):
+                self.show(hidden, False)
+            self.close_gap()
+            self.set_text(self.PLANNED, message)
+            self.refresh_plan()
+            self.focus(self.PLAN if self.item(self.PLAN) else self.CLOSE)
+        elif cid == self.DID_IT:
+            self.set_text(self.STATUS, v.did_it())
+            self.refresh_plan()
+            self.focus(self.PLAN)
+        elif cid == self.SAVE:
+            close, message = v.save(self.typed())
+            if not close:
+                self.set_text(self.STATUS, message)
+                self.focus(self.PLAN)
+                return
+            if v.plan() and v.offer_due():
+                # MB_YESNO | MB_ICONQUESTION; IDYES is 6.
+                answer = self.user.MessageBoxW(self.hwnd, tr(
+                    "Want a reminder when you sign in? It shows your plan from "
+                    "last time, and you answer with one click. You can turn it "
+                    "off under Options."), "hello-world", 0x24)
+                v.set_reminder(answer == 6)
+            self.user.EndDialog(self.hwnd, 1)
+        elif cid == self.CLOSE:
+            self.user.EndDialog(self.hwnd, 2)
+        elif cid == self.OPTIONS:
+            self.options()
+
+    def close_gap(self):
+        """Move what was under the answered question up into its place."""
+        import ctypes
+        from ctypes import wintypes as wt
+        user = self.user
+        user.MapWindowPoints.argtypes = [wt.HWND, wt.HWND, ctypes.c_void_p, wt.UINT]
+        user.SetWindowPos.argtypes = [wt.HWND, wt.HWND] + [ctypes.c_int] * 4 + [wt.UINT]
+
+        def rect(hwnd, client=True):
+            r = wt.RECT()
+            user.GetWindowRect(hwnd, ctypes.byref(r))
+            if client:
+                user.MapWindowPoints(None, self.hwnd, ctypes.byref(r), 2)
+            return r
+
+        later = self.ids[self.ids.index(self.SKIP) + 1:]
+        shift = rect(self.item(later[0])).top - rect(self.item(self.ASK)).bottom
+        for cid in later:
+            r = rect(self.item(cid))
+            # SWP_NOSIZE | SWP_NOZORDER
+            user.SetWindowPos(self.item(cid), None, r.left, r.top - shift, 0, 0, 0x5)
+        r = rect(self.hwnd, client=False)
+        # SWP_NOMOVE | SWP_NOZORDER
+        user.SetWindowPos(self.hwnd, None, 0, 0, r.right - r.left,
+                          r.bottom - r.top - shift, 0x6)
+
+    def typed(self):
+        import ctypes
+        if not self.item(self.PLAN):
+            return ""
+        buffer = ctypes.create_unicode_buffer(MAX_PLAN + 2)
+        self.user.GetWindowTextW(self.item(self.PLAN), buffer, MAX_PLAN + 2)
+        return buffer.value
+
+    def refresh_plan(self):
+        if not self.item(self.PLAN):
+            return
+        self.set_text(self.PLAN_LABEL, self.plan_label())
+        self.set_text(self.PLAN, self.visit.plan())
+        self.set_text(self.CLOSE, self.close_label())
+        self.show(self.DID_IT, bool(self.visit.plan()))
+
+    def options(self):
+        import ctypes
+        from ctypes import wintypes as wt
+        user, v = self.user, self.visit
+        menu = user.CreatePopupMenu()
+        checked, grayed = 0x8, 0x1
+        if launcher_place()[0] and not plans_off():
+            on = launcher_on()
+            user.AppendMenuW(menu, (checked if on else 0) | (
+                grayed if policy("DisableSignInLauncher") and not on else 0),
+                1, tr("Remind me when I sign in"))
+        if not policy("HideThoughtAndTip"):
+            user.AppendMenuW(menu, checked if v.state.get("tips", True) else 0,
+                             2, tr("Show the thought and tip"))
+        user.AppendMenuW(menu, 0x800, 0, None)  # MF_SEPARATOR
+        user.AppendMenuW(menu, grayed if policy("UseTextScreen") else 0, 3,
+                         tr("Use the text screen"))
+        user.AppendMenuW(menu, 0, 4, tr("More options"))
+        rect = wt.RECT()
+        user.GetWindowRect(self.item(self.OPTIONS), ctypes.byref(rect))
+        # TPM_RETURNCMD: the choice comes back here instead of as a message.
+        choice = user.TrackPopupMenu(menu, 0x100, rect.left, rect.bottom, 0,
+                                     self.hwnd, None)
+        user.DestroyMenu(menu)
+        if choice == 1:
+            self.set_text(self.STATUS, v.set_reminder(not launcher_on()))
+        elif choice == 2:
+            saved = v.toggle("tips")
+            self.set_text(self.STATUS, (
+                tr("Could not save that choice on this computer.") if not saved
+                else tr("Done. The thought and tip are on.")
+                if v.state.get("tips", True) else
+                tr("Done. The thought and tip are off.")))
+        elif choice == 3:
+            if v.toggle("text"):
+                open_console()
+                user.EndDialog(self.hwnd, 2)
+            else:
+                self.set_text(self.STATUS, tr("Could not save that choice on "
+                                              "this computer."))
+        elif choice == 4:
+            open_console("--menu")
+            user.EndDialog(self.hwnd, 2)
 
 
 # ==== Translations ====
@@ -2515,10 +3318,10 @@ sitio.""",
             'Enter',
         'Back to the last prompt':
             'Volver a la última pregunta',
-        'Choose 1 to 8, or Enter to go back > ':
-            'Elige del 1 al 8, o Enter para volver > ',
-        'Choose 1 to 8, m to list the options, or Enter to go back > ':
-            'Elige del 1 al 8, m para ver las opciones, o Enter para volver > ',
+        'Choose 1 to 9, or Enter to go back > ':
+            'Elige del 1 al 9, o Enter para volver > ',
+        'Choose 1 to 9, m to list the options, or Enter to go back > ':
+            'Elige del 1 al 9, m para ver las opciones, o Enter para volver > ',
         'The saved file could not be read just now, so this may be out of date.':
             'El archivo guardado no se pudo leer ahora, así que esto puede no estar al día.',
         'Type full to see the whole file, or Enter to go on > ':
@@ -2539,8 +3342,8 @@ sitio.""",
             'Listo. La idea y la sugerencia están activadas.',
         'Done. The thought and tip are off.':
             'Listo. La idea y la sugerencia están desactivadas.',
-        'Type 1 to 8, or press Enter to go back.':
-            'Escribe del 1 al 8, o pulsa Enter para volver.',
+        'Type 1 to 9, or press Enter to go back.':
+            'Escribe del 1 al 9, o pulsa Enter para volver.',
         'Want it to open once a day when you sign in? (y or n, Enter for not now) > ':
             '¿Quieres que se abra una vez al día al iniciar sesión? (s o n, Enter para más tarde) > ',
         'Want it to open once a day when you sign in so it can ask about your plan? (y or n, Enter for not now) > ':
@@ -2647,6 +3450,50 @@ sitio.""",
             '{option} necesita on u off. Estas son las opciones.',
         'Unknown option: {option}. Here are the options.':
             'Opción desconocida: {option}. Estas son las opciones.',
+        '&Done':
+            '&Hecho',
+        '&Not yet':
+            '&Todavía no',
+        'S&kip':
+            '&Saltar',
+        '&Save':
+            '&Guardar',
+        '&I did it':
+            '&Ya lo hice',
+        '&Options':
+            '&Opciones',
+        'Close':
+            'Cerrar',
+        'Not today':
+            'Hoy no',
+        'Did you do it?':
+            '¿Lo hiciste?',
+        'Done. A reminder comes when you sign in, if there is a plan to ask about.':
+            'Listo. Al iniciar sesión verás un aviso si hay un plan sobre el que preguntar.',
+        'Done. The Start menu opens a window with buttons.':
+            'Listo. El menú Inicio abre una ventana con botones.',
+        'Done. The Start menu opens this text screen.':
+            'Listo. El menú Inicio abre esta pantalla de texto.',
+        'More options':
+            'Más opciones',
+        'Remind me when I sign in':
+            'Avisarme al iniciar sesión',
+        'Show the thought and tip':
+            'Mostrar la idea y la sugerencia',
+        'Type your plan in the box.':
+            'Escribe tu plan en el cuadro.',
+        'Use a window with buttons (now this text screen)':
+            'Usar una ventana con botones (ahora esta pantalla de texto)',
+        'Use the text screen':
+            'Usar la pantalla de texto',
+        'Use this text screen (now a window with buttons)':
+            'Usar esta pantalla de texto (ahora una ventana con botones)',
+        'Want a reminder when you sign in? It shows your plan from last time, and you answer with one click. You can turn it off under Options.':
+            '¿Quieres un aviso al iniciar sesión? Te muestra tu plan de la última vez y respondes con un clic. Puedes desactivarlo en Opciones.',
+        'Window or text screen (set by your organization)':
+            'Ventana o pantalla de texto (lo decide tu organización)',
+        'Your organization has set hello-world to open as a text screen.':
+            'Tu organización ha configurado hello-world como pantalla de texto.',
     },
 }
 
@@ -3082,10 +3929,10 @@ Digite m para ver as opções de novo. Nada é enviado para lugar nenhum.""",
             'Enter',
         'Back to the last prompt':
             'Voltar à última pergunta',
-        'Choose 1 to 8, or Enter to go back > ':
-            'Escolha de 1 a 8, ou Enter para voltar > ',
-        'Choose 1 to 8, m to list the options, or Enter to go back > ':
-            'Escolha de 1 a 8, m para listar as opções, ou Enter para voltar > ',
+        'Choose 1 to 9, or Enter to go back > ':
+            'Escolha de 1 a 9, ou Enter para voltar > ',
+        'Choose 1 to 9, m to list the options, or Enter to go back > ':
+            'Escolha de 1 a 9, m para listar as opções, ou Enter para voltar > ',
         'The saved file could not be read just now, so this may be out of date.':
             'Não foi possível ler o arquivo salvo agora, então isto pode estar desatualizado.',
         'Type full to see the whole file, or Enter to go on > ':
@@ -3106,8 +3953,8 @@ Digite m para ver as opções de novo. Nada é enviado para lugar nenhum.""",
             'Concluído. O pensamento e a dica estão ativados.',
         'Done. The thought and tip are off.':
             'Concluído. O pensamento e a dica estão desativados.',
-        'Type 1 to 8, or press Enter to go back.':
-            'Digite de 1 a 8, ou pressione Enter para voltar.',
+        'Type 1 to 9, or press Enter to go back.':
+            'Digite de 1 a 9, ou pressione Enter para voltar.',
         'Want it to open once a day when you sign in? (y or n, Enter for not now) > ':
             'Quer que o hello-world abra uma vez por dia ao iniciar a sessão? (s ou n, Enter para agora não) > ',
         'Want it to open once a day when you sign in so it can ask about your plan? (y or n, Enter for not now) > ':
@@ -3214,6 +4061,50 @@ Digite m para ver as opções de novo. Nada é enviado para lugar nenhum.""",
             '{option} precisa de on ou off. Estas são as opções.',
         'Unknown option: {option}. Here are the options.':
             'Opção desconhecida: {option}. Estas são as opções.',
+        '&Done':
+            '&Feito',
+        '&Not yet':
+            '&Ainda não',
+        'S&kip':
+            '&Pular',
+        '&Save':
+            '&Salvar',
+        '&I did it':
+            '&Eu fiz',
+        '&Options':
+            '&Opções',
+        'Close':
+            'Fechar',
+        'Not today':
+            'Hoje não',
+        'Did you do it?':
+            'Você fez?',
+        'Done. A reminder comes when you sign in, if there is a plan to ask about.':
+            'Concluído. Ao entrar, aparece um lembrete se houver um plano para acompanhar.',
+        'Done. The Start menu opens a window with buttons.':
+            'Concluído. O menu Iniciar abre uma janela com botões.',
+        'Done. The Start menu opens this text screen.':
+            'Concluído. O menu Iniciar abre esta tela de texto.',
+        'More options':
+            'Mais opções',
+        'Remind me when I sign in':
+            'Lembrar-me ao entrar',
+        'Show the thought and tip':
+            'Mostrar o pensamento e a dica',
+        'Type your plan in the box.':
+            'Digite seu plano na caixa.',
+        'Use a window with buttons (now this text screen)':
+            'Usar uma janela com botões (agora esta tela de texto)',
+        'Use the text screen':
+            'Usar a tela de texto',
+        'Use this text screen (now a window with buttons)':
+            'Usar esta tela de texto (agora uma janela com botões)',
+        'Want a reminder when you sign in? It shows your plan from last time, and you answer with one click. You can turn it off under Options.':
+            'Quer um lembrete ao entrar? Ele mostra o seu plano da última vez, e você responde com um clique. Você pode desativá-lo em Opções.',
+        'Window or text screen (set by your organization)':
+            'Janela ou tela de texto (definido pela sua organização)',
+        'Your organization has set hello-world to open as a text screen.':
+            'Sua organização configurou o hello-world para abrir como tela de texto.',
     },
 }
 
@@ -3650,10 +4541,10 @@ Tapez m pour revoir les options. Rien n'est envoyé nulle part.""",
             'Entrée',
         'Back to the last prompt':
             'Revenir à la dernière question',
-        'Choose 1 to 8, or Enter to go back > ':
-            'Choisissez de 1 à 8, ou Entrée pour revenir > ',
-        'Choose 1 to 8, m to list the options, or Enter to go back > ':
-            'Choisissez de 1 à 8, m pour afficher les options, ou Entrée pour revenir > ',
+        'Choose 1 to 9, or Enter to go back > ':
+            'Choisissez de 1 à 9, ou Entrée pour revenir > ',
+        'Choose 1 to 9, m to list the options, or Enter to go back > ':
+            'Choisissez de 1 à 9, m pour afficher les options, ou Entrée pour revenir > ',
         'The saved file could not be read just now, so this may be out of date.':
             "Le fichier enregistré n'a pas pu être lu pour l'instant, ces informations ne sont donc peut-être pas à jour.",
         'Type full to see the whole file, or Enter to go on > ':
@@ -3674,8 +4565,8 @@ Tapez m pour revoir les options. Rien n'est envoyé nulle part.""",
             "C'est fait. La pensée et l'astuce sont activées.",
         'Done. The thought and tip are off.':
             "C'est fait. La pensée et l'astuce sont désactivées.",
-        'Type 1 to 8, or press Enter to go back.':
-            'Tapez un chiffre de 1 à 8, ou appuyez sur Entrée pour revenir.',
+        'Type 1 to 9, or press Enter to go back.':
+            'Tapez un chiffre de 1 à 9, ou appuyez sur Entrée pour revenir.',
         'Want it to open once a day when you sign in? (y or n, Enter for not now) > ':
             "Voulez-vous que hello-world s'ouvre une fois par jour à votre connexion ? (o ou n, Entrée pour plus tard) > ",
         'Want it to open once a day when you sign in so it can ask about your plan? (y or n, Enter for not now) > ':
@@ -3782,6 +4673,50 @@ Tapez m pour revoir les options. Rien n'est envoyé nulle part.""",
             '{option} doit être suivi de on ou off. Voici les options.',
         'Unknown option: {option}. Here are the options.':
             'Option inconnue : {option}. Voici les options.',
+        '&Done':
+            '&Fait',
+        '&Not yet':
+            '&Pas encore',
+        'S&kip':
+            'P&asser',
+        '&Save':
+            '&Enregistrer',
+        '&I did it':
+            "&C'est fait",
+        '&Options':
+            '&Options',
+        'Close':
+            'Fermer',
+        'Not today':
+            "Pas aujourd'hui",
+        'Did you do it?':
+            "L'avez-vous fait ?",
+        'Done. A reminder comes when you sign in, if there is a plan to ask about.':
+            "C'est fait. Un rappel s'affiche à la connexion s'il y a un plan à suivre.",
+        'Done. The Start menu opens a window with buttons.':
+            "C'est fait. Le menu Démarrer ouvre une fenêtre avec des boutons.",
+        'Done. The Start menu opens this text screen.':
+            "C'est fait. Le menu Démarrer ouvre cet écran texte.",
+        'More options':
+            "Plus d'options",
+        'Remind me when I sign in':
+            'Me le rappeler à la connexion',
+        'Show the thought and tip':
+            "Afficher la pensée et l'astuce",
+        'Type your plan in the box.':
+            'Tapez votre plan dans la zone.',
+        'Use a window with buttons (now this text screen)':
+            'Utiliser une fenêtre avec des boutons (écran texte)',
+        'Use the text screen':
+            "Utiliser l'écran texte",
+        'Use this text screen (now a window with buttons)':
+            'Utiliser cet écran texte (fenêtre avec boutons)',
+        'Want a reminder when you sign in? It shows your plan from last time, and you answer with one click. You can turn it off under Options.':
+            "Voulez-vous un rappel à la connexion ? Il affiche votre plan de la dernière fois, et vous répondez d'un clic. Vous pouvez le désactiver dans Options.",
+        'Window or text screen (set by your organization)':
+            'Fenêtre ou écran texte (défini par votre organisation)',
+        'Your organization has set hello-world to open as a text screen.':
+            'Votre organisation a configuré hello-world en écran texte.',
     },
 }
 
@@ -4217,10 +5152,10 @@ irgendwohin gesendet.""",
             'Eingabetaste',
         'Back to the last prompt':
             'Zurück zur letzten Frage',
-        'Choose 1 to 8, or Enter to go back > ':
-            '1 bis 8 wählen oder Eingabetaste zum Zurückkehren > ',
-        'Choose 1 to 8, m to list the options, or Enter to go back > ':
-            '1 bis 8 wählen, m für die Optionen oder Eingabetaste zum Zurückkehren > ',
+        'Choose 1 to 9, or Enter to go back > ':
+            '1 bis 9 wählen oder Eingabetaste zum Zurückkehren > ',
+        'Choose 1 to 9, m to list the options, or Enter to go back > ':
+            '1 bis 9 wählen, m für die Optionen oder Eingabetaste zum Zurückkehren > ',
         'The saved file could not be read just now, so this may be out of date.':
             'Die gespeicherte Datei konnte gerade nicht gelesen werden, daher ist dies eventuell nicht aktuell.',
         'Type full to see the whole file, or Enter to go on > ':
@@ -4241,8 +5176,8 @@ irgendwohin gesendet.""",
             'Fertig. Gedanke und Tipp sind eingeschaltet.',
         'Done. The thought and tip are off.':
             'Fertig. Gedanke und Tipp sind ausgeschaltet.',
-        'Type 1 to 8, or press Enter to go back.':
-            'Geben Sie 1 bis 8 ein, oder drücken Sie die Eingabetaste, um zurückzukehren.',
+        'Type 1 to 9, or press Enter to go back.':
+            'Geben Sie 1 bis 9 ein, oder drücken Sie die Eingabetaste, um zurückzukehren.',
         'Want it to open once a day when you sign in? (y or n, Enter for not now) > ':
             'Soll sich hello-world einmal täglich bei der Anmeldung öffnen? (j oder n, Eingabetaste für später) > ',
         'Want it to open once a day when you sign in so it can ask about your plan? (y or n, Enter for not now) > ':
@@ -4349,6 +5284,50 @@ irgendwohin gesendet.""",
             '{option} erwartet on oder off. Hier sind die Optionen.',
         'Unknown option: {option}. Here are the options.':
             'Unbekannte Option: {option}. Hier sind die Optionen.',
+        '&Done':
+            '&Erledigt',
+        '&Not yet':
+            '&Noch nicht',
+        'S&kip':
+            '&Überspringen',
+        '&Save':
+            '&Speichern',
+        '&I did it':
+            '&Geschafft',
+        '&Options':
+            '&Optionen',
+        'Close':
+            'Schließen',
+        'Not today':
+            'Heute nicht',
+        'Did you do it?':
+            'Haben Sie es geschafft?',
+        'Done. A reminder comes when you sign in, if there is a plan to ask about.':
+            'Fertig. Bei der Anmeldung kommt eine Erinnerung, wenn es einen Plan zum Nachfragen gibt.',
+        'Done. The Start menu opens a window with buttons.':
+            'Fertig. Das Startmenü öffnet ein Fenster mit Schaltflächen.',
+        'Done. The Start menu opens this text screen.':
+            'Fertig. Das Startmenü öffnet diesen Textbildschirm.',
+        'More options':
+            'Weitere Optionen',
+        'Remind me when I sign in':
+            'Bei der Anmeldung erinnern',
+        'Show the thought and tip':
+            'Gedanken und Tipp anzeigen',
+        'Type your plan in the box.':
+            'Geben Sie Ihren Plan in das Feld ein.',
+        'Use a window with buttons (now this text screen)':
+            'Fenster mit Schaltflächen verwenden (jetzt Textbildschirm)',
+        'Use the text screen':
+            'Textbildschirm verwenden',
+        'Use this text screen (now a window with buttons)':
+            'Diesen Textbildschirm verwenden (jetzt Fenster)',
+        'Want a reminder when you sign in? It shows your plan from last time, and you answer with one click. You can turn it off under Options.':
+            'Möchten Sie eine Erinnerung bei der Anmeldung? Sie zeigt Ihren Plan vom letzten Mal, und Sie antworten mit einem Klick. Unter Optionen können Sie sie ausschalten.',
+        'Window or text screen (set by your organization)':
+            'Fenster/Textbildschirm (von Ihrer Organisation festgelegt)',
+        'Your organization has set hello-world to open as a text screen.':
+            'Ihre Organisation hat hello-world auf den Textbildschirm festgelegt.',
     },
 }
 

@@ -34,6 +34,13 @@ Wenn diese Einstellung deaktiviert oder nicht konfiguriert ist, kann jede Person
 Wenn diese Einstellung deaktiviert oder nicht konfiguriert ist, zeigt hello-world seine Bildschirme auf Spanisch, Französisch, Portugiesisch oder Deutsch, wenn die Windows-Anzeigesprache eine davon ist, und sonst auf Englisch. Die Befehlswörter jeder Sprache, etwa erledigt und beenden, funktionieren in allen Sprachen.
 
 Eine Inhaltsdatei der Organisation ersetzt die Gedanken und Tipps in allen Sprachen.</string>
+      <string id="SUPPORTED_1_28">hello-world 1.28.0 oder höher</string>
+      <string id="UseTextScreen">hello-world als Textbildschirm öffnen</string>
+      <string id="UseTextScreen_Help">Wenn diese Einstellung aktiviert ist, öffnet die Verknüpfung im Startmenü hello-world als Textbildschirm in einem Konsolenfenster, wie Versionen vor 1.28, und der Starter bei der Anmeldung öffnet es ebenso. Niemand kann zum Fenster wechseln.
+
+Wenn diese Einstellung deaktiviert oder nicht konfiguriert ist, öffnet sich hello-world in einem Fenster mit Schaltflächen, und jede Person kann unter Optionen oder mit Option 9 im Menü des Textbildschirms zum Textbildschirm wechseln. Ist der Starter eingeschaltet, zeigt die Fensterversion bei der Anmeldung eine Windows-Benachrichtigung, wenn es einen Plan zum Nachfragen gibt, statt sich zu öffnen.
+
+Verwenden Sie diese Einstellung, wenn Screenreader-Nutzer nur den Textbildschirm getestet haben oder keine Windows-Benachrichtigungen gewünscht sind.</string>
     </stringTable>
   </resources>
 </policyDefinitionResources>
