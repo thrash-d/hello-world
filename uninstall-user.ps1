@@ -22,7 +22,9 @@ try {
     $run = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
     $value = (Get-ItemProperty -LiteralPath $run -Name 'hello-world' -ErrorAction SilentlyContinue).'hello-world'
     if ($value -and $value -like "*$dir*") { Remove-ItemProperty -LiteralPath $run -Name 'hello-world' }
-    & (Join-Path $sys32 'schtasks.exe') /Delete /F /TN "hello-world reminder $env:USERNAME" 2>$null | Out-Null
+    # Through cmd: Windows PowerShell 5.1 stops on any stderr text from a
+    # native command, and schtasks writes some when there is no task.
+    & (Join-Path $sys32 'cmd.exe') /d /c "`"$(Join-Path $sys32 'schtasks.exe')`" /Delete /F /TN `"hello-world reminder $env:USERNAME`" >nul 2>&1"
     foreach ($k in 'HKCU:\Software\Classes\hello-world', 'HKCU:\Software\Classes\AppUserModelId\hello-world',
                    'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\hello-world') {
         if (Test-Path -LiteralPath $k) { Remove-Item -LiteralPath $k -Recurse -Force }
