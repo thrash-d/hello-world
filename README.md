@@ -52,7 +52,9 @@ first name at the top.
 Options also has **This week...** (what you finished since Monday), **My
 numbers...** (days opened, your longest run and plans finished, once you turn
 on **Keep my numbers**), **Save my plans to a file** (a Markdown file in
-Documents), and **Keep a longer history** (60 finished plans instead of 7).
+Documents), **Keep a longer history** (60 finished plans instead of 7), and
+**Tips for floor and shift work**, a second list of 40 tips for warehouses,
+factories and shifts in place of the desk ones.
 
 Every on-or-off choice also works from the command line, for example
 `hello.cmd --set numbers on`. The names are `nudge`, `open_after`,
@@ -60,7 +62,7 @@ Every on-or-off choice also works from the command line, for example
 (no finished list in the text screen), `expire_same` (`same` forgets an
 earlier plan after 30 days), `no_count` (no done count kept), `numbers`,
 `close_after_done` (the text screen closes after `done` and the next plan)
-and `colon_prompts` (prompts end in `:` instead of `>`). `--week`,
+`colon_prompts` (prompts end in `:` instead of `>`) and `floor_tips`. `--week`,
 `--numbers` and `--export` print or save the same as the window, and
 `--plain-local` prints the greeting in your language. **Options** in the window
 turns the reminder off, hides the thought and tip, turns on the days-in-a-row
@@ -214,7 +216,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.35.0'
+$tag = 'v1.36.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
@@ -297,7 +299,11 @@ Get-ItemProperty HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\hello
 - `docs/ACCESSIBILITY.md`: how it meets accessibility expectations, and how that was checked.
 - `test_hello.py`: run with `python test_hello.py` (Python 3.11 or later).
 - `VERSION`: the release version; a new version on `main` gets a tag.
+- `hello.<language>.json`: the translations, which `hello.py` reads at
+  start. A regional one, such as `hello.fr-CA.json`, holds only what differs
+  from its base language.
 - `CHANGELOG.md`, `TODO.md`, `reviews/`: change history, the build queue
+- `LICENSE`: MIT.
   with reasons, and the saved review of each round.
 - `PLAN.md`: the value and rollout plan.
 - `TODO.md`: what a six-voice panel agreed should be done next.

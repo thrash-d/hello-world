@@ -64,7 +64,7 @@ and lists each problem. To check a file first, run
 `hello.cmd --check-content <file>`, or add `--local` for the answer in the
 Windows display language.
 
-The file becomes `content.json` in the package, covered by `SHA256SUMS` and
+Each file keeps its name in the package, covered by `SHA256SUMS` and
 the package hash, so the content is reviewed and signed off with the rest of
 the release. The installer checks the file again on the PC and stops if it
 breaks a rule. Your lines replace the built-in ones in every language, so
@@ -74,6 +74,12 @@ like the built-in lists, so everyone sees the same line on the same day.
 An organization that installs from a git clone with `-Commit` commits
 `content.json` at the top of its own fork instead. A `content.json` that
 isn't in the commit is ignored.
+
+You can also ship a file per language, named `content.<language>.json`,
+such as `content.es.json` or `content.fr-CA.json`. A person whose language
+has one sees it; a regional language falls back to its base language's file,
+then to `content.json`. Pass every file to `-ContentFile`, separated by
+commas.
 
 Two more keys are optional:
 - `"holidays"`: up to 100 dates such as `"2026-12-25"`. The reminder doesn't

@@ -4,7 +4,7 @@ Builds the offline install package for a release.
 
 .DESCRIPTION
 Copies install.ps1, uninstall.ps1, install-user.ps1, uninstall-user.ps1,
-hello.py and VERSION into -OutDir. Downloads
+hello.py, the translations (hello.<language>.json) and VERSION into -OutDir. Downloads
 the Python zip that install.ps1 pins and checks it against the pinned SHA-256.
 Writes SHA256SUMS and a CycloneDX bill of materials. Prints the package hash:
 the SHA-256 of SHA256SUMS, which install.ps1 -PackageHash checks first.
@@ -27,8 +27,10 @@ An RFC 3161 timestamp server for the signatures, so they stay valid after
 the certificate expires. Leave it out only for testing.
 
 .PARAMETER ContentFile
-The organization's own thoughts and tips, added to the package as
-content.json and covered by SHA256SUMS. The build stops if the file breaks
+The organization's own thoughts and tips: content.json, and optionally
+content.<language>.json files such as content.es.json, which that language
+shows instead. Each keeps its name in the package and is covered by
+SHA256SUMS. The build stops if the file breaks
 the rules that hello.py --check-content lists. examples/content.json shows
 the format.
 #>
@@ -36,7 +38,7 @@ param(
     [Parameter(Mandatory)][string]$OutDir,
     [ValidatePattern('^[0-9A-Fa-f]{40}$')][string]$CertificateThumbprint,
     [string]$TimestampServer,
-    [string]$ContentFile
+    [string[]]$ContentFile
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
@@ -51,7 +53,15 @@ New-Item -ItemType Directory -Force $OutDir | Out-Null
 foreach ($f in 'install.ps1', 'uninstall.ps1', 'install-user.ps1', 'uninstall-user.ps1', 'hello.py', 'VERSION') {
     Copy-Item -LiteralPath (Join-Path $root $f) -Destination $OutDir
 }
-if ($ContentFile) { Copy-Item -LiteralPath $ContentFile -Destination (Join-Path $OutDir 'content.json') }
+$contentNames = @()
+foreach ($c in $ContentFile) {
+    $name = Split-Path $c -Leaf
+    if ($name -notmatch '^content(\.[A-Za-z-]+)?\.json$') { throw "$name must be named content.json or content.<language>.json." }
+    Copy-Item -LiteralPath $c -Destination (Join-Path $OutDir $name)
+    $contentNames += $name
+}
+$languages = @(Get-ChildItem -LiteralPath $root -Filter 'hello.*.json' | ForEach-Object Name | Sort-Object)
+foreach ($f in $languages) { Copy-Item -LiteralPath (Join-Path $root $f) -Destination $OutDir }
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 $ProgressPreference = 'SilentlyContinue'
@@ -75,15 +85,17 @@ if ($ContentFile) {
     $check = Join-Path ([IO.Path]::GetTempPath()) ([IO.Path]::GetRandomFileName())
     try {
         Expand-Archive -LiteralPath $zip -DestinationPath $check
-        $out = & (Join-Path $check 'python.exe') -I (Join-Path $OutDir 'hello.py') --check-content (Join-Path $OutDir 'content.json')
-        if ($LASTEXITCODE) { throw "The content file breaks these rules:`n$($out -join "`n")" }
+        foreach ($name in $contentNames) {
+            $out = & (Join-Path $check 'python.exe') -I (Join-Path $OutDir 'hello.py') --check-content (Join-Path $OutDir $name)
+            if ($LASTEXITCODE) { throw "$name breaks these rules:`n$($out -join "`n")" }
+        }
     }
     finally { Remove-Item -LiteralPath $check -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
 # One line per file, "<sha256>  <name>", in a fixed order, so the same inputs
 # always give the same package hash.
-$files = @(if ($ContentFile) { 'content.json' }) + 'hello.py', 'install-user.ps1', 'install.ps1', 'python-embed.zip', 'uninstall-user.ps1', 'uninstall.ps1', 'VERSION'
+$files = @($contentNames | Sort-Object) + $languages + 'hello.py', 'install-user.ps1', 'install.ps1', 'python-embed.zip', 'uninstall-user.ps1', 'uninstall.ps1', 'VERSION'
 $sums = foreach ($f in $files) { '{0}  {1}' -f (Get-FileHash -LiteralPath (Join-Path $OutDir $f)).Hash.ToLower(), $f }
 [IO.File]::WriteAllText((Join-Path $OutDir 'SHA256SUMS'), ($sums -join "`n") + "`n", [Text.Encoding]::ASCII)
 
@@ -110,11 +122,11 @@ $bom = [ordered]@{
         }
     )
 }
-if ($ContentFile) {
+foreach ($name in @($contentNames) + $languages) {
     $bom.components += [ordered]@{
         type   = 'data'
-        name   = 'content.json'
-        hashes = @([ordered]@{ alg = 'SHA-256'; content = (Get-FileHash -LiteralPath (Join-Path $OutDir 'content.json')).Hash.ToLower() })
+        name   = $name
+        hashes = @([ordered]@{ alg = 'SHA-256'; content = (Get-FileHash -LiteralPath (Join-Path $OutDir $name)).Hash.ToLower() })
     }
 }
 $bom | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $OutDir 'sbom.cdx.json') -Encoding ascii

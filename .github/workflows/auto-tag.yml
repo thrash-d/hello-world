@@ -1,13 +1,14 @@
-# Installed by dev-kit. devkit.ps1 update overwrites this file, so edit the
-# copy in dev-kit/repo-files/ instead. A repo with .devkit/no-auto-workflows
-# doesn't get it.
+# This repo's own copy, with actions pinned to a commit.
+# .devkit/no-auto-workflows keeps the shared kit from replacing it.
 #
-# Tags main with v<version> when the repo's version file holds a version that
-# has no tag yet. Bump the version and push; the tag follows.
+# Tags main with v<version> once the tests have passed on that commit, when
+# VERSION holds a version that has no tag yet.
 name: auto-tag
 
 on:
-  push:
+  workflow_run:
+    workflows: [tests]
+    types: [completed]
     branches: [main]
 
 permissions:
@@ -15,16 +16,14 @@ permissions:
 
 jobs:
   tag:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - run: |
-          v=
-          for f in VERSION manifest.json extension/manifest.json chrome/manifest.json package.json; do
-            [ -f "$f" ] || continue
-            if [ "$f" = VERSION ]; then v=$(tr -d '[:space:]' < "$f"); else v=$(jq -r '.version // empty' "$f"); fi
-            [ -n "$v" ] && break
-          done
-          [ -n "$v" ] || { echo "No version file."; exit 0; }
+          v=$(tr -d '[:space:]' < VERSION)
+          [ -n "$v" ] || { echo "No version."; exit 0; }
           if git ls-remote --exit-code --tags origin "refs/tags/v$v" > /dev/null; then echo "v$v already tagged."; exit 0; fi
           git tag "v$v" && git push origin "v$v"

@@ -5,7 +5,8 @@ Installs hello.py for all users in a folder only administrators can change.
 .DESCRIPTION
 Creates "Program Files\hello-world", where only Administrators and SYSTEM can
 write. Unpacks a pinned, hash-checked Python from python.org into it, copies
-hello.py and uninstall.ps1 there, with the organization's content.json when
+hello.py, uninstall.ps1 and the translations (hello.<language>.json) there,
+with the organization's content.json and content.<language>.json files when
 the package or commit has one, and writes hello.cmd next to them. hello.cmd
 starts hello.py with that Python in isolated mode and passes its options on. Adds a hello-world shortcut,
 which opens the window through pythonw.exe, to every user's Start menu, and an
@@ -49,7 +50,7 @@ only administrators can read, and success and failure go to the Application
 event log under the source hello-world.
 
 .EXAMPLE
-$tag = 'v1.35.0'
+$tag = 'v1.36.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
@@ -386,7 +387,8 @@ foreach ($line in Get-Content -LiteralPath $sumsFile) {
     if ($line -match '^([0-9a-f]{64})  ([A-Za-z0-9._-]+)$') { $listed[$Matches[2]] = $Matches[1] }
     elseif ($line) { throw "SHA256SUMS has a line it can't read: $line" }
 }
-if ($listed.ContainsKey('content.json')) { $extra = @('content.json') }
+# The translations and the organization's content files.
+$extra = @($listed.Keys | Where-Object { $_ -match '^(content(\.[A-Za-z-]+)?|hello\.[A-Za-z-]+)\.json$' } | Sort-Object)
 foreach ($f in $required + 'python-embed.zip' + $extra) {
     if (-not $listed.ContainsKey($f)) { throw "SHA256SUMS doesn't list $f." }
     $path = Join-Path $PSScriptRoot $f
@@ -405,10 +407,10 @@ if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot '.git') -PathType Cont
 $head = & $git -C $PSScriptRoot rev-parse HEAD
 if ($LASTEXITCODE) { throw "git rev-parse failed with exit $LASTEXITCODE in $PSScriptRoot. If the message above mentions 'dubious ownership', a different account made this clone." }
 if ($head -ne $Commit) { throw "Source is at '$head', not the reviewed commit $Commit." }
-# A content.json that isn't in the commit is ignored, like any other file.
-$tracked = & $git -C $PSScriptRoot ls-tree --name-only HEAD content.json
+# A file that isn't in the commit is ignored, like any other file.
+$tracked = & $git -C $PSScriptRoot ls-tree --name-only HEAD
 if ($LASTEXITCODE) { throw "git ls-tree failed with exit $LASTEXITCODE in $PSScriptRoot." }
-if ("$tracked" -eq 'content.json') { $extra = @('content.json') }
+$extra = @($tracked | Where-Object { $_ -match '^(content(\.[A-Za-z-]+)?|hello\.[A-Za-z-]+)\.json$' } | Sort-Object)
 foreach ($f in $required + $extra) {
     $actual = & $git -C $PSScriptRoot hash-object --no-filters $f
     $actualOk = $LASTEXITCODE -eq 0
@@ -497,9 +499,9 @@ try {
     if ($LASTEXITCODE -or "$out" -ne 'Hello, world!') { throw "Test run failed with exit $LASTEXITCODE`: $out" }
     # hello.py would quietly fall back to its own lists, so a bad file stops
     # the install instead.
-    if ($extra) {
-        $out = & (Join-Path $sys32 'cmd.exe') /d /c "`"$(Join-Path $new 'hello.cmd')`" --check-content `"$(Join-Path $new 'content.json')`""
-        if ($LASTEXITCODE) { throw "content.json breaks these rules:`n$($out -join "`n")" }
+    foreach ($content in @($extra | Where-Object { $_ -like 'content*.json' })) {
+        $out = & (Join-Path $sys32 'cmd.exe') /d /c "`"$(Join-Path $new 'hello.cmd')`" --check-content `"$(Join-Path $new $content)`""
+        if ($LASTEXITCODE) { throw "$content breaks these rules:`n$($out -join "`n")" }
         Write-Info "Organization content: $out"
     }
 
