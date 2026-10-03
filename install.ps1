@@ -5,7 +5,8 @@ Installs hello.py for all users in a folder only administrators can change.
 .DESCRIPTION
 Creates "Program Files\hello-world", where only Administrators and SYSTEM can
 write. Unpacks a pinned, hash-checked Python from python.org into it, copies
-hello.py and uninstall.ps1 there, and writes hello.cmd next to them. hello.cmd
+hello.py and uninstall.ps1 there, with the organization's content.json when
+the package or commit has one, and writes hello.cmd next to them. hello.cmd
 starts hello.py with that Python in isolated mode and passes its options on. Adds a hello-world shortcut
 to every user's Start menu and an entry with an Uninstall button to Settings >
 Apps. The workstation needs Git for Windows and internet access, but no Python
@@ -48,7 +49,7 @@ only administrators can read, and success and failure go to the Application
 event log under the source hello-world.
 
 .EXAMPLE
-$tag = 'v1.24.0'
+$tag = 'v1.25.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
@@ -347,6 +348,9 @@ $env:GIT_CONFIG_GLOBAL = 'NUL'
 $env:GIT_ATTR_NOSYSTEM = '1'
 
 $required = 'install.ps1', 'uninstall.ps1', 'hello.py', 'VERSION'
+# The organization's thoughts and tips, installed only when the package or
+# the commit carries them, and checked like every other file.
+$extra = @()
 if ($packageMode) {
 Write-Step '[3/6] Verifying the package against its hash'
 # The package hash vouches for SHA256SUMS, and SHA256SUMS for every file.
@@ -358,7 +362,8 @@ foreach ($line in Get-Content -LiteralPath $sumsFile) {
     if ($line -match '^([0-9a-f]{64})  ([A-Za-z0-9._-]+)$') { $listed[$Matches[2]] = $Matches[1] }
     elseif ($line) { throw "SHA256SUMS has a line it can't read: $line" }
 }
-foreach ($f in $required + 'python-embed.zip') {
+if ($listed.ContainsKey('content.json')) { $extra = @('content.json') }
+foreach ($f in $required + 'python-embed.zip' + $extra) {
     if (-not $listed.ContainsKey($f)) { throw "SHA256SUMS doesn't list $f." }
     $path = Join-Path $PSScriptRoot $f
     if (-not (Test-Path -LiteralPath $path -PathType Leaf) -or (Get-FileHash -LiteralPath $path).Hash -ne $listed[$f]) {
@@ -376,7 +381,11 @@ if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot '.git') -PathType Cont
 $head = & $git -C $PSScriptRoot rev-parse HEAD
 if ($LASTEXITCODE) { throw "git rev-parse failed with exit $LASTEXITCODE in $PSScriptRoot. If the message above mentions 'dubious ownership', a different account made this clone." }
 if ($head -ne $Commit) { throw "Source is at '$head', not the reviewed commit $Commit." }
-foreach ($f in $required) {
+# A content.json that isn't in the commit is ignored, like any other file.
+$tracked = & $git -C $PSScriptRoot ls-tree --name-only HEAD content.json
+if ($LASTEXITCODE) { throw "git ls-tree failed with exit $LASTEXITCODE in $PSScriptRoot." }
+if ("$tracked" -eq 'content.json') { $extra = @('content.json') }
+foreach ($f in $required + $extra) {
     $actual = & $git -C $PSScriptRoot hash-object $f
     $actualOk = $LASTEXITCODE -eq 0
     $expected = & $git -C $PSScriptRoot rev-parse "HEAD:$f"
@@ -436,13 +445,13 @@ try {
     foreach ($pattern in '_ssl.pyd', '_hashlib.pyd', 'libssl-*.dll', 'libcrypto-*.dll', '_sqlite3.pyd', 'sqlite3.dll') {
         Get-ChildItem -LiteralPath (Join-Path $new 'python') -Filter $pattern -Force | Remove-Item -Force
     }
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'hello.py'), (Join-Path $PSScriptRoot 'uninstall.ps1') -Destination $new
+    foreach ($f in @('hello.py', 'uninstall.ps1') + $extra) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $f) -Destination $new }
     # -I ignores PYTHON* variables and the user's site-packages, so nothing the
     # employee controls loads into the run.
     Set-Content -LiteralPath (Join-Path $new 'hello.cmd') -Value '@"%~dp0python\python.exe" -I "%~dp0hello.py" %*' -Encoding ascii
 
     $hash = (Get-FileHash -LiteralPath (Join-Path $new 'hello.py')).Hash
-    foreach ($f in 'hello.py', 'uninstall.ps1') {
+    foreach ($f in @('hello.py', 'uninstall.ps1') + $extra) {
         if ((Get-FileHash -LiteralPath (Join-Path $new $f)).Hash -ne (Get-FileHash -LiteralPath (Join-Path $PSScriptRoot $f)).Hash) { throw "Installed $f differs from the source" }
     }
 
@@ -457,6 +466,13 @@ try {
     # /d skips cmd AutoRun commands from the registry.
     $out = & (Join-Path $sys32 'cmd.exe') /d /c "`"$(Join-Path $new 'hello.cmd')`" --plain"
     if ($LASTEXITCODE -or "$out" -ne 'Hello, world!') { throw "Test run failed with exit $LASTEXITCODE`: $out" }
+    # hello.py would quietly fall back to its own lists, so a bad file stops
+    # the install instead.
+    if ($extra) {
+        $out = & (Join-Path $sys32 'cmd.exe') /d /c "`"$(Join-Path $new 'hello.cmd')`" --check-content `"$(Join-Path $new 'content.json')`""
+        if ($LASTEXITCODE) { throw "content.json breaks these rules:`n$($out -join "`n")" }
+        Write-Info "Organization content: $out"
+    }
 
     # Swap in the new folder, and put the old one back if that fails.
     $hadOld = Test-Path -LiteralPath $dir

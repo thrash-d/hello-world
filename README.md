@@ -23,6 +23,9 @@ Search. Press Enter at each question to skip it, and once more to close.
 That's all you need. Everyone sees the same thought and tip on the same day,
 so you can compare notes with a coworker.
 
+If Windows is set to Spanish, hello-world speaks Spanish. The Spanish words
+`hecho`, `menú`, `repetir` and `salir` work in either language.
+
 At the last prompt:
 
 - Press Enter to close. `q`, `quit`, `exit`, `x` and `close` also close.
@@ -126,7 +129,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.24.0'
+$tag = 'v1.25.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
@@ -201,8 +204,9 @@ Get-ItemProperty HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\hello
 
 - `hello.py`: the program. `hello.cmd --help` lists its options, such as `--plain`, which prints only the greeting and saves nothing.
 - `install.ps1`, `uninstall.ps1`: deploy and remove it.
-- `tools/build-package.ps1`: builds the offline release package.
-- `policy/`: Group Policy templates (ADMX and ADML).
+- `tools/build-package.ps1`: builds the offline release package, optionally with the organization's own thoughts and tips.
+- `examples/content.json`: a sample organization content file.
+- `policy/`: Group Policy templates (ADMX, and ADML in English and Spanish).
 - `docs/ENTERPRISE.md`: deploying to a large fleet, and the security model.
 - `docs/ROLLOUT.md`: an announcement, an employee FAQ, and a page for privacy reviewers.
 - `docs/ACCESSIBILITY.md`: how it meets accessibility expectations, and how that was checked.

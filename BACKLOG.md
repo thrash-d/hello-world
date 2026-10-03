@@ -28,6 +28,10 @@ Changes considered and declined, with the reason. On 2 October 2026 the list fro
 - Reaching people on their laptop on site days (simulated pilot): installing it on the laptop is IT's call, not a program change.
 - Closing the window after `done` and the next plan (simulated pilot): the last prompt comes back on purpose, so the result can be read first.
 - A `same` that knows when the parts of an earlier plan were finished separately (simulated pilot): the program can't tell. Option 7 or a new plan clears it.
+- `--plain` and `--check-content` in Spanish (1.25.0): scripts read `--plain`, and `--check-content` is for administrators, whose tickets are in English.
+- `retomar` instead of `repetir` as the Spanish word for `same` (Spanish review, 1.25.0): the reviewer called it a closer fit but advised keeping `repetir`, which every prompt already names.
+- Organization content per language (1.25.0): one file replaces the lists in every language, so the organization writes in the language its people read. A second file per language waits for an organization that needs it.
+- A Spanish setting in the menu (1.25.0): the language follows Windows, and `ForceEnglish` covers the organization's choice. Nobody has asked to pick per person.
 
 ## Claims that turned out wrong or already true
 

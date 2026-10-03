@@ -25,6 +25,11 @@ DAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
         "Sunday")
 MONTHS = ("January", "February", "March", "April", "May", "June", "July",
           "August", "September", "October", "November", "December")
+DAYS_ES = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado",
+           "domingo")
+MONTHS_ES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
+             "agosto", "septiembre", "octubre", "noviembre", "diciembre")
+GREETING = "Hello, world!"
 
 # Chosen by date, so everyone sees the same line on the same day and the
 # lists repeat every 100 days (the pairing much later).
@@ -244,6 +249,223 @@ DONE_LINES = (
     "Good. That one is off your list.",
 )
 
+# The Spanish lists follow the English ones item for item.
+TIPS_ES = (
+    'Bebe un vaso de agua despacio, lejos de la pantalla.',
+    'Gira los hombros hacia atrás cinco veces, muy despacio.',
+    'Descansa la vista veinte segundos: mira a lo lejos o cierra los ojos.',
+    'Estira los brazos hacia arriba, en la silla o de pie, y respira hondo.',
+    'Ve hasta la sala o la ventana más lejana que puedas y vuelve.',
+    'Revisa tu postura y deja caer los hombros, lejos de las orejas.',
+    'Gira el cuello con suavidad de un lado a otro, solo hasta donde sea cómodo.',
+    'Abre y cierra las manos diez veces para soltar los dedos.',
+    'Fija el documento que más abres para tenerlo a un clic.',
+    'Sal a dar un paseo corto, caminando o en silla de ruedas, como te vaya mejor.',
+    'Sírvete una bebida caliente o fría y disfrútala lejos de la pantalla.',
+    'Fíjate en algo tranquilo: un paisaje, un sonido o una textura.',
+    'Escribe el siguiente paso de una tarea que dejaste a medias.',
+    'Apoya los pies en el suelo y estira la espalda, en la silla o de pie, durante diez respiraciones.',
+    'Silencia un chat de grupo que solo lees por encima.',
+    'Relaja la mandíbula y la frente durante un momento.',
+    'Muévete durante dos minutos de la forma que te siente bien hoy.',
+    'Reserva quince minutos en tu calendario para la tarea que siempre aplazas.',
+    'Ajusta un poco la silla, la pantalla o el teclado para tu comodidad.',
+    'Si puedes, toma el camino largo hacia tu próxima reunión o llamada.',
+    'Guarda una plantilla para un correo que escribes una y otra vez.',
+    'Aprende un atajo de teclado del programa que más usas.',
+    'Bebe un vaso entero de agua antes de tu próximo café o té.',
+    'Sube los hombros hasta las orejas y luego déjalos caer despacio.',
+    'Sal un minuto o abre una ventana para tomar aire fresco.',
+    'Respira despacio cinco veces y alarga un poco cada exhalación.',
+    'Haz una pausa tranquila de un minuto antes de abrir tu próximo mensaje.',
+    'Anota una cosa buena que te haya pasado hoy.',
+    'Cierra los ojos durante tres respiraciones y nota cómo te sientes.',
+    'Nombra tres cosas que percibes ahora mismo, con cualquier sentido.',
+    'Escribe una cosa que esperas con ganas esta semana.',
+    'Pon un temporizador de dos minutos y descansa sin ninguna pantalla.',
+    'Disfruta de algo pequeño cerca de ti, como una planta o tu taza favorita.',
+    'Piensa en algo que hiciste bien esta semana y reconócelo.',
+    'Escucha una de tus canciones favoritas de principio a fin, sin nada más abierto.',
+    'Inhala contando hasta cuatro y exhala contando hasta seis, tres veces.',
+    'Respira una vez antes de reaccionar a la próxima pequeña molestia.',
+    'Anota algo que te hizo reír hace poco.',
+    'Durante un minuto, fíjate en algo agradable: un sonido, un olor o algo que tocas.',
+    'Recuerda un lugar que te encanta e imagínalo durante treinta segundos.',
+    'Di "por ahora está bien así" sobre una tarea pequeña y sigue adelante.',
+    'Escribe una frase sobre algo que agradeces.',
+    'Saborea el próximo sorbo de tu bebida y fíjate en el sabor.',
+    'Haz una pausa corta entre dos tareas antes de empezar la siguiente.',
+    'Busca hoy una cosa que salga mejor de lo que esperabas.',
+    'Resume en una palabra cómo quieres que sea la tarde.',
+    'Deja descansar la mente sesenta segundos y luego vuelve a tu siguiente tarea.',
+    'Siente los pies en el suelo y nota la estabilidad un momento.',
+    'Recuerda algo amable que alguien hizo por ti y disfruta del recuerdo.',
+    'Anota una idea que quieras retomar más tarde y déjala reposar.',
+    'Ordena un rincón pequeño de tu escritorio, solo uno.',
+    'Responde a un mensaje que lleva un tiempo esperando.',
+    "Apunta la tarea principal de mañana en una nota adhesiva o en tus notas.",
+    'Cierra las pestañas del navegador que ya no necesitas.',
+    'Da las gracias a alguien de tu equipo por algo que hizo hace poco.',
+    'Archiva cinco correos antiguos que ya no necesitas.',
+    'Cambia el nombre de un archivo desordenado para encontrarlo fácilmente después.',
+    'Quita uno o dos archivos sueltos del escritorio de Windows.',
+    'Borra un recordatorio antiguo que ya no sirve.',
+    'Pon un título claro a un documento que abres a menudo.',
+    'Tacha una tarea pequeña de tu lista de pendientes.',
+    'Date de baja de un boletín que nunca lees.',
+    'Limpia el teclado o la pantalla con un paño suave.',
+    'Deja un bolígrafo, un cuaderno y agua donde los alcances fácilmente.',
+    'Escribe una nota breve para tu yo de mañana sobre dónde lo dejaste hoy.',
+    'Elige la tarea más importante de esta tarde y hazla primero.',
+    'Vacía la papelera o el contenedor de reciclaje de tu mesa.',
+    'Actualiza una nota de progreso para que otros vean cómo van las cosas.',
+    'Ordena tu carpeta de descargas moviendo unos cuantos archivos.',
+    'Pon un recordatorio para algo que sueles olvidar.',
+    'Desactiva una notificación que en realidad no necesitas.',
+    'Guarda en favoritos una página que buscas una y otra vez.',
+    'Escribe un resumen de dos líneas de una reunión mientras la recuerdas bien.',
+    'Pregunta si una reunión periódica podría ser un poco más corta.',
+    'Define tu único objetivo para la próxima hora y escríbelo.',
+    'Pregunta a alguien del equipo cómo va su día y escucha con atención.',
+    'Comparte un enlace útil con alguien a quien le pueda gustar.',
+    'Saluda a alguien con quien todavía no has hablado.',
+    'Envía una nota breve de agradecimiento a alguien que te ayudó hace poco.',
+    'Saluda con calidez a los demás al empezar tu próxima llamada.',
+    'Pregunta a alguien de tu equipo qué espera con ganas esta semana.',
+    'Felicita a alguien por un pequeño logro que hayas notado.',
+    'Invita a alguien del trabajo a una charla corta con un té, un café o por llamada.',
+    'Elogia algo concreto que alguien del trabajo hizo bien.',
+    'Aprende el nombre de alguien a quien ves a menudo pero aún no conoces.',
+    'Comparte un consejo útil con alguien del equipo que pueda necesitarlo.',
+    'Pide a alguien que te recomiende una canción, una serie o un libro.',
+    'Habla con alguien del trabajo que ha hablado poco últimamente y pregúntale cómo está.',
+    'Si alguien parece tener mucho trabajo, ofrécete a ayudar con algo pequeño.',
+    'Saluda con calidez a la próxima persona que veas.',
+    'Si oíste algo amable sobre alguien del trabajo, cuéntaselo.',
+    'Pregunta a alguien del trabajo qué le facilitó la semana.',
+    'Envía un mensaje amable a alguien con quien trabajaste antes.',
+    'Da las gracias a quien mantiene en orden los espacios compartidos.',
+    'Presenta a dos personas del trabajo que podrían llevarse bien.',
+    'Pregunta a alguien del equipo cómo puedes facilitarle el traspaso de una tarea.',
+    'Comparte una broma pequeña e inofensiva con alguien cerca de ti.',
+    'Pon un poco más de calidez en tu próximo "por favor" y "gracias".',
+    'Pregunta a alguien del trabajo qué le gusta hacer en su tiempo libre.',
+    'Escucha con toda tu atención a la próxima persona que te hable, sin hacer otras cosas.',
+)
+
+THOUGHTS_ES = (
+    'Abre ese documento que llevas tiempo evitando y lee solo el primer párrafo.',
+    'Diez minutos de trabajo ya son un comienzo, y suelen hacer más fáciles los diez siguientes.',
+    'Hoy no necesitas el plan completo, solo un primer paso razonable.',
+    'Escribe una primera frase imperfecta. Te da algo real que mejorar después.',
+    'Despeja un rincón de tu mesa y fíjate en cuánto más tranquilo se ve el resto.',
+    'Elige la tarea más pequeña de tu lista y termínala antes de mirar las demás.',
+    'Un comienzo imperfecto en una mañana tranquila vale más que esperar un momento perfecto que quizá no llegue.',
+    'Pon el primer paso en tu calendario para que tenga su propio espacio.',
+    'Los grandes proyectos se hacen tarde a tarde. Piensa solo en esta.',
+    'Di en voz alta la próxima acción y deja que el resto de la lista espere su turno.',
+    'Algunos días vas más despacio de lo que te gustaría, y ese ritmo también cuenta.',
+    'Háblate como le hablarías a una persona nueva en su primera semana de trabajo.',
+    'Puedes seguir aprendiendo algo que llevas años haciendo.',
+    'Una mañana floja no decide la tarde. Puedes empezar de nuevo después de comer.',
+    'El cansancio es información, no un fallo. Ajusta el plan y sigue con calma.',
+    'Trátate con la misma comprensión que ofreces tan fácilmente a los demás.',
+    'A veces el progreso no se nota durante un tiempo, y de pronto tienes una página terminada.',
+    'No pasa nada si necesitas leer algo dos veces para entenderlo.',
+    'No necesitas sentir que todo está listo. Hacerlo con nervios también es hacerlo.',
+    "Lo mejor que puedes dar hoy quizá sea menos que ayer, y no pasa nada.",
+    'Cierra las pestañas que no usas. Tu atención lo notará en pocos minutos.',
+    'Una tarea, una ventana, veinticinco minutos. Mira hasta dónde llegas con un rato tranquilo.',
+    'Anota la idea suelta que te venga a la cabeza y vuelve a lo que estabas haciendo.',
+    'Si puedes, silencia el teléfono durante una hora y dale al trabajo toda tu atención.',
+    'Decide qué cosa haría de hoy un buen día y reserva tiempo para ella.',
+    'Hacer las cosas de una en una suele ser más rápido de lo que parece.',
+    'Una lista clara de tres cosas es mejor que una lista desordenada de veinte.',
+    'Nota cuándo se distrae tu mente y tráela de vuelta sin regañarte.',
+    'Pon la tarea más difícil en el momento en que tienes más energía, aunque no sea a primera hora.',
+    'Auriculares puestos, una bebida a mano, puerta cerrada. Prepara el lugar y la concentración llega sola.',
+    'Aléjate de la pantalla cinco minutos. Volverás con la mente un poco más clara.',
+    'Hoy come lejos de tu mesa. El correo puede esperar mientras comes.',
+    'Un paseo corto alrededor del edificio también es trabajo útil para tu cabeza.',
+    'Un minuto lejos de la pantalla es un buen uso de una tarde ocupada.',
+    'Estira los hombros y relaja la mandíbula. Quizá llevas horas en tensión.',
+    "Si puedes, sal a tu hora hoy. Mañana agradecerás haber tenido la tarde libre.",
+    'Descansar es parte del trabajo, porque con cansancio es fácil repetir el mismo error.',
+    'Descansa la vista un momento y deja caer los hombros.',
+    'Un buen descanso hace que la segunda mitad del día se sienta como un nuevo comienzo.',
+    "Deja que la noche sea para ti. Nada en tu correo te necesita a las nueve.",
+    'Da las gracias hoy a alguien por algo pequeño que hizo sin que se lo pidieran.',
+    'La mayoría de la gente hace lo que puede, con más carga de la que tú ves.',
+    'Averigua cómo toma el té o el café alguien del trabajo. Recordarlo es un pequeño regalo.',
+    'Si alguien te responde de forma seca, piensa que tiene un mal día, no que te está juzgando.',
+    'Sujeta la puerta, comparte las galletas y deja que la otra persona termine de hablar.',
+    'Un saludo rápido y una pregunta sobre el fin de semana pueden ser lo mejor de la mañana.',
+    'Cuando alguien nuevo pregunte algo obvio, recuerda que tú también lo preguntaste una vez.',
+    "Reconoce en voz alta cuando la idea de alguien del equipo mejoró tu trabajo.",
+    'Responde a un mensaje con un poco de calidez. No cuesta nada y se recibe bien.',
+    'Habla con alguien que ha participado poco en las reuniones y pregúntale cómo está.',
+    'Termina lo que casi está hecho antes de empezar algo nuevo.',
+    'Más vale hecho y bastante bien que perfecto y sin terminar.',
+    'Cierra hoy un asunto pendiente y nota el pequeño alivio que llega después.',
+    'El último diez por ciento suele ser solo unos minutos de cuidado. Dáselos hoy.',
+    'Envía el correo que espera en tus borradores. Probablemente está bien así.',
+    'Márcalo como hecho, respira y alégrate de haberlo terminado.',
+    'Una cosa pequeña terminada vale más que una grande a medias.',
+    "Antes de desconectarte, anota el primer paso de mañana para no tener que recordarlo.",
+    'Léelo una vez más, corrige lo que encuentres y envíalo.',
+    'Terminar el día con un resultado claro hace que la noche se sienta más ligera.',
+    'Preguntar pronto suele ahorrar una hora de esfuerzo en silencio después.',
+    'A la mayoría de la gente le gusta compartir lo que sabe. Pregunta sin pedir perdón.',
+    '"No sé cómo seguir" es una frase clara y útil con la que tu equipo puede ayudarte.',
+    'Pide lo que necesitas con palabras sencillas y da a los demás la oportunidad de decir que sí.',
+    'Dos personas mirando un problema suelen resolverlo antes que una sola persona en silencio.',
+    'Necesitar ayuda no te convierte en una carga. Eres parte del equipo.',
+    'Lleva una pregunta concreta y la persona a quien preguntes podrá darte una respuesta concreta.',
+    'Si las instrucciones no están claras, pedir aclaraciones es parte de hacer bien el trabajo.',
+    'Ofrece ayuda cuando puedas y acéptala cuando la necesites. Ambas cosas se aprenden con práctica.',
+    'Seguramente alguien cerca de ti ya ha resuelto esto antes. Ve a buscar a esa persona.',
+    'Anota las cosas que aprendiste a resolver esta semana. Suman más de lo que crees.',
+    'Ser principiante en algo nuevo es señal de que tu trabajo sigue creciendo.',
+    'Observa cómo alguien a quien admiras maneja una llamada difícil y quédate con una idea.',
+    'Lee una página útil en tu descanso y da el día por bien aprovechado.',
+    'Explicar una tarea a otra persona es una forma sorprendentemente buena de aprenderla.',
+    'Está bien decir "todavía no lo sé" y luego ir a averiguarlo.',
+    'Todo sistema nuevo parece confuso hasta que lo has usado unas cuantas veces.',
+    'Pregunta a alguien con más experiencia cómo lo aprendió. La respuesta suele tranquilizar.',
+    'Las habilidades vienen de la repetición. Repite lo pequeño y deja que se vuelva fácil.',
+    'Un poco de curiosidad puede hacer más interesante una tarea normal.',
+    'Un error detectado a tiempo es solo una corrección, y la mayoría se detectan a tiempo.',
+    'Corrígelo, avisa a quien necesite saberlo y deja que la molestia pase.',
+    'Casi cualquier error en el trabajo parece más pequeño una semana después.',
+    'Un fallo no borra los años de trabajo cuidadoso que llevas detrás.',
+    'Cuando algo sale mal, mira primero el proceso y después a la persona.',
+    'Todas las personas a tu alrededor han enviado alguna vez un correo a quien no era.',
+    'Quédate con la lección que deja un error y deja atrás el resto.',
+    'Reconocer un error con sencillez suele dar más confianza que no haberlo cometido nunca.',
+    'Hasta la gente cuidadosa tiene días torpes, y se acaban antes de la noche.',
+    "El próximo mes no recordarás la mayoría de los pequeños tropiezos de hoy.",
+    'Un día tranquilo y sin urgencias es un buen día, aunque nadie lo diga.',
+    'Fíjate en los pequeños placeres: una taza caliente, la bandeja de entrada vacía, un minuto de calma.',
+    'No todos los días necesitan un gran logro. Trabajar con calma y a gusto está bien.',
+    'Disfruta de la reunión que termina cinco minutos antes y usa ese tiempo como quieras.',
+    'Un día normal bien hecho es motivo de un orgullo tranquilo.',
+    'El buen trabajo a menudo no se nota desde fuera, y no pasa nada.',
+    'Deja que una tarde agradable sea agradable, sin esperar que sea productiva.',
+    'Las pequeñas rutinas del día, como el primer café y las caras conocidas, merecen tu atención.',
+    'Hoy estuviste presente e hiciste tu parte, y eso es suficiente.',
+    'Esta noche, tómate un momento para recordar algo que salió bien hoy.',
+    'Un minuto tranquilo entre dos tareas no es tiempo perdido; ayuda a empezar bien la siguiente.',
+)
+
+DONE_LINES_ES = (
+    "Bien. Esa ya está terminada.",
+    "Muy bien. Da gusto terminar algo.",
+    "Bien hecho. Descansa un poco antes de la siguiente.",
+    "Bien. Las tareas pequeñas terminadas suman.",
+    "Ya está hecho. Alégrate un momento.",
+    "Bien. Una tarea menos en tu lista.",
+)
+
 HELP = """hello-world prints a greeting, a thought, and a small thing to try.
 
 At the last prompt, type plan for today's plan, done when you finish
@@ -259,6 +481,8 @@ You can also run hello.cmd with one of these:
   --remind on     Open once a day when you sign in (off to stop)
   --streak off    Hide the days-in-a-row message (on to show it)
   --version       Show the version
+  --check-content FILE
+                  Check an organization content file
   --help          Show this text
 
 Exit codes: 0 when it worked, 1 when a command failed or the screen
@@ -279,35 +503,148 @@ In this menu, 1 shows what is saved, 7 forgets one finished plan,
 and 8 hides the thought and tip.
 Type m to hear the options again. Nothing is sent anywhere."""
 
+HELP_ES = """hello-world muestra un saludo, una idea y algo sencillo que probar.
+
+En la última pregunta, escribe plan para el plan de hoy, hecho cuando
+lo termines, o menú (o m) para ver las opciones. Enter cierra; q, salir
+o x cierran desde cualquier pregunta. En la pregunta del plan,
+repetir recupera un plan anterior sin terminar. Después de hecho,
+muestra tus 3 últimos planes terminados. La opción 1 del menú los
+muestra todos, la 7 olvida uno y la 8 oculta la idea y la sugerencia.
+En el menú, Enter vuelve atrás.
+También puedes ejecutar hello.cmd con una de estas opciones:
+  --plain         Muestra solo el saludo, en inglés
+  --stats         Muestra lo que hay guardado en este equipo
+  --reset         Borra todo lo guardado (pregunta antes)
+  --remind on     Se abre al iniciar sesión cada día (off: lo quita)
+  --streak off    Oculta el mensaje de días seguidos (on: lo muestra)
+  --version       Muestra la versión
+  --check-content FILE
+                  Comprueba un archivo de contenido de la organización
+  --help          Muestra este texto
+
+Códigos de salida: 0 si funcionó, 1 si un comando falló o no se pudo
+escribir en la pantalla, 2 para una opción desconocida.
+
+Las notas guardadas se quedan en este equipo, en tu carpeta de
+usuario. No se envía nada a ningún sitio. El personal de TI que puede
+leer los archivos de este equipo podría leerlas."""
+
+MENU_HELP_ES = """Palabras que puedes escribir en la última pregunta:
+  hecho  marca como terminado el plan de hoy y pide el siguiente
+  plan   escribe o cambia el plan de hoy
+  menú   abre estas opciones
+  q      cierra la ventana, igual que Enter
+En la pregunta del plan, repetir recupera tu plan anterior sin terminar.
+Cuando pregunta "¿Lo hiciste?", n significa todavía no, y puedes
+mantener el plan para hoy. q cierra desde cualquier pregunta.
+En este menú, 1 muestra lo guardado, 7 olvida un plan terminado
+y 8 oculta la idea y la sugerencia.
+Escribe m para ver de nuevo las opciones. No se envía nada a ningún
+sitio."""
+
 
 # A thought that shares one of these with the day's tip moves on by one, so
 # one screen never has two lines about the same body part.
 TOPICS = ("shoulder", "jaw", "neck", "eye", "water", "breath", "posture",
-          "stretch", "wrist")
+          "stretch", "wrist", "hombro", "mandíbula", "cuello", "ojo", "agua",
+          "respir", "postura", "estir", "muñeca")
 
 
 def todays_pair(d):
     """The day's thought and tip. Everyone gets the same pair on the same day."""
-    tip = TIPS[d.toordinal() % len(TIPS)]
-    i = (d.toordinal() + 37) % len(THOUGHTS)
-    while any(w in tip.lower() and w in THOUGHTS[i].lower() for w in TOPICS):
-        i = (i + 1) % len(THOUGHTS)
-    return THOUGHTS[i], tip
+    thoughts, tips = content_lists()
+    tip = tips[d.toordinal() % len(tips)]
+    i = (d.toordinal() + 37) % len(thoughts)
+    # At most one pass, so lists where every thought shares a topic with the
+    # tip can't loop forever.
+    for _ in range(len(thoughts)):
+        if not any(w in tip.lower() and w in thoughts[i].lower() for w in TOPICS):
+            break
+        i = (i + 1) % len(thoughts)
+    return thoughts[i], tip
+
+
+# An organization can ship its own thoughts and tips in content.json next to
+# hello.py, inside the signed package. They replace the built-in lists whole.
+# The rules keep it a list of short, timeless lines, not a way to send
+# announcements: no links, no addresses, no dates, nothing long.
+CONTENT = None
+MIN_CONTENT, MAX_CONTENT = 7, 200
+CONTENT_LENGTH = (10, 120)
+
+
+def content_problems(data):
+    """What is wrong with organization content, as plain sentences."""
+    if not isinstance(data, dict) or set(data) != {"thoughts", "tips"}:
+        return ['The file must hold an object with exactly two lists: '
+                '"thoughts" and "tips".']
+    problems = []
+    low_months = [m.lower() for m in MONTHS if m != "May"] + list(MONTHS_ES)
+    for key in ("thoughts", "tips"):
+        items = data[key]
+        if not isinstance(items, list) or not MIN_CONTENT <= len(items) <= MAX_CONTENT:
+            problems.append(f'"{key}" must be a list of {MIN_CONTENT} to '
+                            f"{MAX_CONTENT} lines.")
+            continue
+        for n, item in enumerate(items, 1):
+            where = f"{key} line {n}"
+            if not isinstance(item, str):
+                problems.append(f"{where} is not text.")
+                continue
+            text, low = tidy(item), tidy(item).lower()
+            if text != item.strip():
+                problems.append(f"{where} has control characters or extra spaces.")
+            if not CONTENT_LENGTH[0] <= len(text) <= CONTENT_LENGTH[1]:
+                problems.append(f"{where} must be {CONTENT_LENGTH[0]} to "
+                                f"{CONTENT_LENGTH[1]} characters long.")
+            if any(mark in low for mark in ("http", "www.", "://", "@")):
+                problems.append(f"{where} has a link or an address.")
+            if any(m in low.split() or m + "," in low for m in low_months) or any(
+                    c.isdigit() and next_c in "/-." and after.isdigit()
+                    for c, next_c, after in zip(text, text[1:], text[2:], strict=False)):
+                problems.append(f"{where} has a date.")
+    return problems
+
+
+def content_lists():
+    """The organization's thoughts and tips if it shipped valid ones, else
+    the built-in lists. A file that breaks the rules is ignored whole."""
+    path = CONTENT or os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                   "content.json")
+    try:
+        with open(path, encoding="utf-8-sig") as f:
+            data = json.loads(f.read(200_000))
+    except (OSError, ValueError, RecursionError):
+        return built_in_lists()
+    if content_problems(data):
+        return built_in_lists()
+    return (tuple(tidy(x) for x in data["thoughts"]),
+            tuple(tidy(x) for x in data["tips"]))
+
+
+def built_in_lists():
+    return (THOUGHTS_ES, TIPS_ES) if spanish() else (THOUGHTS, TIPS)
 
 
 def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
-    return HELP + "\n\nhello.cmd is in this folder:\n  " + here
+    return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.24.0"
+VERSION = "1.25.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
-YES = ("y", "yes", "yep", "ya", "yeah", "done")
+# Spanish words count in either language, so nobody has to guess which
+# language the program thinks it speaks.
+YES = ("y", "yes", "yep", "ya", "yeah", "done", "s", "si", "sí", "hecho",
+       "listo")
 # The sign-in offer starts something, so a stray "done" must not count.
-STRICT_YES = ("y", "yes", "yep", "ya", "yeah")
+STRICT_YES = ("y", "yes", "yep", "ya", "yeah", "s", "si", "sí")
 MAX_OFFER_SKIPS = 1
-NO = ("n", "no", "nope", "not yet")
+NO = ("n", "no", "nope", "not yet", "todavía no", "aún no", "aun no")
+DONE_WORDS = ("done", "hecho")
+SAME_WORDS = ("same", "repetir")
 
 # The tests set these after importing the module, to run against a fixed date,
 # a temporary folder, and typed input. Nothing outside the program sets them.
@@ -317,6 +654,8 @@ STARTUP_DIR = None
 FORCE_INTERACTIVE = False
 # A dict of policy values, so tests never read the real registry.
 POLICY = None
+# "en" or "es" in tests; None follows the Windows display language.
+LANGUAGE = None
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 RUN_VALUE = "hello-world"
 POLICY_KEY = r"SOFTWARE\Policies\hello-world"
@@ -326,7 +665,7 @@ class Quit(Exception):
     """The person typed q at a question, so the window closes."""
 
 
-QUIT_WORDS = ("q", "quit", "exit", "x", "close")
+QUIT_WORDS = ("q", "quit", "exit", "x", "close", "salir", "cerrar")
 
 
 class OutputClosed(Exception):
@@ -338,6 +677,8 @@ def today():
 
 
 def long_date(d):
+    if spanish():
+        return f"{DAYS_ES[d.weekday()]}, {d.day} de {MONTHS_ES[d.month - 1]} de {d.year}"
     return f"{DAYS[d.weekday()]}, {d.day} {MONTHS[d.month - 1]} {d.year}"
 
 
@@ -429,6 +770,335 @@ MAX_FINISHED = 7
 SHOWN_AFTER_DONE = 3
 
 
+def spanish():
+    """Spanish when Windows is set to show Spanish, unless policy says English."""
+    if policy("ForceEnglish"):
+        return False
+    if LANGUAGE is not None:
+        return LANGUAGE == "es"
+    if os.name != "nt":
+        return False
+    try:
+        import ctypes
+        # The low 10 bits are the primary language; 0x0A is Spanish.
+        return ctypes.windll.kernel32.GetUserDefaultUILanguage() & 0x3FF == 0x0A
+    except (AttributeError, OSError):
+        return False
+
+
+def tr(text):
+    """The text in the person's language. The English text is the key."""
+    return ES.get(text, text) if spanish() else text
+
+
+ES = {
+    HELP: HELP_ES,
+    MENU_HELP: MENU_HELP_ES,
+    SAVED_PLAN: "Guardado. Escribe hecho al terminarlo, o te lo preguntará "
+                "en la próxima visita.",
+    GREETING: "¡Hola, mundo!",
+    "hello.cmd is in this folder:": "hello.cmd está en esta carpeta:",
+    "Shortened to {n} characters.": "Se acortó a {n} caracteres.",
+    "Your saved file was damaged, so hello-world set it aside as a backup "
+    "copy and started fresh. Your earlier days and plan could not be read. "
+    "Menu option 4 deletes the backup.":
+        "Tu archivo guardado estaba dañado, así que hello-world lo apartó como "
+        "copia de seguridad y empezó de nuevo. No se pudieron leer tus días ni "
+        "tu plan anteriores. La opción 4 del menú borra la copia.",
+    "Backup copy: ": "Copia de seguridad: ",
+    "In the folder: ": "En la carpeta: ",
+    'That was not one of the choices: "{shown}".':
+        'No es una de las opciones: "{shown}".',
+    "The sign-in reminder works on Windows only.":
+        "El aviso al iniciar sesión solo funciona en Windows.",
+    "Your organization has turned off opening at sign-in.":
+        "Tu organización ha desactivado la apertura al iniciar sesión.",
+    "The reminder cannot be set up from this folder.":
+        "El aviso no se puede configurar desde esta carpeta.",
+    "Could not set up the reminder.": "No se pudo configurar el aviso.",
+    "Done. hello-world will open once a day when you sign in.":
+        "Listo. hello-world se abrirá una vez al día al iniciar sesión.",
+    "To stop it, choose option 2 in the menu.":
+        "Para desactivarlo, elige la opción 2 del menú.",
+    "Could not turn off the sign-in reminder.":
+        "No se pudo desactivar el aviso al iniciar sesión.",
+    "Done. The sign-in reminder is off.":
+        "Listo. El aviso al iniciar sesión está desactivado.",
+    "Saved on this computer in:": "Guardado en este equipo, en:",
+    "Saved in your own user folder on this computer.":
+        "Guardado en tu propia carpeta de usuario de este equipo.",
+    "Days you opened it in the last {days} days: {n} (last 7 days: {recent})":
+        "Días que lo abriste en los últimos {days} días: {n} "
+        "(últimos 7 días: {recent})",
+    "Times you marked a plan done: {n}":
+        "Veces que marcaste un plan como hecho: {n}",
+    "Your current plan: ": "Tu plan actual: ",
+    "Earlier plan (for same): ": "Plan anterior (para repetir): ",
+    "Days-in-a-row message: shown.": "Mensaje de días seguidos: visible.",
+    "Days-in-a-row message: hidden.": "Mensaje de días seguidos: oculto.",
+    "Opens by itself at sign-in: turned off by your organization.":
+        "Se abre solo al iniciar sesión: desactivado por tu organización.",
+    "Opens by itself at sign-in: on.": "Se abre solo al iniciar sesión: sí.",
+    "Opens by itself at sign-in: off.": "Se abre solo al iniciar sesión: no.",
+    "It never leaves this computer. Others who can read this computer's "
+    "files, such as IT staff, could read it.":
+        "Nunca sale de este equipo. Quien pueda leer los archivos de este "
+        "equipo, como el personal de TI, podría leerlo.",
+    "After tidying, the file holds only this:":
+        "Después de ordenarlo, el archivo solo contiene esto:",
+    "Delete all saved notes, dates and plans on this computer? "
+    "(y or n, Enter to cancel) > ":
+        "¿Borrar todas las notas, fechas y planes guardados en este equipo? "
+        "(s o n, Enter para cancelar) > ",
+    "Nothing was deleted.": "No se borró nada.",
+    "Could not delete everything.": "No se pudo borrar todo.",
+    "Delete these yourself:": "Borra tú estos archivos:",
+    "Could not list the folder, so backup copies may remain:":
+        "No se pudo leer la carpeta, así que pueden quedar copias:",
+    "Done. Everything saved was deleted.": "Listo. Se borró todo lo guardado.",
+    "Another open hello-world window cannot put it back.":
+        "Otra ventana abierta de hello-world no puede recuperarlo.",
+    "Close any other open hello-world window, or it may save its notes "
+    "again.":
+        "Cierra cualquier otra ventana abierta de hello-world, o podría "
+        "volver a guardar sus notas.",
+    "Everything saved was deleted in another window, so this was not saved.":
+        "Todo lo guardado se borró en otra ventana, así que esto no se "
+        "guardó.",
+    "The other open window had also finished a plan.":
+        "La otra ventana abierta también había terminado un plan.",
+    "The other open window changed the plan, so its plan is kept.":
+        "La otra ventana cambió el plan, así que se mantiene el suyo.",
+    "Type plan at the last prompt to set one.":
+        "Escribe plan en la última pregunta para crear uno.",
+    "That looks like a command, not a plan, so nothing was saved.":
+        "Eso parece un comando, no un plan, así que no se guardó nada.",
+    "Type your plan, or press Enter to go back.":
+        "Escribe tu plan o pulsa Enter para volver.",
+    "Finished lately:": "Terminados hace poco:",
+    "Your plan today: ": "Tu plan de hoy: ",
+    "Your plan from {date}: ": "Tu plan del {date}: ",
+    "Earlier plan: ": "Plan anterior: ",
+    "Type the next plan, or Enter to close > ":
+        "Escribe el siguiente plan, o Enter para cerrar > ",
+    "Type the next plan, same to reuse the earlier plan, or Enter to close > ":
+        "Escribe el siguiente plan, repetir para usar el plan anterior, o "
+        "Enter para cerrar > ",
+    "Type today's plan, or Enter to keep it > ":
+        "Escribe el plan de hoy, o Enter para mantenerlo > ",
+    "Type today's plan, same to reuse the earlier plan, or Enter to keep it > ":
+        "Escribe el plan de hoy, repetir para usar el plan anterior, o Enter "
+        "para mantenerlo > ",
+    "Type today's plan, or Enter to go back > ":
+        "Escribe el plan de hoy, o Enter para volver > ",
+    "Type today's plan, same to reuse the earlier plan, or Enter to go back > ":
+        "Escribe el plan de hoy, repetir para usar el plan anterior, o Enter "
+        "para volver > ",
+    "Closing.": "Cerrando.",
+    "There is no earlier plan to reuse yet. Nothing changed.":
+        "Todavía no hay un plan anterior para repetir. No cambió nada.",
+    "Nothing changed.": "No cambió nada.",
+    "Could not save that on this computer. Your plan is unchanged.":
+        "No se pudo guardar en este equipo. Tu plan no ha cambiado.",
+    "No finished plans are saved.": "No hay planes terminados guardados.",
+    "Type the number to forget (1 to {n}), or Enter to keep them all > ":
+        "Escribe el número que quieres olvidar (del 1 al {n}), o Enter para "
+        "mantenerlos todos > ",
+    'There is no number "{typed}" on the list. Type a number from 1 to {n}, '
+    "or press Enter to keep them all.":
+        'No hay ningún número "{typed}" en la lista. Escribe un número del 1 '
+        "al {n}, o pulsa Enter para mantenerlos todos.",
+    "Also forget it as the earlier plan for same? "
+    "(y or n, Enter to keep it for same) > ":
+        "¿Olvidarlo también como plan anterior para repetir? "
+        "(s o n, Enter para mantenerlo) > ",
+    "Type y or n, or press Enter to keep it for same.":
+        "Escribe s o n, o pulsa Enter para mantenerlo para repetir.",
+    "That plan was already forgotten. Nothing changed.":
+        "Ese plan ya estaba olvidado. No cambió nada.",
+    "Forgotten: ": "Olvidado: ",
+    "Same still has it.": "Aún puedes recuperarlo con repetir.",
+    "Could not save that on this computer. Nothing changed.":
+        "No se pudo guardar en este equipo. No cambió nada.",
+    "Options": "Opciones",
+    "Show what is saved on this computer": "Mostrar lo guardado en este equipo",
+    "Open once a day at sign-in (turned off by your organization)":
+        "Abrir al iniciar sesión (desactivado por tu organización)",
+    "Turn off: open once a day at sign-in (now on)":
+        "Desactivar: abrir al iniciar sesión (ahora activado)",
+    "Turn on: open once a day at sign-in (now off)":
+        "Activar: abrir al iniciar sesión (ahora desactivado)",
+    "Days-in-a-row message (hidden by your organization)":
+        "Mensaje de días seguidos (oculto por tu organización)",
+    "Hide the days-in-a-row message (now shown)":
+        "Ocultar el mensaje de días seguidos (ahora visible)",
+    "Show the days-in-a-row message (now hidden)":
+        "Mostrar el mensaje de días seguidos (ahora oculto)",
+    "Delete everything saved": "Borrar todo lo guardado",
+    "Help": "Ayuda",
+    "Set today's plan (turned off by your organization)":
+        "Escribir el plan de hoy (desactivado por tu organización)",
+    "Forget a finished plan (turned off by your organization)":
+        "Olvidar un plan terminado (desactivado por tu organización)",
+    "Set or change today's plan": "Escribir o cambiar el plan de hoy",
+    "Forget one finished plan": "Olvidar un plan terminado",
+    "Thought and tip (hidden by your organization)":
+        "Idea y sugerencia (ocultas por tu organización)",
+    "Hide the thought and tip (now shown)":
+        "Ocultar la idea y la sugerencia (ahora visibles)",
+    "Show the thought and tip (now hidden)":
+        "Mostrar la idea y la sugerencia (ahora ocultas)",
+    "Back to the last prompt": "Volver a la última pregunta",
+    "Choose 1 to 8, or Enter to go back > ":
+        "Elige del 1 al 8, o Enter para volver > ",
+    "Choose 1 to 8, m to list the options, or Enter to go back > ":
+        "Elige del 1 al 8, m para ver las opciones, o Enter para volver > ",
+    "The saved file could not be read just now, so this may be out of date.":
+        "El archivo guardado no se pudo leer ahora, así que esto puede no "
+        "estar al día.",
+    "Type full to see the whole file, or Enter to go on > ":
+        "Escribe todo para ver el archivo entero, o Enter para seguir > ",
+    "Could not save that choice on this computer.":
+        "No se pudo guardar esa elección en este equipo.",
+    "Your organization has hidden the days-in-a-row message.":
+        "Tu organización ha ocultado el mensaje de días seguidos.",
+    "Done. The days-in-a-row message is on.":
+        "Listo. El mensaje de días seguidos está activado.",
+    "Done. The days-in-a-row message is off.":
+        "Listo. El mensaje de días seguidos está desactivado.",
+    "Plans are turned off by your organization.":
+        "Tu organización ha desactivado los planes.",
+    "Your organization has hidden the thought and tip.":
+        "Tu organización ha ocultado la idea y la sugerencia.",
+    "Done. The thought and tip are on.":
+        "Listo. La idea y la sugerencia están activadas.",
+    "Done. The thought and tip are off.":
+        "Listo. La idea y la sugerencia están desactivadas.",
+    "Type 1 to 8, or press Enter to go back.":
+        "Escribe del 1 al 8, o pulsa Enter para volver.",
+    "Want it to open once a day when you sign in? "
+    "(y or n, Enter for not now) > ":
+        "¿Quieres que se abra una vez al día al iniciar sesión? "
+        "(s o n, Enter para más tarde) > ",
+    "Want it to open once a day when you sign in so it can ask about your "
+    "plan? (y or n, Enter for not now) > ":
+        "¿Quieres que se abra una vez al día al iniciar sesión para "
+        "preguntarte por tu plan? (s o n, Enter para más tarde) > ",
+    "Type y or n, or press Enter for not now.":
+        "Escribe s o n, o pulsa Enter para más tarde.",
+    "That was not understood. It will ask again on a later visit.":
+        "No se entendió. Volverá a preguntar en otra visita.",
+    "It will ask again on a later visit. Menu option 2 also turns it on.":
+        "Volverá a preguntar en otra visita. La opción 2 del menú también "
+        "lo activa.",
+    "No problem. Menu option 2 turns it on later.":
+        "Sin problema. La opción 2 del menú lo activa más adelante.",
+    "Okay. It won't ask again. Menu option 2 turns it on.":
+        "De acuerdo. No volverá a preguntar. La opción 2 del menú lo activa.",
+    "Okay. It will ask again on a later visit. Type n to stop it.":
+        "De acuerdo. Volverá a preguntar en otra visita. Escribe n para "
+        "que no pregunte más.",
+    "When did you finish it?": "¿Cuándo lo terminaste?",
+    "Today": "Hoy",
+    "Type a number from 1 to {n}, or Enter for 1 > ":
+        "Escribe un número del 1 al {n}, o Enter para 1 > ",
+    "Type a number from 1 to {n}, or press Enter.":
+        "Escribe un número del 1 al {n}, o pulsa Enter.",
+    "That looks like more than one thing. Finishing the first part still "
+    "counts.":
+        "Eso parece más de una cosa. Terminar la primera parte ya cuenta.",
+    "There is no plan to mark as done. Type plan to set one.":
+        "No hay ningún plan para marcar como hecho. Escribe plan para crear "
+        "uno.",
+    "Could not save that on this computer. The plan is still open.":
+        "No se pudo guardar en este equipo. El plan sigue pendiente.",
+    "Your plan from over two weeks ago was put away. Type same at the plan "
+    "prompt to bring it back.":
+        "Tu plan de hace más de dos semanas se guardó aparte. Escribe "
+        "repetir en la pregunta del plan para recuperarlo.",
+    "Press Enter at each question to skip it, and once more to close. "
+    "That's it.":
+        "Pulsa Enter en cada pregunta para saltarla, y una vez más para "
+        "cerrar. Eso es todo.",
+    "Welcome.": "Te damos la bienvenida.",
+    "Each day you get one thought and one small thing to try, the same for "
+    "everyone.":
+        "Cada día verás una idea y algo sencillo que probar, igual para "
+        "todo el mundo.",
+    "If you type a plan, it asks next time how it went. Notes stay in your "
+    "user folder and it sends nothing anywhere, but IT staff could read "
+    "them, so skip private details.":
+        "Si escribes un plan, la próxima vez te pregunta cómo fue. Las notas "
+        "se quedan en tu carpeta de usuario y no se envía nada a ningún "
+        "sitio, pero el personal de TI podría leerlas, así que no escribas "
+        "datos privados.",
+    "Type menu at the last prompt for the options.":
+        "Escribe menú en la última pregunta para ver las opciones.",
+    "Welcome back. Glad you are here.": "Qué bien verte de nuevo.",
+    "You have opened this {row} times in a row. Nice to see you.":
+        "Lo has abierto {row} días seguidos. Qué bien verte.",
+    "Last time you planned: ": "Tu último plan: ",
+    "Did you do it? (y for yes, n for not yet, Enter to skip) > ":
+        "¿Lo hiciste? (s para sí, n para todavía no, Enter para saltar) > ",
+    "Type y or n, or press Enter to skip.":
+        "Escribe s o n, o pulsa Enter para saltar.",
+    "Could not save that on this computer. Your answer was not counted.":
+        "No se pudo guardar en este equipo. Tu respuesta no se contó.",
+    "That is fine. Keep it for today? (y or n, Enter to keep it) > ":
+        "No pasa nada. ¿Lo mantienes para hoy? (s o n, Enter para "
+        "mantenerlo) > ",
+    "Type y to keep it, n to clear it, or press Enter to keep it.":
+        "Escribe s para mantenerlo, n para quitarlo, o pulsa Enter para "
+        "mantenerlo.",
+    "Cleared. Type same at a plan prompt if you want it back.":
+        "Quitado. Escribe repetir en la pregunta del plan para recuperarlo.",
+    "Kept for today.": "Se mantiene para hoy.",
+    "That was not understood. Your plan is left as it was.":
+        "No se entendió. Tu plan se queda como estaba.",
+    "Your plan is still open.": "Tu plan sigue pendiente.",
+    "Thought for today:": "Idea para hoy:",
+    "Try this today:": "Prueba esto hoy:",
+    "Your plan for today: ": "Tu plan para hoy: ",
+    "Still open since {date}:": "Pendiente desde el {date}:",
+    "(Enter to skip)": "(Enter para saltar)",
+    "(A plan typed here replaces the old one. Enter to skip)":
+        "(Un plan escrito aquí sustituye al anterior. Enter para saltar)",
+    "(Type same to reuse it, or Enter to skip)":
+        "(Escribe repetir para usarlo, o Enter para saltar)",
+    "What is one thing you want to get done today?":
+        "¿Qué cosa quieres terminar hoy?",
+    "The menu comes at the last prompt, after this question. Type menu "
+    "there.":
+        "El menú está en la última pregunta, después de esta. Escribe menú "
+        "allí.",
+    "There is no earlier plan to reuse yet. Nothing was saved.":
+        "Todavía no hay un plan anterior para repetir. No se guardó nada.",
+    "Your notes could not be saved on this computer. This screen still "
+    "works.":
+        "Tus notas no se pudieron guardar en este equipo. Esta pantalla "
+        "sigue funcionando.",
+    "Type menu or q, or Enter to close > ":
+        "Escribe menú o q, o Enter para cerrar > ",
+    "Type done, plan, menu or q, or Enter to close > ":
+        "Escribe hecho, plan, menú o q, o Enter para cerrar > ",
+    "Type plan, menu or q, or Enter to close > ":
+        "Escribe plan, menú o q, o Enter para cerrar > ",
+    "Type done, plan, menu or q, or press Enter to close.":
+        "Escribe hecho, plan, menú o q, o pulsa Enter para cerrar.",
+    "Type plan, menu or q, or press Enter to close.":
+        "Escribe plan, menú o q, o pulsa Enter para cerrar.",
+    "The saved file can't be read right now, or it is damaged.":
+        "El archivo guardado no se puede leer ahora, o está dañado.",
+    "Nothing was changed. Saved in: ": "No se cambió nada. Guardado en: ",
+    "Deleting saved notes needs a person at the keyboard.":
+        "Para borrar las notas guardadas hace falta una persona al teclado.",
+    "{option} needs on or off. Here are the options.":
+        "{option} necesita on u off. Estas son las opciones.",
+    "Unknown option: {option}. Here are the options.":
+        "Opción desconocida: {option}. Estas son las opciones.",
+}
+
+
 # Controls, format marks such as bidi overrides, private-use and surrogate
 # code points go. Unassigned ones (Cn) stay, so emoji newer than the bundled
 # Python's Unicode tables survive.
@@ -463,7 +1133,7 @@ def clean(text):
 def typed_plan(raw):
     """Clean a typed plan, and say so when it is cut."""
     if len(tidy(raw)) > MAX_PLAN:
-        say(f"Shortened to {MAX_PLAN} characters.")
+        say(tr("Shortened to {n} characters.").format(n=MAX_PLAN))
     return clean(raw)
 
 
@@ -516,13 +1186,11 @@ def load(repair=True):
             os.replace(path, backup)
         except OSError:
             return state, False
-        say(textwrap.fill("Your saved file was damaged, so hello-world set it "
-                          "aside as a backup copy and started fresh. Your "
-                          "earlier days and plan could not be read. Menu "
-                          "option 4 deletes the backup.", 72,
-                          break_on_hyphens=False, break_long_words=False))
-        say("Backup copy: " + os.path.basename(backup))
-        say("In the folder: " + data_dir())
+        para(tr("Your saved file was damaged, so hello-world set it aside as a "
+                "backup copy and started fresh. Your earlier days and plan "
+                "could not be read. Menu option 4 deletes the backup."))
+        say(tr("Backup copy: ") + os.path.basename(backup))
+        say(tr("In the folder: ") + data_dir())
         say()
         return state, True
     if raw.get("streak") is False:
@@ -754,7 +1422,8 @@ def not_a_choice(word, choices):
     shown = tidy(word)
     if len(shown) > 30:
         shown = shown[:30] + "..."
-    say(f'That was not one of the choices: "{shown}". {choices}')
+    say(tr('That was not one of the choices: "{shown}".').format(shown=shown)
+        + " " + choices)
 
 
 def ask_choice(prompt, yes, no, hint, tries=3):
@@ -854,15 +1523,15 @@ def remind(on, quiet=False):
     """Turn the sign-in launcher on or off. True when it worked."""
     kind, where = launcher_place()
     if not kind:
-        say("The sign-in reminder works on Windows only.")
+        say(tr("The sign-in reminder works on Windows only."))
         return False
     if on and policy("DisableSignInLauncher"):
-        say("Your organization has turned off opening at sign-in.")
+        say(tr("Your organization has turned off opening at sign-in."))
         return False
     if on:
         command = launcher_command()
         if not command:
-            say("The reminder cannot be set up from this folder.")
+            say(tr("The reminder cannot be set up from this folder."))
             return False
         try:
             if kind == "file":
@@ -876,10 +1545,10 @@ def remind(on, quiet=False):
                                       f'"{cmd}" /d /c {command}')
                 remove_legacy_launcher()
         except (OSError, UnicodeEncodeError):
-            say("Could not set up the reminder.")
+            say(tr("Could not set up the reminder."))
             return False
-        say("Done. hello-world will open once a day when you sign in.")
-        say("To stop it, choose option 2 in the menu.")
+        say(tr("Done. hello-world will open once a day when you sign in."))
+        say(tr("To stop it, choose option 2 in the menu."))
         return True
     try:
         if kind == "file":
@@ -898,10 +1567,10 @@ def remind(on, quiet=False):
             except FileNotFoundError:
                 pass
     except OSError:
-        say("Could not turn off the sign-in reminder.")
+        say(tr("Could not turn off the sign-in reminder."))
         return False
     if not quiet:
-        say("Done. The sign-in reminder is off.")
+        say(tr("Done. The sign-in reminder is off."))
     return True
 
 
@@ -927,39 +1596,41 @@ def show_saved(state, full=True):
     recent = [v for v in state["visits"]
               if 0 <= (d - datetime.date.fromisoformat(v)).days <= 6]
     if full:
-        say("Saved on this computer in:")
+        say(tr("Saved on this computer in:"))
         say("  " + data_file())
     else:
-        say("Saved in your own user folder on this computer.")
-    say(f"Days you opened it in the last {KEEP_VISIT_DAYS} days: "
-        f"{len(state['visits'])} (last 7 days: {len(recent)})")
+        say(tr("Saved in your own user folder on this computer."))
+    para(tr("Days you opened it in the last {days} days: {n} (last 7 days: "
+            "{recent})").format(days=KEEP_VISIT_DAYS, n=len(state["visits"]),
+                                recent=len(recent)))
     if state.get("done"):
-        say(f"Times you marked a plan done: {state['done']}")
+        say(tr("Times you marked a plan done: {n}").format(n=state["done"]))
     if state["intent"]:
-        say(wrapped("Your current plan: ", state["intent"]["text"]))
+        say(wrapped(tr("Your current plan: "), state["intent"]["text"]))
     if state.get("previous"):
-        say(wrapped("Earlier plan (for same): ", state["previous"]))
+        say(wrapped(tr("Earlier plan (for same): "), state["previous"]))
     show_finished(state)
-    say("Days-in-a-row message: " + ("shown." if state["streak"] else "hidden."))
+    say(tr("Days-in-a-row message: shown.") if state["streak"] else
+        tr("Days-in-a-row message: hidden."))
     if launcher_place()[0]:
-        say("Opens by itself at sign-in: "
-            + ("turned off by your organization."
-               if policy("DisableSignInLauncher") else
-               "on." if launcher_on() else "off."))
-    say("It never leaves this computer. Others who can read this computer's")
-    say("files, such as IT staff, could read it.")
+        say(tr("Opens by itself at sign-in: turned off by your organization.")
+            if policy("DisableSignInLauncher") else
+            tr("Opens by itself at sign-in: on.") if launcher_on() else
+            tr("Opens by itself at sign-in: off."))
+    para(tr("It never leaves this computer. Others who can read this "
+            "computer's files, such as IT staff, could read it."))
     if full:
-        say("After tidying, the file holds only this:")
+        say(tr("After tidying, the file holds only this:"))
         say(json.dumps(file_form(state), indent=2, ensure_ascii=False))
 
 
 def reset(state):
     """True when deleted, False when a delete failed, None when declined."""
-    answer = ask("Delete all saved notes, dates and plans on this computer? "
-                 "(y or n, Enter to cancel) > ")
+    answer = ask(tr("Delete all saved notes, dates and plans on this "
+                    "computer? (y or n, Enter to cancel) > "))
     word = (answer or "").lower().strip(" .!")
     if word not in STRICT_YES:
-        say("Nothing was deleted.")
+        say(tr("Nothing was deleted."))
         if word in QUIT_WORDS:
             raise Quit
         return None
@@ -989,13 +1660,13 @@ def delete_everything(state):
         except OSError:
             failed.append(path)
     if failed or listing_failed:
-        say("Could not delete everything.")
+        say(tr("Could not delete everything."))
         if failed:
-            say("Delete these yourself:")
+            say(tr("Delete these yourself:"))
             for path in failed:
                 say("  " + path)
         if listing_failed:
-            say("Could not list the folder, so backup copies may remain:")
+            say(tr("Could not list the folder, so backup copies may remain:"))
             say("  " + data_dir())
         return False
     state.clear()
@@ -1003,12 +1674,12 @@ def delete_everything(state):
     # A marker with a new epoch instead of no file, so another open window
     # can tell the notes were deleted.
     state["epoch"] = os.urandom(8).hex()
-    say("Done. Everything saved was deleted.")
+    say(tr("Done. Everything saved was deleted."))
     if save(state):
-        say("Another open hello-world window cannot put it back.")
+        say(tr("Another open hello-world window cannot put it back."))
     else:
-        say("Close any other open hello-world window, or it may save its")
-        say("notes again.")
+        para(tr("Close any other open hello-world window, or it may save its "
+                "notes again."))
     return True
 
 
@@ -1100,8 +1771,8 @@ def merge_and_save(state, base, soft):
     # A missing file has no marker at all: deleted by hand or set aside as
     # damaged, not by Delete everything, which always writes a new marker.
     if "epoch" in base and "epoch" in fresh and fresh["epoch"] != base["epoch"]:
-        say("Everything saved was deleted in another window, so this was not")
-        say("saved.")
+        para(tr("Everything saved was deleted in another window, so this was "
+                "not saved."))
         state.clear()
         state.update(fresh)
         base.clear()
@@ -1109,7 +1780,7 @@ def merge_and_save(state, base, soft):
         return False
     if (fresh.get("done", 0) > base.get("done", 0)
             and state.get("done", 0) > base.get("done", 0)):
-        say("The other open window had also finished a plan.")
+        say(tr("The other open window had also finished a plan."))
     for key in set(state) | set(base):
         if key in ("visits", "done", "offer_skips", "finished"):
             continue
@@ -1117,8 +1788,8 @@ def merge_and_save(state, base, soft):
             continue
         if key in soft and fresh.get(key) != base.get(key):
             if key == "intent":
-                say("The other open window changed the plan, so its plan is "
-                    "kept.")
+                say(tr("The other open window changed the plan, so its plan "
+                       "is kept."))
             continue
         if key in state:
             fresh[key] = copy.deepcopy(state[key])
@@ -1164,21 +1835,26 @@ def undo(state, base):
 
 
 COMMAND_WORDS = ("menu", "help", "?", "q", "quit", "exit", "done", "plan",
-                 "m", "p")
+                 "m", "p", "menú", "ayuda", "hecho", "salir")
 # Someone declining to plan is not making an error, so these get no lecture.
-DECLINE_WORDS = ("none", "no", "nope", "nothing", "skip", "n")
+DECLINE_WORDS = ("none", "no", "nope", "nothing", "skip", "n", "nada",
+                 "ninguno", "saltar")
 
 
-def is_command(text, again="Type plan at the last prompt to set one."):
+def is_command(text, again=None):
     """A command word typed where a plan is asked is not a plan."""
     word = (text or "").lower().strip(" .!")
     if word in DECLINE_WORDS:
         return True
     if word in COMMAND_WORDS:
-        say("That looks like a command, not a plan, so nothing was saved. "
-            + again)
+        para(tr("That looks like a command, not a plan, so nothing was saved.")
+             + " " + (again or tr("Type plan at the last prompt to set one.")))
         return True
     return False
+
+
+def is_same(text):
+    return (text or "").strip().lower() in SAME_WORDS
 
 
 def show_finished(state, limit=MAX_FINISHED):
@@ -1191,7 +1867,7 @@ def show_finished(state, limit=MAX_FINISHED):
     if not items:
         return
     say()
-    say("Finished lately:")
+    say(tr("Finished lately:"))
     for item in list(reversed(items))[:limit]:
         say(wrapped("  " + long_date(datetime.date.fromisoformat(
             item["date"])) + ": ", item["text"]))
@@ -1199,7 +1875,7 @@ def show_finished(state, limit=MAX_FINISHED):
 
 def reuse(state, raw):
     """Typing `same` brings back the plan before this one, if there is one."""
-    if (raw or "").strip().lower() == "same" and state.get("previous"):
+    if is_same(raw) and state.get("previous"):
         return state["previous"]
     return raw
 
@@ -1212,33 +1888,43 @@ def set_plan(state, can_save, iso=None, after_done=False):
     # doesn't date a plan to the next day.
     iso = iso or today().isoformat()
     if old:
-        when = ("today" if old["date"] == iso else "from " + long_date(
-            datetime.date.fromisoformat(old["date"])))
-        say(wrapped(f"Your plan {when}: ", old["text"]))
-    if state.get("previous"):
-        say(wrapped("Earlier plan: ", state["previous"]))
-    hint = ", same to reuse the earlier plan" if state.get("previous") else ""
-    typed = ask("Type the next plan" + hint + ", or Enter to close > "
-                if after_done else
-                "Type today's plan" + hint
-                + (", or Enter to keep it > " if old else ", or Enter to go back > "))
+        label = (tr("Your plan today: ") if old["date"] == iso else
+                 tr("Your plan from {date}: ").format(date=long_date(
+                     datetime.date.fromisoformat(old["date"]))))
+        say(wrapped(label, old["text"]))
+    same = bool(state.get("previous"))
+    if same:
+        say(wrapped(tr("Earlier plan: "), state["previous"]))
+    if after_done:
+        prompt = (tr("Type the next plan, same to reuse the earlier plan, or "
+                     "Enter to close > ") if same else
+                  tr("Type the next plan, or Enter to close > "))
+    elif old:
+        prompt = (tr("Type today's plan, same to reuse the earlier plan, or "
+                     "Enter to keep it > ") if same else
+                  tr("Type today's plan, or Enter to keep it > "))
+    else:
+        prompt = (tr("Type today's plan, same to reuse the earlier plan, or "
+                     "Enter to go back > ") if same else
+                  tr("Type today's plan, or Enter to go back > "))
+    typed = ask(prompt)
     word = (typed or "").lower().strip(" .!")
     if after_done and not word:
-        say("Closing.")
+        say(tr("Closing."))
         return True
     if word in QUIT_WORDS:
         raise Quit
     # Another window may have saved while this prompt waited.
     refresh(state, can_save)
     old = state["intent"]
-    if (typed or "").lower() == "same" and not state.get("previous"):
-        say("There is no earlier plan to reuse yet. Nothing changed.")
+    if is_same(typed) and not state.get("previous"):
+        say(tr("There is no earlier plan to reuse yet. Nothing changed."))
         return False
-    if is_command(typed, "Type your plan, or press Enter to go back."):
+    if is_command(typed, tr("Type your plan, or press Enter to go back.")):
         return False
     text = typed_plan(reuse(state, typed) or "")
     if not text:
-        say("Nothing changed.")
+        say(tr("Nothing changed."))
         return False
     base = copy.deepcopy(state)
     # Changing today's plan is a correction, so only a plan carried over from
@@ -1247,11 +1933,11 @@ def set_plan(state, can_save, iso=None, after_done=False):
         state["previous"] = old["text"]
     state["intent"] = {"text": text, "date": iso}
     if commit(state, base, can_save):
-        say(SAVED_PLAN)
+        para(tr(SAVED_PLAN))
         nudge_if_several(text)
     else:
         undo(state, base)
-        say("Could not save that on this computer. Your plan is unchanged.")
+        say(tr("Could not save that on this computer. Your plan is unchanged."))
     return False
 
 
@@ -1260,33 +1946,34 @@ def forget_finished(state, can_save):
     refresh(state, can_save)
     shown = list(reversed(state.get("finished") or []))
     if not shown:
-        say("No finished plans are saved.")
+        say(tr("No finished plans are saved."))
         return
     for n, item in enumerate(shown, 1):
         say(wrapped(f"  {n}  {long_date(datetime.date.fromisoformat(item['date']))}: ",
                     item["text"]))
     numbers = [str(n) for n in range(1, len(shown) + 1)]
     for _ in range(3):
-        choice = ask(f"Type the number to forget (1 to {len(shown)}), "
-                     "or Enter to keep them all > ")
+        choice = ask(tr("Type the number to forget (1 to {n}), or Enter to "
+                        "keep them all > ").format(n=len(shown)))
         if (choice or "").lower().strip(" .!") in QUIT_WORDS:
             raise Quit
         if not choice or choice in numbers:
             break
-        say(f'There is no number "{tidy(choice)[:30]}" on the list. Type a '
-            f"number from 1 to {len(shown)}, or press Enter to keep them all.")
+        para(tr('There is no number "{typed}" on the list. Type a number from '
+                "1 to {n}, or press Enter to keep them all.").format(
+                    typed=tidy(choice)[:30], n=len(shown)))
     if not choice or choice not in numbers:
-        say("Nothing changed.")
+        say(tr("Nothing changed."))
         return
     item = shown[int(choice) - 1]
     also_same = state.get("previous") == item["text"] and ask_choice(
-        "Also forget it as the earlier plan for same? "
-        "(y or n, Enter to keep it for same) > ",
+        tr("Also forget it as the earlier plan for same? "
+           "(y or n, Enter to keep it for same) > "),
         STRICT_YES, ("n", "no", "nope"),
-        "Type y or n, or press Enter to keep it for same.") == "yes"
+        tr("Type y or n, or press Enter to keep it for same.")) == "yes"
     refresh(state, can_save)
     if item not in state.get("finished", []):
-        say("That plan was already forgotten. Nothing changed.")
+        say(tr("That plan was already forgotten. Nothing changed."))
         return
     base = copy.deepcopy(state)
     state["finished"] = [i for i in state["finished"] if i != item]
@@ -1294,12 +1981,12 @@ def forget_finished(state, can_save):
         state.pop("previous")
     kept = state.get("previous") == item["text"]
     if commit(state, base, can_save):
-        say(wrapped("Forgotten: ", item["text"]))
+        say(wrapped(tr("Forgotten: "), item["text"]))
         if kept:
-            say("Same still has it.")
+            say(tr("Same still has it."))
     else:
         undo(state, base)
-        say("Could not save that on this computer. Nothing changed.")
+        say(tr("Could not save that on this computer. Nothing changed."))
 
 
 def menu(state, can_save=True, iso=None):
@@ -1310,54 +1997,57 @@ def menu(state, can_save=True, iso=None):
         say()
         reminding = launcher_on()
         if not listed:
-            say("Options")
-            say("  1  Show what is saved on this computer")
-            say("  2  " + ("Open once a day at sign-in (turned off by your "
-                           "organization)"
+            say(tr("Options"))
+            say("  1  " + tr("Show what is saved on this computer"))
+            say("  2  " + (tr("Open once a day at sign-in (turned off by your "
+                              "organization)")
                            if policy("DisableSignInLauncher") and not reminding else
-                           "Turn off: open once a day at sign-in (now on)"
+                           tr("Turn off: open once a day at sign-in (now on)")
                            if reminding else
-                           "Turn on: open once a day at sign-in (now off)"))
-            say("  3  " + ("Days-in-a-row message (hidden by your organization)"
+                           tr("Turn on: open once a day at sign-in (now off)")))
+            say("  3  " + (tr("Days-in-a-row message (hidden by your "
+                              "organization)")
                            if policy("HideDaysInARow") else
-                           "Hide the days-in-a-row message (now shown)"
+                           tr("Hide the days-in-a-row message (now shown)")
                            if state["streak"] else
-                           "Show the days-in-a-row message (now hidden)"))
-            say("  4  Delete everything saved")
-            say("  5  Help")
+                           tr("Show the days-in-a-row message (now hidden)")))
+            say("  4  " + tr("Delete everything saved"))
+            say("  5  " + tr("Help"))
             if plans_off():
-                say("  6  Set today's plan (turned off by your organization)")
-                say("  7  Forget a finished plan (turned off by your organization)")
+                say("  6  " + tr("Set today's plan (turned off by your "
+                                 "organization)"))
+                say("  7  " + tr("Forget a finished plan (turned off by your "
+                                 "organization)"))
             else:
-                say("  6  Set or change today's plan")
-                say("  7  Forget one finished plan")
-            say("  8  " + ("Thought and tip (hidden by your organization)"
+                say("  6  " + tr("Set or change today's plan"))
+                say("  7  " + tr("Forget one finished plan"))
+            say("  8  " + (tr("Thought and tip (hidden by your organization)")
                            if policy("HideThoughtAndTip") else
-                           "Hide the thought and tip (now shown)"
+                           tr("Hide the thought and tip (now shown)")
                            if state.get("tips", True) else
-                           "Show the thought and tip (now hidden)"))
-            say("  Enter  Back to the last prompt")
+                           tr("Show the thought and tip (now hidden)")))
+            say("  Enter  " + tr("Back to the last prompt"))
             listed = True
-            choice = ask("Choose 1 to 8, or Enter to go back > ")
+            choice = ask(tr("Choose 1 to 8, or Enter to go back > "))
         else:
-            choice = ask("Choose 1 to 8, m to list the options, or Enter to "
-                         "go back > ")
+            choice = ask(tr("Choose 1 to 8, m to list the options, or Enter to "
+                            "go back > "))
         if not choice:
             return
         if choice.lower().strip(" .!") in QUIT_WORDS:
             raise Quit
-        if choice.lower() in ("m", "menu", "list"):
+        if choice.lower() in ("m", "menu", "list", "menú", "lista"):
             listed = False
             continue
-        if choice.lower() in ("help", "?", "h"):
+        if choice.lower() in ("help", "?", "h", "ayuda"):
             choice = "5"
         if choice == "1":
             if not refresh(state, can_save):
-                say("The saved file could not be read just now, so this may "
-                    "be out of date.")
+                para(tr("The saved file could not be read just now, so this "
+                        "may be out of date."))
             show_saved(state, full=False)
-            if (ask("Type full to see the whole file, or Enter to go on > ")
-                    or "").lower() == "full":
+            if (ask(tr("Type full to see the whole file, or Enter to go on > "))
+                    or "").lower() in ("full", "todo"):
                 refresh(state, can_save)
                 say(json.dumps(file_form(state), indent=2, ensure_ascii=False))
         elif choice == "2":
@@ -1368,31 +2058,32 @@ def menu(state, can_save=True, iso=None):
                 state["offered"] = True
                 if not commit(state, base, can_save):
                     undo(state, base)
-                    say("Could not save that choice on this computer.")
+                    say(tr("Could not save that choice on this computer."))
         elif choice == "3" and policy("HideDaysInARow"):
-            say("Your organization has hidden the days-in-a-row message.")
+            say(tr("Your organization has hidden the days-in-a-row message."))
         elif choice == "3":
             refresh(state, can_save)
             base = copy.deepcopy(state)
             state["streak"] = not state["streak"]
             if commit(state, base, can_save):
-                say("Done. The days-in-a-row message is "
-                    + ("on." if state["streak"] else "off."))
+                say(tr("Done. The days-in-a-row message is on.")
+                    if state["streak"] else
+                    tr("Done. The days-in-a-row message is off."))
             else:
                 undo(state, base)
-                say("Could not save that choice on this computer.")
+                say(tr("Could not save that choice on this computer."))
         elif choice == "4":
             reset(state)
         elif choice == "5":
-            say(MENU_HELP)
+            say(tr(MENU_HELP))
         elif choice in ("6", "7") and plans_off():
-            say("Plans are turned off by your organization.")
+            say(tr("Plans are turned off by your organization."))
         elif choice == "6":
             set_plan(state, can_save, iso)
         elif choice == "7":
             forget_finished(state, can_save)
         elif choice == "8" and policy("HideThoughtAndTip"):
-            say("Your organization has hidden the thought and tip.")
+            say(tr("Your organization has hidden the thought and tip."))
         elif choice == "8":
             refresh(state, can_save)
             base = copy.deepcopy(state)
@@ -1401,13 +2092,14 @@ def menu(state, can_save=True, iso=None):
             else:
                 state.pop("tips", None)
             if commit(state, base, can_save):
-                say("Done. The thought and tip are "
-                    + ("on." if state.get("tips", True) else "off."))
+                say(tr("Done. The thought and tip are on.")
+                    if state.get("tips", True) else
+                    tr("Done. The thought and tip are off."))
             else:
                 undo(state, base)
-                say("Could not save that choice on this computer.")
+                say(tr("Could not save that choice on this computer."))
         else:
-            not_a_choice(choice, "Type 1 to 8, or press Enter to go back.")
+            not_a_choice(choice, tr("Type 1 to 8, or press Enter to go back."))
 
 
 def offer_reminder(state, can_save, planned=False):
@@ -1421,37 +2113,39 @@ def offer_reminder(state, can_save, planned=False):
             or not (planned or len(state["visits"]) >= 2)):
         return
     answer = ask_choice(
-        ("Want it to open once a day when you sign in? "
-         if plans_off() else
-         "Want it to open once a day when you sign in so it can ask about "
-         "your plan? ") + "(y or n, Enter for not now) > ",
-        STRICT_YES, ("n", "no", "nope", "no thanks", "never", "stop"),
-        "Type y or n, or press Enter for not now.")
+        tr("Want it to open once a day when you sign in? "
+           "(y or n, Enter for not now) > ")
+        if plans_off() else
+        tr("Want it to open once a day when you sign in so it can ask about "
+           "your plan? (y or n, Enter for not now) > "),
+        STRICT_YES, ("n", "no", "nope", "no thanks", "never", "stop",
+                     "no gracias", "nunca"),
+        tr("Type y or n, or press Enter for not now."))
     if answer is None:
-        say("That was not understood. It will ask again on a later visit.")
+        say(tr("That was not understood. It will ask again on a later visit."))
         return
     refresh(state, can_save)
     base = copy.deepcopy(state)
     if answer == "yes":
         if not remind(True):
-            say("It will ask again on a later visit. Menu option 2 also turns "
-                "it on.")
+            para(tr("It will ask again on a later visit. Menu option 2 also "
+                    "turns it on."))
             say()
             return
         state["offered"] = True
     elif answer == "no":
         state["offered"] = True
-        say("No problem. Menu option 2 turns it on later.")
+        say(tr("No problem. Menu option 2 turns it on later."))
     else:
         skips = state.get("offer_skips", 0) + 1
         state["offer_skips"] = skips
         if skips >= MAX_OFFER_SKIPS:
             state["offered"] = True
-            say("Okay. It won't ask again. Menu option 2 turns it on.")
+            para(tr("Okay. It won't ask again. Menu option 2 turns it on."))
         else:
-            say("Okay. It will ask again on a later visit. Type n to stop it.")
+            para(tr("Okay. It will ask again on a later visit. Type n to stop it."))
     if not commit(state, base, can_save):
-        say("Could not save that choice on this computer.")
+        say(tr("Could not save that choice on this computer."))
     say()
 
 
@@ -1467,7 +2161,8 @@ def finish_plan(state, text, d):
 def done_lines(state, d):
     """Shown only once the save has worked, and with the merged count, so
     nobody is congratulated for something that was not recorded."""
-    return [DONE_LINES[d.toordinal() % len(DONE_LINES)]]
+    lines = DONE_LINES_ES if spanish() else DONE_LINES
+    return [lines[d.toordinal() % len(lines)]]
 
 
 def finish_day(plan_day, d):
@@ -1480,12 +2175,13 @@ def finish_day(plan_day, d):
     if len(days) > 7:
         days = days[:1] + days[-6:]
     # Numbers, like the menu: a letter here would clash with the y just typed.
-    say("When did you finish it?")
+    say(tr("When did you finish it?"))
     for n, when in enumerate(days, 1):
-        say(f"  {n}  " + ("Today" if when == d else long_date(when)))
+        say(f"  {n}  " + (tr("Today") if when == d else long_date(when)))
     numbers = [str(n) for n in range(1, len(days) + 1)]
     for _ in range(3):
-        answer = ask(f"Type a number from 1 to {len(days)}, or Enter for 1 > ")
+        answer = ask(tr("Type a number from 1 to {n}, or Enter for 1 > ")
+                     .format(n=len(days)))
         word = (answer or "").lower().strip(" .!")
         if not word:
             return days[0]
@@ -1493,16 +2189,17 @@ def finish_day(plan_day, d):
             raise Quit
         if word in numbers:
             return days[int(word) - 1]
-        not_a_choice(answer, f"Type a number from 1 to {len(days)}, or press Enter.")
+        not_a_choice(answer, tr("Type a number from 1 to {n}, or press Enter.")
+                     .format(n=len(days)))
     return days[0]
 
 
 def nudge_if_several(text):
     """A plan of several things joined together is hard to finish."""
     padded = f" {text.lower()} "
-    if any(joint in padded for joint in (" and ", " & ")) or "+" in text:
-        para("That looks like more than one thing. Finishing the first part "
-             "still counts.")
+    if any(joint in padded for joint in (" and ", " & ", " y ")) or "+" in text:
+        para(tr("That looks like more than one thing. Finishing the first "
+                "part still counts."))
 
 
 def mark_done_now(state, can_save, d):
@@ -1510,14 +2207,14 @@ def mark_done_now(state, can_save, d):
     refresh(state, can_save)
     plan = state["intent"]
     if not plan:
-        say("There is no plan to mark as done. Type plan to set one.")
+        para(tr("There is no plan to mark as done. Type plan to set one."))
         return False
     base = copy.deepcopy(state)
     finish_plan(state, plan["text"], d)
     state["intent"] = None
     if not commit(state, base, can_save):
         undo(state, base)
-        say("Could not save that on this computer. The plan is still open.")
+        say(tr("Could not save that on this computer. The plan is still open."))
         return False
     for line in done_lines(state, d):
         say(line)
@@ -1553,41 +2250,43 @@ def daily(startup):
         state["previous"] = intent["text"]
         intent, expired = None, True
 
-    say("Hello, world!")
-    say(long_date(d))
+    say(tr(GREETING))
+    header = long_date(d)
+    say(header[0].upper() + header[1:])
     say()
 
     if expired:
-        para("Your plan from over two weeks ago was put away. Type same at "
-             "the plan prompt to bring it back.")
+        para(tr("Your plan from over two weeks ago was put away. Type same "
+                "at the plan prompt to bring it back."))
         say()
 
     if first:
-        para("Press Enter at each question to skip it, and once more to "
-             "close. That's it.")
+        para(tr("Press Enter at each question to skip it, and once more to "
+                "close. That's it."))
         say()
-        welcome = ["Welcome."]
+        welcome = [tr("Welcome.")]
         if not policy("HideThoughtAndTip"):
-            welcome.append("Each day you get one thought and one small thing "
-                           "to try, the same for everyone.")
+            welcome.append(tr("Each day you get one thought and one small "
+                              "thing to try, the same for everyone."))
         if not plans_off():
-            welcome.append("If you type a plan, it asks next time how it "
-                           "went. Notes stay in your user folder and it sends "
-                           "nothing anywhere, but IT staff could read them, so "
-                           "skip private details.")
-        welcome.append("Type menu at the last prompt for the options.")
+            welcome.append(tr("If you type a plan, it asks next time how it "
+                              "went. Notes stay in your user folder and it "
+                              "sends nothing anywhere, but IT staff could read "
+                              "them, so skip private details."))
+        welcome.append(tr("Type menu at the last prompt for the options."))
         para(" ".join(welcome))
         say()
     elif not seen_today:
         last = datetime.date.fromisoformat(state["visits"][-1])
         row = in_a_row(state["visits"], d)
         if (d - last).days > 7:
-            say("Welcome back. Glad you are here.")
+            say(tr("Welcome back. Glad you are here."))
             show_finished(state, SHOWN_AFTER_DONE)
             say()
         elif (state["streak"] and not policy("HideDaysInARow")
               and (row in (3, 7, 14) or row % 30 == 0)):
-            say(f"You have opened this {row} times in a row. Nice to see you.")
+            say(tr("You have opened this {row} times in a row. Nice to see "
+                   "you.").format(row=row))
             say()
 
     quitting = False
@@ -1596,10 +2295,10 @@ def daily(startup):
         # but two skips mean "stop asking"; the plan then shows as still open.
         if (intent and intent["date"] < iso and intent.get("skips", 0) < 2
                 and not plans_off()):
-            say(wrapped("Last time you planned: ", intent["text"]))
+            say(wrapped(tr("Last time you planned: "), intent["text"]))
             answer = ask_choice(
-                "Did you do it? (y for yes, n for not yet, Enter to skip) > ",
-                YES, NO, "Type y or n, or press Enter to skip.")
+                tr("Did you do it? (y for yes, n for not yet, Enter to skip) > "),
+                YES, NO, tr("Type y or n, or press Enter to skip."))
             if answer == "yes":
                 answered = True
                 when = finish_day(datetime.date.fromisoformat(intent["date"]), d)
@@ -1616,65 +2315,70 @@ def daily(startup):
                     # the plan from the state, never the copy held above.
                     undo(state, base)
                     intent = state["intent"]
-                    say("Could not save that on this computer. Your answer was "
-                        "not counted.")
+                    say(tr("Could not save that on this computer. Your answer "
+                           "was not counted."))
             elif answer == "no":
                 answered = True
                 keep = ask_choice(
-                    "That is fine. Keep it for today? (y or n, Enter to keep it) > ",
-                    STRICT_YES + ("not yet",), ("n", "no", "nope"),
-                    "Type y to keep it, n to clear it, or press Enter to keep it.")
+                    tr("That is fine. Keep it for today? (y or n, Enter to "
+                       "keep it) > "),
+                    STRICT_YES + ("not yet", "todavía no", "aún no", "aun no"),
+                    ("n", "no", "nope"),
+                    tr("Type y to keep it, n to clear it, or press Enter to "
+                       "keep it."))
                 if keep == "no":
                     state["previous"] = intent["text"]
                     intent = None
-                    say("Cleared. Type same at a plan prompt if you want it back.")
+                    say(tr("Cleared. Type same at a plan prompt if you want it back."))
                 else:
                     intent = {"text": intent["text"], "date": iso,
                               "since": intent.get("since", intent["date"])}
-                    say("Kept for today.")
+                    say(tr("Kept for today."))
             elif answer is None and person:
-                say("That was not understood. Your plan is left as it was.")
+                say(tr("That was not understood. Your plan is left as it was."))
             elif answer is not None:
                 intent = dict(intent, skips=intent.get("skips", 0) + 1)
-                say("Your plan is still open.")
+                say(tr("Your plan is still open."))
             say()
 
         if state.get("tips", True) and not policy("HideThoughtAndTip"):
             thought, tip = todays_pair(d)
-            say("Thought for today:")
+            say(tr("Thought for today:"))
             say(indent(thought))
             say()
-            say("Try this today:")
+            say(tr("Try this today:"))
             say(indent(tip))
             say()
 
         if intent and intent["date"] == iso:
-            say(wrapped("Your plan for today: ", intent["text"]))
+            say(wrapped(tr("Your plan for today: "), intent["text"]))
             say()
         elif intent:
             # Not answered, or skipped twice; it must not vanish.
             when = long_date(datetime.date.fromisoformat(intent["date"]))
-            say(f"Still open since {when}:")
+            say(tr("Still open since {date}:").format(date=when))
             say(indent(intent["text"]))
             say()
         if (not seen_today and not plans_off()
                 and not (intent and intent["date"] == iso)):
-            skip = ("(Enter to skip)" if not intent else
-                    "(A plan typed here replaces the old one. Enter to skip)")
+            skip = (tr("(Enter to skip)") if not intent else
+                    tr("(A plan typed here replaces the old one. Enter to skip)"))
             if state.get("previous") and not intent:
-                say(wrapped("Earlier plan: ", state["previous"]))
-                skip = "(Type same to reuse it, or Enter to skip)"
-            question = "What is one thing you want to get done today?\n" + skip + " > "
+                say(wrapped(tr("Earlier plan: "), state["previous"]))
+                skip = tr("(Type same to reuse it, or Enter to skip)")
+            question = (tr("What is one thing you want to get done today?")
+                        + "\n" + skip + " > ")
             text = ask(question)
             # The welcome mentions the menu, so someone may type it here first.
-            if (text or "").lower().strip(" .!") in ("menu", "m", "help", "h", "?"):
-                say("The menu comes at the last prompt, after this question. "
-                    "Type menu there.")
+            if (text or "").lower().strip(" .!") in ("menu", "m", "help", "h",
+                                                    "?", "menú", "ayuda"):
+                para(tr("The menu comes at the last prompt, after this question. "
+                        "Type menu there."))
                 text = ask(question)
             if (text or "").lower().strip(" .!") in QUIT_WORDS:
                 raise Quit
-            if (text or "").lower() == "same" and not state.get("previous"):
-                say("There is no earlier plan to reuse yet. Nothing was saved.")
+            if is_same(text) and not state.get("previous"):
+                say(tr("There is no earlier plan to reuse yet. Nothing was saved."))
                 text = ""
             elif is_command(text):
                 text = ""
@@ -1701,12 +2405,12 @@ def daily(startup):
         if not commit(state, base, can_save, soft):
             undo(state, base)
             intent = state["intent"]
-            say("Your notes could not be saved on this computer. This screen "
-                "still works.")
+            para(tr("Your notes could not be saved on this computer. This "
+                    "screen still works."))
         else:
             intent = state["intent"]
             if typed_new:
-                say(SAVED_PLAN)
+                para(tr(SAVED_PLAN))
                 nudge_if_several(intent["text"])
                 say()
             if not seen_today and not quitting:
@@ -1717,7 +2421,7 @@ def daily(startup):
                 # The offer re-reads the file, so pick up the plan it read.
                 intent = state["intent"]
     if quitting:
-        say("Closing.")
+        say(tr("Closing."))
         return
 
     # A message at the very end must stay on screen until the person has read
@@ -1725,22 +2429,22 @@ def daily(startup):
     try:
         last_prompt(state, can_save, intent, person, d, iso)
     except Quit:
-        say("Closing.")
+        say(tr("Closing."))
 
 
 def last_prompt(state, can_save, intent, person, d, iso):
     """Loop at the last prompt until the person closes the window."""
     while True:
         planned = bool(intent and person and state["intent"] is intent)
-        prompt = ("Type menu or q, or Enter to close > " if plans_off() else
-                  "Type done, plan, menu or q, or Enter to close > "
+        prompt = (tr("Type menu or q, or Enter to close > ") if plans_off() else
+                  tr("Type done, plan, menu or q, or Enter to close > ")
                   if planned else
-                  "Type plan, menu or q, or Enter to close > ")
+                  tr("Type plan, menu or q, or Enter to close > "))
         answer = (ask(prompt) or "").lower().strip()
-        if answer in ("done", "p", "plan") and plans_off():
-            say("Plans are turned off by your organization.")
+        if answer in (*DONE_WORDS, "p", "plan") and plans_off():
+            say(tr("Plans are turned off by your organization."))
             continue
-        if answer == "done" and person:
+        if answer in DONE_WORDS and person:
             closing = False
             if mark_done_now(state, can_save, d):
                 say()
@@ -1753,25 +2457,30 @@ def last_prompt(state, can_save, intent, person, d, iso):
             set_plan(state, can_save, iso)
             intent = state["intent"]
             continue
-        elif answer in ("m", "menu", "h", "help", "?"):
+        elif answer in ("m", "menu", "h", "help", "?", "menú", "ayuda"):
             menu(state, can_save, iso)
             intent = state["intent"]
             continue
-        elif answer in ("q", "quit", "exit", "x", "close"):
+        elif answer in QUIT_WORDS:
             pass
         elif answer:
-            not_a_choice(answer, "Type " + ("done, " if planned else "")
-                         + "plan, menu or q, or press Enter to close.")
+            not_a_choice(answer, tr("Type done, plan, menu or q, or press "
+                                    "Enter to close.")
+                         if planned else
+                         tr("Type plan, menu or q, or press Enter to close."))
             continue
         break
 
 
 def run(argv):
+    # Before lowercasing, so a path keeps its case.
+    if len(argv) == 2 and argv[0].lower() == "--check-content":
+        return check_content(argv[1])
     argv = [a.lower() for a in argv]
     if argv in (["/?"], ["-?"], ["/help"], ["-help"], ["help"]):
         argv = ["--help"]
     if argv == ["--plain"]:
-        say("Hello, world!")
+        say(GREETING)
         return 0
     if argv in (["--version"], ["-v"]):
         say("hello-world " + VERSION)
@@ -1788,14 +2497,14 @@ def run(argv):
     if argv == ["--stats"]:
         state, readable = load(repair=False)
         if not readable:
-            say("The saved file can't be read right now, or it is damaged.")
-            say("Nothing was changed. Saved in: " + data_dir())
+            say(tr("The saved file can't be read right now, or it is damaged."))
+            say(tr("Nothing was changed. Saved in: ") + data_dir())
             return 1
         show_saved(state)
         return 0
     if argv == ["--reset"]:
         if not interactive():
-            say("Deleting saved notes needs a person at the keyboard.")
+            say(tr("Deleting saved notes needs a person at the keyboard."))
             return 1
         state, _ = load(repair=False)
         # Answering no is the person's choice; only a failed delete is an error.
@@ -1810,18 +2519,41 @@ def run(argv):
         base = copy.deepcopy(state)
         state["streak"] = argv[1] == "on"
         if commit(state, base, can_save):
-            say("Done. The days-in-a-row message is "
-                + ("on." if state["streak"] else "off."))
+            say(tr("Done. The days-in-a-row message is on.")
+                if state["streak"] else
+                tr("Done. The days-in-a-row message is off."))
             return 0
-        say("Could not save that choice on this computer.")
+        say(tr("Could not save that choice on this computer."))
         return 1
     if len(argv) == 1 and argv[0] in ("--remind", "--streak"):
-        say(f"{argv[0]} needs on or off. Here are the options.")
+        say(tr("{option} needs on or off. Here are the options.")
+            .format(option=argv[0]))
     else:
-        say("Unknown option: " + tidy(" ".join(argv))[:60] + ". Here are the options.")
+        say(tr("Unknown option: {option}. Here are the options.")
+            .format(option=tidy(" ".join(argv))[:60]))
     say()
     say(help_text())
     return 2
+
+
+def check_content(path):
+    """--check-content: say whether an organization content file is usable."""
+    try:
+        with open(path, encoding="utf-8-sig") as f:
+            data = json.loads(f.read(200_001))
+    except OSError as e:
+        say(f"Can't read {tidy(path)}: {e.strerror}")
+        return 1
+    except (ValueError, RecursionError):
+        say("The file isn't valid JSON, or is over 200,000 characters.")
+        return 1
+    problems = content_problems(data)
+    for problem in problems:
+        say(problem)
+    if problems:
+        return 1
+    say(f"OK: {len(data['thoughts'])} thoughts and {len(data['tips'])} tips.")
+    return 0
 
 
 def main():

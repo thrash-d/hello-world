@@ -112,6 +112,21 @@ jobs:
           powershell -NoProfile -ExecutionPolicy Bypass -File "$dir\uninstall.ps1" -Quiet | Write-Host
           Check ($LASTEXITCODE -eq 0) 'uninstall exits 0'
           Check (-not (Test-Path $dir) -and -not (Test-Path $key)) 'uninstall removes the folder and the Apps entry'
+
+          # The same package with the sample organization content in it.
+          $withContent = Join-Path $env:RUNNER_TEMP 'package-content'
+          $contentHash = (powershell -NoProfile -ExecutionPolicy Bypass -File tools\build-package.ps1 -OutDir $withContent -ContentFile examples\content.json | Select-Object -Last 1).Trim()
+          Get-ChildItem $setup | Remove-Item -Force
+          Copy-Item "$withContent\*" $setup
+          Add-Content "$setup\content.json" ' '
+          Check ((Install $contentHash) -eq 1 -and -not (Test-Path $dir)) 'an edited content.json is refused'
+          Copy-Item "$withContent\content.json" $setup -Force
+          Check ((Install $contentHash) -eq 0) 'a package with content.json installs'
+          $tip = & "$dir\python\python.exe" -I -c "import sys; sys.path.insert(0, sys.argv[1]); import hello; print(hello.content_lists()[1][0])" $dir
+          $sample = (Get-Content -Raw examples\content.json | ConvertFrom-Json).tips[0]
+          Check ("$tip" -eq $sample) 'the installed program uses the organization content'
+          powershell -NoProfile -ExecutionPolicy Bypass -File "$dir\uninstall.ps1" -Quiet | Write-Host
+          Check ($LASTEXITCODE -eq 0 -and -not (Test-Path $dir)) 'the content install uninstalls'
       # A dead URL or a wrong hash would pass every other check and fail every
       # real install at step 4, so run what the installer will run.
       - name: Check the pinned Python and run hello.py on it
