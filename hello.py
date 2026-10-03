@@ -292,7 +292,12 @@ TOPICS = ("shoulder", "jaw", "neck", "eye", "water", "breath", "posture",
           "respir", "postura", "estir", "muñeca", "épaule", "mâchoire", "nuque",
           "yeux", "œil", "étir", "poignet", "ombro", "pescoço", "olho", "água",
           "along", "pulso", "schulter", "kiefer", "nacken", "auge", "wasser",
-          "atem", "atm", "haltung", "dehn", "handgelenk")
+          "atem", "atm", "haltung", "dehn", "handgelenk",
+          "肩", "下巴", "颈", "眼", "水", "呼吸", "姿势", "伸展", "手腕",
+          "あご", "首", "目", "姿勢", "ストレッチ", "手首",
+          "어깨", "턱", "목", "눈", "물", "호흡", "자세", "스트레칭", "손목",
+          "كتف", "فك", "رقبة", "عين", "ماء", "تنفس", "وضعية", "تمدد", "معصم",
+          "כתפ", "לסת", "צוואר", "עינ", "מים", "נשימ", "יציבה", "מתיחה")
 
 
 def todays_pair(d):
@@ -443,7 +448,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.33.0"
+VERSION = "1.34.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -722,32 +727,48 @@ SHOWN_AFTER_DONE = 3
 
 
 # Windows primary language IDs, for the translations at the end of this file.
-WINDOWS_LANGUAGES = {0x0A: "es", 0x0C: "fr", 0x16: "pt", 0x07: "de"}
+WINDOWS_LANGUAGES = {0x0A: "es", 0x0C: "fr", 0x16: "pt", 0x07: "de",
+                     0x11: "ja", 0x12: "ko", 0x01: "ar", 0x0D: "he"}
+# Whole language IDs, checked first: regional variants, and Simplified
+# Chinese only where Windows shows it (China and Singapore).
+WINDOWS_VARIANTS = {0x0C0C: "fr-CA", 0x0816: "pt-PT", 0x0804: "zh", 0x1004: "zh"}
+# Older consoles draw these scripts as "?", and right-to-left text runs
+# backwards in one, so the text screen stays in English for them.
+WINDOW_ONLY = ("zh", "ja", "ko", "ar", "he")
+RIGHT_TO_LEFT = ("ar", "he")
 LANGUAGES = {}
 # Each in its own language, so anyone can find theirs.
 LANGUAGE_NAMES = {"en": "English", "es": "Español", "fr": "Français",
-                  "pt": "Português", "de": "Deutsch"}
+                  "fr-CA": "Français (Canada)", "pt": "Português",
+                  "pt-PT": "Português (Portugal)", "de": "Deutsch",
+                  "zh": "中文 (简体)", "ja": "日本語", "ko": "한국어",
+                  "ar": "العربية", "he": "עברית"}
 # The language this person chose, read from their file; None follows Windows.
 CHOSEN_LANGUAGE = None
 
 
 def language():
-    """The code of the language to show: the Windows display language when
-    there is a translation for it, else "en". Policy can force English."""
-    if policy("ForceEnglish"):
+    """The code of the language to show: the person's choice, else the
+    Windows display language when there is a translation for it, else "en".
+    Policy can force English, and the text screen shows English for the
+    scripts in WINDOW_ONLY."""
+    code = windows_language() if CHOSEN_LANGUAGE not in LANGUAGE_NAMES else CHOSEN_LANGUAGE
+    if policy("ForceEnglish") or code in WINDOW_ONLY and not WINDOW:
         return "en"
-    if CHOSEN_LANGUAGE in LANGUAGE_NAMES:
-        return CHOSEN_LANGUAGE
+    return code
+
+
+def windows_language():
     if LANGUAGE is not None:
         return LANGUAGE
     if os.name != "nt":
         return "en"
     try:
         import ctypes
-        primary = ctypes.windll.kernel32.GetUserDefaultUILanguage() & 0x3FF
+        whole = ctypes.windll.kernel32.GetUserDefaultUILanguage() & 0xFFFF
     except (AttributeError, OSError):
         return "en"
-    return WINDOWS_LANGUAGES.get(primary, "en")
+    return WINDOWS_VARIANTS.get(whole) or WINDOWS_LANGUAGES.get(whole & 0x3FF, "en")
 
 
 def translation():
@@ -3350,7 +3371,9 @@ class Window:
 
     def lines(self, text):
         per_line = int(self.WIDTH / 4.2)
-        return max(1, len(textwrap.wrap(text, per_line)))
+        # Chinese, Japanese and Korean characters are about two wide.
+        units = sum(2 if unicodedata.east_asian_width(c) in "WF" else 1 for c in text)
+        return max(1, len(textwrap.wrap(text, per_line)), -(-units // per_line))
 
     def layout(self):
         """The controls, as (class, id, text, style, x, y, w, h), and the height."""
@@ -3437,7 +3460,9 @@ class Window:
         self.ids = [item[1] for item in items]
         # WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, and DS_SETFONT,
         # DS_MODALFRAME and DS_CENTER. WS_EX_APPWINDOW puts it on the taskbar.
-        data = struct.pack("<IIH4h", 0x80CA08C0, 0x40000, len(items), 0, 0,
+        # WS_EX_LAYOUTRTL mirrors the whole dialog for Arabic and Hebrew.
+        exstyle = 0x40000 | (0x400000 if language() in RIGHT_TO_LEFT else 0)
+        data = struct.pack("<IIH4h", 0x80CA08C0, exstyle, len(items), 0, 0,
                            self.WIDTH + 2 * self.MARGIN, height)
         data += b"\0\0\0\0" + text("hello-world") + struct.pack("<H", 12)
         data += text("Segoe UI")
@@ -3736,19 +3761,28 @@ class Window:
         rect = wt.RECT()
         user.GetWindowRect(self.item(self.OPTIONS), ctypes.byref(rect))
         # TPM_RETURNCMD: the choice comes back here instead of as a message.
-        choice = user.TrackPopupMenu(menu, 0x100, rect.left, rect.bottom, 0,
+        # TPM_LAYOUTRTL for a right-to-left language.
+        rtl = 0x8000 if language() in RIGHT_TO_LEFT else 0
+        choice = user.TrackPopupMenu(menu, 0x100 | rtl, rect.left, rect.bottom, 0,
                                      self.hwnd, None)
         user.DestroyMenu(menu)
         return choice
 
+    @staticmethod
+    def rtl_box():
+        """MB_RTLREADING | MB_RIGHT for a right-to-left language."""
+        return 0x180000 if language() in RIGHT_TO_LEFT else 0
+
     def confirm(self, text):
         """A yes or no question in a standard message box."""
         # MB_YESNO | MB_ICONQUESTION; IDYES is 6.
-        return self.user.MessageBoxW(self.hwnd, text, "hello-world", 0x24) == 6
+        return self.user.MessageBoxW(self.hwnd, text, "hello-world",
+                                     0x24 | self.rtl_box()) == 6
 
     def inform(self, text):
         """Text to read, in a standard message box with OK."""
-        self.user.MessageBoxW(self.hwnd, text, "hello-world", 0x40)  # MB_ICONINFORMATION
+        self.user.MessageBoxW(self.hwnd, text, "hello-world",
+                              0x40 | self.rtl_box())  # MB_ICONINFORMATION
 
     def reminder_settings(self):
         v, checked = self.visit, 0x8
@@ -6882,6 +6916,4575 @@ irgendwohin gesendet.""",
             'Zeile {line} von {list} ist kein Text.',
         '{list} line {line} must be {low} to {high} characters long.':
             'Zeile {line} von {list} muss {low} bis {high} Zeichen lang sein.',
+    },
+}
+
+def _override(items, changes):
+    """A list with some items replaced, by index, for a regional variant."""
+    return tuple(changes.get(i, item) for i, item in enumerate(items))
+
+
+# ---- Canadian French ----
+
+_FR_CA_TEXT = {
+    MENU_HELP:
+        """Mots à taper à la dernière question :
+  fait  marque le plan du jour comme terminé, puis demande le suivant
+  plan  définit ou modifie le plan du jour
+  menu  ouvre ces options
+  q     ferme la fenêtre, tout comme Entrée
+À une question de plan, reprendre ramène le plan antérieur non terminé.
+À la question « L'avez-vous fait? », n veut dire pas encore, et
+vous pouvez garder le plan pour aujourd'hui. q ferme depuis n'importe
+quelle question.
+Dans ce menu, 1 montre ce qui est enregistré, 7 oublie un plan terminé
+et 8 masque la pensée et l'astuce.
+Tapez m pour revoir les options. Rien n'est envoyé nulle part.""",
+    GREETING:
+        'Bonjour, le monde!',
+    'Delete all saved notes, dates and plans on this computer? (y or n, Enter to cancel) > ':
+        'Supprimer toutes les notes, dates et plans enregistrés sur cet ordinateur? (o ou n, Entrée pour annuler) > ',
+    'Also forget it as the earlier plan for same? (y or n, Enter to keep it for same) > ':
+        "L'oublier aussi comme plan à reprendre? (o ou n, Entrée pour le garder) > ",
+    'Want it to open once a day when you sign in? (y or n, Enter for not now) > ':
+        "Voulez-vous que hello-world s'ouvre une fois par jour à votre connexion? (o ou n, Entrée pour plus tard) > ",
+    'Want it to open once a day when you sign in so it can ask about your plan? (y or n, Enter for not now) > ':
+        "Voulez-vous que hello-world s'ouvre une fois par jour à votre connexion pour vous demander où en est votre plan? (o ou n, Entrée pour plus tard) > ",
+    'When did you finish it?':
+        "Quand l'avez-vous terminé?",
+    'Did you do it? (y for yes, n for not yet, Enter to skip) > ':
+        "L'avez-vous fait? (o pour oui, n pour pas encore, Entrée pour passer) > ",
+    'That is fine. Keep it for today? (y or n, Enter to keep it) > ':
+        "Ce n'est pas grave. Le garder pour aujourd'hui? (o ou n, Entrée pour le garder) > ",
+    'What is one thing you want to get done today?':
+        "Quelle tâche voulez-vous accomplir aujourd'hui?",
+    'Did you do it?':
+        "L'avez-vous fait?",
+    'Want a reminder when you sign in? It shows your plan from last time, and you answer with one click. You can turn it off under Options.':
+        "Voulez-vous un rappel à la connexion? Il affiche votre plan de la dernière fois, et vous répondez d'un clic. Vous pouvez le désactiver dans Options.",
+    'Save your plan before closing?':
+        'Enregistrer votre plan avant de fermer?',
+    'Delete all saved notes, dates and plans on this computer?':
+        'Supprimer toutes les notes, dates et plans enregistrés sur cet ordinateur?',
+    "Clear today's plan?":
+        "Effacer le plan d'aujourd'hui?",
+    'Did you do them? (y for all, n for not yet, numbers for the ones you did, Enter to skip) > ':
+        'Les avez-vous faites? (o pour toutes, n pour pas encore, les numéros de celles faites, Entrée pour passer) > ',
+    'Hello, {name}!':
+        'Bonjour, {name}!',
+    'One thing to get done today? Open hello-world to plan it.':
+        "Une chose à faire aujourd'hui? Ouvrez hello-world pour la planifier.",
+    'Not on weekends':
+        'Pas la fin de semaine',
+}
+LANGUAGES["fr-CA"] = {**LANGUAGES["fr"],
+    "text": {**LANGUAGES["fr"]["text"], **_FR_CA_TEXT},
+    "thoughts": _override(LANGUAGES["fr"]["thoughts"], {
+        13: "Une matinée sans entrain ne décide pas de l'après-midi. Vous pouvez recommencer après le dîner.",
+        31: "Dînez loin de votre bureau aujourd'hui. La boîte de réception peut attendre le temps d'un sandwich.",
+        45: 'Un petit bonjour et une question sur la fin de semaine peuvent être le meilleur moment de la matinée.',
+        54: 'Envoyez le courriel qui attend dans vos brouillons. Il est sans doute très bien tel quel.',
+        85: 'Tout le monde autour de vous a déjà envoyé un courriel à la mauvaise personne au moins une fois.',
+    }),
+    "tips": _override(LANGUAGES["fr"]["tips"], {
+        14: "Désactivez les notifications d'un clavardage de groupe que vous ne faites que survoler.",
+        20: 'Enregistrez un modèle pour un courriel que vous écrivez encore et encore.',
+        52: 'Notez la tâche principale de demain sur un papillon adhésif ou dans vos notes.',
+        55: "Archivez cinq vieux courriels dont vous n'avez plus besoin.",
+        61: "Désabonnez-vous d'une infolettre que vous ne lisez jamais.",
+        66: 'Videz le bac de recyclage ou la poubelle de votre bureau.',
+        82: "Invitez quelqu'un de votre équipe à jaser quelques minutes autour d'un thé, d'un café ou lors d'un appel.",
+    }),
+}
+
+# ---- Chinese ----
+
+LANGUAGES["zh"] = {
+    "days": ('星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'),
+    "months": ('1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'),
+    "date": '{year}年{month}{d}日 {day}',
+    "thoughts": (
+        '打开那份您一直在回避的文档，只读第一段。',
+        '开始十分钟也是开始，而且往往会让接下来的十分钟更轻松。',
+        '今天不需要完整的计划，只需要一个合理的第一步。',
+        '先写下一个粗糙的第一句。有了它，之后才有东西可以改。',
+        '把桌上的一个小角落收拾干净，您会发现其他地方看起来也平静多了。',
+        '从清单上挑最小的一件事，做完再看其他的。',
+        '趁着安静的早上开个不完美的头，也胜过等一个可能不会来的完美时机。',
+        '把第一步写进日历，让它有个落脚的地方。',
+        '大项目大多是由一个个普通的下午叠起来的，今天就争取做好一个下午。',
+        '把下一步要做的事说出来，清单上的其他事先排队等着。',
+        '有些日子节奏比您希望的慢，但这样的节奏同样算数。',
+        '对自己说话，就像对刚入职一周的新同事那样温和。',
+        '做了多年的事，您仍然可以边做边学。',
+        '早上状态平平，不代表下午也是如此。午饭后可以重新开始。',
+        '累了是一种信号，不是失败。调整一下计划，慢慢继续。',
+        '您常常体谅别人，也请同样体谅自己。',
+        '进步常常一阵子看不出来，然后忽然就有了写满的一页。',
+        '有些内容要读第二遍才明白，这很正常。',
+        '不必等到觉得准备好了。紧张着去做，也是在做。',
+        '今天的尽力而为可能比昨天少一些，这没关系。',
+        '关掉不用的标签页。几分钟内您就会觉得注意力集中了。',
+        '一件事，一个窗口，二十五分钟。看看专注一阵能做多少。',
+        '冒出杂念时就把它记下来，然后回到手头的事。',
+        '如果可以，把手机静音一小时，专心做事。',
+        '想想哪一件事能让今天成为不错的一天，并为它留出时间。',
+        '一次只做一件事，通常比感觉上更快。',
+        '一张简洁的三件事清单，胜过一张零散的二十件事清单。',
+        '留意自己走神的时候，然后不加责备地把注意力拉回来。',
+        '把最难的任务放在精力最好的时候，哪怕那不是一早。',
+        '戴上耳机，烧上一壶水，关上门。环境布置好了，专注自然会来。',
+        '离开屏幕五分钟。回来时头脑会清醒一些。',
+        '今天离开工位吃午饭吧。邮件可以等您吃完。',
+        '绕着大楼走一小圈，也是在为头脑做正事。',
+        '在忙碌的下午离开屏幕一分钟，时间花得很值。',
+        '活动一下肩膀，放松下巴。它们可能已经紧绷好几个小时了。',
+        '如果可以，今晚准时下班。明天的您会感谢今晚的休息。',
+        '休息也是工作的一部分，因为人累了容易重复犯同样的小错。',
+        '让眼睛休息一会儿，把肩膀放松下来。',
+        '好好休息一下，下半天就像重新开始。',
+        '把晚上留给自己。晚上九点，收件箱里没有什么非您不可。',
+        '今天向一位同事道声谢，谢谢对方主动帮忙的一件小事。',
+        '大多数人都在尽力而为，他们要处理的事往往比您看到的多。',
+        '记住同事喝茶还是喝咖啡、喜欢怎么喝。记住这些是一份小小的心意。',
+        '如果有人对您说话有点冲，就当对方今天不顺，而不是在评判您。',
+        '帮人扶一下门，分享一些零食，让别人把话说完。',
+        '一声问好，再问一句周末过得怎样，可能是一个早上最愉快的时刻。',
+        '新同事问到看似显而易见的问题时，想想您也曾这样问过。',
+        '同事的想法让您的工作变得更好时，请当面说出来，把功劳归给对方。',
+        '回复消息时多一点温度。不费什么，却让人舒服。',
+        '找最近开会时比较安静的同事聊聊，问问对方近况如何。',
+        '先把快完成的事做完，再开始新的。',
+        '完成且够好，通常比完美却没做完更有用。',
+        '今天了结一件悬而未决的事，感受一下随之而来的轻松。',
+        '最后那百分之十，往往只需要几分钟的细心。今天就把它做完。',
+        '把草稿箱里那封邮件发出去吧。它很可能已经可以了。',
+        '标记为完成，深呼吸一下，为做完它高兴一下。',
+        '做完的一件小事，比做了一半的大事更有价值。',
+        '下班前把明天的第一步写在便条上，这样就不用记在脑子里了。',
+        '再读一遍，改掉发现的问题，然后发出去。',
+        '一天以一个整洁的成果收尾，晚上会觉得轻松些。',
+        '早点提问，通常能省下之后一个小时的独自苦想。',
+        '大多数人都乐意分享自己的知识。提问时不必道歉。',
+        '“我卡住了”是一句清楚、有用的话，同事听了就知道怎么帮您。',
+        '用简单的话说出您需要什么，给别人一个答应的机会。',
+        '两个人一起看问题，往往比一个人苦苦盯着解决得更快。',
+        '需要帮忙并不是给人添麻烦。您是团队的一员。',
+        '带着具体的问题去问，对方才能给出具体的答案。',
+        '如果说明不清楚，问清楚本身就是把工作做好的一部分。',
+        '能帮忙时就帮，需要时就接受帮助。两者都会越练越自然。',
+        '走廊那头可能就有人解决过这个问题。去找找吧。',
+        '把这周弄明白的事简单记下来。积累起来会比您想的多。',
+        '在新事物面前当新手，说明您还在成长。',
+        '留意一位您欣赏的同事怎样处理一通棘手的电话，学上一招。',
+        '休息时读上一页有用的东西，对头脑来说，今天就算收获不错。',
+        '把一项工作讲给别人听，自己往往也会学得更透。',
+        '说一句“这个我还不知道”，然后去弄清楚，完全没问题。',
+        '任何不熟悉的系统，在用过几次之前看起来都让人困惑。',
+        '问问更有经验的人是怎么学会的。答案常常让人安心。',
+        '技能来自重复，把小事反复做，直到它变得容易。',
+        '对平常的工作多一点好奇，可能会让它变得更有意思。',
+        '早发现的错误只是一处更正，而大多数错误都会被及早发现。',
+        '改正它，告诉需要知道的人，然后让那份难受慢慢过去。',
+        '工作中几乎每个错误，一周后看都没有当时感觉的那么大。',
+        '一次失误抹不掉您多年来认真的工作。',
+        '出了问题时，先看流程，再看人。',
+        '您身边的每个人，都至少有一次把邮件发给了不该发的人。',
+        '从错误中记住一条教训，其余的就放下吧。',
+        '坦然承认错误，通常比从不犯错更能赢得信任。',
+        '细心的人也会有笨手笨脚的一天，到晚上就过去了。',
+        '到下个月，今天的大多数小磕绊您都不会记得了。',
+        '平静无事、不用救火的一天就是好日子，哪怕没人提起。',
+        '留意那些小小的愉快：一杯热饮、清空的收件箱、安静的一分钟。',
+        '不是每天都需要大成就。平稳愉快也是很好的工作方式。',
+        '会议提前五分钟结束时，好好享受，随意安排这段时间。',
+        '把平凡的一天过好，就值得默默为自己骄傲。',
+        '好的工作从外面看往往不起眼，这没关系。',
+        '愉快的下午就让它愉快地过，不必非要高效。',
+        '一天中的小日常，第一杯咖啡、熟悉的面孔，都值得留意。',
+        '今天您到岗了，也做好了自己的那份，这就足够了。',
+        '今晚花一点时间，想想今天进展顺利的一件事。',
+        '两件事之间安静的一分钟不算浪费，下一件事往往由此开个好头。',
+    ),
+    "tips": (
+        '离开屏幕，慢慢喝一杯水。',
+        '慢慢地向后转动肩膀五次。',
+        '让眼睛休息二十秒：望向远处，或闭上眼睛。',
+        '坐着或站着，把双臂举过头顶伸展一下，深吸一口气。',
+        '去到您能去的最远的房间或窗边，再回来。',
+        '检查一下坐姿，让肩膀放松下沉，远离耳朵。',
+        '轻轻左右转动脖子，转到舒服的程度就好。',
+        '双手张开、握拳十次，放松手指。',
+        '把最常打开的那份文档固定起来，一点就能打开。',
+        '到室外短暂走走或转转，选您方便的方式。',
+        '倒一杯热饮或冷饮，离开屏幕慢慢享用。',
+        '把注意力放在一样平静的东西上，比如一处景色、一种声音或一种触感。',
+        '为一件做了一半的事写下下一步。',
+        '双脚平放在地上，坐直或站直，做十次呼吸。',
+        '把一个您只是随便扫一眼的群聊设为免打扰。',
+        '松开咬紧的下巴，放松一下额头。',
+        '用今天觉得舒服的任何方式活动两分钟。',
+        '在日历上为一直拖着的那件事留出十五分钟。',
+        '调整一下椅子、屏幕或键盘，让其中一样用起来更舒服。',
+        '如果方便，去下一个会议或通话时绕点远路。',
+        '为一封经常要写的邮件保存一个模板。',
+        '为最常用的程序学一个快捷键。',
+        '下一杯咖啡或茶之前，先喝完一整杯水。',
+        '耸起肩膀贴近耳朵，然后让它们慢慢放松下来。',
+        '走到室外或打开窗户，呼吸一分钟新鲜空气。',
+        '慢慢呼吸五次，每次呼气都比上一次长一点。',
+        '打开下一条消息前，安静地停一分钟。',
+        '记下今天到目前为止发生的一件好事。',
+        '闭上眼睛呼吸三次，感受一下自己现在的状态。',
+        '说出您此刻注意到的三样东西，看到、听到、闻到都算。',
+        '写下这周您期待的一件事。',
+        '定一个两分钟的计时器，不看屏幕，就这样坐一会儿。',
+        '欣赏身边的一样小东西，比如一盆植物或您喜欢的杯子。',
+        '想一件这周您做得好的事，向自己点点头。',
+        '不开别的程序，从头到尾听完一首喜欢的歌。',
+        '吸气数四下，呼气数六下，重复三次。',
+        '下次遇到小小的烦心事，先呼吸一次再反应。',
+        '记下最近让您笑出来的一件事。',
+        '花一分钟留意一样让人愉快的东西：一种声音、一种气味或手边摸到的东西。',
+        '想一个您喜爱的地方，在脑海里想象它三十秒。',
+        '对一件小任务说一句“现在这样就够好了”，然后继续往下做。',
+        '写一句话，记下一件让您感激的事。',
+        '细细品味下一口饮品，留意它的味道。',
+        '在两件事之间短暂休息一下，再开始下一件。',
+        '今天留意一件结果比预想更好的事。',
+        '用一个词说说您希望下午过得怎样。',
+        '让头脑休息六十秒，然后回到下一件事。',
+        '感受双脚踩在地面上，让自己稳下来一会儿。',
+        '想起一件别人为您做过的好事，回味一下。',
+        '记下一个以后想再想想的点子，然后先放下。',
+        '整理桌上的一个小角落，一个就好。',
+        '回复一条已经等了一段时间的消息。',
+        '把明天最重要的事写在便利贴或笔记里。',
+        '关掉不再需要的浏览器标签页。',
+        '为同事最近做的一件事向对方道声谢。',
+        '归档五封不再需要的旧邮件。',
+        '给一个名字很乱的文件重新命名，方便以后找。',
+        '清掉桌面上一两个零散的文件。',
+        '删除一个已经没用的旧提醒。',
+        '给一份常打开的文档加一个清楚的标题。',
+        '在待办清单上划掉一件小事。',
+        '退订一份您从来不读的订阅邮件。',
+        '用软布擦一擦键盘或屏幕。',
+        '把笔、笔记本和水放在顺手的地方。',
+        '给未来的自己写个简短的便条，记下今天做到哪里了。',
+        '挑出今天下午最重要的一件事，先做它。',
+        '倒掉工位旁的回收箱或垃圾桶。',
+        '更新一条进度记录，让大家看到事情进展到哪一步。',
+        '整理一下下载文件夹，先挪走一小批文件。',
+        '为一件您容易忘记的事设个提醒。',
+        '关掉一个并不真正需要的通知。',
+        '把一个您总要去搜的网页加入收藏夹。',
+        '趁着记忆犹新，用两行字总结一下会议。',
+        '问问某个例会能否稍微缩短一些。',
+        '说出接下来一小时的唯一目标，并写下来。',
+        '问问同事今天过得怎么样，并认真倾听。',
+        '把一个有用的链接分享给可能感兴趣的人。',
+        '向一位还没说过话的人打个招呼。',
+        '给最近帮过您的人发一句简短的感谢。',
+        '下次通话开始时，热情地向同事问好。',
+        '问问同事这周有什么期待的事。',
+        '看到别人有个小进展，向对方道声贺。',
+        '约同事喝杯茶或咖啡，或打个电话，简单聊聊。',
+        '具体地称赞同事做得好的一件事。',
+        '记住一个常见面但还不认识的人的名字。',
+        '把一个实用的小窍门分享给可能用得上的同事。',
+        '请别人推荐一首歌、一部剧或一本书。',
+        '关心一下最近比较安静的同事。',
+        '如果有人看起来很忙，主动帮忙做一件小事。',
+        '热情地向下一个遇到的人问好。',
+        '把听到的一句对同事的好话转告给对方。',
+        '问问同事这周什么让工作轻松了一些。',
+        '给以前的同事发一条友好的消息。',
+        '感谢那些让公共区域保持整洁顺畅的人。',
+        '介绍两位可能会聊得来的同事互相认识。',
+        '问问同事，交接时您怎样做能让对方更方便。',
+        '和身边的人分享一个无伤大雅的小笑话。',
+        '下次说“请”和“谢谢”时，多带一点温暖。',
+        '问问同事工作之外喜欢做什么。',
+        '下一个人跟您说话时，放下其他事，认真听完。',
+    ),
+    "done": (
+        '很好，这件完成了。',
+        '不错。完成一件事的感觉真好。',
+        '做得好。开始下一件之前，先稍微休息一下。',
+        '很好。完成的小事会积少成多。',
+        '完成了。可以为此高兴一下。',
+        '很好。这件可以从清单上划掉了。',
+    ),
+    "text": {
+        HELP:
+            """hello-world 会显示一句问候、每日一句和一件可以试试的小事。
+
+在最后一个提示处，输入 plan 设定今天的计划，完成后输入 done，
+输入 menu（或 m）查看选项。按 Enter 关闭；在任何问题处输入 q、x
+或 close 也可关闭。在计划提示处，输入 same 可找回之前未完成的计划。
+输入 done 后，会列出您最近完成的 3 个计划。菜单选项 1 显示全部，
+选项 7 删除其中一个，选项 8 隐藏每日一句和小建议。在菜单中按 Enter 返回。
+您也可以在运行 hello.cmd 时加上以下任一选项：
+  --plain         只显示问候语
+  --stats         显示这台电脑上保存的内容
+  --reset         删除所有保存的内容（会先询问）
+  --remind on     每天登录时打开一次（off 为关闭）
+  --streak off    隐藏连续天数提示（on 为显示）
+  --version       显示版本
+  --check-content FILE
+                  检查组织内容文件
+  --help          显示此说明
+
+退出代码：0 表示成功，1 表示命令失败或无法写入屏幕，
+2 表示未知选项。
+
+保存的记录只留在这台电脑上您的用户文件夹中，不会发送到任何地方。
+能读取这台电脑文件的 IT 人员可以看到这些记录。""",
+        MENU_HELP:
+            """可以在最后一个提示处输入的词：
+  done  将今天的计划标记为完成，然后询问下一个计划
+  plan  设定或更改今天的计划
+  menu  打开这些选项
+  q     关闭窗口，按 Enter 也可以
+在计划提示处，输入 same 可找回之前未完成的计划。
+询问“您完成了吗？”时，n 表示还没有，您可以把这个计划
+留到今天。在任何问题处输入 q 都可关闭。
+在此菜单中，1 显示保存的内容，7 删除一个已完成的计划，
+8 隐藏每日一句和小建议。
+输入 m 可再次查看选项。所有内容都不会发送出去。""",
+        SAVED_PLAN:
+            '已保存。完成后请输入 done，否则下次打开时会询问您。',
+        GREETING:
+            '你好，世界！',
+        'hello.cmd is in this folder:':
+            'hello.cmd 位于此文件夹：',
+        'Shortened to {n} characters.':
+            '已缩短为 {n} 个字符。',
+        'Your saved file was damaged, so hello-world set it aside as a backup copy and started fresh. Your earlier days and plan could not be read. Menu option 4 deletes the backup.':
+            '您保存的文件已损坏，hello-world 已将其另存为备份并重新开始。之前的天数和计划无法读取。菜单选项 4 可删除该备份。',
+        'Backup copy: ':
+            '备份副本：',
+        'In the folder: ':
+            '所在文件夹：',
+        'Sorry, "{shown}" is not one of the choices.':
+            '抱歉，“{shown}”不是可选项。',
+        'A plan needs a word or two, so nothing was saved.':
+            '计划至少要写几个字，因此没有保存。',
+        'The sign-in reminder works on Windows only.':
+            '登录提醒仅适用于 Windows。',
+        'Your organization has turned off opening at sign-in.':
+            '您的组织已关闭“登录时打开”。',
+        'The reminder cannot be set up from this folder.':
+            '无法从此文件夹设置提醒。',
+        'Could not set up the reminder.':
+            '无法设置提醒。',
+        'Done. hello-world will open once a day when you sign in.':
+            '好了。hello-world 会在您每天登录时打开一次。',
+        'To stop it, choose option 2 in the menu.':
+            '要关闭它，请在菜单中选择选项 2。',
+        'Could not turn off the sign-in reminder.':
+            '无法关闭登录提醒。',
+        'Done. The sign-in reminder is off.':
+            '好了。登录提醒已关闭。',
+        'Saved on this computer in:':
+            '已保存在这台电脑上的以下位置：',
+        'Saved in your own user folder on this computer.':
+            '保存在这台电脑上您自己的用户文件夹中。',
+        'Days you opened it in the last {days} days: {n} (last 7 days: {recent})':
+            '最近 {days} 天内打开的天数：{n}（最近 7 天：{recent}）',
+        'Times you marked a plan done: {n}':
+            '将计划标记为完成的次数：{n}',
+        'Your current plan: ':
+            '当前计划：',
+        'Earlier plan (for same): ':
+            '之前的计划（供 same 使用）：',
+        'Days-in-a-row message: shown.':
+            '连续天数提示：显示。',
+        'Days-in-a-row message: hidden.':
+            '连续天数提示：隐藏。',
+        'Opens by itself at sign-in: turned off by your organization.':
+            '登录时自动打开：已被您的组织关闭。',
+        'Opens by itself at sign-in: on.':
+            '登录时自动打开：已开启。',
+        'Opens by itself at sign-in: off.':
+            '登录时自动打开：已关闭。',
+        "It never leaves this computer. Others who can read this computer's files, such as IT staff, could read it.":
+            '这些内容不会离开这台电脑。能读取这台电脑文件的人（例如 IT 人员）可以看到。',
+        'After tidying, the file holds only this:':
+            '整理后，文件中只有以下内容：',
+        'Delete all saved notes, dates and plans on this computer? (y or n, Enter to cancel) > ':
+            '删除这台电脑上保存的所有记录、日期和计划吗？（y 或 n，按 Enter 取消）> ',
+        'Nothing was deleted.':
+            '未删除任何内容。',
+        'Could not delete everything.':
+            '无法全部删除。',
+        'Delete these yourself:':
+            '请您手动删除以下文件：',
+        'Could not list the folder, so backup copies may remain:':
+            '无法列出文件夹内容，可能还有备份副本残留：',
+        'Done. Everything saved was deleted.':
+            '好了。所有保存的内容都已删除。',
+        'Another open hello-world window cannot put it back.':
+            '其他打开的 hello-world 窗口无法恢复这些内容。',
+        'Close any other open hello-world window, or it may save its notes again.':
+            '请关闭其他打开的 hello-world 窗口，否则它可能会再次保存记录。',
+        'Everything saved was deleted in another window, so this was not saved.':
+            '所有保存的内容已在另一个窗口中删除，因此这次没有保存。',
+        'The other open window had also finished a plan.':
+            '另一个打开的窗口也完成了一个计划。',
+        'The other open window changed the plan, so its plan is kept.':
+            '另一个打开的窗口更改了计划，因此以那个窗口的计划为准。',
+        'Type plan at the last prompt to set one.':
+            '在最后一个提示处输入 plan 即可设定计划。',
+        'That looks like a command, not a plan, so nothing was saved.':
+            '这看起来像命令，不像计划，因此没有保存。',
+        'Type your plan, or press Enter to go back.':
+            '请输入您的计划，或按 Enter 返回。',
+        'Finished lately:':
+            '最近完成：',
+        'Your plan today: ':
+            '今天的计划：',
+        'Your plan from {date}: ':
+            '{date} 的计划：',
+        'Earlier plan: ':
+            '之前的计划：',
+        'Type the next plan, or Enter to close > ':
+            '输入下一个计划，或按 Enter 关闭 > ',
+        'Type the next plan, same to reuse the earlier plan, or Enter to close > ':
+            '输入下一个计划，输入 same 沿用之前的计划，或按 Enter 关闭 > ',
+        "Type today's plan, or Enter to keep it > ":
+            '输入今天的计划，或按 Enter 保留现有计划 > ',
+        "Type today's plan, same to reuse the earlier plan, or Enter to keep it > ":
+            '输入今天的计划，输入 same 沿用之前的计划，或按 Enter 保留现有计划 > ',
+        "Type today's plan, or Enter to go back > ":
+            '输入今天的计划，或按 Enter 返回 > ',
+        "Type today's plan, same to reuse the earlier plan, or Enter to go back > ":
+            '输入今天的计划，输入 same 沿用之前的计划，或按 Enter 返回 > ',
+        'Closing.':
+            '正在关闭。',
+        'There is no earlier plan to reuse yet. Nothing changed.':
+            '还没有之前的计划可沿用。未作更改。',
+        'Nothing changed.':
+            '未作更改。',
+        'Could not save that on this computer. Your plan is unchanged.':
+            '无法保存到这台电脑。您的计划保持不变。',
+        'No finished plans are saved.':
+            '还没有保存已完成的计划。',
+        'Type the number to forget (1 to {n}), or Enter to keep them all > ':
+            '输入要删除的编号（1 到 {n}），或按 Enter 全部保留 > ',
+        'There is no number "{typed}" on the list. Type a number from 1 to {n}, or press Enter to keep them all.':
+            '列表中没有编号“{typed}”。请输入 1 到 {n} 之间的数字，或按 Enter 全部保留。',
+        'Also forget it as the earlier plan for same? (y or n, Enter to keep it for same) > ':
+            '也从 same 中删除它吗？（y 或 n，按 Enter 保留给 same）> ',
+        'Type y or n, or press Enter to keep it for same.':
+            '请输入 y 或 n，或按 Enter 保留给 same。',
+        'That plan was already forgotten. Nothing changed.':
+            '该计划之前已删除。未作更改。',
+        'Forgotten: ':
+            '已删除：',
+        'Same still has it.':
+            '仍可用 same 找回。',
+        'Could not save that on this computer. Nothing changed.':
+            '无法保存到这台电脑。未作更改。',
+        'Options':
+            '选项',
+        'Show what is saved on this computer':
+            '显示这台电脑上保存的内容',
+        'Open once a day at sign-in (turned off by your organization)':
+            '每天登录时打开一次（已被您的组织关闭）',
+        'Turn off: open once a day at sign-in (now on)':
+            '关闭：每天登录时打开一次（当前已开启）',
+        'Turn on: open once a day at sign-in (now off)':
+            '开启：每天登录时打开一次（当前已关闭）',
+        'Days-in-a-row message (hidden by your organization)':
+            '连续天数提示（已被您的组织隐藏）',
+        'Hide the days-in-a-row message (now shown)':
+            '隐藏连续天数提示（当前显示）',
+        'Show the days-in-a-row message (now hidden)':
+            '显示连续天数提示（当前隐藏）',
+        'Delete everything saved':
+            '删除所有保存的内容',
+        'Help':
+            '帮助',
+        "Set today's plan (turned off by your organization)":
+            '设定今天的计划（已被您的组织关闭）',
+        'Forget a finished plan (turned off by your organization)':
+            '删除一个已完成的计划（已被您的组织关闭）',
+        "Set or change today's plan":
+            '设定或更改今天的计划',
+        'Forget one finished plan':
+            '删除一个已完成的计划',
+        'Thought and tip (hidden by your organization)':
+            '每日一句和小建议（已被您的组织隐藏）',
+        'Hide the thought and tip (now shown)':
+            '隐藏每日一句和小建议（当前显示）',
+        'Show the thought and tip (now hidden)':
+            '显示每日一句和小建议（当前隐藏）',
+        '{date}: ':
+            '{date}：',
+        'Enter':
+            'Enter',
+        'Back to the last prompt':
+            '返回最后一个提示',
+        'Choose 1 to 11, or Enter to go back > ':
+            '请选择 1 到 11，或按 Enter 返回 > ',
+        'Choose 1 to 11, m to list the options, or Enter to go back > ':
+            '请选择 1 到 11，输入 m 列出选项，或按 Enter 返回 > ',
+        'The saved file could not be read just now, so this may be out of date.':
+            '暂时无法读取保存的文件，因此这些内容可能不是最新的。',
+        'Type full to see the whole file, or Enter to go on > ':
+            '输入 full 查看完整文件，或按 Enter 继续 > ',
+        'Could not save that choice on this computer.':
+            '无法将该选择保存到这台电脑。',
+        'Your organization has hidden the days-in-a-row message.':
+            '您的组织已隐藏连续天数提示。',
+        'Done. The days-in-a-row message is on.':
+            '好了。连续天数提示已开启。',
+        'Done. The days-in-a-row message is off.':
+            '好了。连续天数提示已关闭。',
+        'Plans are turned off by your organization.':
+            '您的组织已关闭计划功能。',
+        'Your organization has hidden the thought and tip.':
+            '您的组织已隐藏每日一句和小建议。',
+        'Done. The thought and tip are on.':
+            '好了。每日一句和小建议已开启。',
+        'Done. The thought and tip are off.':
+            '好了。每日一句和小建议已关闭。',
+        'Type 1 to 11, or press Enter to go back.':
+            '请输入 1 到 11，或按 Enter 返回。',
+        'Want it to open once a day when you sign in? (y or n, Enter for not now) > ':
+            '要让它在您每天登录时打开一次吗？（y 或 n，按 Enter 暂不设置）> ',
+        'Want it to open once a day when you sign in so it can ask about your plan? (y or n, Enter for not now) > ':
+            '要让它在您每天登录时打开一次，问问您的计划吗？（y 或 n，按 Enter 暂不设置）> ',
+        'Type y or n, or press Enter for not now.':
+            '请输入 y 或 n，或按 Enter 暂不设置。',
+        'That was not understood. It will ask again on a later visit.':
+            '没有理解您的输入。下次打开时会再询问。',
+        'It will ask again on a later visit. Menu option 2 also turns it on.':
+            '下次打开时会再询问。菜单选项 2 也可以开启。',
+        'No problem. Menu option 2 turns it on later.':
+            '没问题。之后可以用菜单选项 2 开启。',
+        "Okay. It won't ask again. Menu option 2 turns it on.":
+            '好的。不会再询问。菜单选项 2 可以开启。',
+        'Okay. It will ask again on a later visit. Type n to stop it.':
+            '好的。下次打开时会再询问。输入 n 可不再询问。',
+        'When did you finish it?':
+            '您是什么时候完成的？',
+        'Today':
+            '今天',
+        'Type a number from 1 to {n}, or Enter for 1 > ':
+            '请输入 1 到 {n} 之间的数字，或按 Enter 选 1 > ',
+        'Type a number from 1 to {n}, or press Enter.':
+            '请输入 1 到 {n} 之间的数字，或按 Enter。',
+        'That looks like more than one thing. Finishing the first part still counts.':
+            '这看起来不止一件事。完成第一部分也算数。',
+        'There is no plan to mark as done. Type plan to set one.':
+            '没有可标记为完成的计划。输入 plan 设定一个。',
+        'Could not save that on this computer. The plan is still open.':
+            '无法保存到这台电脑。该计划仍未完成。',
+        'Your plan from over two weeks ago was put away. Type same at the plan prompt to bring it back.':
+            '您两周多以前的计划已收起。在计划提示处输入 same 可找回。',
+        "Press Enter at each question to skip it, and once more to close. That's it.":
+            '在每个问题处按 Enter 可跳过，再按一次即可关闭。就这么简单。',
+        'Welcome.':
+            '欢迎使用。',
+        'Each day you get one thought and one small thing to try, the same for everyone.':
+            '每天您会看到一句话和一件可以试试的小事，大家看到的都一样。',
+        'If you type a plan, it asks next time how it went. Your notes stay on this computer and are never sent anywhere. Like any work file they are not secret, so keep them to everyday tasks.':
+            '如果您输入计划，下次会问您进展如何。您的记录只保存在这台电脑上，不会发送到任何地方。和其他工作文件一样，这些记录并不保密，所以请只写日常事务。',
+        'Type menu at the end for the options.':
+            '最后输入 menu 可查看选项。',
+        'Welcome back. Glad you are here.':
+            '欢迎回来，很高兴见到您。',
+        'You have opened this {row} days in a row. Nice to see you.':
+            '您已连续 {row} 天打开 hello-world。很高兴见到您。',
+        'Last time you planned: ':
+            '上次的计划：',
+        'Did you do it? (y for yes, n for not yet, Enter to skip) > ':
+            '您完成了吗？（y 表示完成，n 表示还没有，按 Enter 跳过）> ',
+        'Type y or n, or press Enter to skip.':
+            '请输入 y 或 n，或按 Enter 跳过。',
+        'Could not save that on this computer. Your answer was not counted.':
+            '无法保存到这台电脑。您的回答未被记录。',
+        'That is fine. Keep it for today? (y or n, Enter to keep it) > ':
+            '没关系。今天继续保留吗？（y 或 n，按 Enter 保留）> ',
+        'Type y to keep it, n to clear it, or press Enter to keep it.':
+            '输入 y 保留，n 清除，或按 Enter 保留。',
+        'Cleared. Type same at a plan prompt if you want it back.':
+            '已清除。如需找回，请在计划提示处输入 same。',
+        'Kept for today.':
+            '今天继续保留。',
+        'That was not understood. Your plan is left as it was.':
+            '没有理解您的输入。您的计划保持不变。',
+        'Your plan is still open.':
+            '您的计划仍未完成。',
+        'Thought for today:':
+            '今日一句：',
+        'Try this today:':
+            '今天试试：',
+        'Your plan for today: ':
+            '您今天的计划：',
+        'Still open since {date}:':
+            '自 {date} 起仍未完成：',
+        '(Enter to skip)':
+            '（按 Enter 跳过）',
+        '(A plan typed here replaces the old one. Enter to skip)':
+            '（在这里输入的计划会替换旧计划。按 Enter 跳过）',
+        '(Type same to reuse it, or Enter to skip)':
+            '（输入 same 沿用，或按 Enter 跳过）',
+        'What is one thing you want to get done today?':
+            '今天最想完成的一件事是什么？',
+        'There is no earlier plan to reuse yet. Nothing was saved.':
+            '还没有之前的计划可沿用。未保存任何内容。',
+        'Your notes could not be saved on this computer. This screen still works.':
+            '无法在这台电脑上保存您的记录。此界面仍可正常使用。',
+        'Type menu, or Enter to close > ':
+            '输入 menu，或按 Enter 关闭 > ',
+        'Type done, plan or menu, or Enter to close > ':
+            '输入 done、plan 或 menu，或按 Enter 关闭 > ',
+        'Type plan or menu, or Enter to close > ':
+            '输入 plan 或 menu，或按 Enter 关闭 > ',
+        'Type done, plan or menu, or press Enter to close.':
+            '请输入 done、plan 或 menu，或按 Enter 关闭。',
+        'Type plan or menu, or press Enter to close.':
+            '请输入 plan 或 menu，或按 Enter 关闭。',
+        "The saved file can't be read right now, or it is damaged.":
+            '暂时无法读取保存的文件，或文件已损坏。',
+        'Nothing was changed. Saved in: ':
+            '未作任何更改。保存位置：',
+        'Deleting saved notes needs a person at the keyboard.':
+            '删除保存的记录需要有人在键盘前操作。',
+        '{option} needs on or off. Here are the options.':
+            '{option} 需要加上 on 或 off。以下是可用选项。',
+        'Unknown option: {option}. Here are the options.':
+            '未知选项：{option}。以下是可用选项。',
+        '&Done':
+            '完成(&D)',
+        '&Not yet':
+            '还没有(&N)',
+        'S&kip':
+            '跳过(&K)',
+        '&Save':
+            '保存(&S)',
+        '&I did it':
+            '我完成了(&I)',
+        '&Options':
+            '选项(&O)',
+        'Close':
+            '关闭',
+        'Not today':
+            '今天先不',
+        'Did you do it?':
+            '您完成了吗？',
+        'Done. A reminder comes when you sign in, if there is a plan to ask about.':
+            '好了。登录时如果有计划需要询问，会提醒您。',
+        'Done. The Start menu opens a window with buttons.':
+            '好了。开始菜单将打开带按钮的窗口。',
+        'Done. The Start menu opens this text screen.':
+            '好了。开始菜单将打开此文本界面。',
+        'More options':
+            '更多选项',
+        'Remind me when I sign in':
+            '登录时提醒我',
+        'Show the thought and tip':
+            '显示每日一句和小建议',
+        'Type your plan in the box.':
+            '请在框中输入您的计划。',
+        'Use a window with buttons (now this text screen)':
+            '使用带按钮的窗口（当前为文本界面）',
+        'Use the text screen':
+            '使用文本界面',
+        'Use this text screen (now a window with buttons)':
+            '使用此文本界面（当前为带按钮的窗口）',
+        'Want a reminder when you sign in? It shows your plan from last time, and you answer with one click. You can turn it off under Options.':
+            '要在登录时提醒您吗？提醒会显示您上次的计划，点一下就能回答。您可以在“选项”中关闭。',
+        'Window or text screen (set by your organization)':
+            '窗口或文本界面（由您的组织设定）',
+        'Your organization has set hello-world to open as a text screen.':
+            '您的组织已将 hello-world 设为以文本界面打开。',
+        'Saved.':
+            '已保存。',
+        'Save your plan before closing?':
+            '关闭前保存您的计划吗？',
+        'Delete all saved notes, dates and plans on this computer?':
+            '删除这台电脑上保存的所有记录、日期和计划吗？',
+        'Turn off: reminder when you sign in (now on)':
+            '关闭：登录时提醒（当前已开启）',
+        'Turn on: reminder when you sign in (now off)':
+            '开启：登录时提醒（当前已关闭）',
+        'Reminder when you sign in (turned off by your organization)':
+            '登录时提醒（已被您的组织关闭）',
+        'Reminder when you sign in: on.':
+            '登录时提醒：已开启。',
+        'Reminder when you sign in: off.':
+            '登录时提醒：已关闭。',
+        'Reminder when you sign in: turned off by your organization.':
+            '登录时提醒：已被您的组织关闭。',
+        'Show the days-in-a-row message':
+            '显示连续天数提示',
+        'Done. The thought and tip show next time you open hello-world.':
+            '好了。下次打开 hello-world 时会显示每日一句和小建议。',
+        "Clear today's plan?":
+            '清除今天的计划吗？',
+        'Next plan, if you want one:':
+            '如果需要，可以写下一个计划：',
+        'A few things? Put ; between them.':
+            '有好几件事？用 ; 隔开。',
+        'A plan can be up to {n} characters.':
+            '计划最多 {n} 个字符。',
+        'Did you do them? (y for all, n for not yet, numbers for the ones you did, Enter to skip) > ':
+            '这些都完成了吗？（y 表示全部完成，n 表示还没有，或输入已完成的编号，按 Enter 跳过）> ',
+        'Last time you planned:':
+            '上次的计划：',
+        'The rest is kept for today.':
+            '其余的今天继续保留。',
+        'Tick the ones you did, then click Done. With none ticked, Done means all of them.':
+            '勾选已完成的事项，然后点击“完成”。如果一项都没勾选，“完成”表示全部完成。',
+        'Type y for all, n for not yet, or the numbers you did, such as 1 3. Enter skips.':
+            '输入 y 表示全部完成，n 表示还没有，或输入已完成的编号，例如 1 3。按 Enter 跳过。',
+        'Your settings were kept.':
+            '您的设置已保留。',
+        'Language (set by your organization)':
+            '语言（由您的组织设定）',
+        'Language (now {name})':
+            '语言（当前：{name}）',
+        'following Windows':
+            '跟随 Windows',
+        'Your organization shows hello-world in English.':
+            '您的组织已将 hello-world 设为英文显示。',
+        'Follow Windows':
+            '跟随 Windows',
+        'Type a number from 1 to {n}, or Enter to keep it > ':
+            '请输入 1 到 {n} 之间的数字，或按 Enter 保持不变 > ',
+        'Done. The new language shows next time you open hello-world.':
+            '好了。下次打开 hello-world 时将显示新语言。',
+        'Language...':
+            '语言...',
+        'Hello, {name}!':
+            '{name}，您好！',
+        'One thing to get done today? Open hello-world to plan it.':
+            '今天有什么想完成的事吗？打开 hello-world 写下计划吧。',
+        '&Open':
+            '打开(&O)',
+        'Reminder settings...':
+            '提醒设置...',
+        'Greet me by name':
+            '问候时称呼我的名字',
+        'At sign-in':
+            '登录时',
+        'At {at}':
+            '每天 {at}',
+        'Also on days with no plan':
+            '没有计划的日子也提醒',
+        'Open hello-world after I answer':
+            '回答后打开 hello-world',
+        'Not on weekends':
+            '周末不提醒',
+        'Done. A reminder comes at {at} each day, if there is a plan to ask about.':
+            '好了。如果有计划需要询问，每天 {at} 会提醒您。',
+        'Send feedback...':
+            '发送反馈...',
+        '"holidays" must be a list of at most {n} dates.':
+            '"holidays" 必须是最多包含 {n} 个日期的列表。',
+        '"title" must be 1 to 40 characters of plain text, with no link or address.':
+            '"title" 必须是 1 到 40 个字符的纯文本，不能包含链接或地址。',
+        '"{list}" must be a list of {low} to {high} lines.':
+            '"{list}" 必须是包含 {low} 到 {high} 行的列表。',
+        "Can't read {path}: {error}":
+            '无法读取 {path}：{error}',
+        'Could not save that on this computer.':
+            '无法保存到这台电脑。',
+        'Days you opened hello-world: {n}':
+            '打开 hello-world 的天数：{n}',
+        'Keep a longer history':
+            '保留更长的历史记录',
+        'Keep my numbers':
+            '保存我的统计数据',
+        'Longest run of days: {n}':
+            '最长连续天数：{n}',
+        "Mark today's plan done":
+            '将今天的计划标记为完成',
+        "Mark today's plan done (plans are turned off)":
+            '将今天的计划标记为完成（计划功能已关闭）',
+        'My numbers are off. Turn them on under Options, or with --set numbers on.':
+            '“我的统计”已关闭。可在“选项”中开启，或使用 --set numbers on。',
+        'My numbers...':
+            '我的统计...',
+        'Nothing finished yet this week. That is fine.':
+            '本周还没有完成任何事。没关系。',
+        'OK: {thoughts} thoughts and {tips} tips.':
+            '检查通过：共 {thoughts} 条想法、{tips} 条小建议。',
+        'Plans finished: {n}':
+            '已完成的计划：{n}',
+        'Save my plans to a file':
+            '将我的计划保存到文件',
+        'Saved to {path}':
+            '已保存到 {path}',
+        "The file isn't valid JSON, or is over 200,000 characters.":
+            '该文件不是有效的 JSON，或超过 200,000 个字符。',
+        'The file must hold an object with two lists, "thoughts" and "tips", and may add "holidays" and "title".':
+            '该文件必须包含一个对象，其中有 "thoughts" 和 "tips" 两个列表，还可以添加 "holidays" 和 "title"。',
+        'This week you finished {n}:':
+            '本周您完成了 {n} 件：',
+        'This week...':
+            '本周...',
+        'holidays line {line} is not a date like 2026-12-25.':
+            'holidays 第 {line} 行不是类似 2026-12-25 的日期。',
+        '{list} line {line} has a date.':
+            '{list} 第 {line} 行包含日期。',
+        '{list} line {line} has a link or an address.':
+            '{list} 第 {line} 行包含链接或地址。',
+        '{list} line {line} has control characters or extra spaces.':
+            '{list} 第 {line} 行包含控制字符或多余空格。',
+        '{list} line {line} is not text.':
+            '{list} 第 {line} 行不是文本。',
+        '{list} line {line} must be {low} to {high} characters long.':
+            '{list} 第 {line} 行的长度必须为 {low} 到 {high} 个字符。',
+    },
+}
+
+# ---- Japanese ----
+
+LANGUAGES["ja"] = {
+    "days": ('月', '火', '水', '木', '金', '土', '日'),
+    "months": ('1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'),
+    "date": '{year}年{month}{d}日（{day}）',
+    "thoughts": (
+        '後回しにしている文書を一つ開いて、最初の段落だけ読んでみましょう。',
+        '10分だけでも、始めたことに変わりはありません。次の10分もたいてい楽になります。',
+        '今日、計画のすべてはいりません。無理のない最初の一歩があれば十分です。',
+        '不格好な最初の一文を書いてみましょう。あとで直せる、形のあるものが手に入ります。',
+        '机の一角だけ片付けてみると、ほかの場所まで落ち着いて見えてきます。',
+        'リストでいちばん小さなタスクを選んで、ほかを見る前に終わらせましょう。',
+        '静かな朝に不格好に始めるほうが、来るかわからない完璧な瞬間を待つよりずっといいです。',
+        '最初の一歩をカレンダーに入れて、取り組む時間を確保しましょう。',
+        '大きなプロジェクトも、ほとんどは数時間の作業の積み重ねです。まずは午後ひとつ分を目指しましょう。',
+        '次にやることを一つだけ声に出して、残りのリストには順番を待ってもらいましょう。',
+        '思うようにペースが上がらない日もあります。そのペースでも、ちゃんと前に進んでいます。',
+        '入ったばかりの同僚に声をかけるように、自分にもやさしく話しかけてみましょう。',
+        '何年もやってきたことでも、まだ学んでいる途中でかまいません。',
+        '朝がいまひとつでも、午後まで決まるわけではありません。昼食のあとに仕切り直せます。',
+        '疲れは失敗ではなく、ひとつの合図です。予定を調整して、無理せず続けましょう。',
+        '人にはすぐ向けられる思いやりを、自分にも向けてあげましょう。',
+        '進歩はしばらく何も見えず、ある日突然、仕上がった1ページとして現れたりします。',
+        '2回読んでやっとわかることがあっても、問題ありません。',
+        '準備ができたと感じなくても大丈夫です。緊張しながらでも、やっていることに変わりはありません。',
+        '今日のベストが昨日より小さくても、それでかまいません。',
+        '使っていないタブを閉じましょう。数分で集中しやすくなります。',
+        'タスク一つ、ウィンドウ一つ、25分。静かな時間でどこまで進めるか試してみましょう。',
+        'ふと浮かんだ考えはメモしておいて、やっていたことに戻りましょう。',
+        'できれば1時間スマートフォンの通知を切って、仕事に集中してみましょう。',
+        '今日をいい日にする一つのことを決めて、そのための時間を確保しましょう。',
+        '一つずつ片付けるほうが、感じているより速く進むものです。',
+        '散らかった20項目のリストより、すっきりした3項目のリストのほうが役に立ちます。',
+        '気が散ったことに気づいたら、自分を責めずに、そっと戻しましょう。',
+        'いちばん難しいタスクは、元気がいちばんある時間帯に。朝一番でなくてもかまいません。',
+        'ヘッドホンをつけ、飲み物を用意し、ドアを閉める。場を整えれば、集中はあとからついてきます。',
+        '5分だけ画面から離れましょう。戻ったとき、少し頭がすっきりしています。',
+        '今日は机を離れて昼食をとりましょう。受信トレイは、昼食のあいだくらい待ってくれます。',
+        '建物のまわりを少し歩くのも、頭にとっては立派な仕事です。',
+        '忙しい午後でも、1分画面から離れるのはいい時間の使い方です。',
+        '肩を伸ばして、歯の食いしばりをゆるめましょう。何時間も力が入っていたかもしれません。',
+        'できれば今夜は定時で帰りましょう。明日の自分が、今夜の時間に感謝するはずです。',
+        '休むことも仕事のうちです。疲れていると、同じミスを繰り返しやすくなります。',
+        '少しのあいだ目を休めて、肩の力を抜きましょう。',
+        'しっかり休憩をとると、一日の後半が新しいスタートのように感じられます。',
+        '夜の時間は自分のために。夜9時に対応しなければならないメールはありません。',
+        '頼まれてもいないのに誰かがしてくれた小さなことに、今日はお礼を伝えましょう。',
+        'たいていの人は、見えないところで多くを抱えながら精いっぱいやっています。',
+        '同僚のお茶やコーヒーの好みを覚えておきましょう。ささやかな気づかいになります。',
+        '誰かがそっけなくても、自分への評価ではなく、その人が大変な一日なのだと考えましょう。',
+        'ドアを押さえる、お菓子を分ける、相手の話を最後まで聞く。そんな小さなことを大切にしましょう。',
+        'ちょっとしたあいさつと週末の話が、朝いちばんの楽しみになることもあります。',
+        '新しく来た人が当たり前のことを聞いてきたら、自分も昔同じことを聞いたと思い出しましょう。',
+        'チームメイトのアイデアで仕事が良くなったら、そのことを口に出して伝えましょう。',
+        'メッセージの返信に、少しだけ温かみを添えましょう。手間はかからず、やさしく届きます。',
+        '最近会議で口数の少ない同僚に、調子はどうか声をかけてみましょう。',
+        '新しいことを始める前に、もうすぐ終わることを仕上げましょう。',
+        '完璧でも終わっていないものより、十分な出来で終わったもののほうが役に立つことが多いです。',
+        '今日はやりかけのことを一つ片付けて、そのあとのちょっとした安心感を味わいましょう。',
+        '最後の10%は、丁寧な数分で済むことがよくあります。今日はその数分を使いましょう。',
+        '下書きに残っているメールを送りましょう。たぶん、そのままで大丈夫です。',
+        '完了にして、ひと息ついて、終わったことを喜びましょう。',
+        '終わった小さなことは、途中で止まった大きなことより価値があります。',
+        'ログオフする前に、明日の最初の一歩をメモしておきましょう。覚えておかなくて済みます。',
+        'もう一度だけ読んで、見つけたところを直したら、送信しましょう。',
+        '一つきちんと仕上げて一日を終えると、夜の気分が軽くなります。',
+        '早めに質問すれば、あとで一人で1時間悩まずに済むことが多いです。',
+        'たいていの人は、知っていることを聞かれるとうれしいものです。謝らずに聞いてみましょう。',
+        '「行き詰まっています」は、同僚が手を貸しやすい、わかりやすくて役に立つ一言です。',
+        '必要なことはわかりやすい言葉で頼みましょう。相手が「いいですよ」と言いやすくなります。',
+        '一人で問題をにらむより、二人で見るほうが早く解決することがよくあります。',
+        '手を借りるのは迷惑ではありません。チームの一員なのですから。',
+        '具体的に質問すれば、相手も具体的に答えられます。',
+        '指示がわかりにくいときに確認するのも、仕事をきちんとすることの一部です。',
+        'できるときは手を貸し、必要なときは手を借りましょう。どちらも慣れるほど楽になります。',
+        'これを前に解決した人が、きっと社内のどこかにいます。探しに行ってみましょう。',
+        '今週わかったことを、小さくメモしておきましょう。思っている以上にたまっていきます。',
+        '新しいことに初心者として取り組むのは、まだ成長を続けている証拠です。',
+        '尊敬する同僚が難しい電話にどう対応しているか見て、一つ取り入れてみましょう。',
+        '休憩中に役立つページを1ページ読めたら、それだけで頭にとってはいい一日です。',
+        '誰かに作業を説明すると、意外なほど自分の理解も深まります。',
+        '「まだわかりません」と言って、それから調べに行けば大丈夫です。',
+        '慣れないシステムは、何度か使うまでは誰にとってもわかりにくいものです。',
+        '経験のある人に、どうやって覚えたのか聞いてみましょう。たいてい安心できる答えが返ってきます。',
+        'スキルは繰り返しで身につきます。小さなことを繰り返して、楽にできるようにしましょう。',
+        'ありふれた作業も、少し興味を持ってみると、おもしろくなることがあります。',
+        '早く見つけたミスは、直せば済みます。そして、ほとんどのミスは早く見つかります。',
+        '直して、知らせるべき人に伝えたら、あとは気持ちが落ち着くのを待ちましょう。',
+        '仕事のミスのほとんどは、1週間もすれば、その場で感じたより小さく思えます。',
+        '一度のミスで、これまでの何年もの丁寧な仕事が消えるわけではありません。',
+        '何かがうまくいかなかったら、人より先に、まずやり方を見直しましょう。',
+        'まわりの誰もが、少なくとも一度はメールを送る相手を間違えています。',
+        'ミスから学べることを一つだけ受け取って、残りは置いていきましょう。',
+        'ミスを素直に認めるほうが、一度もミスしないことより信頼されることが多いものです。',
+        '慎重な人にも、うっかりが続く日はあります。夕方には過ぎていきます。',
+        '今日の小さなつまずきのほとんどは、来月には覚えていないでしょう。',
+        '大きなトラブルのない静かな一日は、誰も何も言わなくても、いい一日です。',
+        '温かいマグカップ、片付いた受信トレイ、静かな1分。小さな楽しみに目を向けましょう。',
+        '毎日大きな成果がなくてもかまいません。穏やかに着実に進めるのも、立派な働き方です。',
+        '会議が5分早く終わったら、その時間は好きに使いましょう。',
+        'ありふれた一日をきちんと過ごせたら、それはひそかに誇っていいことです。',
+        'いい仕事ほど、外からは目立たないことがあります。それでいいのです。',
+        '気持ちのいい午後は、成果を気にせず、そのまま楽しみましょう。',
+        '最初のコーヒーやいつもの顔ぶれなど、一日の小さな習慣にも目を向けてみましょう。',
+        '今日も仕事に向き合い、自分の分を果たしました。それで十分です。',
+        '今夜、今日うまくいったことを一つ思い出してみましょう。',
+        'タスクの合間の静かな1分は、むだではありません。次のタスクをうまく始めるための時間です。',
+    ),
+    "tips": (
+        '画面から離れて、水を一杯ゆっくり飲みましょう。',
+        '肩をゆっくり5回、後ろに回しましょう。',
+        '20秒間、目を休めましょう。遠くを見るか、目を閉じます。',
+        '座ったままでも立っても、腕を頭の上に伸ばして深呼吸しましょう。',
+        '行ける範囲でいちばん遠い部屋か窓まで行って、戻ってきましょう。',
+        '姿勢を確かめて、肩を耳から離すように下ろしましょう。',
+        '無理のない範囲で、首をゆっくり左右に回しましょう。',
+        '手を10回、閉じたり開いたりして、指をほぐしましょう。',
+        'いちばんよく開く文書をピン留めして、ワンクリックで開けるようにしましょう。',
+        '歩いてでも車いすでも、自分に合った方法で少し外に出てみましょう。',
+        '温かい飲み物か冷たい飲み物を用意して、画面から離れて楽しみましょう。',
+        '景色や音、手ざわりなど、落ち着くものに意識を向けてみましょう。',
+        '途中で止まっているタスクに、次の一歩を書き足しましょう。',
+        '両足を床につけて、座ったままか立ったままで背筋を伸ばし、10回呼吸しましょう。',
+        '流し読みしかしていないグループ チャットを一つミュートしましょう。',
+        '少しのあいだ、あごの力を抜いて、額をゆるめましょう。',
+        '今日の気分に合った動き方で、2分間体を動かしましょう。',
+        '先延ばしにしているタスクのために、カレンダーに15分の枠を入れましょう。',
+        '椅子、画面、キーボードのどれか一つを調整して、少し楽にしましょう。',
+        'できれば、次の会議には少し遠回りして向かいましょう。',
+        '何度も書いているメールを一つ、テンプレートとして保存しましょう。',
+        'いちばんよく使うプログラムのショートカット キーを一つ覚えましょう。',
+        '次のコーヒーやお茶の前に、水をコップ一杯飲みましょう。',
+        '肩を耳まで持ち上げてから、すとんと力を抜きましょう。',
+        '外に出るか窓を開けて、1分間新鮮な空気を吸いましょう。',
+        'ゆっくり5回呼吸しましょう。吐く息を少しずつ長くします。',
+        '次のメッセージを開く前に、1分間静かにひと息つきましょう。',
+        '今日ここまでにあった、いいことを一つ書き留めましょう。',
+        '目を閉じて3回呼吸し、今の気分を感じてみましょう。',
+        '今気づいたことを三つ挙げてみましょう。見えるもの、聞こえるもの、何でもかまいません。',
+        '今週楽しみにしていることを一つ書き出しましょう。',
+        'タイマーを2分にセットして、画面を見ずにただ座ってみましょう。',
+        '植物やお気に入りのマグカップなど、近くの小さなものを楽しみましょう。',
+        '今週うまくできたことを一つ思い出して、自分をほめましょう。',
+        '好きな曲を一曲、ほかに何も開かずに最初から最後まで聴きましょう。',
+        '4つ数えて吸い、6つ数えて吐く。これを3回繰り返しましょう。',
+        '次にちょっとイラッとしたら、反応する前にひと呼吸おきましょう。',
+        '最近笑ったことを一つメモしましょう。',
+        '1分間、音や香り、手ざわりなど、心地よいものに意識を向けましょう。',
+        '好きな場所を思い出して、30秒間思い浮かべましょう。',
+        '小さなタスクを一つ「今はこれで十分」と区切って、次に進みましょう。',
+        '感謝していることを一文で書いてみましょう。',
+        '次のひと口をゆっくり味わってみましょう。',
+        '二つのタスクのあいだに、短い休憩をはさみましょう。',
+        '今日、思っていたよりうまくいくことを一つ探してみましょう。',
+        '午後をどんな気分で過ごしたいか、ひとことで決めてみましょう。',
+        '60秒間頭を休めてから、次のタスクに戻りましょう。',
+        '床についた足を感じて、少しのあいだ落ち着きましょう。',
+        '誰かがしてくれた親切を一つ思い出して、その思い出を味わいましょう。',
+        'あとで見直したいアイデアを一つメモして、いったん置いておきましょう。',
+        '机の小さな一角を片付けましょう。一か所だけで大丈夫です。',
+        'しばらく返信していないメッセージに、一つ返信しましょう。',
+        '明日いちばんのタスクを、付箋かメモに書いておきましょう。',
+        'もう使わないブラウザーのタブを閉じましょう。',
+        '最近何かをしてくれた同僚にお礼を言いましょう。',
+        'もう要らない古いメールを5通アーカイブしましょう。',
+        'わかりにくい名前のファイルを一つ名前変更して、あとで見つけやすくしましょう。',
+        'デスクトップに散らばったファイルを一つか二つ片付けましょう。',
+        'もう必要のない古いリマインダーを一つ削除しましょう。',
+        'よく開く文書に、わかりやすいタイトルを付けましょう。',
+        'ToDo リストの小さな項目を一つ消しましょう。',
+        '読んでいないメール マガジンの配信を一つ停止しましょう。',
+        'キーボードか画面を柔らかい布でふきましょう。',
+        'ペン、ノート、水を手の届くところに置きましょう。',
+        '今日どこまで進んだか、未来の自分に短いメモを残しましょう。',
+        '今日の午後いちばん大事なタスクを一つ選んで、最初に取りかかりましょう。',
+        '机のそばのごみ箱を空にしましょう。',
+        '進捗メモを一つ更新して、ほかの人にも状況がわかるようにしましょう。',
+        'ダウンロード フォルダーのファイルを、いくつか移動して整理しましょう。',
+        '忘れがちなことを一つ、リマインダーに設定しましょう。',
+        'あまり必要のない通知を一つオフにしましょう。',
+        'いつも検索しているページを一つブックマークしましょう。',
+        '記憶が新しいうちに、会議の内容を2行でまとめましょう。',
+        '定例会議を一つ、少し短くできないか相談してみましょう。',
+        'この1時間の目標を一つ決めて、書き出しましょう。',
+        '同僚に今日の調子を聞いて、しっかり耳を傾けましょう。',
+        '役に立つリンクを、喜んでくれそうな人に共有しましょう。',
+        'まだ話したことのない人にあいさつしましょう。',
+        '最近助けてくれた人に、短いお礼のメッセージを送りましょう。',
+        '次の通話の始めに、同僚に温かくあいさつしましょう。',
+        'チームメイトに、今週楽しみにしていることを聞いてみましょう。',
+        '誰かの小さな成功に気づいたら、声をかけてお祝いしましょう。',
+        'お茶やコーヒー、または通話で、同僚を少しのおしゃべりに誘ってみましょう。',
+        '同僚がうまくやったことを、具体的にほめましょう。',
+        'よく見かけるけれど、まだ名前を知らない人の名前を覚えましょう。',
+        '役に立ちそうなコツを、必要としていそうなチームメイトに教えましょう。',
+        'おすすめの曲や番組、本を誰かに聞いてみましょう。',
+        '最近口数の少ない同僚に、声をかけてみましょう。',
+        '忙しそうな人がいたら、小さなことを一つ手伝うと申し出ましょう。',
+        '次に会う人に、笑顔であいさつしましょう。',
+        '同僚をほめる言葉を耳にしたら、本人に伝えましょう。',
+        '同僚に、今週何があって楽になったか聞いてみましょう。',
+        '以前一緒に働いていた人に、気軽なメッセージを送りましょう。',
+        '共有スペースをいつも整えてくれている人にお礼を言いましょう。',
+        '気が合いそうな同僚どうしを紹介しましょう。',
+        '引き継ぎをもっと楽にするにはどうしたらいいか、チームメイトに聞いてみましょう。',
+        '近くの人と、ちょっとした軽い冗談を言い合いましょう。',
+        '次の「お願いします」と「ありがとう」に、少しだけ温かさを込めましょう。',
+        '同僚に、仕事以外で楽しんでいることを聞いてみましょう。',
+        '次に話しかけてきた人の話を、ほかのことをせずにしっかり聞きましょう。',
+    ),
+    "done": (
+        'よかったです。これで一つ終わりました。',
+        'いいですね。何かを終えるのは気持ちのいいものです。',
+        'お疲れさまでした。次に取りかかる前に、少し休みましょう。',
+        'いいですね。小さな完了が積み重なっていきます。',
+        'これで完了です。ちょっと誇らしく思っていいですよ。',
+        'よかったです。リストから一つ消えました。',
+    ),
+    "text": {
+        HELP:
+            """hello-world は、あいさつと今日のひとこと、ちょっと試してみることを表示します。
+
+最後の入力欄では、plan で今日の予定を設定し、終わったら done と入力します。
+menu（または m）でオプションを開きます。Enter で閉じます。q、x、close は
+どの質問からでも閉じます。予定の入力欄で same と入力すると、終わっていない
+前の予定を呼び戻せます。done のあとには、最近終えた予定を3件表示します。
+メニューの1ですべて表示、7で1件を削除、8でひとこととヒントを非表示に
+できます。メニューでは Enter で戻ります。
+hello.cmd は次のオプションを付けて実行することもできます。
+  --plain         あいさつだけを英語で表示
+  --stats         このコンピューターに保存されている内容を表示
+  --reset         保存内容をすべて削除（実行前に確認）
+  --remind on     サインイン時に1日1回開く（off で停止）
+  --streak off    連続日数のメッセージを非表示（on で表示）
+  --version       バージョンを表示
+  --check-content FILE
+                  組織のコンテンツ ファイルをチェック
+  --help          このテキストを表示
+
+終了コード: 0 は成功、1 はコマンドの失敗または画面に書き込めなかった場合、
+2 は不明なオプションです。
+
+保存したメモは、このコンピューターのユーザー フォルダーに残ります。どこにも
+送信されません。ただし、このコンピューターのファイルを読める IT 担当者は
+読むことができます。""",
+        MENU_HELP:
+            """最後の入力欄で使える言葉:
+  done  今日の予定を完了にして、次の予定をたずねます
+  plan  今日の予定を設定・変更します
+  menu  このオプションを開きます
+  q     ウィンドウを閉じます（Enter でも閉じます）
+予定の入力欄で same と入力すると、終わっていない前の予定を呼び戻せます。
+「できましたか？」と聞かれたときの n は「まだ」の意味で、予定を今日に
+持ち越せます。q はどの質問からでも閉じます。
+このメニューでは、1で保存内容を表示、7で終えた予定を1件削除、
+8でひとこととヒントを非表示にします。
+m と入力すると、オプションをもう一度表示します。データはどこにも送信されません。""",
+        SAVED_PLAN:
+            '保存しました。終わったら done と入力してください。入力しなくても、次に開いたときにたずねます。',
+        GREETING:
+            'こんにちは、世界！',
+        'hello.cmd is in this folder:':
+            'hello.cmd はこのフォルダーにあります:',
+        'Shortened to {n} characters.':
+            '{n}文字に短くしました。',
+        'Your saved file was damaged, so hello-world set it aside as a backup copy and started fresh. Your earlier days and plan could not be read. Menu option 4 deletes the backup.':
+            '保存ファイルが壊れていたため、hello-world はバックアップとして別に保存し、新しく始めました。これまでの日数と予定は読み込めませんでした。バックアップはメニューの4で削除できます。',
+        'Backup copy: ':
+            'バックアップ: ',
+        'In the folder: ':
+            'フォルダー: ',
+        'Sorry, "{shown}" is not one of the choices.':
+            'すみません、「{shown}」は選択肢にありません。',
+        'A plan needs a word or two, so nothing was saved.':
+            '予定が短すぎるため、保存しませんでした。',
+        'The sign-in reminder works on Windows only.':
+            'サインイン時のリマインダーは Windows でのみ使えます。',
+        'Your organization has turned off opening at sign-in.':
+            'サインイン時に開く機能は、組織の設定でオフになっています。',
+        'The reminder cannot be set up from this folder.':
+            'このフォルダーからはリマインダーを設定できません。',
+        'Could not set up the reminder.':
+            'リマインダーを設定できませんでした。',
+        'Done. hello-world will open once a day when you sign in.':
+            '設定しました。hello-world はサインイン時に1日1回開きます。',
+        'To stop it, choose option 2 in the menu.':
+            '止めるには、メニューの2を選んでください。',
+        'Could not turn off the sign-in reminder.':
+            'サインイン時のリマインダーをオフにできませんでした。',
+        'Done. The sign-in reminder is off.':
+            '設定しました。サインイン時のリマインダーはオフです。',
+        'Saved on this computer in:':
+            'このコンピューターの保存先:',
+        'Saved in your own user folder on this computer.':
+            'このコンピューターの、ご自分のユーザー フォルダーに保存しています。',
+        'Days you opened it in the last {days} days: {n} (last 7 days: {recent})':
+            '過去{days}日間で開いた日数: {n}（直近7日間: {recent}）',
+        'Times you marked a plan done: {n}':
+            '予定を完了にした回数: {n}',
+        'Your current plan: ':
+            '現在の予定: ',
+        'Earlier plan (for same): ':
+            '前の予定（same 用）: ',
+        'Days-in-a-row message: shown.':
+            '連続日数のメッセージ: 表示',
+        'Days-in-a-row message: hidden.':
+            '連続日数のメッセージ: 非表示',
+        'Opens by itself at sign-in: turned off by your organization.':
+            'サインイン時に自動で開く: 組織の設定でオフ',
+        'Opens by itself at sign-in: on.':
+            'サインイン時に自動で開く: オン',
+        'Opens by itself at sign-in: off.':
+            'サインイン時に自動で開く: オフ',
+        "It never leaves this computer. Others who can read this computer's files, such as IT staff, could read it.":
+            'このコンピューターの外には出ません。ただし、IT 担当者など、このコンピューターのファイルを読める人は読むことができます。',
+        'After tidying, the file holds only this:':
+            '整理したあとのファイルの中身は、これだけです:',
+        'Delete all saved notes, dates and plans on this computer? (y or n, Enter to cancel) > ':
+            'このコンピューターに保存したメモ、日付、予定をすべて削除しますか？（y または n、Enter でキャンセル） > ',
+        'Nothing was deleted.':
+            '何も削除していません。',
+        'Could not delete everything.':
+            '一部を削除できませんでした。',
+        'Delete these yourself:':
+            '次のファイルは手動で削除してください:',
+        'Could not list the folder, so backup copies may remain:':
+            'フォルダーの一覧を取得できなかったため、バックアップが残っている可能性があります:',
+        'Done. Everything saved was deleted.':
+            '完了しました。保存内容をすべて削除しました。',
+        'Another open hello-world window cannot put it back.':
+            'ほかの hello-world ウィンドウが開いていても、データが復元されることはありません。',
+        'Close any other open hello-world window, or it may save its notes again.':
+            'ほかに開いている hello-world ウィンドウは閉じてください。開いたままだと、そのウィンドウがメモを再び保存することがあります。',
+        'Everything saved was deleted in another window, so this was not saved.':
+            '保存内容が別のウィンドウで削除されたため、これは保存しませんでした。',
+        'The other open window had also finished a plan.':
+            '別のウィンドウでも予定が完了になっていました。',
+        'The other open window changed the plan, so its plan is kept.':
+            '別のウィンドウで予定が変更されたため、そちらの予定を残しました。',
+        'Type plan at the last prompt to set one.':
+            '予定を設定するには、最後の入力欄で plan と入力してください。',
+        'That looks like a command, not a plan, so nothing was saved.':
+            'コマンドのようなので、予定としては保存しませんでした。',
+        'Type your plan, or press Enter to go back.':
+            '予定を入力してください。Enter で戻ります。',
+        'Finished lately:':
+            '最近終えた予定:',
+        'Your plan today: ':
+            '今日の予定: ',
+        'Your plan from {date}: ':
+            '{date}の予定: ',
+        'Earlier plan: ':
+            '前の予定: ',
+        'Type the next plan, or Enter to close > ':
+            '次の予定を入力（Enter で閉じる） > ',
+        'Type the next plan, same to reuse the earlier plan, or Enter to close > ':
+            '次の予定を入力（same で前の予定を使う、Enter で閉じる） > ',
+        "Type today's plan, or Enter to keep it > ":
+            '今日の予定を入力（Enter でそのまま） > ',
+        "Type today's plan, same to reuse the earlier plan, or Enter to keep it > ":
+            '今日の予定を入力（same で前の予定を使う、Enter でそのまま） > ',
+        "Type today's plan, or Enter to go back > ":
+            '今日の予定を入力（Enter で戻る） > ',
+        "Type today's plan, same to reuse the earlier plan, or Enter to go back > ":
+            '今日の予定を入力（same で前の予定を使う、Enter で戻る） > ',
+        'Closing.':
+            '閉じます。',
+        'There is no earlier plan to reuse yet. Nothing changed.':
+            '呼び戻せる前の予定はまだありません。変更はありません。',
+        'Nothing changed.':
+            '変更はありません。',
+        'Could not save that on this computer. Your plan is unchanged.':
+            'このコンピューターに保存できませんでした。予定は変わっていません。',
+        'No finished plans are saved.':
+            '終えた予定は保存されていません。',
+        'Type the number to forget (1 to {n}), or Enter to keep them all > ':
+            '削除する番号を入力（1～{n}、Enter ですべて残す） > ',
+        'There is no number "{typed}" on the list. Type a number from 1 to {n}, or press Enter to keep them all.':
+            'リストに「{typed}」という番号はありません。1～{n}の番号を入力するか、Enter ですべて残してください。',
+        'Also forget it as the earlier plan for same? (y or n, Enter to keep it for same) > ':
+            'same 用の前の予定からも削除しますか？（y または n、Enter で same 用に残す） > ',
+        'Type y or n, or press Enter to keep it for same.':
+            'y か n を入力するか、Enter で same 用に残してください。',
+        'That plan was already forgotten. Nothing changed.':
+            'その予定はすでに削除されています。変更はありません。',
+        'Forgotten: ':
+            '削除しました: ',
+        'Same still has it.':
+            'same でまだ呼び戻せます。',
+        'Could not save that on this computer. Nothing changed.':
+            'このコンピューターに保存できませんでした。変更はありません。',
+        'Options':
+            'オプション',
+        'Show what is saved on this computer':
+            'このコンピューターに保存されている内容を表示',
+        'Open once a day at sign-in (turned off by your organization)':
+            'サインイン時に1日1回開く（組織の設定でオフ）',
+        'Turn off: open once a day at sign-in (now on)':
+            'オフにする: サインイン時に1日1回開く（現在オン）',
+        'Turn on: open once a day at sign-in (now off)':
+            'オンにする: サインイン時に1日1回開く（現在オフ）',
+        'Days-in-a-row message (hidden by your organization)':
+            '連続日数のメッセージ（組織の設定で非表示）',
+        'Hide the days-in-a-row message (now shown)':
+            '連続日数のメッセージを非表示にする（現在は表示）',
+        'Show the days-in-a-row message (now hidden)':
+            '連続日数のメッセージを表示する（現在は非表示）',
+        'Delete everything saved':
+            '保存内容をすべて削除',
+        'Help':
+            'ヘルプ',
+        "Set today's plan (turned off by your organization)":
+            '今日の予定を設定（組織の設定でオフ）',
+        'Forget a finished plan (turned off by your organization)':
+            '終えた予定を削除（組織の設定でオフ）',
+        "Set or change today's plan":
+            '今日の予定を設定・変更',
+        'Forget one finished plan':
+            '終えた予定を1件削除',
+        'Thought and tip (hidden by your organization)':
+            'ひとこととヒント（組織の設定で非表示）',
+        'Hide the thought and tip (now shown)':
+            'ひとこととヒントを非表示にする（現在は表示）',
+        'Show the thought and tip (now hidden)':
+            'ひとこととヒントを表示する（現在は非表示）',
+        '{date}: ':
+            '{date}: ',
+        'Enter':
+            'Enter',
+        'Back to the last prompt':
+            '最後の入力欄に戻る',
+        'Choose 1 to 11, or Enter to go back > ':
+            '1～11を選択（Enter で戻る） > ',
+        'Choose 1 to 11, m to list the options, or Enter to go back > ':
+            '1～11を選択（m でオプション一覧、Enter で戻る） > ',
+        'The saved file could not be read just now, so this may be out of date.':
+            '保存ファイルを今は読み込めなかったため、この内容は最新でない可能性があります。',
+        'Type full to see the whole file, or Enter to go on > ':
+            'ファイル全体を見るには full、続けるには Enter > ',
+        'Could not save that choice on this computer.':
+            'この選択をこのコンピューターに保存できませんでした。',
+        'Your organization has hidden the days-in-a-row message.':
+            '連続日数のメッセージは、組織の設定で非表示になっています。',
+        'Done. The days-in-a-row message is on.':
+            '設定しました。連続日数のメッセージはオンです。',
+        'Done. The days-in-a-row message is off.':
+            '設定しました。連続日数のメッセージはオフです。',
+        'Plans are turned off by your organization.':
+            '予定の機能は、組織の設定でオフになっています。',
+        'Your organization has hidden the thought and tip.':
+            'ひとこととヒントは、組織の設定で非表示になっています。',
+        'Done. The thought and tip are on.':
+            '設定しました。ひとこととヒントはオンです。',
+        'Done. The thought and tip are off.':
+            '設定しました。ひとこととヒントはオフです。',
+        'Type 1 to 11, or press Enter to go back.':
+            '1～11を入力するか、Enter で戻ってください。',
+        'Want it to open once a day when you sign in? (y or n, Enter for not now) > ':
+            'サインイン時に1日1回、自動で開くようにしますか？（y または n、Enter であとで） > ',
+        'Want it to open once a day when you sign in so it can ask about your plan? (y or n, Enter for not now) > ':
+            '予定についてたずねられるよう、サインイン時に1日1回、自動で開くようにしますか？（y または n、Enter であとで） > ',
+        'Type y or n, or press Enter for not now.':
+            'y か n を入力してください。あとで決めるなら Enter を押してください。',
+        'That was not understood. It will ask again on a later visit.':
+            '入力を認識できませんでした。また今度たずねます。',
+        'It will ask again on a later visit. Menu option 2 also turns it on.':
+            'また今度たずねます。メニューの2でもオンにできます。',
+        'No problem. Menu option 2 turns it on later.':
+            'わかりました。あとでメニューの2からオンにできます。',
+        "Okay. It won't ask again. Menu option 2 turns it on.":
+            'わかりました。今後はたずねません。メニューの2でオンにできます。',
+        'Okay. It will ask again on a later visit. Type n to stop it.':
+            'わかりました。また今度たずねます。今後たずねないようにするには n と入力してください。',
+        'When did you finish it?':
+            'いつ終えましたか？',
+        'Today':
+            '今日',
+        'Type a number from 1 to {n}, or Enter for 1 > ':
+            '1～{n}の番号を入力（Enter で1） > ',
+        'Type a number from 1 to {n}, or press Enter.':
+            '1～{n}の番号を入力するか、Enter を押してください。',
+        'That looks like more than one thing. Finishing the first part still counts.':
+            'いくつかのことが含まれているようです。最初の一つを終えるだけでも、ちゃんと数に入ります。',
+        'There is no plan to mark as done. Type plan to set one.':
+            '完了にする予定がありません。plan と入力して設定してください。',
+        'Could not save that on this computer. The plan is still open.':
+            'このコンピューターに保存できませんでした。予定は未完了のままです。',
+        'Your plan from over two weeks ago was put away. Type same at the plan prompt to bring it back.':
+            '2週間以上前の予定は、いったんしまっておきました。予定の入力欄で same と入力すると呼び戻せます。',
+        "Press Enter at each question to skip it, and once more to close. That's it.":
+            '各質問で Enter を押すとスキップ、もう一度押すと閉じます。使い方はこれだけです。',
+        'Welcome.':
+            'ようこそ。',
+        'Each day you get one thought and one small thing to try, the same for everyone.':
+            '毎日、ひとことと、ちょっと試してみることが一つずつ表示されます。内容は全員共通です。',
+        'If you type a plan, it asks next time how it went. Your notes stay on this computer and are never sent anywhere. Like any work file they are not secret, so keep them to everyday tasks.':
+            '予定を入力すると、次回どうだったかをたずねます。メモはこのコンピューターにだけ保存され、どこにも送信されません。ただし、ほかの仕事のファイルと同じく機密扱いではないので、書くのは日常の作業だけにしてください。',
+        'Type menu at the end for the options.':
+            'オプションを見るには、最後に menu と入力してください。',
+        'Welcome back. Glad you are here.':
+            'おかえりなさい。また会えてうれしいです。',
+        'You have opened this {row} days in a row. Nice to see you.':
+            '{row}日続けて開いています。今日も会えてうれしいです。',
+        'Last time you planned: ':
+            '前回の予定: ',
+        'Did you do it? (y for yes, n for not yet, Enter to skip) > ':
+            'できましたか？（y: はい、n: まだ、Enter: スキップ） > ',
+        'Type y or n, or press Enter to skip.':
+            'y か n を入力するか、Enter でスキップしてください。',
+        'Could not save that on this computer. Your answer was not counted.':
+            'このコンピューターに保存できませんでした。回答は記録されていません。',
+        'That is fine. Keep it for today? (y or n, Enter to keep it) > ':
+            '大丈夫です。今日に持ち越しますか？（y または n、Enter で持ち越す） > ',
+        'Type y to keep it, n to clear it, or press Enter to keep it.':
+            '持ち越すなら y、取り消すなら n を入力してください。Enter でも持ち越します。',
+        'Cleared. Type same at a plan prompt if you want it back.':
+            '取り消しました。戻したいときは、予定の入力欄で same と入力してください。',
+        'Kept for today.':
+            '今日に持ち越しました。',
+        'That was not understood. Your plan is left as it was.':
+            '入力を認識できませんでした。予定はそのままです。',
+        'Your plan is still open.':
+            '予定は未完了のままです。',
+        'Thought for today:':
+            '今日のひとこと:',
+        'Try this today:':
+            '今日試してみること:',
+        'Your plan for today: ':
+            '今日の予定: ',
+        'Still open since {date}:':
+            '{date}から未完了:',
+        '(Enter to skip)':
+            '（Enter でスキップ）',
+        '(A plan typed here replaces the old one. Enter to skip)':
+            '（ここに入力すると前の予定と置き換わります。Enter でスキップ）',
+        '(Type same to reuse it, or Enter to skip)':
+            '（same で再利用、Enter でスキップ）',
+        'What is one thing you want to get done today?':
+            '今日終わらせたいことを、一つ挙げるなら何ですか？',
+        'There is no earlier plan to reuse yet. Nothing was saved.':
+            '呼び戻せる前の予定はまだありません。何も保存していません。',
+        'Your notes could not be saved on this computer. This screen still works.':
+            'メモをこのコンピューターに保存できませんでした。この画面はそのまま使えます。',
+        'Type menu, or Enter to close > ':
+            'menu と入力、または Enter で閉じる > ',
+        'Type done, plan or menu, or Enter to close > ':
+            'done、plan、menu のどれかを入力、または Enter で閉じる > ',
+        'Type plan or menu, or Enter to close > ':
+            'plan か menu を入力、または Enter で閉じる > ',
+        'Type done, plan or menu, or press Enter to close.':
+            'done、plan、menu のどれかを入力するか、Enter を押して閉じてください。',
+        'Type plan or menu, or press Enter to close.':
+            'plan か menu を入力するか、Enter を押して閉じてください。',
+        "The saved file can't be read right now, or it is damaged.":
+            '保存ファイルを今は読み込めないか、ファイルが壊れています。',
+        'Nothing was changed. Saved in: ':
+            '何も変更していません。保存先: ',
+        'Deleting saved notes needs a person at the keyboard.':
+            '保存したメモを削除するには、キーボードの前に人がいる必要があります。',
+        '{option} needs on or off. Here are the options.':
+            '{option} には on か off を指定してください。オプションは次のとおりです。',
+        'Unknown option: {option}. Here are the options.':
+            '不明なオプションです: {option}。オプションは次のとおりです。',
+        '&Done':
+            '完了(&D)',
+        '&Not yet':
+            'まだ(&N)',
+        'S&kip':
+            'スキップ(&K)',
+        '&Save':
+            '保存(&S)',
+        '&I did it':
+            'できました(&I)',
+        '&Options':
+            'オプション(&O)',
+        'Close':
+            '閉じる',
+        'Not today':
+            '今日はやめておく',
+        'Did you do it?':
+            'できましたか？',
+        'Done. A reminder comes when you sign in, if there is a plan to ask about.':
+            '設定しました。たずねる予定があるときは、サインイン時にリマインダーが表示されます。',
+        'Done. The Start menu opens a window with buttons.':
+            '設定しました。スタート メニューからボタン付きのウィンドウが開きます。',
+        'Done. The Start menu opens this text screen.':
+            '設定しました。スタート メニューからこのテキスト画面が開きます。',
+        'More options':
+            'その他のオプション',
+        'Remind me when I sign in':
+            'サインイン時にリマインダーを表示',
+        'Show the thought and tip':
+            'ひとこととヒントを表示',
+        'Type your plan in the box.':
+            '予定をボックスに入力してください。',
+        'Use a window with buttons (now this text screen)':
+            'ボタン付きのウィンドウを使う（現在はこのテキスト画面）',
+        'Use the text screen':
+            'テキスト画面を使う',
+        'Use this text screen (now a window with buttons)':
+            'このテキスト画面を使う（現在はボタン付きのウィンドウ）',
+        'Want a reminder when you sign in? It shows your plan from last time, and you answer with one click. You can turn it off under Options.':
+            'サインイン時にリマインダーを表示しますか？前回の予定が表示され、ワンクリックで答えられます。オプションからオフにできます。',
+        'Window or text screen (set by your organization)':
+            'ウィンドウかテキスト画面か（組織が設定）',
+        'Your organization has set hello-world to open as a text screen.':
+            '組織の設定により、hello-world はテキスト画面で開きます。',
+        'Saved.':
+            '保存しました。',
+        'Save your plan before closing?':
+            '閉じる前に予定を保存しますか？',
+        'Delete all saved notes, dates and plans on this computer?':
+            'このコンピューターに保存したメモ、日付、予定をすべて削除しますか？',
+        'Turn off: reminder when you sign in (now on)':
+            'オフにする: サインイン時のリマインダー（現在オン）',
+        'Turn on: reminder when you sign in (now off)':
+            'オンにする: サインイン時のリマインダー（現在オフ）',
+        'Reminder when you sign in (turned off by your organization)':
+            'サインイン時のリマインダー（組織の設定でオフ）',
+        'Reminder when you sign in: on.':
+            'サインイン時のリマインダー: オン',
+        'Reminder when you sign in: off.':
+            'サインイン時のリマインダー: オフ',
+        'Reminder when you sign in: turned off by your organization.':
+            'サインイン時のリマインダー: 組織の設定でオフ',
+        'Show the days-in-a-row message':
+            '連続日数のメッセージを表示',
+        'Done. The thought and tip show next time you open hello-world.':
+            '設定しました。次に hello-world を開いたときから、ひとこととヒントが表示されます。',
+        "Clear today's plan?":
+            '今日の予定を取り消しますか？',
+        'Next plan, if you want one:':
+            '次の予定（必要なら）:',
+        'A few things? Put ; between them.':
+            '複数あるときは ; で区切ってください。',
+        'A plan can be up to {n} characters.':
+            '予定は{n}文字まで入力できます。',
+        'Did you do them? (y for all, n for not yet, numbers for the ones you did, Enter to skip) > ':
+            'できましたか？（y: すべて、n: まだ、番号: できたものだけ、Enter: スキップ） > ',
+        'Last time you planned:':
+            '前回の予定:',
+        'The rest is kept for today.':
+            '残りは今日に持ち越します。',
+        'Tick the ones you did, then click Done. With none ticked, Done means all of them.':
+            'できたものにチェックを付けて、[完了] をクリックしてください。何もチェックしないと、すべて完了になります。',
+        'Type y for all, n for not yet, or the numbers you did, such as 1 3. Enter skips.':
+            'すべてなら y、まだなら n、できたものだけなら 1 3 のように番号を入力してください。Enter でスキップします。',
+        'Your settings were kept.':
+            '設定は変更していません。',
+        'Language (set by your organization)':
+            '言語（組織が設定）',
+        'Language (now {name})':
+            '言語（現在: {name}）',
+        'following Windows':
+            'Windows の設定に従う',
+        'Your organization shows hello-world in English.':
+            '組織の設定により、hello-world は英語で表示されます。',
+        'Follow Windows':
+            'Windows の設定に従う',
+        'Type a number from 1 to {n}, or Enter to keep it > ':
+            '1～{n}の番号を入力（Enter でそのまま） > ',
+        'Done. The new language shows next time you open hello-world.':
+            '設定しました。次に hello-world を開いたときから、新しい言語で表示されます。',
+        'Language...':
+            '言語...',
+        'Hello, {name}!':
+            'こんにちは、{name}さん！',
+        'One thing to get done today? Open hello-world to plan it.':
+            '今日終わらせたいことはありますか？hello-world を開いて予定を立てましょう。',
+        '&Open':
+            '開く(&O)',
+        'Reminder settings...':
+            'リマインダーの設定...',
+        'Greet me by name':
+            'あいさつに名前を入れる',
+        'At sign-in':
+            'サインイン時',
+        'At {at}':
+            '{at}',
+        'Also on days with no plan':
+            '予定がない日も表示',
+        'Open hello-world after I answer':
+            '答えたあとに hello-world を開く',
+        'Not on weekends':
+            '週末は表示しない',
+        'Done. A reminder comes at {at} each day, if there is a plan to ask about.':
+            '設定しました。たずねる予定があるときは、毎日{at}にリマインダーが表示されます。',
+        'Send feedback...':
+            'フィードバックを送る...',
+        '"holidays" must be a list of at most {n} dates.':
+            '"holidays" は{n}件以下の日付のリストにしてください。',
+        '"title" must be 1 to 40 characters of plain text, with no link or address.':
+            '"title" は、リンクやアドレスを含まない1～40文字のプレーン テキストにしてください。',
+        '"{list}" must be a list of {low} to {high} lines.':
+            '"{list}" は{low}～{high}行のリストにしてください。',
+        "Can't read {path}: {error}":
+            '{path} を読み込めません: {error}',
+        'Could not save that on this computer.':
+            'このコンピューターに保存できませんでした。',
+        'Days you opened hello-world: {n}':
+            'hello-world を開いた日数: {n}',
+        'Keep a longer history':
+            'より長い履歴を残す',
+        'Keep my numbers':
+            '自分の記録を残す',
+        'Longest run of days: {n}':
+            '最長連続日数: {n}',
+        "Mark today's plan done":
+            '今日の予定を完了にする',
+        "Mark today's plan done (plans are turned off)":
+            '今日の予定を完了にする（予定はオフ）',
+        'My numbers are off. Turn them on under Options, or with --set numbers on.':
+            '記録はオフになっています。オプションまたは --set numbers on でオンにできます。',
+        'My numbers...':
+            '自分の記録...',
+        'Nothing finished yet this week. That is fine.':
+            '今週はまだ何も終えていません。それでも大丈夫です。',
+        'OK: {thoughts} thoughts and {tips} tips.':
+            'OK: ひとこと{thoughts}件、ヒント{tips}件。',
+        'Plans finished: {n}':
+            '終えた予定: {n}',
+        'Save my plans to a file':
+            '予定をファイルに保存',
+        'Saved to {path}':
+            '{path} に保存しました',
+        "The file isn't valid JSON, or is over 200,000 characters.":
+            'ファイルが有効な JSON ではないか、200,000文字を超えています。',
+        'The file must hold an object with two lists, "thoughts" and "tips", and may add "holidays" and "title".':
+            'ファイルには "thoughts" と "tips" の2つのリストを持つオブジェクトが必要です。"holidays" と "title" も追加できます。',
+        'This week you finished {n}:':
+            '今週終えた予定（{n}件）:',
+        'This week...':
+            '今週...',
+        'holidays line {line} is not a date like 2026-12-25.':
+            'holidays の{line}行目が、2026-12-25 のような日付になっていません。',
+        '{list} line {line} has a date.':
+            '{list} の{line}行目に日付が含まれています。',
+        '{list} line {line} has a link or an address.':
+            '{list} の{line}行目にリンクまたはアドレスが含まれています。',
+        '{list} line {line} has control characters or extra spaces.':
+            '{list} の{line}行目に制御文字または余分なスペースが含まれています。',
+        '{list} line {line} is not text.':
+            '{list} の{line}行目がテキストではありません。',
+        '{list} line {line} must be {low} to {high} characters long.':
+            '{list} の{line}行目は{low}～{high}文字にしてください。',
+    },
+}
+
+# ---- Korean ----
+
+LANGUAGES["ko"] = {
+    "days": ('월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'),
+    "months": ('1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'),
+    "date": '{year}년 {month} {d}일 {day}',
+    "thoughts": (
+        '계속 피하던 문서 하나를 열고 첫 문단만 읽어 보세요.',
+        '10분만 해도 시작은 시작이에요. 그러면 대개 다음 10분이 더 쉬워져요.',
+        '오늘 계획을 다 세울 필요는 없어요. 괜찮은 첫걸음 하나면 돼요.',
+        '어설픈 첫 문장을 써 보세요. 나중에 다듬을 진짜 재료가 생겨요.',
+        '책상 한쪽 구석만 치워 보세요. 나머지도 한결 차분해 보일 거예요.',
+        '목록에서 가장 작은 일을 골라, 다른 일을 보기 전에 끝내 보세요.',
+        '오지 않을지도 모를 완벽한 순간을 기다리는 것보다, 조용한 아침에 서툴게라도 시작하는 게 나아요.',
+        '첫 단계를 캘린더에 넣어 자리를 마련해 주세요.',
+        '큰 프로젝트도 대부분 오후 몇 시간이 쌓여 이뤄져요. 오늘은 오후 한나절만 목표로 해 보세요.',
+        '바로 다음에 할 일을 소리 내어 말해 보세요. 나머지 목록은 차례를 기다려도 돼요.',
+        '생각보다 속도가 느린 날도 있어요. 그 속도도 충분히 의미가 있어요.',
+        '첫 주를 보내는 새 동료를 대하듯 자신을 대해 보세요.',
+        '몇 년째 해 온 일도 아직 배우는 중일 수 있어요.',
+        '아침이 처졌다고 오후까지 정해지는 건 아니에요. 점심 먹고 다시 시작해도 돼요.',
+        '피곤함은 실패가 아니라 신호예요. 계획을 조금 바꾸고 천천히 이어 가세요.',
+        '다른 사람에게 선뜻 베푸는 너그러움을 자신에게도 베풀어 주세요.',
+        '발전은 한동안 아무 티가 안 나다가, 어느 순간 완성된 한 페이지로 나타나요.',
+        '한 번 더 읽어야 이해되는 것도 괜찮아요.',
+        '준비됐다는 느낌이 없어도 돼요. 떨리는 채로 해도 한 거예요.',
+        '오늘의 최선이 어제보다 작을 수도 있어요. 그래도 괜찮아요.',
+        '안 쓰는 탭은 닫아 보세요. 몇 분 안에 집중이 한결 편해질 거예요.',
+        '일 하나, 창 하나, 25분. 조용히 집중하면 어디까지 갈 수 있는지 보세요.',
+        '불쑥 떠오른 생각은 적어 두고, 하던 일로 돌아가세요.',
+        '할 수 있다면 한 시간 동안 휴대폰을 무음으로 두고 일에 온전히 집중해 보세요.',
+        '오늘을 좋은 하루로 만들 한 가지를 정하고, 그 일을 할 시간을 지켜 주세요.',
+        '한 번에 하나씩 하는 게 생각보다 빠를 때가 많아요.',
+        '할 일 세 개를 깔끔하게 적은 목록이 스무 개가 흩어진 목록보다 나아요.',
+        '마음이 딴 데로 가면 알아차리고, 탓하지 말고 살며시 돌아오세요.',
+        '가장 어려운 일은 기운이 가장 좋을 때 하세요. 그게 아침 첫 시간이 아니어도요.',
+        '헤드폰을 쓰고, 차 한 잔 준비하고, 문을 닫으세요. 분위기를 만들면 집중은 따라와요.',
+        '5분만 화면에서 떨어져 보세요. 돌아오면 머리가 조금 맑아져 있을 거예요.',
+        '오늘 점심은 책상을 떠나서 드세요. 메일은 점심 먹는 동안 기다려 줘요.',
+        '건물 주변을 잠깐 걷는 것도 머리를 위한 엄연한 일이에요.',
+        '바쁜 오후에 화면에서 1분 떨어지는 것도 시간을 잘 쓰는 거예요.',
+        '어깨를 펴고 턱에 힘을 빼 보세요. 몇 시간째 긴장하고 있었을지도 몰라요.',
+        '할 수 있다면 오늘은 제시간에 퇴근하세요. 내일의 내가 저녁 시간을 고마워할 거예요.',
+        '쉬는 것도 일의 일부예요. 지치면 같은 실수를 반복하기 쉬우니까요.',
+        '잠시 눈을 쉬게 하고 어깨에 힘을 빼세요.',
+        '제대로 쉬고 나면 오후가 새로 시작하는 것처럼 느껴져요.',
+        '저녁은 온전히 나를 위해 쓰세요. 밤 9시에 꼭 봐야 할 메일은 없어요.',
+        '부탁하지 않았는데 작은 일을 해 준 사람에게 오늘 고맙다고 말해 보세요.',
+        '대부분의 사람은 눈에 보이는 것보다 많은 일을 안고도 최선을 다하고 있어요.',
+        '동료가 차나 커피를 어떻게 마시는지 알아 두세요. 기억해 주는 것만으로도 작은 선물이에요.',
+        '누가 퉁명스럽게 굴면, 나에 대한 평가가 아니라 힘든 하루를 보내는 중이라고 생각하세요.',
+        '문을 잡아 주고, 간식을 나누고, 남의 말은 끝까지 들어 주세요.',
+        '가벼운 인사와 주말 이야기 한마디가 아침의 가장 좋은 순간이 될 수 있어요.',
+        '새로 온 사람이 뻔한 걸 물으면, 나도 예전에 같은 걸 물었다는 걸 떠올려 보세요.',
+        '동료의 아이디어 덕분에 일이 나아졌다면 그 동료 덕분이라고 모두 앞에서 말해 주세요.',
+        '메시지에 답할 때 따뜻함을 조금 담아 보세요. 돈 드는 일도 아니고, 받는 사람 마음도 편해져요.',
+        '요즘 회의에서 말이 없던 동료에게 잘 지내는지 물어보세요.',
+        '새 일을 시작하기 전에 거의 다 된 일부터 끝내세요.',
+        '완벽하지만 끝나지 않은 것보다 적당히 괜찮게 끝낸 것이 대개 더 쓸모 있어요.',
+        '마무리 못 한 일 하나를 오늘 끝내고, 뒤따르는 작은 홀가분함을 느껴 보세요.',
+        '마지막 10%는 대개 몇 분만 신경 쓰면 돼요. 오늘 그 몇 분을 내 보세요.',
+        '임시 보관함에서 기다리는 메일을 보내세요. 아마 지금 그대로도 괜찮을 거예요.',
+        '완료로 표시하고, 숨 한 번 쉬고, 끝냈다는 걸 기뻐하세요.',
+        '반쯤 한 큰일보다 끝낸 작은 일이 더 값져요.',
+        '퇴근 전에 내일 첫 단계를 메모해 두세요. 기억하려고 애쓰지 않아도 돼요.',
+        '한 번 더 읽고, 보이는 것만 고친 다음 보내세요.',
+        '깔끔한 결과 하나로 하루를 마치면 저녁이 가벼워져요.',
+        '일찍 물어보면 나중에 혼자 끙끙대는 한 시간을 아낄 수 있어요.',
+        '대부분은 자기가 아는 걸 물어봐 주면 좋아해요. 미안해하지 말고 물어보세요.',
+        '"막혔어요"는 동료가 바로 도와줄 수 있는, 분명하고 쓸모 있는 말이에요.',
+        '필요한 걸 쉬운 말로 부탁하고, 상대가 "좋아요"라고 할 기회를 주세요.',
+        '혼자 붙잡고 있는 것보다 둘이 함께 보면 대개 더 빨리 풀려요.',
+        '도움이 필요하다고 짐이 되는 게 아니에요. 같은 팀이니까요.',
+        '구체적으로 물어보면 상대도 구체적으로 답해 줄 수 있어요.',
+        '지시가 분명하지 않으면 확인하는 것도 일을 제대로 하는 과정이에요.',
+        '도울 수 있을 때 돕고, 필요할 때 도움을 받으세요. 둘 다 할수록 쉬워져요.',
+        '복도 저쪽 누군가는 아마 이걸 전에 해결해 봤을 거예요. 찾아가 보세요.',
+        '이번 주에 알아낸 것들을 짧게 적어 두세요. 생각보다 많이 쌓여요.',
+        '새로운 일에서 초보라는 건 아직 성장하고 있다는 뜻이에요.',
+        '존경하는 동료가 까다로운 통화를 어떻게 처리하는지 보고, 한 가지만 배워 보세요.',
+        '쉬는 시간에 유익한 글 한 페이지를 읽었다면, 오늘 공부는 그걸로 충분해요.',
+        '다른 사람에게 일을 설명하다 보면 의외로 나도 잘 배우게 돼요.',
+        '"그건 아직 모르겠어요"라고 말하고 알아보러 가도 괜찮아요.',
+        '낯선 시스템도 몇 번 써 보기 전까지는 다 헷갈려 보여요.',
+        '경험 많은 사람에게 그걸 어떻게 배웠는지 물어보세요. 대개 안심이 되는 답이 돌아와요.',
+        '기술은 반복에서 나와요. 작은 일을 되풀이하다 보면 쉬워져요.',
+        '평범한 일에도 호기심을 조금 가지면 더 재미있어질 수 있어요.',
+        '일찍 발견한 실수는 수정 한 번이면 끝나요. 그리고 실수는 대부분 일찍 발견돼요.',
+        '고치고, 알아야 할 사람에게 알리고, 그다음엔 속상함이 가라앉게 두세요.',
+        '일하다 한 실수는 거의 다 그 순간보다 일주일 뒤에 더 작게 느껴져요.',
+        '한 번의 실수가 그동안 꼼꼼히 해 온 몇 년을 지우지는 않아요.',
+        '일이 잘못되면 사람을 탓하기 전에 과정부터 살펴보세요.',
+        '주변 사람 모두 메일을 엉뚱한 사람에게 보낸 적이 한 번쯤은 있어요.',
+        '실수가 주는 교훈 하나만 챙기고 나머지는 털어 버리세요.',
+        '실수를 솔직하게 인정하면, 실수를 안 한 것보다 대개 더 신뢰를 얻어요.',
+        '꼼꼼한 사람도 유난히 덜렁대는 날이 있어요. 저녁이면 지나가요.',
+        '오늘의 작은 실수들은 다음 달이면 대부분 기억도 안 날 거예요.',
+        '급한 불 없이 조용한 날은 좋은 날이에요. 아무도 말하지 않더라도요.',
+        '작은 즐거움을 알아차려 보세요. 따뜻한 머그잔, 깔끔한 받은편지함, 조용한 1분.',
+        '날마다 큰 성과가 필요하진 않아요. 꾸준하고 기분 좋게 일하는 것도 좋은 방식이에요.',
+        '회의가 5분 일찍 끝나면 그 시간을 즐기고 마음대로 쓰세요.',
+        '평범한 하루를 잘 보낸 것도 조용히 자랑스러워할 일이에요.',
+        '좋은 일은 겉으로는 별것 아닌 것처럼 보일 때가 많아요. 그래도 괜찮아요.',
+        '기분 좋은 오후라면, 꼭 뭔가를 해내지 않아도 그냥 즐기세요.',
+        '첫 커피, 익숙한 얼굴들 같은 하루의 작은 일상도 눈여겨볼 만해요.',
+        '오늘도 자리를 지키며 내 몫을 했어요. 그거면 충분해요.',
+        '오늘 저녁, 잠깐 시간을 내서 오늘 잘된 일 하나를 떠올려 보세요.',
+        '두 일 사이의 조용한 1분은 낭비가 아니에요. 다음 일을 잘 시작하는 방법이에요.',
+    ),
+    "tips": (
+        '화면에서 떨어져 물 한 잔을 천천히 마셔 보세요.',
+        '어깨를 뒤로 다섯 번, 천천히 돌려 보세요.',
+        '20초 동안 눈을 쉬게 하세요. 먼 곳을 보거나 눈을 감아 보세요.',
+        '앉아서든 서서든 팔을 머리 위로 뻗고 숨을 깊이 쉬어 보세요.',
+        '갈 수 있는 가장 먼 방이나 창가까지 갔다 와 보세요.',
+        '자세를 확인하고 어깨를 아래로 툭 내려 보세요.',
+        '편한 만큼만 목을 좌우로 천천히 돌려 보세요.',
+        '손을 열 번 쥐었다 폈다 하며 손가락을 풀어 보세요.',
+        '가장 자주 여는 문서 하나를 고정해 클릭 한 번으로 열리게 하세요.',
+        '걷든 휠체어로든, 편한 방법으로 잠깐 밖에 다녀오세요.',
+        '따뜻하거나 시원한 음료를 한 잔 따라 화면에서 떨어져 즐겨 보세요.',
+        '풍경, 소리, 촉감처럼 차분한 것에 잠시 주의를 기울여 보세요.',
+        '하다 만 일 하나에 다음 단계를 적어 두세요.',
+        '두 발을 바닥에 붙이고 바르게 앉거나 서서 열 번 숨 쉬어 보세요.',
+        '훑어보기만 하는 단체 채팅방 하나의 알림을 꺼 보세요.',
+        '턱에 힘을 빼고 이마도 잠깐 풀어 보세요.',
+        '오늘 기분 좋은 방식으로 2분 동안 몸을 움직여 보세요.',
+        '자꾸 미루는 일을 위해 캘린더에 15분을 잡아 두세요.',
+        '의자, 화면, 키보드 중 하나를 조금 더 편하게 조정해 보세요.',
+        '할 수 있다면 다음 회의나 통화하러 갈 때 조금 돌아서 가 보세요.',
+        '자주 쓰는 메일 하나를 템플릿으로 저장해 두세요.',
+        '가장 많이 쓰는 프로그램의 바로 가기 키 하나를 익혀 보세요.',
+        '다음 커피나 차를 마시기 전에 물 한 잔을 다 마셔 보세요.',
+        '어깨를 귀까지 으쓱 올렸다가 스르르 내려놓으세요.',
+        '1분 동안 밖에 나가거나 창문을 열어 바람을 쐬세요.',
+        '천천히 다섯 번 숨 쉬고, 내쉴 때마다 조금 더 길게 내쉬어 보세요.',
+        '다음 메시지를 열기 전에 1분만 조용히 쉬어 보세요.',
+        '오늘 지금까지 있었던 좋은 일 하나를 적어 보세요.',
+        '눈을 감고 세 번 숨 쉬며 지금 기분을 살펴보세요.',
+        '지금 느껴지는 것 세 가지를 떠올려 보세요. 어떤 감각이든 괜찮아요.',
+        '이번 주에 기대되는 일 하나를 적어 보세요.',
+        '2분 타이머를 맞추고 화면 없이 그냥 앉아 있어 보세요.',
+        '화분이나 좋아하는 머그잔처럼 가까이 있는 작은 것을 즐겨 보세요.',
+        '이번 주에 잘한 일 하나를 떠올리고 스스로 칭찬해 주세요.',
+        '다른 창은 다 닫고 좋아하는 노래 한 곡을 처음부터 끝까지 들어 보세요.',
+        '넷을 세며 들이쉬고 여섯을 세며 내쉬기를 세 번 해 보세요.',
+        '다음에 사소한 짜증이 나면 반응하기 전에 숨 한 번 쉬어 보세요.',
+        '최근에 웃었던 일 하나를 적어 보세요.',
+        '1분 동안 소리, 냄새, 손에 닿는 것 중 기분 좋은 것 하나를 느껴 보세요.',
+        '좋아하는 장소를 떠올리고 30초 동안 그려 보세요.',
+        '작은 일 하나에 "지금은 이 정도면 됐어"라고 말하고 넘어가세요.',
+        '고마운 일 하나를 한 문장으로 적어 보세요.',
+        '다음 한 모금은 천천히 맛을 느끼며 마셔 보세요.',
+        '다음 일을 시작하기 전에 두 일 사이에 잠깐 쉬어 가세요.',
+        '오늘 생각보다 잘 풀린 일 하나를 찾아보세요.',
+        '오후를 어떤 느낌으로 보내고 싶은지 한 단어로 정해 보세요.',
+        '60초 동안 머리를 쉬게 한 다음 하던 일로 돌아가세요.',
+        '바닥에 닿은 발을 느끼며 잠시 중심을 잡아 보세요.',
+        '누군가 나에게 해 준 친절 하나를 떠올리고 그 기억을 즐겨 보세요.',
+        '나중에 다시 보고 싶은 아이디어 하나를 적어 두고 잠시 내려놓으세요.',
+        '책상 한쪽 구석을 정리해 보세요. 딱 한 곳만요.',
+        '한동안 답하지 못한 메시지 하나에 답장해 보세요.',
+        '내일 가장 중요한 일을 포스트잇이나 메모에 적어 두세요.',
+        '더 이상 필요 없는 브라우저 탭을 닫아 보세요.',
+        '최근에 도움을 준 동료에게 고맙다고 말해 보세요.',
+        '필요 없는 오래된 메일 다섯 개를 보관함으로 옮겨 보세요.',
+        '지저분한 파일 이름 하나를 나중에 찾기 쉽게 바꿔 보세요.',
+        '바탕 화면에 흩어진 파일 한두 개를 정리해 보세요.',
+        '이제 필요 없는 오래된 알림 하나를 지워 보세요.',
+        '자주 여는 문서에 알아보기 쉬운 제목을 붙여 보세요.',
+        '할 일 목록에서 작은 일 하나를 끝내고 지워 보세요.',
+        '읽지 않는 뉴스레터 하나를 구독 취소하세요.',
+        '부드러운 천으로 키보드나 화면을 닦아 보세요.',
+        '펜, 노트, 물을 손 닿는 곳에 두세요.',
+        '오늘 어디까지 했는지 미래의 나에게 짧은 메모를 남겨 보세요.',
+        '오늘 오후 가장 중요한 일 하나를 골라 먼저 해 보세요.',
+        '책상 옆 휴지통이나 재활용함을 비워 보세요.',
+        '진행 상황 메모 하나를 업데이트해서 다른 사람도 현황을 알 수 있게 하세요.',
+        '다운로드 폴더에서 파일 몇 개만 옮겨 정리해 보세요.',
+        '자주 잊어버리는 일 하나에 알림을 설정하세요.',
+        '꼭 필요하지 않은 알림 하나를 꺼 보세요.',
+        '자꾸 검색하게 되는 페이지 하나를 즐겨찾기에 추가하세요.',
+        '기억이 생생할 때 회의 내용을 두 줄로 요약해 보세요.',
+        '정기 회의 하나를 조금 줄일 수 있는지 물어보세요.',
+        '앞으로 한 시간 동안의 목표 하나를 정하고 적어 보세요.',
+        '동료에게 오늘 어떻게 지내는지 묻고 귀 기울여 들어 보세요.',
+        '좋아할 만한 사람에게 유용한 링크를 공유해 보세요.',
+        '아직 이야기해 본 적 없는 사람에게 인사해 보세요.',
+        '최근에 도와준 사람에게 짧은 감사 메시지를 보내 보세요.',
+        '다음 통화를 시작할 때 동료에게 따뜻하게 인사해 보세요.',
+        '팀원에게 이번 주에 기대되는 일이 있는지 물어보세요.',
+        '눈에 띈 작은 성과를 축하해 주세요.',
+        '동료에게 차나 커피, 아니면 통화로 잠깐 이야기하자고 해 보세요.',
+        '동료가 잘한 일을 구체적으로 칭찬해 보세요.',
+        '자주 마주치지만 아직 이름을 모르는 사람의 이름을 알아 두세요.',
+        '도움이 될 만한 팁을 필요한 팀원에게 알려 주세요.',
+        '누군가에게 노래나 드라마, 책을 추천해 달라고 해 보세요.',
+        '요즘 말수가 적은 동료에게 안부를 물어보세요.',
+        '바빠 보이는 사람이 있으면 작은 일 하나를 돕겠다고 해 보세요.',
+        '다음에 만나는 사람에게 따뜻하게 인사해 보세요.',
+        '동료에 대해 들은 좋은 말을 그 사람에게 전해 주세요.',
+        '동료에게 이번 주에 무엇 덕분에 일이 수월했는지 물어보세요.',
+        '예전에 함께 일했던 사람에게 반가운 메시지를 보내 보세요.',
+        '공용 공간을 잘 관리해 주는 분께 고맙다고 말해 보세요.',
+        '서로 알면 좋을 것 같은 동료 두 사람을 소개해 주세요.',
+        '팀원에게 인수인계를 어떻게 하면 더 편할지 물어보세요.',
+        '가까이 있는 사람과 부담 없는 농담을 나눠 보세요.',
+        '다음 "부탁해요"와 "고마워요"에 따뜻함을 조금 더 담아 보세요.',
+        '동료에게 일 말고 무엇을 즐겨 하는지 물어보세요.',
+        '다음에 말을 거는 사람의 이야기를 다른 일 없이 온전히 들어 보세요.',
+    ),
+    "done": (
+        '좋아요. 하나 끝냈어요.',
+        '잘했어요. 뭔가를 끝내면 기분이 좋죠.',
+        '수고했어요. 다음 일 전에 잠깐 쉬어 가세요.',
+        '좋아요. 작은 일도 끝내다 보면 쌓여요.',
+        '끝냈어요. 뿌듯해해도 돼요.',
+        '좋아요. 목록에서 하나 지웠어요.',
+    ),
+    "text": {
+        HELP:
+            """hello-world는 인사, 생각 하나, 해 볼 만한 작은 일 하나를 보여 줘요.
+
+마지막 질문에서 plan을 입력하면 오늘 계획을 정하고, 끝내면 done,
+옵션을 보려면 menu(또는 m)를 입력하세요. Enter를 누르면 닫히고,
+q, x, close는 어느 질문에서든 창을 닫아요. 계획 질문에서 same을
+입력하면 끝내지 못한 이전 계획을 다시 불러와요. done 다음에는
+최근에 끝낸 계획 3개를 보여 줘요. 메뉴 1번은 전체를 보여 주고,
+7번은 하나를 지우고, 8번은 생각과 팁을 숨겨요.
+메뉴에서 Enter를 누르면 돌아가요.
+hello.cmd를 다음 옵션 중 하나와 함께 실행할 수도 있어요.
+  --plain         인사만 영어로 표시
+  --stats         이 컴퓨터에 저장된 내용 표시
+  --reset         저장된 내용 모두 삭제(먼저 물어봄)
+  --remind on     로그인할 때 하루 한 번 열기(끄려면 off)
+  --streak off    연속 일수 메시지 숨기기(표시하려면 on)
+  --version       버전 표시
+  --check-content FILE
+                  조직 콘텐츠 파일 검사
+  --help          이 도움말 표시
+
+종료 코드: 0은 성공, 1은 명령이 실패했거나 화면에 쓸 수 없을 때,
+2는 알 수 없는 옵션일 때예요.
+
+저장된 메모는 이 컴퓨터의 사용자 폴더에만 있고, 어디로도 보내지
+않아요. 이 컴퓨터의 파일을 읽을 수 있는 IT 담당자는 볼 수 있어요.""",
+        MENU_HELP:
+            """마지막 질문에서 입력할 수 있는 단어:
+  done  오늘 계획을 완료로 표시하고 다음 계획을 물어요
+  plan  오늘 계획을 정하거나 바꿔요
+  menu  이 옵션을 열어요
+  q     창을 닫아요. Enter도 마찬가지예요
+계획 질문에서 same을 입력하면 끝내지 못한 이전 계획을 불러와요.
+"하셨나요?"라고 물을 때 n은 아직이라는 뜻이고, 계획을 오늘도
+그대로 둘 수 있어요. q는 어느 질문에서든 창을 닫아요.
+이 메뉴에서 1번은 저장된 내용을 보여 주고, 7번은 완료한 계획
+하나를 지우고, 8번은 생각과 팁을 숨겨요.
+옵션을 다시 보려면 m을 입력하세요. 어디로도 보내지 않아요.""",
+        SAVED_PLAN:
+            '저장했어요. 끝내면 done을 입력하세요. 아니면 다음에 열 때 물어볼게요.',
+        GREETING:
+            '안녕, 세상!',
+        'hello.cmd is in this folder:':
+            'hello.cmd는 이 폴더에 있어요:',
+        'Shortened to {n} characters.':
+            '{n}자로 줄였어요.',
+        'Your saved file was damaged, so hello-world set it aside as a backup copy and started fresh. Your earlier days and plan could not be read. Menu option 4 deletes the backup.':
+            '저장 파일이 손상되어 hello-world가 백업 사본으로 따로 두고 새로 시작했어요. 이전 기록과 계획은 읽을 수 없었어요. 메뉴 4번으로 백업을 삭제할 수 있어요.',
+        'Backup copy: ':
+            '백업 사본: ',
+        'In the folder: ':
+            '폴더: ',
+        'Sorry, "{shown}" is not one of the choices.':
+            '죄송해요, "{shown}"은(는) 선택지에 없어요.',
+        'A plan needs a word or two, so nothing was saved.':
+            '계획은 한두 단어라도 있어야 해서 저장하지 않았어요.',
+        'The sign-in reminder works on Windows only.':
+            '로그인 알림은 Windows에서만 작동해요.',
+        'Your organization has turned off opening at sign-in.':
+            '로그인할 때 자동으로 열리는 기능은 조직에서 꺼 두었어요.',
+        'The reminder cannot be set up from this folder.':
+            '이 폴더에서는 알림을 설정할 수 없어요.',
+        'Could not set up the reminder.':
+            '알림을 설정하지 못했어요.',
+        'Done. hello-world will open once a day when you sign in.':
+            '설정했어요. 이제 로그인하면 하루 한 번 hello-world가 열려요.',
+        'To stop it, choose option 2 in the menu.':
+            '끄려면 메뉴에서 2번을 선택하세요.',
+        'Could not turn off the sign-in reminder.':
+            '로그인 알림을 끄지 못했어요.',
+        'Done. The sign-in reminder is off.':
+            '로그인 알림을 껐어요.',
+        'Saved on this computer in:':
+            '이 컴퓨터의 저장 위치:',
+        'Saved in your own user folder on this computer.':
+            '이 컴퓨터의 내 사용자 폴더에 저장돼요.',
+        'Days you opened it in the last {days} days: {n} (last 7 days: {recent})':
+            '최근 {days}일 동안 연 날: {n} (최근 7일: {recent})',
+        'Times you marked a plan done: {n}':
+            '계획을 완료한 횟수: {n}',
+        'Your current plan: ':
+            '현재 계획: ',
+        'Earlier plan (for same): ':
+            '이전 계획(same용): ',
+        'Days-in-a-row message: shown.':
+            '연속 일수 메시지: 표시',
+        'Days-in-a-row message: hidden.':
+            '연속 일수 메시지: 숨김',
+        'Opens by itself at sign-in: turned off by your organization.':
+            '로그인할 때 자동으로 열기: 조직에서 끔',
+        'Opens by itself at sign-in: on.':
+            '로그인할 때 자동으로 열기: 켜짐',
+        'Opens by itself at sign-in: off.':
+            '로그인할 때 자동으로 열기: 꺼짐',
+        "It never leaves this computer. Others who can read this computer's files, such as IT staff, could read it.":
+            '이 컴퓨터 밖으로 나가지 않아요. 다만 IT 담당자처럼 이 컴퓨터의 파일을 읽을 수 있는 사람은 볼 수 있어요.',
+        'After tidying, the file holds only this:':
+            '정리하고 나면 파일에는 이것만 남아요:',
+        'Delete all saved notes, dates and plans on this computer? (y or n, Enter to cancel) > ':
+            '이 컴퓨터에 저장된 메모, 날짜, 계획을 모두 삭제할까요? (y 또는 n, Enter는 취소) > ',
+        'Nothing was deleted.':
+            '아무것도 삭제하지 않았어요.',
+        'Could not delete everything.':
+            '모두 삭제하지는 못했어요.',
+        'Delete these yourself:':
+            '다음 항목은 직접 삭제하세요:',
+        'Could not list the folder, so backup copies may remain:':
+            '폴더 목록을 읽지 못해서 백업 사본이 남아 있을 수 있어요:',
+        'Done. Everything saved was deleted.':
+            '저장된 내용을 모두 삭제했어요.',
+        'Another open hello-world window cannot put it back.':
+            '열려 있는 다른 hello-world 창도 이 내용을 되살릴 수 없어요.',
+        'Close any other open hello-world window, or it may save its notes again.':
+            '열려 있는 다른 hello-world 창은 닫으세요. 그렇지 않으면 그 창이 메모를 다시 저장할 수 있어요.',
+        'Everything saved was deleted in another window, so this was not saved.':
+            '다른 창에서 저장된 내용을 모두 삭제해서 이 내용은 저장하지 않았어요.',
+        'The other open window had also finished a plan.':
+            '열려 있던 다른 창에서도 계획을 완료했어요.',
+        'The other open window changed the plan, so its plan is kept.':
+            '열려 있던 다른 창에서 계획을 바꿔서 그 계획을 유지해요.',
+        'Type plan at the last prompt to set one.':
+            '계획을 정하려면 마지막 질문에서 plan을 입력하세요.',
+        'That looks like a command, not a plan, so nothing was saved.':
+            '계획이 아니라 명령어 같아서 저장하지 않았어요.',
+        'Type your plan, or press Enter to go back.':
+            '계획을 입력하거나 Enter를 눌러 돌아가세요.',
+        'Finished lately:':
+            '최근에 끝낸 일:',
+        'Your plan today: ':
+            '오늘의 계획: ',
+        'Your plan from {date}: ':
+            '{date}의 계획: ',
+        'Earlier plan: ':
+            '이전 계획: ',
+        'Type the next plan, or Enter to close > ':
+            '다음 계획을 입력하세요. Enter는 닫기 > ',
+        'Type the next plan, same to reuse the earlier plan, or Enter to close > ':
+            '다음 계획을 입력하세요. same은 이전 계획 다시 쓰기, Enter는 닫기 > ',
+        "Type today's plan, or Enter to keep it > ":
+            '오늘 계획을 입력하세요. Enter는 그대로 두기 > ',
+        "Type today's plan, same to reuse the earlier plan, or Enter to keep it > ":
+            '오늘 계획을 입력하세요. same은 이전 계획 다시 쓰기, Enter는 그대로 두기 > ',
+        "Type today's plan, or Enter to go back > ":
+            '오늘 계획을 입력하세요. Enter는 돌아가기 > ',
+        "Type today's plan, same to reuse the earlier plan, or Enter to go back > ":
+            '오늘 계획을 입력하세요. same은 이전 계획 다시 쓰기, Enter는 돌아가기 > ',
+        'Closing.':
+            '닫을게요.',
+        'There is no earlier plan to reuse yet. Nothing changed.':
+            '다시 쓸 이전 계획이 아직 없어요. 바뀐 것은 없어요.',
+        'Nothing changed.':
+            '바뀐 것은 없어요.',
+        'Could not save that on this computer. Your plan is unchanged.':
+            '이 컴퓨터에 저장하지 못했어요. 계획은 그대로예요.',
+        'No finished plans are saved.':
+            '저장된 완료 계획이 없어요.',
+        'Type the number to forget (1 to {n}), or Enter to keep them all > ':
+            '지울 번호를 입력하세요(1~{n}). Enter는 모두 두기 > ',
+        'There is no number "{typed}" on the list. Type a number from 1 to {n}, or press Enter to keep them all.':
+            '목록에 "{typed}"에 해당하는 번호가 없어요. 1부터 {n}까지 번호를 입력하거나 Enter를 눌러 모두 그대로 두세요.',
+        'Also forget it as the earlier plan for same? (y or n, Enter to keep it for same) > ':
+            'same으로 불러올 이전 계획에서도 지울까요? (y 또는 n, Enter는 same용으로 두기) > ',
+        'Type y or n, or press Enter to keep it for same.':
+            'y 또는 n을 입력하거나, Enter를 눌러 same용으로 두세요.',
+        'That plan was already forgotten. Nothing changed.':
+            '이미 지운 계획이에요. 바뀐 것은 없어요.',
+        'Forgotten: ':
+            '지웠어요: ',
+        'Same still has it.':
+            'same으로는 아직 불러올 수 있어요.',
+        'Could not save that on this computer. Nothing changed.':
+            '이 컴퓨터에 저장하지 못했어요. 바뀐 것은 없어요.',
+        'Options':
+            '옵션',
+        'Show what is saved on this computer':
+            '이 컴퓨터에 저장된 내용 보기',
+        'Open once a day at sign-in (turned off by your organization)':
+            '로그인할 때 하루 한 번 열기(조직에서 끔)',
+        'Turn off: open once a day at sign-in (now on)':
+            '끄기: 로그인할 때 하루 한 번 열기(현재 켜짐)',
+        'Turn on: open once a day at sign-in (now off)':
+            '켜기: 로그인할 때 하루 한 번 열기(현재 꺼짐)',
+        'Days-in-a-row message (hidden by your organization)':
+            '연속 일수 메시지(조직에서 숨김)',
+        'Hide the days-in-a-row message (now shown)':
+            '연속 일수 메시지 숨기기(현재 표시)',
+        'Show the days-in-a-row message (now hidden)':
+            '연속 일수 메시지 표시(현재 숨김)',
+        'Delete everything saved':
+            '저장된 내용 모두 삭제',
+        'Help':
+            '도움말',
+        "Set today's plan (turned off by your organization)":
+            '오늘 계획 정하기(조직에서 끔)',
+        'Forget a finished plan (turned off by your organization)':
+            '완료한 계획 지우기(조직에서 끔)',
+        "Set or change today's plan":
+            '오늘 계획 정하기 또는 바꾸기',
+        'Forget one finished plan':
+            '완료한 계획 하나 지우기',
+        'Thought and tip (hidden by your organization)':
+            '생각과 팁(조직에서 숨김)',
+        'Hide the thought and tip (now shown)':
+            '생각과 팁 숨기기(현재 표시)',
+        'Show the thought and tip (now hidden)':
+            '생각과 팁 표시(현재 숨김)',
+        '{date}: ':
+            '{date}: ',
+        'Enter':
+            'Enter',
+        'Back to the last prompt':
+            '마지막 질문으로 돌아가기',
+        'Choose 1 to 11, or Enter to go back > ':
+            '1~11 중에서 선택하세요. Enter는 돌아가기 > ',
+        'Choose 1 to 11, m to list the options, or Enter to go back > ':
+            '1~11 중에서 선택하세요. m은 옵션 목록, Enter는 돌아가기 > ',
+        'The saved file could not be read just now, so this may be out of date.':
+            '지금은 저장 파일을 읽지 못해서 최신 내용이 아닐 수 있어요.',
+        'Type full to see the whole file, or Enter to go on > ':
+            '전체 파일을 보려면 full, 계속하려면 Enter > ',
+        'Could not save that choice on this computer.':
+            '이 선택을 이 컴퓨터에 저장하지 못했어요.',
+        'Your organization has hidden the days-in-a-row message.':
+            '조직에서 연속 일수 메시지를 숨겼어요.',
+        'Done. The days-in-a-row message is on.':
+            '연속 일수 메시지를 켰어요.',
+        'Done. The days-in-a-row message is off.':
+            '연속 일수 메시지를 껐어요.',
+        'Plans are turned off by your organization.':
+            '조직에서 계획 기능을 껐어요.',
+        'Your organization has hidden the thought and tip.':
+            '조직에서 생각과 팁을 숨겼어요.',
+        'Done. The thought and tip are on.':
+            '생각과 팁을 켰어요.',
+        'Done. The thought and tip are off.':
+            '생각과 팁을 껐어요.',
+        'Type 1 to 11, or press Enter to go back.':
+            '1~11 중에서 입력하거나 Enter를 눌러 돌아가세요.',
+        'Want it to open once a day when you sign in? (y or n, Enter for not now) > ':
+            '로그인할 때 하루 한 번 열리게 할까요? (y 또는 n, Enter는 나중에) > ',
+        'Want it to open once a day when you sign in so it can ask about your plan? (y or n, Enter for not now) > ':
+            '로그인할 때 하루 한 번 열어서 계획을 물어볼까요? (y 또는 n, Enter는 나중에) > ',
+        'Type y or n, or press Enter for not now.':
+            'y 또는 n을 입력하세요. 나중에 하려면 Enter를 누르세요.',
+        'That was not understood. It will ask again on a later visit.':
+            '알아듣지 못했어요. 다음에 다시 물어볼게요.',
+        'It will ask again on a later visit. Menu option 2 also turns it on.':
+            '다음에 다시 물어볼게요. 메뉴 2번으로 켤 수도 있어요.',
+        'No problem. Menu option 2 turns it on later.':
+            '괜찮아요. 나중에 메뉴 2번으로 켤 수 있어요.',
+        "Okay. It won't ask again. Menu option 2 turns it on.":
+            '알겠어요. 다시 묻지 않을게요. 메뉴 2번으로 켤 수 있어요.',
+        'Okay. It will ask again on a later visit. Type n to stop it.':
+            '알겠어요. 다음에 다시 물어볼게요. 그만 물으려면 n을 입력하세요.',
+        'When did you finish it?':
+            '언제 끝냈나요?',
+        'Today':
+            '오늘',
+        'Type a number from 1 to {n}, or Enter for 1 > ':
+            '1부터 {n}까지 번호를 입력하세요. Enter는 1 > ',
+        'Type a number from 1 to {n}, or press Enter.':
+            '1부터 {n}까지 번호를 입력하거나 Enter를 누르세요.',
+        'That looks like more than one thing. Finishing the first part still counts.':
+            '여러 가지가 섞여 있는 것 같아요. 첫 번째만 끝내도 완료로 쳐요.',
+        'There is no plan to mark as done. Type plan to set one.':
+            '완료로 표시할 계획이 없어요. 계획을 정하려면 plan을 입력하세요.',
+        'Could not save that on this computer. The plan is still open.':
+            '이 컴퓨터에 저장하지 못했어요. 계획은 아직 진행 중이에요.',
+        'Your plan from over two weeks ago was put away. Type same at the plan prompt to bring it back.':
+            '2주 넘게 지난 계획은 따로 넣어 뒀어요. 계획 질문에서 same을 입력하면 다시 불러올 수 있어요.',
+        "Press Enter at each question to skip it, and once more to close. That's it.":
+            '질문마다 Enter를 누르면 건너뛰고, 한 번 더 누르면 닫혀요. 이게 다예요.',
+        'Welcome.':
+            '환영해요.',
+        'Each day you get one thought and one small thing to try, the same for everyone.':
+            '날마다 생각 하나와 해 볼 만한 작은 일 하나를 보여 드려요. 모두에게 같은 내용이에요.',
+        'If you type a plan, it asks next time how it went. Your notes stay on this computer and are never sent anywhere. Like any work file they are not secret, so keep them to everyday tasks.':
+            '계획을 입력하면 다음번에 어떻게 됐는지 물어봐요. 메모는 이 컴퓨터에만 있고 어디로도 보내지 않아요. 다만 다른 업무 파일처럼 비밀은 아니니 평범한 업무 내용만 적어 주세요.',
+        'Type menu at the end for the options.':
+            '옵션을 보려면 마지막에 menu를 입력하세요.',
+        'Welcome back. Glad you are here.':
+            '다시 오셨네요. 반가워요.',
+        'You have opened this {row} days in a row. Nice to see you.':
+            '{row}일 연속으로 열었어요. 오늘도 만나서 좋네요.',
+        'Last time you planned: ':
+            '지난번 계획: ',
+        'Did you do it? (y for yes, n for not yet, Enter to skip) > ':
+            '하셨나요? (y는 예, n은 아직, Enter는 건너뛰기) > ',
+        'Type y or n, or press Enter to skip.':
+            'y 또는 n을 입력하거나 Enter를 눌러 건너뛰세요.',
+        'Could not save that on this computer. Your answer was not counted.':
+            '이 컴퓨터에 저장하지 못해서 답이 반영되지 않았어요.',
+        'That is fine. Keep it for today? (y or n, Enter to keep it) > ':
+            '괜찮아요. 오늘도 이 계획으로 할까요? (y 또는 n, Enter는 그대로 두기) > ',
+        'Type y to keep it, n to clear it, or press Enter to keep it.':
+            '그대로 두려면 y, 지우려면 n을 입력하세요. Enter를 눌러도 그대로 둬요.',
+        'Cleared. Type same at a plan prompt if you want it back.':
+            '지웠어요. 다시 쓰려면 계획 질문에서 same을 입력하세요.',
+        'Kept for today.':
+            '오늘도 그대로 둘게요.',
+        'That was not understood. Your plan is left as it was.':
+            '알아듣지 못했어요. 계획은 그대로 뒀어요.',
+        'Your plan is still open.':
+            '계획이 아직 진행 중이에요.',
+        'Thought for today:':
+            '오늘의 생각:',
+        'Try this today:':
+            '오늘 해 볼 일:',
+        'Your plan for today: ':
+            '오늘의 계획: ',
+        'Still open since {date}:':
+            '{date}부터 진행 중:',
+        '(Enter to skip)':
+            '(Enter는 건너뛰기)',
+        '(A plan typed here replaces the old one. Enter to skip)':
+            '(여기에 입력하면 기존 계획이 바뀌어요. Enter는 건너뛰기)',
+        '(Type same to reuse it, or Enter to skip)':
+            '(same을 입력하면 다시 쓰고, Enter는 건너뛰기)',
+        'What is one thing you want to get done today?':
+            '오늘 끝내고 싶은 일 하나가 있나요?',
+        'There is no earlier plan to reuse yet. Nothing was saved.':
+            '다시 쓸 이전 계획이 아직 없어요. 저장하지 않았어요.',
+        'Your notes could not be saved on this computer. This screen still works.':
+            '메모를 이 컴퓨터에 저장할 수 없어요. 이 화면은 그대로 쓸 수 있어요.',
+        'Type menu, or Enter to close > ':
+            'menu를 입력하세요. Enter는 닫기 > ',
+        'Type done, plan or menu, or Enter to close > ':
+            'done, plan, menu 중 하나를 입력하세요. Enter는 닫기 > ',
+        'Type plan or menu, or Enter to close > ':
+            'plan 또는 menu를 입력하세요. Enter는 닫기 > ',
+        'Type done, plan or menu, or press Enter to close.':
+            'done, plan, menu 중 하나를 입력하거나 Enter를 눌러 닫으세요.',
+        'Type plan or menu, or press Enter to close.':
+            'plan 또는 menu를 입력하거나 Enter를 눌러 닫으세요.',
+        "The saved file can't be read right now, or it is damaged.":
+            '지금은 저장 파일을 읽을 수 없거나 파일이 손상됐어요.',
+        'Nothing was changed. Saved in: ':
+            '바뀐 것은 없어요. 저장 위치: ',
+        'Deleting saved notes needs a person at the keyboard.':
+            '저장된 메모를 삭제하려면 키보드 앞에 사람이 있어야 해요.',
+        '{option} needs on or off. Here are the options.':
+            '{option}에는 on 또는 off가 필요해요. 옵션은 다음과 같아요.',
+        'Unknown option: {option}. Here are the options.':
+            '알 수 없는 옵션: {option}. 옵션은 다음과 같아요.',
+        '&Done':
+            '완료(&D)',
+        '&Not yet':
+            '아직(&N)',
+        'S&kip':
+            '건너뛰기(&K)',
+        '&Save':
+            '저장(&S)',
+        '&I did it':
+            '했어요(&I)',
+        '&Options':
+            '옵션(&O)',
+        'Close':
+            '닫기',
+        'Not today':
+            '오늘은 안 할게요',
+        'Did you do it?':
+            '하셨나요?',
+        'Done. A reminder comes when you sign in, if there is a plan to ask about.':
+            '설정했어요. 물어볼 계획이 있으면 로그인할 때 알림이 와요.',
+        'Done. The Start menu opens a window with buttons.':
+            '설정했어요. 이제 시작 메뉴에서 열면 버튼이 있는 창이 열려요.',
+        'Done. The Start menu opens this text screen.':
+            '설정했어요. 이제 시작 메뉴에서 열면 이 텍스트 화면이 열려요.',
+        'More options':
+            '옵션 더 보기',
+        'Remind me when I sign in':
+            '로그인할 때 알려 주기',
+        'Show the thought and tip':
+            '생각과 팁 표시',
+        'Type your plan in the box.':
+            '상자에 계획을 입력하세요.',
+        'Use a window with buttons (now this text screen)':
+            '버튼이 있는 창 사용(현재 텍스트 화면)',
+        'Use the text screen':
+            '텍스트 화면 사용',
+        'Use this text screen (now a window with buttons)':
+            '이 텍스트 화면 사용(현재 버튼이 있는 창)',
+        'Want a reminder when you sign in? It shows your plan from last time, and you answer with one click. You can turn it off under Options.':
+            '로그인할 때 알림을 받을까요? 지난번 계획을 보여 주고, 클릭 한 번으로 답할 수 있어요. 옵션에서 끌 수 있어요.',
+        'Window or text screen (set by your organization)':
+            '창 또는 텍스트 화면(조직에서 설정)',
+        'Your organization has set hello-world to open as a text screen.':
+            '조직에서 hello-world를 텍스트 화면으로 열도록 설정했어요.',
+        'Saved.':
+            '저장했어요.',
+        'Save your plan before closing?':
+            '닫기 전에 계획을 저장할까요?',
+        'Delete all saved notes, dates and plans on this computer?':
+            '이 컴퓨터에 저장된 메모, 날짜, 계획을 모두 삭제할까요?',
+        'Turn off: reminder when you sign in (now on)':
+            '끄기: 로그인 알림(현재 켜짐)',
+        'Turn on: reminder when you sign in (now off)':
+            '켜기: 로그인 알림(현재 꺼짐)',
+        'Reminder when you sign in (turned off by your organization)':
+            '로그인 알림(조직에서 끔)',
+        'Reminder when you sign in: on.':
+            '로그인 알림: 켜짐',
+        'Reminder when you sign in: off.':
+            '로그인 알림: 꺼짐',
+        'Reminder when you sign in: turned off by your organization.':
+            '로그인 알림: 조직에서 끔',
+        'Show the days-in-a-row message':
+            '연속 일수 메시지 표시',
+        'Done. The thought and tip show next time you open hello-world.':
+            '설정했어요. 다음에 hello-world를 열면 생각과 팁이 보여요.',
+        "Clear today's plan?":
+            '오늘 계획을 지울까요?',
+        'Next plan, if you want one:':
+            '원하면 다음 계획도 적어 보세요:',
+        'A few things? Put ; between them.':
+            '여러 가지인가요? 사이에 ;를 넣으세요.',
+        'A plan can be up to {n} characters.':
+            '계획은 {n}자까지 쓸 수 있어요.',
+        'Did you do them? (y for all, n for not yet, numbers for the ones you did, Enter to skip) > ':
+            '하셨나요? (y는 전부, n은 아직, 한 일은 번호로, Enter는 건너뛰기) > ',
+        'Last time you planned:':
+            '지난번 계획:',
+        'The rest is kept for today.':
+            '나머지는 오늘도 그대로 둬요.',
+        'Tick the ones you did, then click Done. With none ticked, Done means all of them.':
+            '한 일에 체크한 다음 완료를 클릭하세요. 아무것도 체크하지 않으면 전부 완료로 처리해요.',
+        'Type y for all, n for not yet, or the numbers you did, such as 1 3. Enter skips.':
+            '전부 했으면 y, 아직이면 n, 일부만 했으면 1 3처럼 번호를 입력하세요. Enter는 건너뛰기예요.',
+        'Your settings were kept.':
+            '설정은 그대로 뒀어요.',
+        'Language (set by your organization)':
+            '언어(조직에서 설정)',
+        'Language (now {name})':
+            '언어(현재 {name})',
+        'following Windows':
+            'Windows 설정 따름',
+        'Your organization shows hello-world in English.':
+            '조직에서 hello-world를 영어로 표시하도록 설정했어요.',
+        'Follow Windows':
+            'Windows 설정 따르기',
+        'Type a number from 1 to {n}, or Enter to keep it > ':
+            '1부터 {n}까지 번호를 입력하세요. Enter는 그대로 두기 > ',
+        'Done. The new language shows next time you open hello-world.':
+            '설정했어요. 다음에 hello-world를 열면 새 언어로 보여요.',
+        'Language...':
+            '언어...',
+        'Hello, {name}!':
+            '{name}님, 안녕하세요!',
+        'One thing to get done today? Open hello-world to plan it.':
+            '오늘 끝낼 일 하나 있나요? hello-world를 열어 계획해 보세요.',
+        '&Open':
+            '열기(&O)',
+        'Reminder settings...':
+            '알림 설정...',
+        'Greet me by name':
+            '이름으로 인사하기',
+        'At sign-in':
+            '로그인할 때',
+        'At {at}':
+            '{at}에',
+        'Also on days with no plan':
+            '계획이 없는 날에도',
+        'Open hello-world after I answer':
+            '답한 다음 hello-world 열기',
+        'Not on weekends':
+            '주말 제외',
+        'Done. A reminder comes at {at} each day, if there is a plan to ask about.':
+            '설정했어요. 물어볼 계획이 있으면 매일 {at}에 알림이 와요.',
+        'Send feedback...':
+            '의견 보내기...',
+        '"holidays" must be a list of at most {n} dates.':
+            '"holidays"는 날짜가 최대 {n}개인 목록이어야 합니다.',
+        '"title" must be 1 to 40 characters of plain text, with no link or address.':
+            '"title"은 링크나 주소가 없는 일반 텍스트로 1~40자여야 합니다.',
+        '"{list}" must be a list of {low} to {high} lines.':
+            '"{list}"은(는) {low}~{high}줄인 목록이어야 합니다.',
+        "Can't read {path}: {error}":
+            '{path}을(를) 읽을 수 없습니다: {error}',
+        'Could not save that on this computer.':
+            '이 컴퓨터에 저장하지 못했어요.',
+        'Days you opened hello-world: {n}':
+            'hello-world를 연 날: {n}',
+        'Keep a longer history':
+            '기록을 더 오래 보관하기',
+        'Keep my numbers':
+            '내 통계 보관하기',
+        'Longest run of days: {n}':
+            '최장 연속 일수: {n}',
+        "Mark today's plan done":
+            '오늘 계획 완료로 표시',
+        "Mark today's plan done (plans are turned off)":
+            '오늘 계획 완료로 표시(계획 기능 꺼짐)',
+        'My numbers are off. Turn them on under Options, or with --set numbers on.':
+            '내 통계가 꺼져 있어요. 옵션에서 켜거나 --set numbers on으로 켜세요.',
+        'My numbers...':
+            '내 통계...',
+        'Nothing finished yet this week. That is fine.':
+            '이번 주에는 아직 끝낸 일이 없어요. 괜찮아요.',
+        'OK: {thoughts} thoughts and {tips} tips.':
+            'OK: 생각 {thoughts}개, 팁 {tips}개.',
+        'Plans finished: {n}':
+            '끝낸 계획: {n}',
+        'Save my plans to a file':
+            '내 계획을 파일로 저장',
+        'Saved to {path}':
+            '{path}에 저장했어요',
+        "The file isn't valid JSON, or is over 200,000 characters.":
+            '올바른 JSON 파일이 아니거나 200,000자를 넘습니다.',
+        'The file must hold an object with two lists, "thoughts" and "tips", and may add "holidays" and "title".':
+            '파일에는 "thoughts"와 "tips" 두 목록이 있는 객체가 있어야 하며, "holidays"와 "title"을 추가할 수 있습니다.',
+        'This week you finished {n}:':
+            '이번 주에 끝낸 일 {n}개:',
+        'This week...':
+            '이번 주...',
+        'holidays line {line} is not a date like 2026-12-25.':
+            'holidays {line}번째 줄이 2026-12-25 같은 날짜 형식이 아닙니다.',
+        '{list} line {line} has a date.':
+            '{list} {line}번째 줄에 날짜가 있습니다.',
+        '{list} line {line} has a link or an address.':
+            '{list} {line}번째 줄에 링크나 주소가 있습니다.',
+        '{list} line {line} has control characters or extra spaces.':
+            '{list} {line}번째 줄에 제어 문자나 불필요한 공백이 있습니다.',
+        '{list} line {line} is not text.':
+            '{list} {line}번째 줄이 텍스트가 아닙니다.',
+        '{list} line {line} must be {low} to {high} characters long.':
+            '{list} {line}번째 줄은 {low}~{high}자여야 합니다.',
+    },
+}
+
+# ---- Hebrew ----
+
+LANGUAGES["he"] = {
+    "days": ('יום שני', 'יום שלישי', 'יום רביעי', 'יום חמישי', 'יום שישי', 'שבת', 'יום ראשון'),
+    "months": ('ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'),
+    "date": '{day}, {d} ב{month} {year}',
+    "thoughts": (
+        'לפתוח את המסמך שנדחה כבר זמן מה ולקרוא רק את הפסקה הראשונה.',
+        'התחלה של עשר דקות היא עדיין התחלה, ובדרך כלל היא מקלה על עשר הדקות הבאות.',
+        'לא צריך את כל התוכנית היום, רק צעד ראשון הגיוני.',
+        'לכתוב את המשפט הראשון, גם אם הוא מכוער. כך יש משהו אמיתי לשפר אחר כך.',
+        'לפנות פינה קטנה אחת בשולחן ולשים לב כמה רגוע יותר כל השאר.',
+        'לבחור את המשימה הקטנה ביותר ברשימה ולסיים אותה לפני שמסתכלים על האחרות.',
+        'התחלה עקומה בבוקר שקט עדיפה על המתנה לרגע מושלם שאולי לא יגיע.',
+        'לשים את הצעד הראשון ביומן, כדי שיהיה לו מקום משלו.',
+        'פרויקט גדול בנוי בעיקר מהרבה שעות עבודה קטנות, אז מספיק לכוון לאחר צהריים אחד.',
+        'לומר בקול רק את הפעולה הבאה, ולתת לשאר הרשימה לחכות לתורה.',
+        'יש ימים שהקצב איטי יותר מהרצוי, וגם הקצב הזה נחשב.',
+        'לדבר אל עצמנו כמו אל עמית חדש בשבוע הראשון שלו.',
+        'מותר עדיין ללמוד משהו שעושים כבר שנים.',
+        'בוקר חלש לא קובע את אחר הצהריים. אפשר להתחיל מחדש אחרי ארוחת הצהריים.',
+        'עייפות היא מידע, לא כישלון. מעדכנים את התוכנית וממשיכים בעדינות.',
+        'לתת לעצמנו את אותה חמלה שאנחנו נותנים לאחרים כל כך בקלות.',
+        'התקדמות נראית הרבה פעמים כמו כלום לזמן מה, ואז פתאום כמו עמוד גמור.',
+        'זה בסדר לקרוא פעמיים לפני שהדברים מתבהרים.',
+        'לא צריך להרגיש מוכנים. לעשות את זה עם קצת פחד זה עדיין לעשות.',
+        'המיטב של היום יכול להיות קטן מהמיטב של אתמול, וזה בסדר.',
+        'לסגור את הלשוניות שלא בשימוש. הריכוז יודה על כך תוך כמה דקות.',
+        'משימה אחת, חלון אחד, עשרים וחמש דקות. לבדוק כמה רחוק מגיעים ברצף שקט.',
+        'לרשום את המחשבה שקופצת פתאום, ואז לחזור למה שעשינו.',
+        'אם אפשר, להשתיק את הטלפון לשעה ולתת לעבודה את מלוא תשומת הלב.',
+        'להחליט מה הדבר האחד שיהפוך את היום לטוב, ולשמור לו זמן.',
+        'לעשות דבר אחד בכל פעם בדרך כלל מהיר יותר ממה שזה מרגיש.',
+        'רשימה מסודרת של שלושה דברים עדיפה על רשימה מפוזרת של עשרים.',
+        'לשים לב כשהמחשבות נודדות, ולהחזיר אותן בלי לנזוף.',
+        'לשבץ את המשימה הקשה ביותר בשעה שבה יש הכי הרבה אנרגיה, גם אם זה לא הדבר הראשון בבוקר.',
+        'אוזניות על הראש, קומקום מלא, דלת סגורה. מכינים את הסביבה, והריכוז מגיע אחריה.',
+        'להתרחק מהמסך לחמש דקות. חוזרים קצת יותר צלולים.',
+        'לאכול היום צהריים לא ליד השולחן. תיבת הדואר יכולה לחכות לכריך.',
+        'הליכה קצרה סביב הבניין היא עבודה אמיתית בשביל הראש.',
+        'דקה הרחק מהמסך היא שימוש טוב באחר צהריים עמוס.',
+        'למתוח את הכתפיים ולשחרר את הלסת. ייתכן שהן מכווצות כבר שעות.',
+        'לצאת בזמן הערב, אם אפשר. ערב פנוי היום הוא מתנה למחר.',
+        'מנוחה היא חלק מהעבודה, כי אנשים עייפים נוטים לחזור על אותה טעות פעמיים.',
+        'לתת לעיניים לנוח לרגע ולהוריד את הכתפיים.',
+        'הפסקה אמיתית הופכת את החצי השני של היום להתחלה חדשה.',
+        'הערב הוא זמן פרטי. שום דבר בתיבת הדואר לא דחוף בתשע בערב.',
+        'להגיד היום תודה למישהו על דבר קטן שעשה בלי שביקשו ממנו.',
+        'רוב האנשים עושים כמיטב יכולתם, עם יותר על הצלחת ממה שרואים מבחוץ.',
+        'לברר איך עמית אוהב את התה או הקפה שלו. מתנה קטנה לזכור את זה.',
+        'אם מישהו עונה בקוצר רוח, כנראה עובר עליו יום קשה. זה לא שיפוט אישי.',
+        'להחזיק את הדלת, לחלוק את העוגיות ולתת למישהו לסיים את המשפט.',
+        'שלום קצר ושאלה על סוף השבוע יכולים להיות החלק הכי נעים בבוקר.',
+        'כשמישהו חדש שואל משהו מובן מאליו, לזכור שפעם גם אנחנו שאלנו את זה.',
+        'לתת קרדיט בקול כשרעיון של חבר צוות שיפר את העבודה שלנו.',
+        'לענות להודעה עם קצת חום. זה לא עולה כלום ומתקבל בנעימות.',
+        'לפנות לעמית שהיה שקט בישיבות לאחרונה ולשאול מה שלומו.',
+        'לסיים את מה שכמעט גמור לפני שמתחילים משהו חדש.',
+        'גמור וטוב מספיק שימושי בדרך כלל יותר ממושלם ולא גמור.',
+        'לסגור היום עניין פתוח אחד ולשים לב להקלה הקטנה שבאה אחריו.',
+        'עשרת האחוזים האחרונים הם לרוב רק כמה דקות של תשומת לב. אפשר לתת אותן היום.',
+        'לשלוח את המייל שמחכה בטיוטות. כנראה הוא בסדר כמו שהוא.',
+        'לסמן שהושלם, לנשום, ולשמוח שזה מאחורינו.',
+        'דבר קטן שהושלם שווה יותר מדבר גדול שנעשה עד חציו.',
+        'לפני סיום היום, לרשום על פתק את הצעד הראשון של מחר, כדי שלא יהיה צריך לזכור אותו.',
+        'לקרוא עוד פעם, לתקן את מה שמוצאים, ואז לשלוח.',
+        'סיום היום עם תוצאה מסודרת אחת עושה את הערב קל יותר.',
+        'שאלה מוקדמת חוסכת בדרך כלל שעה של התלבטות שקטה בהמשך.',
+        'רוב האנשים נהנים כשפונים אליהם בגלל הידע שלהם. אפשר לשאול בלי להתנצל.',
+        '"נתקעתי" זה משפט ברור ושימושי שעמיתים יכולים לעבוד איתו.',
+        'לבקש את מה שצריך במילים פשוטות, ולתת לאנשים הזדמנות להגיד כן.',
+        'שני אנשים שמסתכלים על בעיה פותרים אותה לרוב מהר יותר מאדם אחד שבוהה בה לבד.',
+        'לבקש עזרה זה לא להיות נטל. ככה עובד צוות.',
+        'עם שאלה ממוקדת, אפשר לקבל תשובה ממוקדת.',
+        'אם ההנחיות לא ברורות, לבקש הבהרה זה חלק מלעשות את העבודה כמו שצריך.',
+        'להציע עזרה כשאפשר ולקבל אותה כשצריך. שני הדברים נעשים קלים יותר עם הזמן.',
+        'מישהו במסדרון כנראה כבר פתר את זה בעבר. שווה ללכת לחפש אותו.',
+        'לרשום בפתק קטן דברים שהתבררו השבוע. זה מצטבר ליותר ממה שנדמה.',
+        'להיות בהתחלה של משהו חדש זה סימן שעדיין מתפתחים בעבודה.',
+        'לשים לב איך עמית שמעריכים מתמודד עם שיחה מסובכת, ולאמץ ממנו דבר אחד.',
+        'לקרוא עמוד אחד מועיל בהפסקה. זה כבר יום טוב לראש.',
+        'להסביר משימה למישהו אחר זו דרך טובה להפליא ללמוד אותה בעצמנו.',
+        'זה בסדר להגיד "את זה עוד לא למדתי", ואז ללכת לברר.',
+        'כל מערכת לא מוכרת נראית מבלבלת עד שמשתמשים בה כמה פעמים.',
+        'לשאול מישהו מנוסה יותר איך הוא למד את זה. התשובה לרוב מרגיעה.',
+        'מיומנות באה מחזרה, אז חוזרים על הדבר הקטן עד שהוא נעשה קל.',
+        'קצת סקרנות לגבי משימה רגילה יכולה להפוך אותה למעניינת יותר.',
+        'טעות שנתפסת מוקדם היא רק תיקון, ורוב הטעויות נתפסות מוקדם.',
+        'לתקן, לעדכן את מי שצריך לדעת, ולתת לעקיצה לחלוף.',
+        'כמעט כל טעות בעבודה נראית קטנה יותר אחרי שבוע מאשר ברגע עצמו.',
+        'מעידה אחת לא מוחקת שנים של עבודה קפדנית.',
+        'כשמשהו משתבש, לבדוק קודם את התהליך ורק אחר כך את האדם.',
+        'כל מי שסביבנו שלח לפחות פעם אחת מייל לאדם הלא נכון.',
+        'לקחת מהטעות את הלקח האחד שלה ולהשאיר את כל השאר מאחור.',
+        'לקחת אחריות על טעות בפשטות בונה לרוב יותר אמון מאשר לא לטעות אף פעם.',
+        'גם לאנשים זהירים יש ימים מגושמים, והם חולפים עד הערב.',
+        'בעוד חודש, רוב המעידות הקטנות של היום כבר יישכחו.',
+        'יום שקט שבו שום דבר לא בוער הוא יום טוב, גם אם אף אחד לא מזכיר את זה.',
+        'לשים לב להנאות הקטנות: ספל חם, תיבת דואר ריקה, דקה של שקט.',
+        'לא כל יום צריך ניצחון גדול. יציב ונעים זו דרך טובה לעבוד.',
+        'ליהנות מישיבה שמסתיימת חמש דקות מוקדם ולנצל את הזמן איך שרוצים.',
+        'יום רגיל שנעשה היטב הוא סיבה לגאווה שקטה.',
+        'עבודה טובה נראית לרוב לא מרשימה מבחוץ, וזה בסדר.',
+        'לתת לאחר צהריים נעים להיות פשוט נעים, בלי לחכות שיהיה פרודוקטיבי.',
+        'השגרות הקטנות של היום, הקפה הראשון והפרצופים המוכרים, שוות תשומת לב.',
+        'היום הגענו ועשינו את החלק שלנו, וזה די והותר.',
+        'לקחת רגע הערב כדי להיזכר בדבר אחד שהלך טוב היום.',
+        'דקה שקטה בין שתי משימות היא לא בזבוז; ככה המשימה הבאה מתחילה טוב.',
+    ),
+    "tips": (
+        'ללגום כוס מים לאט, הרחק מהמסך.',
+        'לגלגל את הכתפיים לאחור חמש פעמים, לאט ובנחת.',
+        'לתת לעיניים לנוח עשרים שניות: להסתכל רחוק, או לעצום אותן.',
+        'למתוח את הידיים מעל הראש, בישיבה או בעמידה, ולנשום עמוק.',
+        'להגיע לחדר או לחלון הרחוקים ביותר שאפשר, ולחזור.',
+        'לבדוק את היציבה ולהוריד את הכתפיים הרחק מהאוזניים.',
+        'לסובב את הצוואר בעדינות מצד לצד, רק עד כמה שנוח.',
+        'לפתוח ולסגור את כפות הידיים עשר פעמים כדי לשחרר את האצבעות.',
+        'להצמיד את המסמך שנפתח הכי הרבה, כדי שיהיה במרחק לחיצה.',
+        'לצאת לסיבוב קצר בחוץ, בכל דרך שמתאימה.',
+        'למזוג משקה חם או קר וליהנות ממנו הרחק מהמסך.',
+        'להתמקד במשהו רגוע: נוף, צליל או מרקם.',
+        'לרשום את הצעד הבא במשימה אחת שנשארה באמצע.',
+        'להניח את שתי כפות הרגליים על הרצפה ולשבת זקוף, או לעמוד זקוף, לעשר נשימות.',
+        "להשתיק קבוצת צ'אט אחת שרק מרפרפים עליה.",
+        'לשחרר את הלסת ולהרפות את המצח לרגע.',
+        'לזוז שתי דקות בכל דרך שמרגישה טוב היום.',
+        'לשריין ביומן רבע שעה למשימה שכל הזמן נדחית.',
+        'לכוונן את הכיסא, המסך או המקלדת כך שדבר אחד יהיה נוח יותר.',
+        'ללכת בדרך הארוכה לישיבה או לשיחה הבאה, אם אפשר.',
+        'לשמור תבנית למייל אחד שנכתב שוב ושוב.',
+        'ללמוד קיצור מקשים אחד בתוכנה שעובדים בה הכי הרבה.',
+        'לשתות כוס מים מלאה לפני הקפה או התה הבא.',
+        'להרים את הכתפיים עד האוזניים, ואז לתת להן לרדת לאט.',
+        'לצאת החוצה או לפתוח חלון לדקה של אוויר צח.',
+        'לקחת חמש נשימות איטיות, וכל נשיפה קצת יותר ארוכה.',
+        'לעצור לדקה של שקט לפני שפותחים את ההודעה הבאה.',
+        'לרשום דבר טוב אחד שקרה היום עד עכשיו.',
+        'לעצום עיניים לשלוש נשימות ולשים לב להרגשה.',
+        'לשים לב עכשיו לשלושה דברים, בכל חוש שהוא.',
+        'לרשום דבר אחד שמחכים לו השבוע.',
+        'לכוון טיימר לשתי דקות ופשוט לשבת בלי מסך.',
+        'ליהנות ממשהו קטן בסביבה, כמו עציץ או ספל אהוב.',
+        'להיזכר בדבר אחד שהצליח השבוע ולטפוח לעצמנו על השכם.',
+        'להאזין לשיר אהוב אחד מההתחלה ועד הסוף, בלי שום דבר אחר פתוח.',
+        'לשאוף בספירה עד ארבע ולנשוף בספירה עד שש, שלוש פעמים.',
+        'לקחת נשימה אחת לפני שמגיבים למטרד הקטן הבא.',
+        'לרשום דבר אחד שהצחיק לאחרונה.',
+        'במשך דקה, לשים לב למשהו נעים: צליל, ריח או מגע.',
+        'להיזכר במקום אהוב ולדמיין אותו שלושים שניות.',
+        'להגיד "מספיק טוב בינתיים" על משימה קטנה אחת ולהמשיך הלאה.',
+        'לכתוב משפט אחד על משהו שמודים עליו.',
+        'ליהנות מהלגימה הבאה ולשים לב לטעם.',
+        'לקחת הפסקה קצרה בין שתי משימות לפני שמתחילים את הבאה.',
+        'לחפש היום דבר אחד שיוצא טוב מהצפוי.',
+        'לבחור מילה אחת שמתארת איך אחר הצהריים אמור להרגיש.',
+        'לתת לראש לנוח שישים שניות, ואז לחזור למשימה הבאה.',
+        'לשים לב לכפות הרגליים על הרצפה ולהרגיש יציבות לרגע.',
+        'להיזכר במעשה טוב שמישהו עשה פעם וליהנות מהזיכרון.',
+        'לרשום רעיון אחד שכדאי לחזור אליו אחר כך, ולהניח לו.',
+        'לסדר פינה קטנה אחת בשולחן, רק אחת.',
+        'לענות להודעה אחת שמחכה כבר זמן מה.',
+        'לרשום את המשימה החשובה של מחר על פתק דביק או בהערות.',
+        'לסגור את לשוניות הדפדפן שכבר לא צריך.',
+        'להגיד תודה לעמית על משהו שעשה לאחרונה.',
+        'להעביר לארכיון חמישה מיילים ישנים שכבר לא צריך.',
+        'לשנות שם לקובץ מבולגן אחד כדי שיהיה קל למצוא אותו אחר כך.',
+        'לפנות קובץ או שניים משולחן העבודה.',
+        'למחוק תזכורת ישנה אחת שכבר לא רלוונטית.',
+        'לתת כותרת ברורה למסמך שנפתח הרבה.',
+        'לסמן כבוצע פריט קטן אחד ברשימת המשימות.',
+        'לבטל מינוי לניוזלטר אחד שאף פעם לא נקרא.',
+        'לנגב את המקלדת או המסך במטלית רכה.',
+        'לשים עט, מחברת ומים במקום שקל להגיע אליו.',
+        'לכתוב פתק קצר לעצמנו של מחר על המקום שבו עצרנו היום.',
+        'לבחור את המשימה החשובה ביותר אחר הצהריים ולעשות אותה ראשונה.',
+        'לרוקן את פח המיחזור או האשפה ליד השולחן.',
+        'לעדכן הערת התקדמות אחת כדי שאחרים יראו איפה הדברים עומדים.',
+        'לסדר קצת את תיקיית ההורדות ולהעביר ממנה חופן קבצים אחד.',
+        'להגדיר תזכורת לדבר אחד שנוטים לשכוח.',
+        'לכבות התראה אחת שלא באמת צריך.',
+        'לשמור בסימניות עמוד אחד שכל הזמן מחפשים.',
+        'לכתוב סיכום של שתי שורות לישיבה כל עוד היא טרייה.',
+        'לשאול אם אפשר לקצר קצת ישיבה קבועה אחת.',
+        'לקבוע מטרה אחת לשעה הקרובה ולרשום אותה.',
+        'לשאול עמית איך עובר עליו היום ולהקשיב באמת.',
+        'לשתף קישור שימושי עם מישהו שעשוי ליהנות ממנו.',
+        'להגיד שלום למישהו שעוד לא יצא לדבר איתו.',
+        'לשלוח הודעת תודה קצרה למישהו שעזר לאחרונה.',
+        'לברך עמית בחום בתחילת השיחה הבאה.',
+        'לשאול חבר צוות למה הוא מחכה השבוע.',
+        'לפרגן למישהו על הצלחה קטנה.',
+        'להזמין עמית לשיחה קצרה, על כוס תה או קפה או בטלפון.',
+        'להחמיא לעמית על משהו מסוים שעשה טוב.',
+        'ללמוד את השם של מישהו שרואים הרבה אבל עוד לא מכירים.',
+        'לשתף טיפ שימושי עם חבר צוות שאולי צריך אותו.',
+        'לבקש ממישהו המלצה על שיר, סדרה או ספר.',
+        'לבדוק מה שלומו של עמית שהיה שקט לאחרונה.',
+        'להציע עזרה בדבר קטן אחד אם מישהו נראה עמוס.',
+        'לברך את האדם הבא שפוגשים בשלום חם.',
+        'להעביר הלאה מילה טובה שנאמרה על עמית.',
+        'לשאול עמית מה הקל עליו השבוע.',
+        'לשלוח הודעה ידידותית למישהו שעבדו איתו פעם.',
+        'להודות למי שדואג שהמרחבים המשותפים יתפקדו כמו שצריך.',
+        'להכיר בין שני עמיתים שעשויים ליהנות מההיכרות.',
+        'לשאול חבר צוות איך להקל עליו בהעברת עבודה.',
+        'לשתף בדיחה קטנה ותמימה עם מישהו בסביבה.',
+        'להוסיף קצת יותר חום ל"בבקשה" ול"תודה" הבאים.',
+        'לשאול עמית מה הוא אוהב לעשות מחוץ לעבודה.',
+        'להקשיב עד הסוף לאדם הבא שמדבר, בלי לעשות דברים אחרים במקביל.',
+    ),
+    "done": (
+        'יופי. זה הושלם.',
+        'נהדר. טוב לסיים משהו.',
+        'כל הכבוד. כדאי לקחת הפסקה קצרה לפני הדבר הבא.',
+        'יופי. משימות קטנות שהושלמו מצטברות.',
+        'זה גמור. אפשר להיות מרוצים מזה.',
+        'יופי. עוד דבר ירד מהרשימה.',
+    ),
+    "text": {
+        HELP:
+            """hello-world מציג ברכה, מחשבה ודבר קטן לנסות.
+
+בשאלה האחרונה, להקליד plan לתוכנית של היום, done בסיום שלה,
+או menu (או m) לאפשרויות. Enter סוגר, ו-q, x ו-close סוגרים
+מכל שאלה. בשאלת תוכנית, same מחזיר תוכנית קודמת שלא הושלמה.
+אחרי done מוצגות 3 התוכניות האחרונות שהושלמו. אפשרות 1 בתפריט
+מציגה את כולן, אפשרות 7 מוחקת אחת, ואפשרות 8 מסתירה את המחשבה
+ואת הטיפ. בתפריט, Enter חוזר אחורה.
+אפשר גם להריץ את hello.cmd עם אחת מהאפשרויות האלה:
+  --plain         מציג רק את הברכה, באנגלית
+  --stats         מציג מה שמור במחשב הזה
+  --reset         מוחק את כל מה שנשמר (שואל קודם)
+  --remind on     נפתח פעם ביום בכניסה למערכת (off להפסקה)
+  --streak off    מסתיר את הודעת הימים ברצף (on להצגה)
+  --version       מציג את הגרסה
+  --check-content FILE
+                  בודק קובץ תוכן של הארגון
+  --help          מציג את הטקסט הזה
+
+קודי יציאה: 0 כשהפעולה הצליחה, 1 כשפקודה נכשלה או שלא ניתן היה
+לכתוב למסך, 2 לאפשרות לא מוכרת.
+
+המידע השמור נשאר במחשב הזה, בתיקיית המשתמש. שום דבר לא נשלח
+לשום מקום. אנשי IT שיכולים לקרוא את הקבצים במחשב הזה יכולים
+לקרוא גם אותו.""",
+        MENU_HELP:
+            """מילים שאפשר להקליד בשאלה האחרונה:
+  done  מסמן שהתוכנית של היום הושלמה, ואז שואל על הבאה
+  plan  קובע או משנה את התוכנית של היום
+  menu  פותח את האפשרויות האלה
+  q     סוגר את החלון, וכך גם Enter
+בשאלת תוכנית, same מחזיר את התוכנית הקודמת שלא הושלמה.
+בשאלה "זה בוצע?", n פירושו עוד לא, ואפשר להשאיר את התוכנית
+להיום. q סוגר מכל שאלה.
+בתפריט הזה, 1 מציג מה שמור, 7 מוחק תוכנית אחת שהושלמה,
+ו-8 מסתיר את המחשבה והטיפ.
+להקליד m כדי לראות שוב את האפשרויות. שום דבר לא נשלח לשום מקום.""",
+        SAVED_PLAN:
+            'נשמר. בסיום אפשר להקליד done, או לענות על השאלה בפעם הבאה.',
+        GREETING:
+            'שלום, עולם!',
+        'hello.cmd is in this folder:':
+            'הקובץ hello.cmd נמצא בתיקייה הזו:',
+        'Shortened to {n} characters.':
+            'קוצר ל-{n} תווים.',
+        'Your saved file was damaged, so hello-world set it aside as a backup copy and started fresh. Your earlier days and plan could not be read. Menu option 4 deletes the backup.':
+            'הקובץ השמור נפגם, ולכן hello-world העביר אותו הצידה כעותק גיבוי והתחיל מחדש. לא ניתן היה לקרוא את הימים ואת התוכנית הקודמים. אפשרות 4 בתפריט מוחקת את הגיבוי.',
+        'Backup copy: ':
+            'עותק גיבוי: ',
+        'In the folder: ':
+            'בתיקייה: ',
+        'Sorry, "{shown}" is not one of the choices.':
+            'סליחה, "{shown}" לא נמצא בין האפשרויות.',
+        'A plan needs a word or two, so nothing was saved.':
+            'תוכנית צריכה מילה או שתיים, ולכן שום דבר לא נשמר.',
+        'The sign-in reminder works on Windows only.':
+            'התזכורת בכניסה למערכת עובדת רק ב-Windows.',
+        'Your organization has turned off opening at sign-in.':
+            'הארגון כיבה את הפתיחה בכניסה למערכת.',
+        'The reminder cannot be set up from this folder.':
+            'אי אפשר להגדיר את התזכורת מהתיקייה הזו.',
+        'Could not set up the reminder.':
+            'לא ניתן היה להגדיר את התזכורת.',
+        'Done. hello-world will open once a day when you sign in.':
+            'בוצע. hello-world ייפתח פעם ביום בכניסה למערכת.',
+        'To stop it, choose option 2 in the menu.':
+            'כדי להפסיק, לבחור באפשרות 2 בתפריט.',
+        'Could not turn off the sign-in reminder.':
+            'לא ניתן היה לכבות את התזכורת בכניסה למערכת.',
+        'Done. The sign-in reminder is off.':
+            'בוצע. התזכורת בכניסה למערכת כבויה.',
+        'Saved on this computer in:':
+            'נשמר במחשב הזה במיקום:',
+        'Saved in your own user folder on this computer.':
+            'נשמר בתיקיית המשתמש האישית במחשב הזה.',
+        'Days you opened it in the last {days} days: {n} (last 7 days: {recent})':
+            'ימי שימוש ב-{days} הימים האחרונים: {n} (ב-7 האחרונים: {recent})',
+        'Times you marked a plan done: {n}':
+            'פעמים שתוכנית סומנה כבוצעה: {n}',
+        'Your current plan: ':
+            'התוכנית הנוכחית: ',
+        'Earlier plan (for same): ':
+            'תוכנית קודמת (עבור same): ',
+        'Days-in-a-row message: shown.':
+            'הודעת הימים ברצף: מוצגת.',
+        'Days-in-a-row message: hidden.':
+            'הודעת הימים ברצף: מוסתרת.',
+        'Opens by itself at sign-in: turned off by your organization.':
+            'פתיחה אוטומטית בכניסה למערכת: כבויה על ידי הארגון.',
+        'Opens by itself at sign-in: on.':
+            'פתיחה אוטומטית בכניסה למערכת: פועלת.',
+        'Opens by itself at sign-in: off.':
+            'פתיחה אוטומטית בכניסה למערכת: כבויה.',
+        "It never leaves this computer. Others who can read this computer's files, such as IT staff, could read it.":
+            'המידע לא יוצא מהמחשב הזה. מי שיכול לקרוא את הקבצים במחשב, כמו אנשי IT, יכול לקרוא גם אותו.',
+        'After tidying, the file holds only this:':
+            'אחרי הסידור, הקובץ מכיל רק את זה:',
+        'Delete all saved notes, dates and plans on this computer? (y or n, Enter to cancel) > ':
+            'למחוק את כל הרשומות, התאריכים והתוכניות השמורים במחשב הזה? (y או n, Enter לביטול) > ',
+        'Nothing was deleted.':
+            'שום דבר לא נמחק.',
+        'Could not delete everything.':
+            'לא ניתן היה למחוק הכול.',
+        'Delete these yourself:':
+            'את אלה צריך למחוק ידנית:',
+        'Could not list the folder, so backup copies may remain:':
+            'לא ניתן היה להציג את תוכן התיקייה, ולכן ייתכן שנשארו עותקי גיבוי:',
+        'Done. Everything saved was deleted.':
+            'בוצע. כל מה שנשמר נמחק.',
+        'Another open hello-world window cannot put it back.':
+            'גם חלון hello-world פתוח אחר לא יוכל לשחזר אותו.',
+        'Close any other open hello-world window, or it may save its notes again.':
+            'כדאי לסגור כל חלון hello-world אחר שפתוח, אחרת הוא עלול לשמור שוב את הרשומות שלו.',
+        'Everything saved was deleted in another window, so this was not saved.':
+            'כל מה שנשמר נמחק בחלון אחר, ולכן זה לא נשמר.',
+        'The other open window had also finished a plan.':
+            'גם בחלון הפתוח השני הושלמה תוכנית.',
+        'The other open window changed the plan, so its plan is kept.':
+            'החלון הפתוח השני שינה את התוכנית, ולכן התוכנית שלו נשארת.',
+        'Type plan at the last prompt to set one.':
+            'כדי לקבוע תוכנית, להקליד plan בשאלה האחרונה.',
+        'That looks like a command, not a plan, so nothing was saved.':
+            'זה נראה כמו פקודה ולא כמו תוכנית, ולכן שום דבר לא נשמר.',
+        'Type your plan, or press Enter to go back.':
+            'להקליד את התוכנית, או ללחוץ Enter כדי לחזור.',
+        'Finished lately:':
+            'הושלמו לאחרונה:',
+        'Your plan today: ':
+            'התוכנית להיום: ',
+        'Your plan from {date}: ':
+            'התוכנית מ-{date}: ',
+        'Earlier plan: ':
+            'תוכנית קודמת: ',
+        'Type the next plan, or Enter to close > ':
+            'להקליד את התוכנית הבאה, או Enter לסגירה > ',
+        'Type the next plan, same to reuse the earlier plan, or Enter to close > ':
+            'להקליד את התוכנית הבאה, same לתוכנית הקודמת, או Enter לסגירה > ',
+        "Type today's plan, or Enter to keep it > ":
+            'להקליד את התוכנית להיום, או Enter כדי להשאיר אותה > ',
+        "Type today's plan, same to reuse the earlier plan, or Enter to keep it > ":
+            'להקליד את התוכנית להיום, same לתוכנית הקודמת, או Enter כדי להשאיר אותה > ',
+        "Type today's plan, or Enter to go back > ":
+            'להקליד את התוכנית להיום, או Enter לחזרה > ',
+        "Type today's plan, same to reuse the earlier plan, or Enter to go back > ":
+            'להקליד את התוכנית להיום, same לתוכנית הקודמת, או Enter לחזרה > ',
+        'Closing.':
+            'נסגר.',
+        'There is no earlier plan to reuse yet. Nothing changed.':
+            'עדיין אין תוכנית קודמת לשימוש חוזר. שום דבר לא השתנה.',
+        'Nothing changed.':
+            'שום דבר לא השתנה.',
+        'Could not save that on this computer. Your plan is unchanged.':
+            'לא ניתן היה לשמור את זה במחשב הזה. התוכנית לא השתנתה.',
+        'No finished plans are saved.':
+            'אין עדיין תוכניות שהושלמו.',
+        'Type the number to forget (1 to {n}), or Enter to keep them all > ':
+            'להקליד את המספר למחיקה (1 עד {n}), או Enter כדי להשאיר את כולן > ',
+        'There is no number "{typed}" on the list. Type a number from 1 to {n}, or press Enter to keep them all.':
+            'אין מספר "{typed}" ברשימה. להקליד מספר מ-1 עד {n}, או ללחוץ Enter כדי להשאיר את כולן.',
+        'Also forget it as the earlier plan for same? (y or n, Enter to keep it for same) > ':
+            'למחוק אותה גם כתוכנית הקודמת עבור same? (y או n, Enter כדי להשאיר אותה עבור same) > ',
+        'Type y or n, or press Enter to keep it for same.':
+            'להקליד y או n, או ללחוץ Enter כדי להשאיר אותה עבור same.',
+        'That plan was already forgotten. Nothing changed.':
+            'התוכנית הזו כבר נמחקה. שום דבר לא השתנה.',
+        'Forgotten: ':
+            'נמחקה: ',
+        'Same still has it.':
+            'היא עדיין זמינה דרך same.',
+        'Could not save that on this computer. Nothing changed.':
+            'לא ניתן היה לשמור את זה במחשב הזה. שום דבר לא השתנה.',
+        'Options':
+            'אפשרויות',
+        'Show what is saved on this computer':
+            'הצגת מה ששמור במחשב הזה',
+        'Open once a day at sign-in (turned off by your organization)':
+            'פתיחה פעם ביום בכניסה למערכת (כבויה על ידי הארגון)',
+        'Turn off: open once a day at sign-in (now on)':
+            'כיבוי: פתיחה פעם ביום בכניסה למערכת (כרגע פועלת)',
+        'Turn on: open once a day at sign-in (now off)':
+            'הפעלה: פתיחה פעם ביום בכניסה למערכת (כרגע כבויה)',
+        'Days-in-a-row message (hidden by your organization)':
+            'הודעת הימים ברצף (מוסתרת על ידי הארגון)',
+        'Hide the days-in-a-row message (now shown)':
+            'הסתרת הודעת הימים ברצף (כרגע מוצגת)',
+        'Show the days-in-a-row message (now hidden)':
+            'הצגת הודעת הימים ברצף (כרגע מוסתרת)',
+        'Delete everything saved':
+            'מחיקת כל מה שנשמר',
+        'Help':
+            'עזרה',
+        "Set today's plan (turned off by your organization)":
+            'קביעת התוכנית להיום (כבויה על ידי הארגון)',
+        'Forget a finished plan (turned off by your organization)':
+            'מחיקת תוכנית שהושלמה (כבויה על ידי הארגון)',
+        "Set or change today's plan":
+            'קביעה או שינוי של התוכנית להיום',
+        'Forget one finished plan':
+            'מחיקת תוכנית אחת שהושלמה',
+        'Thought and tip (hidden by your organization)':
+            'מחשבה וטיפ (מוסתרים על ידי הארגון)',
+        'Hide the thought and tip (now shown)':
+            'הסתרת המחשבה והטיפ (כרגע מוצגים)',
+        'Show the thought and tip (now hidden)':
+            'הצגת המחשבה והטיפ (כרגע מוסתרים)',
+        '{date}: ':
+            '{date}: ',
+        'Enter':
+            'Enter',
+        'Back to the last prompt':
+            'חזרה לשאלה האחרונה',
+        'Choose 1 to 11, or Enter to go back > ':
+            'לבחור 1 עד 11, או Enter לחזרה > ',
+        'Choose 1 to 11, m to list the options, or Enter to go back > ':
+            'לבחור 1 עד 11, m להצגת האפשרויות, או Enter לחזרה > ',
+        'The saved file could not be read just now, so this may be out of date.':
+            'לא ניתן היה לקרוא את הקובץ השמור כרגע, ולכן ייתכן שהמידע לא עדכני.',
+        'Type full to see the whole file, or Enter to go on > ':
+            'להקליד full כדי לראות את כל הקובץ, או Enter כדי להמשיך > ',
+        'Could not save that choice on this computer.':
+            'לא ניתן היה לשמור את הבחירה הזו במחשב הזה.',
+        'Your organization has hidden the days-in-a-row message.':
+            'הארגון הסתיר את הודעת הימים ברצף.',
+        'Done. The days-in-a-row message is on.':
+            'בוצע. הודעת הימים ברצף מוצגת.',
+        'Done. The days-in-a-row message is off.':
+            'בוצע. הודעת הימים ברצף מוסתרת.',
+        'Plans are turned off by your organization.':
+            'התוכניות כבויות על ידי הארגון.',
+        'Your organization has hidden the thought and tip.':
+            'הארגון הסתיר את המחשבה והטיפ.',
+        'Done. The thought and tip are on.':
+            'בוצע. המחשבה והטיפ מוצגים.',
+        'Done. The thought and tip are off.':
+            'בוצע. המחשבה והטיפ מוסתרים.',
+        'Type 1 to 11, or press Enter to go back.':
+            'להקליד 1 עד 11, או ללחוץ Enter כדי לחזור.',
+        'Want it to open once a day when you sign in? (y or n, Enter for not now) > ':
+            'לפתוח את התוכנה פעם ביום בכניסה למערכת? (y או n, Enter לדחייה) > ',
+        'Want it to open once a day when you sign in so it can ask about your plan? (y or n, Enter for not now) > ':
+            'לפתוח את התוכנה פעם ביום בכניסה למערכת, כדי שתשאל על התוכנית? (y או n, Enter לדחייה) > ',
+        'Type y or n, or press Enter for not now.':
+            'להקליד y או n, או ללחוץ Enter לדחייה.',
+        'That was not understood. It will ask again on a later visit.':
+            'התשובה לא הובנה. השאלה תחזור בפעם אחרת.',
+        'It will ask again on a later visit. Menu option 2 also turns it on.':
+            'השאלה תחזור בפעם אחרת. אפשר גם להפעיל את זה באפשרות 2 בתפריט.',
+        'No problem. Menu option 2 turns it on later.':
+            'אין בעיה. אפשר להפעיל את זה בהמשך באפשרות 2 בתפריט.',
+        "Okay. It won't ask again. Menu option 2 turns it on.":
+            'בסדר. השאלה לא תחזור. אפשרות 2 בתפריט מפעילה את זה.',
+        'Okay. It will ask again on a later visit. Type n to stop it.':
+            'בסדר. השאלה תחזור בפעם אחרת. כדי שלא תחזור, להקליד n.',
+        'When did you finish it?':
+            'מתי זה הושלם?',
+        'Today':
+            'היום',
+        'Type a number from 1 to {n}, or Enter for 1 > ':
+            'להקליד מספר מ-1 עד {n}, או Enter ל-1 > ',
+        'Type a number from 1 to {n}, or press Enter.':
+            'להקליד מספר מ-1 עד {n}, או ללחוץ Enter.',
+        'That looks like more than one thing. Finishing the first part still counts.':
+            'זה נראה כמו יותר מדבר אחד. גם השלמת החלק הראשון נחשבת.',
+        'There is no plan to mark as done. Type plan to set one.':
+            'אין תוכנית לסמן כבוצעה. להקליד plan כדי לקבוע אחת.',
+        'Could not save that on this computer. The plan is still open.':
+            'לא ניתן היה לשמור את זה במחשב הזה. התוכנית עדיין פתוחה.',
+        'Your plan from over two weeks ago was put away. Type same at the plan prompt to bring it back.':
+            'התוכנית מלפני יותר משבועיים הועברה הצידה. כדי להחזיר אותה, להקליד same בשאלת התוכנית.',
+        "Press Enter at each question to skip it, and once more to close. That's it.":
+            'בכל שאלה, Enter מדלג עליה, ועוד Enter אחד סוגר. זה הכול.',
+        'Welcome.':
+            'ברוכים הבאים.',
+        'Each day you get one thought and one small thing to try, the same for everyone.':
+            'בכל יום יש מחשבה אחת ודבר קטן אחד לנסות, אותם לכולם.',
+        'If you type a plan, it asks next time how it went. Your notes stay on this computer and are never sent anywhere. Like any work file they are not secret, so keep them to everyday tasks.':
+            'אם מקלידים תוכנית, בפעם הבאה תופיע שאלה איך זה הלך. הרשומות נשארות במחשב הזה ולא נשלחות לשום מקום. כמו כל קובץ עבודה, הן לא סודיות, אז עדיף לכתוב בהן רק משימות יומיומיות.',
+        'Type menu at the end for the options.':
+            'להקליד menu בסוף כדי לראות את האפשרויות.',
+        'Welcome back. Glad you are here.':
+            'ברוכים השבים. טוב לראות אותך.',
+        'You have opened this {row} days in a row. Nice to see you.':
+            'זה היום ה-{row} ברצף. טוב לראות אותך.',
+        'Last time you planned: ':
+            'בפעם הקודמת התוכנית הייתה: ',
+        'Did you do it? (y for yes, n for not yet, Enter to skip) > ':
+            'זה בוצע? (y כן, n עוד לא, Enter לדילוג) > ',
+        'Type y or n, or press Enter to skip.':
+            'להקליד y או n, או ללחוץ Enter לדילוג.',
+        'Could not save that on this computer. Your answer was not counted.':
+            'לא ניתן היה לשמור את זה במחשב הזה. התשובה לא נספרה.',
+        'That is fine. Keep it for today? (y or n, Enter to keep it) > ':
+            'זה בסדר. להשאיר אותה להיום? (y או n, Enter כדי להשאיר) > ',
+        'Type y to keep it, n to clear it, or press Enter to keep it.':
+            'להקליד y כדי להשאיר, n כדי לנקות, או ללחוץ Enter כדי להשאיר.',
+        'Cleared. Type same at a plan prompt if you want it back.':
+            'נוקתה. כדי להחזיר אותה, להקליד same בשאלת תוכנית.',
+        'Kept for today.':
+            'נשארת להיום.',
+        'That was not understood. Your plan is left as it was.':
+            'התשובה לא הובנה. התוכנית נשארה כמו שהייתה.',
+        'Your plan is still open.':
+            'התוכנית עדיין פתוחה.',
+        'Thought for today:':
+            'מחשבה להיום:',
+        'Try this today:':
+            'לנסות היום:',
+        'Your plan for today: ':
+            'התוכנית להיום: ',
+        'Still open since {date}:':
+            'פתוחה מאז {date}:',
+        '(Enter to skip)':
+            '(Enter לדילוג)',
+        '(A plan typed here replaces the old one. Enter to skip)':
+            '(תוכנית שתוקלד כאן תחליף את הקודמת. Enter לדילוג)',
+        '(Type same to reuse it, or Enter to skip)':
+            '(להקליד same כדי להשתמש בה שוב, או Enter לדילוג)',
+        'What is one thing you want to get done today?':
+            'מה הדבר האחד שחשוב להספיק היום?',
+        'There is no earlier plan to reuse yet. Nothing was saved.':
+            'עדיין אין תוכנית קודמת לשימוש חוזר. שום דבר לא נשמר.',
+        'Your notes could not be saved on this computer. This screen still works.':
+            'לא ניתן היה לשמור את הרשומות במחשב הזה. המסך הזה עדיין עובד.',
+        'Type menu, or Enter to close > ':
+            'להקליד menu, או Enter לסגירה > ',
+        'Type done, plan or menu, or Enter to close > ':
+            'להקליד done, plan או menu, או Enter לסגירה > ',
+        'Type plan or menu, or Enter to close > ':
+            'להקליד plan או menu, או Enter לסגירה > ',
+        'Type done, plan or menu, or press Enter to close.':
+            'להקליד done, plan או menu, או ללחוץ Enter לסגירה.',
+        'Type plan or menu, or press Enter to close.':
+            'להקליד plan או menu, או ללחוץ Enter לסגירה.',
+        "The saved file can't be read right now, or it is damaged.":
+            'לא ניתן לקרוא את הקובץ השמור כרגע, או שהוא פגום.',
+        'Nothing was changed. Saved in: ':
+            'שום דבר לא השתנה. מיקום השמירה: ',
+        'Deleting saved notes needs a person at the keyboard.':
+            'מחיקת הרשומות השמורות דורשת מישהו ליד המקלדת.',
+        '{option} needs on or off. Here are the options.':
+            '{option} דורש on או off. הנה האפשרויות.',
+        'Unknown option: {option}. Here are the options.':
+            'אפשרות לא מוכרת: {option}. הנה האפשרויות.',
+        '&Done':
+            'בוצע(&D)',
+        '&Not yet':
+            'עוד לא(&N)',
+        'S&kip':
+            'דילוג(&K)',
+        '&Save':
+            'שמירה(&S)',
+        '&I did it':
+            'עשיתי(&I)',
+        '&Options':
+            'אפשרויות(&O)',
+        'Close':
+            'סגירה',
+        'Not today':
+            'לא היום',
+        'Did you do it?':
+            'זה בוצע?',
+        'Done. A reminder comes when you sign in, if there is a plan to ask about.':
+            'בוצע. תזכורת תופיע בכניסה למערכת, אם יש תוכנית לשאול עליה.',
+        'Done. The Start menu opens a window with buttons.':
+            'בוצע. תפריט התחל יפתח חלון עם לחצנים.',
+        'Done. The Start menu opens this text screen.':
+            'בוצע. תפריט התחל יפתח את מסך הטקסט הזה.',
+        'More options':
+            'אפשרויות נוספות',
+        'Remind me when I sign in':
+            'להזכיר לי בכניסה למערכת',
+        'Show the thought and tip':
+            'הצגת המחשבה והטיפ',
+        'Type your plan in the box.':
+            'להקליד את התוכנית בתיבה.',
+        'Use a window with buttons (now this text screen)':
+            'שימוש בחלון עם לחצנים (כרגע מסך טקסט)',
+        'Use the text screen':
+            'שימוש במסך הטקסט',
+        'Use this text screen (now a window with buttons)':
+            'שימוש במסך הטקסט הזה (כרגע חלון עם לחצנים)',
+        'Want a reminder when you sign in? It shows your plan from last time, and you answer with one click. You can turn it off under Options.':
+            "רוצים תזכורת בכניסה למערכת? היא מציגה את התוכנית מהפעם הקודמת, ועונים בלחיצה אחת. אפשר לכבות אותה דרך 'אפשרויות'.",
+        'Window or text screen (set by your organization)':
+            'חלון או מסך טקסט (נקבע על ידי הארגון)',
+        'Your organization has set hello-world to open as a text screen.':
+            'הארגון הגדיר ש-hello-world ייפתח כמסך טקסט.',
+        'Saved.':
+            'נשמר.',
+        'Save your plan before closing?':
+            'לשמור את התוכנית לפני הסגירה?',
+        'Delete all saved notes, dates and plans on this computer?':
+            'למחוק את כל הרשומות, התאריכים והתוכניות השמורים במחשב הזה?',
+        'Turn off: reminder when you sign in (now on)':
+            'כיבוי: תזכורת בכניסה למערכת (כרגע פועלת)',
+        'Turn on: reminder when you sign in (now off)':
+            'הפעלה: תזכורת בכניסה למערכת (כרגע כבויה)',
+        'Reminder when you sign in (turned off by your organization)':
+            'תזכורת בכניסה למערכת (כבויה על ידי הארגון)',
+        'Reminder when you sign in: on.':
+            'תזכורת בכניסה למערכת: פועלת.',
+        'Reminder when you sign in: off.':
+            'תזכורת בכניסה למערכת: כבויה.',
+        'Reminder when you sign in: turned off by your organization.':
+            'תזכורת בכניסה למערכת: כבויה על ידי הארגון.',
+        'Show the days-in-a-row message':
+            'הצגת הודעת הימים ברצף',
+        'Done. The thought and tip show next time you open hello-world.':
+            'בוצע. המחשבה והטיפ יוצגו בפעם הבאה ש-hello-world ייפתח.',
+        "Clear today's plan?":
+            'לנקות את התוכנית להיום?',
+        'Next plan, if you want one:':
+            'התוכנית הבאה, אם רוצים:',
+        'A few things? Put ; between them.':
+            'כמה דברים? להפריד ביניהם בתו ;',
+        'A plan can be up to {n} characters.':
+            'תוכנית יכולה להכיל עד {n} תווים.',
+        'Did you do them? (y for all, n for not yet, numbers for the ones you did, Enter to skip) > ':
+            'הם בוצעו? (y לכולם, n לעוד לא, מספרים לאלה שבוצעו, Enter לדילוג) > ',
+        'Last time you planned:':
+            'בפעם הקודמת התוכנית הייתה:',
+        'The rest is kept for today.':
+            'כל השאר נשאר להיום.',
+        'Tick the ones you did, then click Done. With none ticked, Done means all of them.':
+            "לסמן את מה שבוצע וללחוץ על 'בוצע'. בלי סימון, 'בוצע' פירושו הכול.",
+        'Type y for all, n for not yet, or the numbers you did, such as 1 3. Enter skips.':
+            'להקליד y לכולם, n לעוד לא, או את המספרים שבוצעו, למשל 1 3. Enter מדלג.',
+        'Your settings were kept.':
+            'ההגדרות נשארו כמו שהיו.',
+        'Language (set by your organization)':
+            'שפה (נקבעה על ידי הארגון)',
+        'Language (now {name})':
+            'שפה (כרגע {name})',
+        'following Windows':
+            'לפי Windows',
+        'Your organization shows hello-world in English.':
+            'הארגון קבע ש-hello-world יוצג באנגלית.',
+        'Follow Windows':
+            'לפי Windows',
+        'Type a number from 1 to {n}, or Enter to keep it > ':
+            'להקליד מספר מ-1 עד {n}, או Enter כדי להשאיר > ',
+        'Done. The new language shows next time you open hello-world.':
+            'בוצע. השפה החדשה תוצג בפעם הבאה ש-hello-world ייפתח.',
+        'Language...':
+            'שפה...',
+        'Hello, {name}!':
+            'שלום, {name}!',
+        'One thing to get done today? Open hello-world to plan it.':
+            'דבר אחד להספיק היום? אפשר לפתוח את hello-world ולתכנן אותו.',
+        '&Open':
+            'פתיחה(&O)',
+        'Reminder settings...':
+            'הגדרות תזכורת...',
+        'Greet me by name':
+            'לפנות אליי בשמי',
+        'At sign-in':
+            'בכניסה למערכת',
+        'At {at}':
+            'בשעה {at}',
+        'Also on days with no plan':
+            'גם בימים בלי תוכנית',
+        'Open hello-world after I answer':
+            'לפתוח את hello-world אחרי התשובה',
+        'Not on weekends':
+            'לא בסופי שבוע',
+        'Done. A reminder comes at {at} each day, if there is a plan to ask about.':
+            'בוצע. תזכורת תופיע כל יום בשעה {at}, אם יש תוכנית לשאול עליה.',
+        'Send feedback...':
+            'שליחת משוב...',
+        '"holidays" must be a list of at most {n} dates.':
+            '"holidays" חייב להיות רשימה של עד {n} תאריכים.',
+        '"title" must be 1 to 40 characters of plain text, with no link or address.':
+            '"title" חייב להיות טקסט פשוט באורך 1 עד 40 תווים, בלי קישור או כתובת.',
+        '"{list}" must be a list of {low} to {high} lines.':
+            '"{list}" חייב להיות רשימה של {low} עד {high} שורות.',
+        "Can't read {path}: {error}":
+            'לא ניתן לקרוא את {path}: {error}',
+        'Could not save that on this computer.':
+            'לא ניתן היה לשמור את זה במחשב הזה.',
+        'Days you opened hello-world: {n}':
+            'ימים שבהם hello-world נפתח: {n}',
+        'Keep a longer history':
+            'שמירת היסטוריה ארוכה יותר',
+        'Keep my numbers':
+            'שמירת המספרים שלי',
+        'Longest run of days: {n}':
+            'הרצף הארוך ביותר (בימים): {n}',
+        "Mark today's plan done":
+            'סימון התוכנית להיום כבוצעה',
+        "Mark today's plan done (plans are turned off)":
+            'סימון התוכנית להיום כבוצעה (התוכניות כבויות)',
+        'My numbers are off. Turn them on under Options, or with --set numbers on.':
+            "'המספרים שלי' כבוי. אפשר להפעיל אותו דרך 'אפשרויות', או עם --set numbers on.",
+        'My numbers...':
+            'המספרים שלי...',
+        'Nothing finished yet this week. That is fine.':
+            'עוד לא הושלם כלום השבוע. זה בסדר.',
+        'OK: {thoughts} thoughts and {tips} tips.':
+            'OK: {thoughts} מחשבות ו-{tips} טיפים.',
+        'Plans finished: {n}':
+            'תוכניות שהושלמו: {n}',
+        'Save my plans to a file':
+            'שמירת התוכניות שלי בקובץ',
+        'Saved to {path}':
+            'נשמר ב-{path}',
+        "The file isn't valid JSON, or is over 200,000 characters.":
+            'הקובץ אינו JSON תקין, או שהוא ארוך מ-200,000 תווים.',
+        'The file must hold an object with two lists, "thoughts" and "tips", and may add "holidays" and "title".':
+            'הקובץ חייב להכיל אובייקט עם שתי רשימות, "thoughts" ו-"tips", ואפשר להוסיף "holidays" ו-"title".',
+        'This week you finished {n}:':
+            'השבוע הושלמו {n}:',
+        'This week...':
+            'השבוע...',
+        'holidays line {line} is not a date like 2026-12-25.':
+            'שורה {line} ב-holidays אינה תאריך בפורמט 2026-12-25.',
+        '{list} line {line} has a date.':
+            'בשורה {line} של {list} יש תאריך.',
+        '{list} line {line} has a link or an address.':
+            'בשורה {line} של {list} יש קישור או כתובת.',
+        '{list} line {line} has control characters or extra spaces.':
+            'בשורה {line} של {list} יש תווי בקרה או רווחים מיותרים.',
+        '{list} line {line} is not text.':
+            'שורה {line} של {list} אינה טקסט.',
+        '{list} line {line} must be {low} to {high} characters long.':
+            'שורה {line} של {list} חייבת להיות באורך {low} עד {high} תווים.',
+    },
+}
+
+# ---- European Portuguese ----
+
+_PT_PT_TEXT = {
+    HELP:
+        """hello-world mostra uma saudação, um pensamento e uma pequena coisa
+para experimentar.
+
+Na última pergunta, escreva plan para o plano de hoje, feito quando
+o terminar, ou menu (ou m) para ver as opções. Enter fecha; q, x e
+sair fecham a partir de qualquer pergunta. Na pergunta do plano,
+repetir recupera um plano anterior por terminar. Depois de feito,
+mostra os 3 últimos planos concluídos. A opção 1 do menu mostra-os
+todos, a 7 esquece um e a 8 oculta o pensamento e a sugestão.
+No menu, Enter volta atrás.
+Também pode executar o hello.cmd com uma destas opções:
+  --plain         Mostra só a saudação, em inglês
+  --stats         Mostra o que está guardado neste computador
+  --reset         Elimina tudo o que está guardado (pergunta antes)
+  --remind on     Abre uma vez por dia ao iniciar sessão (off: desliga)
+  --streak off    Oculta a mensagem de dias seguidos (on: mostra)
+  --version       Mostra a versão
+  --check-content FICHEIRO
+                  Verifica um ficheiro de conteúdo da organização
+  --help          Mostra este texto
+
+Códigos de saída: 0 se correu bem, 1 se um comando falhou ou não foi
+possível escrever no ecrã, 2 para uma opção desconhecida.
+
+As notas guardadas ficam neste computador, na sua pasta de
+utilizador. Nada é enviado para lado nenhum. Quem trabalha na
+informática e tem acesso aos ficheiros deste computador pode lê-las.""",
+    MENU_HELP:
+        """Palavras que pode escrever na última pergunta:
+  feito  marca o plano de hoje como concluído e pede o seguinte
+  plan   define ou altera o plano de hoje
+  menu   abre estas opções
+  q      fecha a janela, tal como Enter
+Na pergunta do plano, repetir recupera o plano anterior por terminar.
+Quando aparece "Conseguiu fazer?", n quer dizer ainda não, e pode
+manter o plano para hoje. q fecha a partir de qualquer pergunta.
+Neste menu, 1 mostra o que está guardado, 7 esquece um plano
+concluído e 8 oculta o pensamento e a sugestão.
+Escreva m para ver de novo as opções. Nada é enviado para lado nenhum.""",
+    SAVED_PLAN:
+        'Guardado. Escreva feito quando o terminar; caso contrário, a pergunta aparece da próxima vez que abrir o hello-world.',
+    GREETING:
+        'Olá, mundo!',
+    'hello.cmd is in this folder:':
+        'O hello.cmd está nesta pasta:',
+    'Shortened to {n} characters.':
+        'Encurtado para {n} caracteres.',
+    'Your saved file was damaged, so hello-world set it aside as a backup copy and started fresh. Your earlier days and plan could not be read. Menu option 4 deletes the backup.':
+        'O ficheiro guardado estava danificado, por isso o hello-world pô-lo de parte como cópia de segurança e recomeçou do zero. Não foi possível ler os dias nem o plano anteriores. A opção 4 do menu elimina a cópia de segurança.',
+    'Backup copy: ':
+        'Cópia de segurança: ',
+    'In the folder: ':
+        'Na pasta: ',
+    'Sorry, "{shown}" is not one of the choices.':
+        'Desculpe, "{shown}" não é uma das opções.',
+    'A plan needs a word or two, so nothing was saved.':
+        'Um plano precisa de uma ou duas palavras, por isso não foi guardado nada.',
+    'The sign-in reminder works on Windows only.':
+        'O lembrete ao iniciar sessão só funciona no Windows.',
+    'Your organization has turned off opening at sign-in.':
+        'A sua organização desativou a abertura ao iniciar sessão.',
+    'The reminder cannot be set up from this folder.':
+        'Não é possível configurar o lembrete a partir desta pasta.',
+    'Could not set up the reminder.':
+        'Não foi possível configurar o lembrete.',
+    'Done. hello-world will open once a day when you sign in.':
+        'Pronto. O hello-world vai abrir uma vez por dia ao iniciar sessão.',
+    'To stop it, choose option 2 in the menu.':
+        'Para o desativar, escolha a opção 2 do menu.',
+    'Could not turn off the sign-in reminder.':
+        'Não foi possível desativar o lembrete ao iniciar sessão.',
+    'Done. The sign-in reminder is off.':
+        'Pronto. O lembrete ao iniciar sessão está desativado.',
+    'Saved on this computer in:':
+        'Guardado neste computador em:',
+    'Saved in your own user folder on this computer.':
+        'Guardado na sua pasta de utilizador neste computador.',
+    'Days you opened it in the last {days} days: {n} (last 7 days: {recent})':
+        'Dias em que o abriu nos últimos {days} dias: {n} (últimos 7 dias: {recent})',
+    'Times you marked a plan done: {n}':
+        'Vezes que marcou um plano como feito: {n}',
+    'Your current plan: ':
+        'Plano atual: ',
+    'Earlier plan (for same): ':
+        'Plano anterior (para repetir): ',
+    'Days-in-a-row message: shown.':
+        'Mensagem de dias seguidos: visível.',
+    'Days-in-a-row message: hidden.':
+        'Mensagem de dias seguidos: oculta.',
+    'Opens by itself at sign-in: turned off by your organization.':
+        'Abertura automática ao iniciar sessão: desativada pela sua organização.',
+    'Opens by itself at sign-in: on.':
+        'Abertura automática ao iniciar sessão: ativada.',
+    'Opens by itself at sign-in: off.':
+        'Abertura automática ao iniciar sessão: desativada.',
+    "It never leaves this computer. Others who can read this computer's files, such as IT staff, could read it.":
+        'Nunca sai deste computador. Quem puder ler os ficheiros deste computador, como a equipa de informática, poderá lê-lo.',
+    'After tidying, the file holds only this:':
+        'Depois de arrumado, o ficheiro contém apenas isto:',
+    'Delete all saved notes, dates and plans on this computer? (y or n, Enter to cancel) > ':
+        'Eliminar todas as notas, datas e planos guardados neste computador? (s ou n, Enter para cancelar) > ',
+    'Nothing was deleted.':
+        'Não foi eliminado nada.',
+    'Could not delete everything.':
+        'Não foi possível eliminar tudo.',
+    'Delete these yourself:':
+        'Elimine estes ficheiros manualmente:',
+    'Could not list the folder, so backup copies may remain:':
+        'Não foi possível listar a pasta; podem ter ficado cópias de segurança:',
+    'Done. Everything saved was deleted.':
+        'Pronto. Tudo o que estava guardado foi eliminado.',
+    'Another open hello-world window cannot put it back.':
+        'Outra janela aberta do hello-world não o consegue repor.',
+    'Close any other open hello-world window, or it may save its notes again.':
+        'Feche qualquer outra janela aberta do hello-world; caso contrário, pode voltar a guardar as notas dela.',
+    'Everything saved was deleted in another window, so this was not saved.':
+        'Tudo o que estava guardado foi eliminado noutra janela, por isso isto não foi guardado.',
+    'The other open window had also finished a plan.':
+        'A outra janela aberta também tinha concluído um plano.',
+    'The other open window changed the plan, so its plan is kept.':
+        'A outra janela aberta alterou o plano, por isso fica o plano dela.',
+    'Type plan at the last prompt to set one.':
+        'Escreva plan na última pergunta para definir um.',
+    'That looks like a command, not a plan, so nothing was saved.':
+        'Isso parece um comando, não um plano, por isso não foi guardado nada.',
+    'Type your plan, or press Enter to go back.':
+        'Escreva o plano ou prima Enter para voltar.',
+    'Finished lately:':
+        'Concluídos recentemente:',
+    'Your plan today: ':
+        'Plano de hoje: ',
+    'Your plan from {date}: ':
+        'Plano de {date}: ',
+    'Earlier plan: ':
+        'Plano anterior: ',
+    'Type the next plan, or Enter to close > ':
+        'Escreva o plano seguinte, ou Enter para fechar > ',
+    'Type the next plan, same to reuse the earlier plan, or Enter to close > ':
+        'Escreva o plano seguinte, repetir para reutilizar o plano anterior, ou Enter para fechar > ',
+    "Type today's plan, or Enter to keep it > ":
+        'Escreva o plano de hoje, ou Enter para o manter > ',
+    "Type today's plan, same to reuse the earlier plan, or Enter to keep it > ":
+        'Escreva o plano de hoje, repetir para reutilizar o plano anterior, ou Enter para o manter > ',
+    "Type today's plan, or Enter to go back > ":
+        'Escreva o plano de hoje, ou Enter para voltar > ',
+    "Type today's plan, same to reuse the earlier plan, or Enter to go back > ":
+        'Escreva o plano de hoje, repetir para reutilizar o plano anterior, ou Enter para voltar > ',
+    'Closing.':
+        'A fechar.',
+    'There is no earlier plan to reuse yet. Nothing changed.':
+        'Ainda não há um plano anterior para reutilizar. Nada foi alterado.',
+    'Nothing changed.':
+        'Nada foi alterado.',
+    'Could not save that on this computer. Your plan is unchanged.':
+        'Não foi possível guardar neste computador. O plano não foi alterado.',
+    'No finished plans are saved.':
+        'Não há planos concluídos guardados.',
+    'Type the number to forget (1 to {n}), or Enter to keep them all > ':
+        'Escreva o número a esquecer (1 a {n}), ou Enter para manter todos > ',
+    'There is no number "{typed}" on the list. Type a number from 1 to {n}, or press Enter to keep them all.':
+        'Não há nenhum número "{typed}" na lista. Escreva um número de 1 a {n}, ou prima Enter para manter todos.',
+    'Also forget it as the earlier plan for same? (y or n, Enter to keep it for same) > ':
+        'Esquecê-lo também como plano anterior para repetir? (s ou n, Enter para o manter para repetir) > ',
+    'Type y or n, or press Enter to keep it for same.':
+        'Escreva s ou n, ou prima Enter para o manter para repetir.',
+    'That plan was already forgotten. Nothing changed.':
+        'Esse plano já tinha sido esquecido. Nada foi alterado.',
+    'Forgotten: ':
+        'Esquecido: ',
+    'Same still has it.':
+        'Continua disponível com repetir.',
+    'Could not save that on this computer. Nothing changed.':
+        'Não foi possível guardar neste computador. Nada foi alterado.',
+    'Options':
+        'Opções',
+    'Show what is saved on this computer':
+        'Mostrar o que está guardado neste computador',
+    'Open once a day at sign-in (turned off by your organization)':
+        'Abrir ao iniciar sessão (desativado pela organização)',
+    'Turn off: open once a day at sign-in (now on)':
+        'Desativar: abrir uma vez por dia ao iniciar sessão (agora ativado)',
+    'Turn on: open once a day at sign-in (now off)':
+        'Ativar: abrir uma vez por dia ao iniciar sessão (agora desativado)',
+    'Days-in-a-row message (hidden by your organization)':
+        'Mensagem de dias seguidos (oculta pela sua organização)',
+    'Hide the days-in-a-row message (now shown)':
+        'Ocultar a mensagem de dias seguidos (agora visível)',
+    'Show the days-in-a-row message (now hidden)':
+        'Mostrar a mensagem de dias seguidos (agora oculta)',
+    'Delete everything saved':
+        'Eliminar tudo o que está guardado',
+    'Help':
+        'Ajuda',
+    "Set today's plan (turned off by your organization)":
+        'Definir o plano de hoje (desativado pela sua organização)',
+    'Forget a finished plan (turned off by your organization)':
+        'Esquecer um plano concluído (desativado pela sua organização)',
+    "Set or change today's plan":
+        'Definir ou alterar o plano de hoje',
+    'Forget one finished plan':
+        'Esquecer um plano concluído',
+    'Thought and tip (hidden by your organization)':
+        'Pensamento e sugestão (ocultos pela sua organização)',
+    'Hide the thought and tip (now shown)':
+        'Ocultar o pensamento e a sugestão (agora visíveis)',
+    'Show the thought and tip (now hidden)':
+        'Mostrar o pensamento e a sugestão (agora ocultos)',
+    '{date}: ':
+        '{date}: ',
+    'Enter':
+        'Enter',
+    'Back to the last prompt':
+        'Voltar à última pergunta',
+    'Choose 1 to 11, or Enter to go back > ':
+        'Escolha de 1 a 11, ou Enter para voltar > ',
+    'Choose 1 to 11, m to list the options, or Enter to go back > ':
+        'Escolha de 1 a 11, m para ver as opções, ou Enter para voltar > ',
+    'The saved file could not be read just now, so this may be out of date.':
+        'Não foi possível ler o ficheiro guardado neste momento, por isso isto pode estar desatualizado.',
+    'Type full to see the whole file, or Enter to go on > ':
+        'Escreva full para ver o ficheiro completo, ou Enter para continuar > ',
+    'Could not save that choice on this computer.':
+        'Não foi possível guardar essa escolha neste computador.',
+    'Your organization has hidden the days-in-a-row message.':
+        'A sua organização ocultou a mensagem de dias seguidos.',
+    'Done. The days-in-a-row message is on.':
+        'Pronto. A mensagem de dias seguidos está ativada.',
+    'Done. The days-in-a-row message is off.':
+        'Pronto. A mensagem de dias seguidos está desativada.',
+    'Plans are turned off by your organization.':
+        'Os planos foram desativados pela sua organização.',
+    'Your organization has hidden the thought and tip.':
+        'A sua organização ocultou o pensamento e a sugestão.',
+    'Done. The thought and tip are on.':
+        'Pronto. O pensamento e a sugestão estão ativados.',
+    'Done. The thought and tip are off.':
+        'Pronto. O pensamento e a sugestão estão desativados.',
+    'Type 1 to 11, or press Enter to go back.':
+        'Escreva de 1 a 11, ou prima Enter para voltar.',
+    'Want it to open once a day when you sign in? (y or n, Enter for not now) > ':
+        'Quer que o hello-world abra uma vez por dia ao iniciar sessão? (s ou n, Enter para mais tarde) > ',
+    'Want it to open once a day when you sign in so it can ask about your plan? (y or n, Enter for not now) > ':
+        'Quer que o hello-world abra uma vez por dia ao iniciar sessão, para perguntar pelo plano? (s ou n, Enter para mais tarde) > ',
+    'Type y or n, or press Enter for not now.':
+        'Escreva s ou n, ou prima Enter para mais tarde.',
+    'That was not understood. It will ask again on a later visit.':
+        'Resposta não percebida. A pergunta volta numa próxima visita.',
+    'It will ask again on a later visit. Menu option 2 also turns it on.':
+        'A pergunta volta numa próxima visita. A opção 2 do menu também o ativa.',
+    'No problem. Menu option 2 turns it on later.':
+        'Não há problema. A opção 2 do menu ativa-o mais tarde.',
+    "Okay. It won't ask again. Menu option 2 turns it on.":
+        'Está bem. Não volta a perguntar. A opção 2 do menu ativa-o.',
+    'Okay. It will ask again on a later visit. Type n to stop it.':
+        'Está bem. A pergunta volta numa próxima visita. Escreva n para não voltar a perguntar.',
+    'When did you finish it?':
+        'Quando o concluiu?',
+    'Today':
+        'Hoje',
+    'Type a number from 1 to {n}, or Enter for 1 > ':
+        'Escreva um número de 1 a {n}, ou Enter para 1 > ',
+    'Type a number from 1 to {n}, or press Enter.':
+        'Escreva um número de 1 a {n}, ou prima Enter.',
+    'That looks like more than one thing. Finishing the first part still counts.':
+        'Isso parece mais do que uma coisa. Concluir a primeira parte já conta.',
+    'There is no plan to mark as done. Type plan to set one.':
+        'Não há nenhum plano para marcar como feito. Escreva plan para definir um.',
+    'Could not save that on this computer. The plan is still open.':
+        'Não foi possível guardar neste computador. O plano continua aberto.',
+    'Your plan from over two weeks ago was put away. Type same at the plan prompt to bring it back.':
+        'O plano de há mais de duas semanas foi posto de parte. Escreva repetir na pergunta do plano para o recuperar.',
+    "Press Enter at each question to skip it, and once more to close. That's it.":
+        'Prima Enter em cada pergunta para a saltar, e mais uma vez para fechar. É só isto.',
+    'Welcome.':
+        'Damos-lhe as boas-vindas.',
+    'Each day you get one thought and one small thing to try, the same for everyone.':
+        'Todos os dias há um pensamento e uma pequena coisa para experimentar, iguais para toda a gente.',
+    'If you type a plan, it asks next time how it went. Your notes stay on this computer and are never sent anywhere. Like any work file they are not secret, so keep them to everyday tasks.':
+        'Se escrever um plano, da próxima vez é perguntado como correu. As notas ficam neste computador e nunca são enviadas para lado nenhum. Como qualquer ficheiro de trabalho, não são secretas, por isso use-as só para tarefas do dia a dia.',
+    'Type menu at the end for the options.':
+        'Escreva menu no fim para ver as opções.',
+    'Welcome back. Glad you are here.':
+        'Olá outra vez. Ainda bem que voltou.',
+    'You have opened this {row} days in a row. Nice to see you.':
+        'Abriu o hello-world {row} dias seguidos. Que bom.',
+    'Last time you planned: ':
+        'Último plano: ',
+    'Did you do it? (y for yes, n for not yet, Enter to skip) > ':
+        'Conseguiu fazer? (s para sim, n para ainda não, Enter para saltar) > ',
+    'Type y or n, or press Enter to skip.':
+        'Escreva s ou n, ou prima Enter para saltar.',
+    'Could not save that on this computer. Your answer was not counted.':
+        'Não foi possível guardar neste computador. A resposta não foi contada.',
+    'That is fine. Keep it for today? (y or n, Enter to keep it) > ':
+        'Não faz mal. Manter para hoje? (s ou n, Enter para manter) > ',
+    'Type y to keep it, n to clear it, or press Enter to keep it.':
+        'Escreva s para manter, n para limpar, ou prima Enter para manter.',
+    'Cleared. Type same at a plan prompt if you want it back.':
+        'Plano removido. Escreva repetir numa pergunta de plano para o recuperar.',
+    'Kept for today.':
+        'Mantido para hoje.',
+    'That was not understood. Your plan is left as it was.':
+        'Não foi possível perceber a resposta. O plano ficou como estava.',
+    'Your plan is still open.':
+        'O plano continua por concluir.',
+    'Thought for today:':
+        'Pensamento do dia:',
+    'Try this today:':
+        'Para experimentar hoje:',
+    'Your plan for today: ':
+        'Plano para hoje: ',
+    'Still open since {date}:':
+        'Por concluir desde {date}:',
+    '(Enter to skip)':
+        '(Enter para saltar)',
+    '(A plan typed here replaces the old one. Enter to skip)':
+        '(Um plano escrito aqui substitui o anterior. Enter para saltar)',
+    '(Type same to reuse it, or Enter to skip)':
+        '(Escreva repetir para o reutilizar, ou Enter para saltar)',
+    'What is one thing you want to get done today?':
+        'Qual é a coisa que quer deixar feita hoje?',
+    'There is no earlier plan to reuse yet. Nothing was saved.':
+        'Ainda não há um plano anterior para reutilizar. Nada foi guardado.',
+    'Your notes could not be saved on this computer. This screen still works.':
+        'Não foi possível guardar as notas neste computador. Este ecrã continua a funcionar.',
+    'Type menu, or Enter to close > ':
+        'Escreva menu, ou Enter para fechar > ',
+    'Type done, plan or menu, or Enter to close > ':
+        'Escreva feito, plan ou menu, ou Enter para fechar > ',
+    'Type plan or menu, or Enter to close > ':
+        'Escreva plan ou menu, ou Enter para fechar > ',
+    'Type done, plan or menu, or press Enter to close.':
+        'Escreva feito, plan ou menu, ou prima Enter para fechar.',
+    'Type plan or menu, or press Enter to close.':
+        'Escreva plan ou menu, ou prima Enter para fechar.',
+    "The saved file can't be read right now, or it is damaged.":
+        'Não é possível ler agora o ficheiro guardado, ou está danificado.',
+    'Nothing was changed. Saved in: ':
+        'Nada foi alterado. Guardado em: ',
+    'Deleting saved notes needs a person at the keyboard.':
+        'Para eliminar as notas guardadas, é preciso estar alguém ao teclado.',
+    '{option} needs on or off. Here are the options.':
+        '{option} precisa de on ou off. Estas são as opções.',
+    'Unknown option: {option}. Here are the options.':
+        'Opção desconhecida: {option}. Estas são as opções.',
+    '&Done':
+        '&Feito',
+    '&Not yet':
+        '&Ainda não',
+    'S&kip':
+        '&Saltar',
+    '&Save':
+        '&Guardar',
+    '&I did it':
+        '&Já está',
+    '&Options':
+        '&Opções',
+    'Close':
+        'Fechar',
+    'Not today':
+        'Hoje não',
+    'Did you do it?':
+        'Conseguiu fazer?',
+    'Done. A reminder comes when you sign in, if there is a plan to ask about.':
+        'Pronto. Ao iniciar sessão, aparece um lembrete se houver um plano sobre o qual perguntar.',
+    'Done. The Start menu opens a window with buttons.':
+        'Pronto. O menu Iniciar abre uma janela com botões.',
+    'Done. The Start menu opens this text screen.':
+        'Pronto. O menu Iniciar abre este ecrã de texto.',
+    'More options':
+        'Mais opções',
+    'Remind me when I sign in':
+        'Lembrar-me ao iniciar sessão',
+    'Show the thought and tip':
+        'Mostrar o pensamento e a sugestão',
+    'Type your plan in the box.':
+        'Escreva o plano na caixa.',
+    'Use a window with buttons (now this text screen)':
+        'Usar uma janela com botões (agora este ecrã de texto)',
+    'Use the text screen':
+        'Usar o ecrã de texto',
+    'Use this text screen (now a window with buttons)':
+        'Usar este ecrã de texto (agora uma janela com botões)',
+    'Want a reminder when you sign in? It shows your plan from last time, and you answer with one click. You can turn it off under Options.':
+        'Quer um lembrete ao iniciar sessão? Mostra o plano da última vez e basta um clique para responder. Pode desativá-lo em Opções.',
+    'Window or text screen (set by your organization)':
+        'Janela ou ecrã de texto (definido pela sua organização)',
+    'Your organization has set hello-world to open as a text screen.':
+        'A sua organização definiu o hello-world para abrir como ecrã de texto.',
+    'Saved.':
+        'Guardado.',
+    'Save your plan before closing?':
+        'Guardar o plano antes de fechar?',
+    'Delete all saved notes, dates and plans on this computer?':
+        'Eliminar todas as notas, datas e planos guardados neste computador?',
+    'Turn off: reminder when you sign in (now on)':
+        'Desativar: lembrete ao iniciar sessão (agora ativado)',
+    'Turn on: reminder when you sign in (now off)':
+        'Ativar: lembrete ao iniciar sessão (agora desativado)',
+    'Reminder when you sign in (turned off by your organization)':
+        'Lembrete ao iniciar sessão (desativado pela sua organização)',
+    'Reminder when you sign in: on.':
+        'Lembrete ao iniciar sessão: ativado.',
+    'Reminder when you sign in: off.':
+        'Lembrete ao iniciar sessão: desativado.',
+    'Reminder when you sign in: turned off by your organization.':
+        'Lembrete ao iniciar sessão: desativado pela sua organização.',
+    'Show the days-in-a-row message':
+        'Mostrar a mensagem de dias seguidos',
+    'Done. The thought and tip show next time you open hello-world.':
+        'Pronto. O pensamento e a sugestão aparecem da próxima vez que abrir o hello-world.',
+    "Clear today's plan?":
+        'Limpar o plano de hoje?',
+    'Next plan, if you want one:':
+        'Próximo plano, se quiser:',
+    'A few things? Put ; between them.':
+        'Várias coisas? Separe-as com ;',
+    'A plan can be up to {n} characters.':
+        'Um plano pode ter até {n} caracteres.',
+    'Did you do them? (y for all, n for not yet, numbers for the ones you did, Enter to skip) > ':
+        'Conseguiu fazê-las? (s para todas, n para ainda não, os números das que fez, Enter para saltar) > ',
+    'Last time you planned:':
+        'Último plano:',
+    'The rest is kept for today.':
+        'O resto fica para hoje.',
+    'Tick the ones you did, then click Done. With none ticked, Done means all of them.':
+        'Assinale as que fez e clique em Feito. Sem nenhuma assinalada, Feito vale para todas.',
+    'Type y for all, n for not yet, or the numbers you did, such as 1 3. Enter skips.':
+        'Escreva s para todas, n para ainda não, ou os números das que fez, por exemplo 1 3. Enter salta.',
+    'Your settings were kept.':
+        'As definições foram mantidas.',
+    'Language (set by your organization)':
+        'Idioma (definido pela sua organização)',
+    'Language (now {name})':
+        'Idioma (agora {name})',
+    'following Windows':
+        'de acordo com o Windows',
+    'Your organization shows hello-world in English.':
+        'A sua organização mostra o hello-world em inglês.',
+    'Follow Windows':
+        'Seguir o Windows',
+    'Type a number from 1 to {n}, or Enter to keep it > ':
+        'Escreva um número de 1 a {n}, ou Enter para manter > ',
+    'Done. The new language shows next time you open hello-world.':
+        'Pronto. O novo idioma aparece da próxima vez que abrir o hello-world.',
+    'Language...':
+        'Idioma...',
+    'Hello, {name}!':
+        'Olá, {name}!',
+    'One thing to get done today? Open hello-world to plan it.':
+        'Uma coisa para fazer hoje? Abra o hello-world para a planear.',
+    '&Open':
+        '&Abrir',
+    'Reminder settings...':
+        'Definições do lembrete...',
+    'Greet me by name':
+        'Cumprimentar-me pelo nome',
+    'At sign-in':
+        'Ao iniciar sessão',
+    'At {at}':
+        'Às {at}',
+    'Also on days with no plan':
+        'Também nos dias sem plano',
+    'Open hello-world after I answer':
+        'Abrir o hello-world depois de responder',
+    'Not on weekends':
+        'Não aos fins de semana',
+    'Done. A reminder comes at {at} each day, if there is a plan to ask about.':
+        'Pronto. Todos os dias às {at} aparece um lembrete, se houver um plano sobre o qual perguntar.',
+    'Send feedback...':
+        'Enviar comentários...',
+    '"holidays" must be a list of at most {n} dates.':
+        '"holidays" tem de ser uma lista com, no máximo, {n} datas.',
+    '"title" must be 1 to 40 characters of plain text, with no link or address.':
+        '"title" tem de ter de 1 a 40 caracteres de texto simples, sem ligações nem endereços.',
+    '"{list}" must be a list of {low} to {high} lines.':
+        '"{list}" tem de ser uma lista de {low} a {high} linhas.',
+    "Can't read {path}: {error}":
+        'Não é possível ler {path}: {error}',
+    'Could not save that on this computer.':
+        'Não foi possível guardar neste computador.',
+    'Days you opened hello-world: {n}':
+        'Dias em que abriu o hello-world: {n}',
+    'Keep a longer history':
+        'Guardar um histórico mais longo',
+    'Keep my numbers':
+        'Guardar os meus números',
+    'Longest run of days: {n}':
+        'Maior sequência de dias: {n}',
+    "Mark today's plan done":
+        'Marcar o plano de hoje como feito',
+    "Mark today's plan done (plans are turned off)":
+        'Marcar o plano de hoje como feito (planos desativados)',
+    'My numbers are off. Turn them on under Options, or with --set numbers on.':
+        'Os meus números estão desativados. Pode ativá-los em Opções ou com --set numbers on.',
+    'My numbers...':
+        'Os meus números...',
+    'Nothing finished yet this week. That is fine.':
+        'Ainda nada concluído esta semana. Não faz mal.',
+    'OK: {thoughts} thoughts and {tips} tips.':
+        'OK: {thoughts} pensamentos e {tips} sugestões.',
+    'Plans finished: {n}':
+        'Planos concluídos: {n}',
+    'Save my plans to a file':
+        'Guardar os meus planos num ficheiro',
+    'Saved to {path}':
+        'Guardado em {path}',
+    "The file isn't valid JSON, or is over 200,000 characters.":
+        'O ficheiro não é JSON válido ou tem mais de 200 000 caracteres.',
+    'The file must hold an object with two lists, "thoughts" and "tips", and may add "holidays" and "title".':
+        'O ficheiro tem de conter um objeto com duas listas, "thoughts" e "tips", e pode acrescentar "holidays" e "title".',
+    'This week you finished {n}:':
+        'Esta semana concluiu {n}:',
+    'This week...':
+        'Esta semana...',
+    'holidays line {line} is not a date like 2026-12-25.':
+        'A linha {line} de holidays não é uma data como 2026-12-25.',
+    '{list} line {line} has a date.':
+        'A linha {line} de {list} tem uma data.',
+    '{list} line {line} has a link or an address.':
+        'A linha {line} de {list} tem uma ligação ou um endereço.',
+    '{list} line {line} has control characters or extra spaces.':
+        'A linha {line} de {list} tem caracteres de controlo ou espaços a mais.',
+    '{list} line {line} is not text.':
+        'A linha {line} de {list} não é texto.',
+    '{list} line {line} must be {low} to {high} characters long.':
+        'A linha {line} de {list} tem de ter entre {low} e {high} caracteres.',
+}
+LANGUAGES["pt-PT"] = {**LANGUAGES["pt"],
+    "text": {**LANGUAGES["pt"]["text"], **_PT_PT_TEXT},
+    "thoughts": _override(LANGUAGES["pt"]["thoughts"], {
+        0: 'Abrir aquele documento que tem andado a adiar e ler só o primeiro parágrafo.',
+        1: 'Dez minutos de arranque já são um começo, e costumam tornar os dez seguintes mais fáceis.',
+        2: 'Hoje não é preciso ter o plano todo, só um primeiro passo sensato.',
+        3: 'Escrever a primeira frase, mesmo que fique feia. Dá algo real para melhorar depois.',
+        4: 'Arrumar um cantinho da secretária e reparar como o resto parece logo mais calmo.',
+        5: 'Escolher a tarefa mais pequena da lista e terminá-la antes de olhar para as outras.',
+        6: 'Começar mal numa manhã calma é melhor do que esperar por um momento perfeito que pode não chegar.',
+        7: 'Pôr o primeiro passo no calendário, para que tenha um lugar seu.',
+        8: 'Os grandes projetos são sobretudo pequenas tardes umas atrás das outras. O objetivo é uma tarde de cada vez.',
+        9: 'Dizer em voz alta a próxima ação e deixar o resto da lista esperar pela sua vez.',
+        10: 'Há dias em que o ritmo é mais lento do que gostaria, e esse ritmo também conta.',
+        11: 'Falar consigo da mesma forma que falaria com alguém novo na equipa, na primeira semana.',
+        12: 'Não há mal nenhum em continuar a aprender algo que faz há anos.',
+        13: 'Uma manhã fraca não decide a tarde. Pode recomeçar depois do almoço.',
+        14: 'O cansaço é informação, não uma falha. Ajustar o plano e continuar com calma.',
+        15: 'Tratar-se com a mesma compreensão que oferece tão facilmente aos outros.',
+        16: 'O progresso muitas vezes parece nada durante algum tempo e, de repente, é uma página terminada.',
+        17: 'Não faz mal precisar de ler algo duas vezes para fazer sentido.',
+        18: 'Não é preciso sentir-se a postos. Fazer com nervos também é fazer.',
+        19: 'O melhor de hoje pode ser menos do que o de ontem, e não faz mal.',
+        20: 'Fechar os separadores que não estão a ser usados. A atenção agradece em poucos minutos.',
+        21: 'Uma tarefa, uma janela, vinte e cinco minutos. Ver até onde chega um bocado de sossego.',
+        22: 'Anotar o pensamento solto que aparecer e voltar ao que estava a fazer.',
+        23: 'Se possível, silenciar o telemóvel durante uma hora e dar ao trabalho toda a atenção.',
+        24: 'Decidir que coisa faria de hoje um bom dia e guardar tempo para ela.',
+        25: 'Fazer uma coisa de cada vez costuma ser mais rápido do que parece.',
+        26: 'Uma lista arrumada de três coisas vale mais do que uma lista dispersa de vinte.',
+        27: 'Reparar quando a mente se distrai e trazê-la de volta sem ralhar.',
+        28: 'Pôr a tarefa mais difícil na hora em que há mais energia, mesmo que não seja logo de manhã.',
+        29: 'Auscultadores postos, chaleira cheia, porta fechada. Preparar o ambiente e a concentração vem a seguir.',
+        30: 'Afastar-se do ecrã durante cinco minutos. No regresso, a cabeça vem um pouco mais clara.',
+        31: 'Hoje, almoçar longe da secretária. A caixa de entrada pode esperar por uma sandes.',
+        32: 'Uma volta curta ao edifício também é trabalho a sério para a cabeça.',
+        33: 'Um minuto longe do ecrã é uma boa forma de usar uma tarde atarefada.',
+        34: 'Esticar os ombros e descontrair o maxilar. Talvez estejam tensos há horas.',
+        35: 'Se possível, sair a horas hoje. Amanhã vai agradecer o serão livre.',
+        36: 'Descansar faz parte do trabalho, porque o cansaço leva a repetir o mesmo deslize.',
+        37: 'Descansar os olhos um momento e deixar cair os ombros.',
+        38: 'Uma pausa a sério faz a segunda metade do dia parecer um novo começo.',
+        39: 'O serão é seu. Nada na caixa de entrada precisa de resposta às nove da noite.',
+        40: 'Agradecer hoje a alguém uma pequena coisa que fez sem ninguém pedir.',
+        41: 'A maioria das pessoas está a fazer o melhor que pode, com mais coisas em mãos do que se vê.',
+        42: 'Descobrir como alguém da equipa gosta do chá ou do café. Lembrar-se disso é um pequeno presente.',
+        43: 'Se alguém responder de forma seca, pensar num dia difícil e não num julgamento.',
+        44: 'Segurar a porta, partilhar as bolachas e deixar a outra pessoa acabar a frase.',
+        45: 'Um olá rápido e uma pergunta sobre o fim de semana podem ser o melhor da manhã.',
+        46: 'Quando alguém novo perguntar algo óbvio, lembrar-se de que também já fez essa pergunta.',
+        47: 'Reconhecer em voz alta quando a ideia de alguém da equipa melhorou o trabalho.',
+        48: 'Responder a uma mensagem com um pouco de simpatia. Não custa nada e é bem recebido.',
+        49: 'Falar com alguém da equipa que tem falado pouco nas reuniões e perguntar como está.',
+        50: 'Terminar o que está quase feito antes de começar algo novo.',
+        51: 'Terminado e suficientemente bom costuma ser mais útil do que perfeito e por terminar.',
+        52: 'Fechar hoje um assunto pendente e reparar no pequeno alívio que vem a seguir.',
+        53: 'Os últimos dez por cento são muitas vezes só uns minutos de cuidado. Vale a pena dedicá-los hoje.',
+        54: 'Enviar o e-mail que está à espera nos rascunhos. Provavelmente está bem assim.',
+        55: 'Marcar como concluído, respirar fundo e ficar contente por estar feito.',
+        56: 'Uma coisa pequena terminada vale mais do que uma grande a meio.',
+        57: 'Antes de terminar a sessão, anotar o primeiro passo de amanhã para não ter de se lembrar dele.',
+        58: 'Ler mais uma vez, corrigir o que encontrar e depois enviar.',
+        59: 'Acabar o dia com um resultado arrumado torna o serão mais leve.',
+        60: 'Perguntar cedo costuma poupar uma hora de luta em silêncio mais tarde.',
+        61: 'A maioria das pessoas gosta que lhe peçam o que sabe. Perguntar sem pedir desculpa.',
+        62: '"Não sei como avançar" é uma frase clara e útil, com a qual a equipa pode trabalhar.',
+        63: 'Pedir o que precisa em palavras simples e dar aos outros a oportunidade de dizer que sim.',
+        64: 'Duas pessoas a olhar para um problema resolvem-no muitas vezes mais depressa do que uma sozinha.',
+        65: 'Precisar de ajuda não faz de ninguém um fardo. Faz parte de trabalhar em equipa.',
+        66: 'Levar uma pergunta concreta permite a quem responde dar uma resposta concreta.',
+        67: 'Se as instruções não forem claras, pedir esclarecimentos faz parte de fazer bem o trabalho.',
+        68: 'Oferecer ajuda quando puder e aceitá-la quando precisar. As duas coisas ficam mais fáceis com a prática.',
+        69: 'Provavelmente alguém ao fundo do corredor já resolveu isto. Vale a pena ir procurar essa pessoa.',
+        70: 'Tomar nota do que conseguiu resolver esta semana. Soma mais do que parece.',
+        71: 'Ser principiante em algo novo é sinal de que o trabalho continua a crescer.',
+        72: 'Reparar como alguém que admira lida com uma chamada difícil e aproveitar uma coisa.',
+        73: 'Ler uma página útil durante a pausa e dar o dia por bem aproveitado para a cabeça.',
+        74: 'Explicar uma tarefa a outra pessoa é uma forma surpreendentemente boa de a aprender.',
+        75: 'Não faz mal dizer "ainda não sei" e depois ir descobrir.',
+        76: 'Qualquer sistema desconhecido parece confuso até ser usado meia dúzia de vezes.',
+        77: 'Perguntar a alguém com mais experiência como aprendeu. A resposta costuma tranquilizar.',
+        78: 'As competências vêm da repetição. Repetir a coisa pequena até ficar fácil.',
+        79: 'Um pouco de curiosidade sobre uma tarefa comum pode torná-la mais interessante.',
+        80: 'Um erro apanhado cedo é só uma correção, e a maioria é apanhada cedo.',
+        81: 'Corrigir, avisar quem precisa de saber e deixar passar o incómodo.',
+        82: 'Quase todos os erros no trabalho parecem mais pequenos uma semana depois.',
+        83: 'Um deslize não apaga os anos de trabalho cuidadoso que ficaram para trás.',
+        84: 'Quando algo corre mal, olhar primeiro para o processo e só depois para a pessoa.',
+        85: 'Toda a gente à sua volta já enviou um e-mail à pessoa errada pelo menos uma vez.',
+        86: 'Ficar com a lição que um erro traz e deixar o resto para trás.',
+        87: 'Assumir um erro com simplicidade costuma gerar mais confiança do que nunca ter errado.',
+        88: 'Até as pessoas cuidadosas têm dias desastrados, e esses dias passam até ao fim da tarde.',
+        89: 'Daqui a um mês, a maioria dos pequenos tropeções de hoje já estará esquecida.',
+        90: 'Um dia calmo sem nada a arder é um bom dia, mesmo que ninguém o diga.',
+        91: 'Reparar nos pequenos prazeres: uma caneca quente, uma caixa de entrada vazia, um minuto de sossego.',
+        92: 'Nem todos os dias precisam de uma grande vitória. Com constância e bom ambiente também se trabalha bem.',
+        93: 'Aproveitar a reunião que acaba cinco minutos mais cedo e usar esse tempo como quiser.',
+        94: 'Um dia normal bem feito é motivo para um orgulho tranquilo.',
+        95: 'O bom trabalho muitas vezes não se nota de fora, e não faz mal.',
+        96: 'Deixar uma tarde agradável ser agradável, sem esperar que seja produtiva.',
+        97: 'As pequenas rotinas do dia, o primeiro café e as caras conhecidas, merecem atenção.',
+        98: 'Hoje esteve cá e fez a sua parte, e isso chega.',
+        99: 'Ao fim do dia, tirar um momento para recordar uma coisa que correu bem hoje.',
+        100: 'Um minuto de sossego entre duas tarefas não é tempo perdido; é assim que a seguinte começa bem.',
+    }),
+    "tips": _override(LANGUAGES["pt"]["tips"], {
+        0: 'Beber um copo de água devagar, longe do ecrã.',
+        1: 'Rodar os ombros para trás cinco vezes, bem devagar.',
+        2: 'Descansar os olhos vinte segundos: olhar para longe ou fechá-los.',
+        3: 'Esticar os braços para cima, na cadeira ou de pé, e respirar fundo.',
+        4: 'Ir até à sala ou janela mais distante que conseguir e voltar.',
+        5: 'Verificar a postura e deixar os ombros descer, longe das orelhas.',
+        6: 'Rodar o pescoço devagar de um lado para o outro, só até onde for confortável.',
+        7: 'Abrir e fechar as mãos dez vezes para soltar os dedos.',
+        8: 'Afixar o documento que abre mais vezes, para ficar à distância de um clique.',
+        9: 'Dar um pequeno passeio lá fora, a pé ou em cadeira de rodas, como for melhor.',
+        10: 'Servir uma bebida quente ou fresca e apreciá-la longe do ecrã.',
+        11: 'Pousar a atenção em algo calmo: uma vista, um som ou uma textura.',
+        12: 'Escrever o próximo passo de uma tarefa que ficou a meio.',
+        13: 'Assentar bem os pés no chão e endireitar as costas, na cadeira ou de pé, durante dez respirações.',
+        14: 'Silenciar um chat de grupo que só lê na diagonal.',
+        15: 'Descontrair o maxilar e relaxar a testa por um momento.',
+        16: 'Mexer-se durante dois minutos, da forma que souber melhor hoje.',
+        17: 'Reservar quinze minutos no calendário para a tarefa que anda sempre a adiar.',
+        18: 'Ajustar a cadeira, o ecrã ou o teclado para que uma coisa fique mais confortável.',
+        19: 'Se possível, ir pelo caminho mais longo para a próxima reunião ou chamada.',
+        20: 'Guardar um modelo para um e-mail que escreve vezes sem conta.',
+        21: 'Aprender um atalho de teclado do programa que mais usa.',
+        22: 'Beber um copo de água cheio antes do próximo café ou chá.',
+        23: 'Encolher os ombros até às orelhas e depois deixá-los descer devagar.',
+        24: 'Sair um minuto ou abrir uma janela para apanhar ar fresco.',
+        25: 'Respirar devagar cinco vezes, com cada expiração um pouco mais longa.',
+        26: 'Fazer uma pausa de um minuto em silêncio antes de abrir a próxima mensagem.',
+        27: 'Anotar uma coisa boa que já aconteceu hoje.',
+        28: 'Fechar os olhos durante três respirações e reparar em como se sente.',
+        29: 'Nomear três coisas que nota neste momento, com qualquer um dos sentidos.',
+        30: 'Escrever uma coisa boa que vem aí esta semana.',
+        31: 'Pôr um temporizador de dois minutos e ficar simplesmente sem ecrã.',
+        32: 'Apreciar algo pequeno por perto, como uma planta ou a caneca preferida.',
+        33: 'Pensar numa coisa que fez bem esta semana e reconhecê-la.',
+        34: 'Ouvir uma canção preferida do princípio ao fim, sem mais nada aberto.',
+        35: 'Inspirar a contar até quatro e expirar a contar até seis, três vezes.',
+        36: 'Respirar uma vez antes de reagir ao próximo pequeno incómodo.',
+        37: 'Anotar uma coisa que deu vontade de rir há pouco tempo.',
+        38: 'Durante um minuto, reparar em algo agradável: um som, um cheiro ou algo em que toca.',
+        39: 'Recordar um sítio de que gosta muito e imaginá-lo durante trinta segundos.',
+        40: 'Dizer "por agora está bom assim" sobre uma tarefa pequena e seguir em frente.',
+        41: 'Escrever uma frase sobre algo pelo qual sente gratidão.',
+        42: 'Saborear o próximo gole da bebida e reparar no sabor.',
+        43: 'Fazer uma pequena pausa entre duas tarefas antes de começar a seguinte.',
+        44: 'Procurar hoje uma coisa que corra melhor do que esperava.',
+        45: 'Escolher uma palavra para a forma como quer que a tarde seja.',
+        46: 'Deixar a mente descansar sessenta segundos e depois voltar à próxima tarefa.',
+        47: 'Sentir os pés no chão e a firmeza que isso dá, durante um momento.',
+        48: 'Recordar algo simpático que alguém fez por si e aproveitar a memória.',
+        49: 'Anotar uma ideia para retomar mais tarde e deixá-la repousar.',
+        50: 'Arrumar um pequeno canto da secretária, só um.',
+        51: 'Responder a uma mensagem que está à espera há algum tempo.',
+        52: 'Apontar a tarefa principal de amanhã num post-it ou nas notas.',
+        53: 'Fechar os separadores do browser que já não são precisos.',
+        54: 'Agradecer a alguém da equipa uma coisa que fez recentemente.',
+        55: 'Arquivar cinco e-mails antigos que já não são precisos.',
+        56: 'Mudar o nome de um ficheiro desarrumado para o encontrar facilmente mais tarde.',
+        57: 'Tirar um ou dois ficheiros perdidos do ambiente de trabalho.',
+        58: 'Apagar um lembrete antigo que já não se aplica.',
+        59: 'Dar um título claro a um documento que abre muitas vezes.',
+        60: 'Riscar uma tarefa pequena da lista de tarefas.',
+        61: 'Cancelar a subscrição de uma newsletter que nunca lê.',
+        62: 'Limpar o teclado ou o ecrã com um pano macio.',
+        63: 'Deixar uma caneta, um caderno e água ao alcance da mão.',
+        64: 'Escrever uma nota curta para amanhã a dizer onde ficou hoje.',
+        65: 'Escolher a tarefa mais importante desta tarde e fazê-la primeiro.',
+        66: 'Esvaziar o caixote do lixo ou da reciclagem junto à secretária.',
+        67: 'Atualizar uma nota de progresso para que os outros vejam em que ponto estão as coisas.',
+        68: 'Arrumar a pasta Transferências: mover só uma mão-cheia de ficheiros.',
+        69: 'Criar um lembrete para uma coisa que costuma esquecer.',
+        70: 'Desativar uma notificação que não faz mesmo falta.',
+        71: 'Adicionar aos favoritos uma página que está sempre a procurar.',
+        72: 'Escrever um resumo de duas linhas de uma reunião enquanto ainda está fresca.',
+        73: 'Perguntar se uma reunião recorrente podia ser um pouco mais curta.',
+        74: 'Definir um único objetivo para a próxima hora e escrevê-lo.',
+        75: 'Perguntar a alguém da equipa como está a correr o dia e ouvir com atenção.',
+        76: 'Partilhar uma ligação útil com alguém que possa gostar dela.',
+        77: 'Cumprimentar alguém com quem ainda não falou.',
+        78: 'Enviar uma nota rápida de agradecimento a alguém que ajudou recentemente.',
+        79: 'Cumprimentar toda a gente com simpatia no início da próxima chamada.',
+        80: 'Perguntar a alguém da equipa o que de bom vem aí esta semana.',
+        81: 'Dar os parabéns a alguém por uma pequena vitória em que reparou.',
+        82: 'Convidar alguém do trabalho para uma conversa rápida com um chá, um café ou numa chamada.',
+        83: 'Elogiar algo concreto que alguém do trabalho fez bem.',
+        84: 'Aprender o nome de alguém que vê muitas vezes mas ainda não conhece.',
+        85: 'Partilhar um conselho útil com alguém da equipa que possa precisar dele.',
+        86: 'Pedir a alguém que recomende uma música, uma série ou um livro.',
+        87: 'Ir saber de alguém do trabalho que tem falado pouco ultimamente.',
+        88: 'Oferecer ajuda numa coisa pequena se alguém parecer ter muito trabalho.',
+        89: 'Cumprimentar com simpatia a próxima pessoa com quem se cruzar.',
+        90: 'Passar a alguém do trabalho uma palavra simpática que ouviu sobre essa pessoa.',
+        91: 'Perguntar a alguém do trabalho o que lhe facilitou a semana.',
+        92: 'Enviar uma mensagem simpática a alguém com quem já trabalhou.',
+        93: 'Agradecer a quem mantém os espaços partilhados a funcionar bem.',
+        94: 'Apresentar duas pessoas do trabalho que possam gostar de se conhecer.',
+        95: 'Perguntar a alguém da equipa como pode facilitar a passagem de uma tarefa.',
+        96: 'Partilhar uma piada pequena e inofensiva com alguém por perto.',
+        97: 'Pôr um pouco mais de simpatia no próximo pedido e no próximo agradecimento.',
+        98: 'Perguntar a alguém do trabalho o que gosta de fazer nos tempos livres.',
+        99: 'Ouvir com toda a atenção a próxima pessoa que falar consigo, sem fazer outras coisas ao mesmo tempo.',
+    }),
+    "done": _override(LANGUAGES["pt"]["done"], {
+        0: 'Muito bem. Esse já está.',
+        1: 'Boa. Sabe bem terminar alguma coisa.',
+        2: 'Muito bem. Agora uma pequena pausa antes do próximo.',
+        3: 'Boa. As pequenas tarefas concluídas vão somando.',
+        4: 'Está feito. É motivo para ficar contente.',
+        5: 'Boa. Menos uma coisa na lista.',
+    }),
+}
+
+# ---- Arabic ----
+
+LANGUAGES["ar"] = {
+    "days": ('الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد'),
+    "months": ('يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'),
+    "date": '{day}، {d} {month} {year}',
+    "thoughts": (
+        'يكفي فتح المستند الذي طال تأجيله وقراءة فقرته الأولى فقط.',
+        'عشر دقائق من البدء تبقى بداية، وغالبًا ما تجعل الدقائق العشر التالية أسهل.',
+        'لا حاجة إلى الخطة كاملة اليوم، تكفي خطوة أولى معقولة.',
+        'الجملة الأولى الركيكة تستحق الكتابة، فهي تمنحك شيئًا حقيقيًا لتحسينه لاحقًا.',
+        'ترتيب زاوية صغيرة من المكتب يجعل بقيته تبدو أهدأ بكثير.',
+        'البدء بأصغر مهمة في القائمة وإنهاؤها قبل النظر إلى البقية.',
+        'بداية متعثرة في صباح هادئ أفضل من انتظار لحظة مثالية قد لا تأتي.',
+        'وضع الخطوة الأولى في التقويم يمنحها مكانًا ثابتًا.',
+        'المشاريع الكبيرة في معظمها جلسات عمل صغيرة متراكمة، فلتكن الغاية جلسة واحدة.',
+        'يكفي تسمية الخطوة التالية بصوت مسموع، ولتنتظر بقية القائمة دورها.',
+        'في بعض الأيام يكون الإيقاع أبطأ مما نحب، وهذا الإيقاع يُحتسب أيضًا.',
+        'لنتحدث إلى أنفسنا كما نتحدث إلى زميل جديد في أسبوعه الأول.',
+        'لا بأس في أن نظل نتعلم شيئًا نفعله منذ سنوات.',
+        'الصباح الفاتر لا يحدد شكل ما بعد الظهر. يمكن البدء من جديد بعد الغداء.',
+        'التعب معلومة، لا تقصير. نعدّل الخطة ونكمل بهدوء.',
+        'لنمنح أنفسنا التسامح نفسه الذي نمنحه للآخرين بسهولة.',
+        'كثيرًا ما يبدو التقدم كأنه لا شيء لفترة، ثم يصير فجأة صفحة مكتملة.',
+        'لا بأس في الحاجة إلى قراءة ثانية حتى تتضح الأمور.',
+        'ليس شرطًا أن نشعر بالاستعداد. العمل مع شيء من التوتر يبقى عملًا.',
+        'قد يكون أفضل ما نقدر عليه اليوم أقل مما كان بالأمس، ولا بأس بذلك.',
+        'إغلاق علامات التبويب غير المستخدمة يريح الانتباه خلال دقائق.',
+        'مهمة واحدة، نافذة واحدة، خمس وعشرون دقيقة. لنرَ إلى أين تصل فترة هادئة.',
+        'تدوين الفكرة العابرة حين تخطر، ثم العودة إلى ما كنا نفعله.',
+        'إسكات الهاتف لساعة إن أمكن، ومنح العمل كامل الانتباه.',
+        'ما الشيء الواحد الذي يجعل اليوم يومًا جيدًا؟ يستحق أن يُحجز له وقت.',
+        'إنجاز الأمور واحدًا تلو الآخر أسرع عادةً مما يبدو.',
+        'قائمة مرتبة من ثلاثة أشياء أفضل من قائمة مبعثرة من عشرين.',
+        'حين يشرد الذهن، نعيده بهدوء ومن دون لوم.',
+        'أصعب مهمة تستحق أفضل أوقات النشاط، حتى لو لم يكن ذلك أول الصباح.',
+        'سماعات على الأذنين، وإبريق الشاي جاهز، وباب مغلق. حين تتهيأ الأجواء يأتي التركيز.',
+        'خمس دقائق بعيدًا عن الشاشة تعيدنا إليها بذهن أصفى قليلًا.',
+        'غداء اليوم بعيدًا عن المكتب. يمكن للبريد أن ينتظر ريثما ينتهي الغداء.',
+        'جولة قصيرة حول المبنى عمل حقيقي لصالح الذهن.',
+        'دقيقة بعيدًا عن الشاشة وقت في محله، حتى في يوم مزدحم.',
+        'إرخاء الكتفين وفك انقباض الفك. ربما بقيا مشدودين لساعات.',
+        'المغادرة في الموعد الليلة إن أمكن. غدًا ستشكرك نفسك على هذا المساء.',
+        'الراحة جزء من العمل، فالتعب يدفع إلى تكرار الخطأ نفسه.',
+        'إراحة العينين لحظة، وترك الكتفين ينخفضان.',
+        'استراحة حقيقية تجعل النصف الثاني من اليوم يبدو كبداية جديدة.',
+        'المساء لك. لا شيء في البريد يحتاج إليك في التاسعة ليلًا.',
+        'كلمة شكر اليوم لشخص قام بشيء صغير من دون أن يُطلب منه.',
+        'معظم الناس يبذلون ما في وسعهم، وعلى كاهلهم أكثر مما يظهر.',
+        'معرفة كيف يحب الزميل شايه أو قهوته هدية صغيرة تستحق التذكر.',
+        'إن بدا أحدهم حادًّا معك، فالأرجح أن يومه صعب، لا أنه يحكم عليك.',
+        'إمساك الباب، ومشاركة البسكويت، وترك الآخرين يكملون كلامهم.',
+        'تحية سريعة وسؤال عن عطلة نهاية الأسبوع قد يكونان أجمل ما في الصباح.',
+        'حين يسأل زميل جديد عن شيء بديهي، لنتذكر أننا سألنا عنه يومًا.',
+        'فكرة زميل حسّنت عملك؟ ذِكر فضله أمام الآخرين لفتة جميلة.',
+        'قليل من الدفء في الرد على رسالة لا يكلف شيئًا ويصل بلطف.',
+        'زميل كان هادئًا في الاجتماعات مؤخرًا قد يسعده سؤال عن حاله.',
+        'إنهاء ما أوشك على الاكتمال قبل البدء بشيء جديد.',
+        'المنجَز الجيد بما يكفي أنفع عادةً من الكامل غير المنجَز.',
+        'إغلاق مسألة معلقة واحدة اليوم، وملاحظة الارتياح الصغير الذي يليه.',
+        'الجزء الأخير غالبًا ليس سوى دقائق قليلة من العناية. اليوم وقت مناسب لها.',
+        'الرسالة المنتظرة في المسودات جاهزة على الأرجح كما هي. حان وقت إرسالها.',
+        'وضع علامة الاكتمال، وأخذ نفس، والرضا بأنه انتهى.',
+        'شيء صغير مكتمل أثمن من شيء كبير نصف مكتمل.',
+        'قبل تسجيل الخروج، تدوين أول خطوة للغد على ورقة يغني عن تذكرها.',
+        'قراءة أخيرة، وتصحيح ما يظهر، ثم الإرسال.',
+        'إنهاء اليوم بنتيجة واحدة مرتبة يجعل المساء أخف.',
+        'السؤال المبكر يوفر غالبًا ساعة من المعاناة الصامتة لاحقًا.',
+        'معظم الناس يسعدهم أن يُسألوا عما يعرفون. لا داعي للاعتذار عند السؤال.',
+        '"أحتاج إلى مساعدة هنا" جملة واضحة ومفيدة يستطيع الزملاء البناء عليها.',
+        'طلب ما نحتاج إليه بكلمات بسيطة يمنح الآخرين فرصة لقول نعم.',
+        'اثنان ينظران إلى مشكلة يحلانها غالبًا أسرع من واحد يحدق فيها وحده.',
+        'طلب المساعدة لا يجعلك عبئًا. أنت جزء من الفريق.',
+        'السؤال المحدد يلقى إجابة محددة.',
+        'حين تكون التعليمات غير واضحة، فطلب التوضيح جزء من أداء العمل كما ينبغي.',
+        'تقديم المساعدة عند الإمكان، وقبولها عند الحاجة. كلاهما يسهل بالممارسة.',
+        'على الأرجح أن أحدًا في آخر الممر حلّ هذا من قبل. يستحق أن نبحث عنه.',
+        'قائمة صغيرة بما تعلمناه هذا الأسبوع تكبر أسرع مما نظن.',
+        'أن نكون مبتدئين في شيء جديد علامة على أن عملنا لا يزال ينمو.',
+        'مراقبة كيف يتعامل زميل نقدّره مع مكالمة صعبة، واستعارة شيء واحد منه.',
+        'قراءة صفحة مفيدة واحدة في الاستراحة تكفي ليكون اليوم جيدًا للذهن.',
+        'شرح مهمة لشخص آخر طريقة جيدة على نحو مفاجئ لتعلّمها.',
+        'لا بأس بقول "لا أعرف ذلك بعد"، ثم البحث عن الإجابة.',
+        'كل نظام غير مألوف يبدو مربكًا حتى نستخدمه بضع مرات.',
+        'سؤال صاحب الخبرة عن طريقة تعلّمه كثيرًا ما يأتي بإجابة مطمئنة.',
+        'المهارة تأتي من التكرار، فلنكرر الشيء الصغير حتى يصبح سهلًا.',
+        'قليل من الفضول تجاه مهمة عادية قد يجعلها أكثر إمتاعًا.',
+        'الخطأ الذي يُكتشف مبكرًا مجرد تصحيح، ومعظم الأخطاء تُكتشف مبكرًا.',
+        'الإصلاح، ثم إبلاغ من يلزم، ثم ترك الانزعاج يتلاشى.',
+        'كل خطأ تقريبًا في العمل يبدو بعد أسبوع أصغر مما بدا في لحظته.',
+        'زلة واحدة لا تمحو سنوات العمل المتقن خلفك.',
+        'حين يحدث خطأ، ننظر في الإجراءات أولًا، ثم في الأشخاص.',
+        'كل من حولك أرسل بريدًا إلى الشخص الخطأ مرة واحدة على الأقل.',
+        'من كل خطأ درس واحد نأخذه، والباقي نتركه خلفنا.',
+        'الاعتراف بالخطأ بوضوح يكسب ثقة أكبر عادةً من ألا يخطئ المرء أبدًا.',
+        'اليوم المتعثر يمر به الحريصون أيضًا، وينتهي بحلول المساء.',
+        'معظم عثرات اليوم الصغيرة لن يبقى منها شيء في الذاكرة الشهر المقبل.',
+        'يوم هادئ بلا حرائق يوم جيد، حتى لو لم يذكره أحد.',
+        'المتع الصغيرة تستحق الانتباه: كوب دافئ، وبريد فارغ، ودقيقة هادئة.',
+        'ليس كل يوم بحاجة إلى إنجاز كبير. الثبات والهدوء طريقة جيدة للعمل.',
+        'اجتماع ينتهي قبل موعده بخمس دقائق متعة صغيرة، والدقائق الخمس لك.',
+        'يوم عادي أُنجز جيدًا أمر يستحق فخرًا هادئًا.',
+        'العمل الجيد يبدو غالبًا عاديًا من الخارج، ولا بأس بذلك.',
+        'إن كان العصر هادئًا لطيفًا، فليبقَ كذلك من دون انتظار أن يكون مثمرًا.',
+        'تفاصيل اليوم الصغيرة، كالقهوة الأولى والوجوه المألوفة، تستحق الانتباه.',
+        'اليوم حضرت وقمت بنصيبك، وهذا كافٍ تمامًا.',
+        'لحظة هذا المساء لتذكّر شيء واحد سار على ما يرام اليوم.',
+        'دقيقة هادئة بين مهمتين ليست وقتًا ضائعًا، بل بها تبدأ المهمة التالية جيدًا.',
+    ),
+    "tips": (
+        'ارتشاف كوب ماء ببطء، بعيدًا عن الشاشة.',
+        'تدوير الكتفين إلى الخلف خمس مرات، على مهل.',
+        'إراحة العينين عشرين ثانية: بالنظر بعيدًا، أو بإغماضهما.',
+        'مدّ الذراعين فوق الرأس، جلوسًا أو وقوفًا، مع نفس عميق.',
+        'الذهاب إلى أبعد غرفة أو نافذة يمكن الوصول إليها، ثم العودة.',
+        'الانتباه إلى وضعية الجلوس، وإرخاء الكتفين بعيدًا عن الأذنين.',
+        'تحريك الرقبة برفق من جانب إلى آخر، في حدود الراحة فقط.',
+        'فتح اليدين وإغلاقهما عشر مرات لإرخاء الأصابع.',
+        'تثبيت المستند الأكثر استخدامًا ليصبح على بعد نقرة واحدة.',
+        'جولة قصيرة في الخارج، مشيًا أو بالكرسي المتحرك، حسب ما يناسب.',
+        'تحضير مشروب دافئ أو بارد والاستمتاع به بعيدًا عن الشاشة.',
+        'إراحة الانتباه على شيء هادئ: منظر، أو صوت، أو ملمس.',
+        'كتابة الخطوة التالية لمهمة توقفت في منتصفها.',
+        'وضع القدمين على الأرض والجلوس أو الوقوف باستقامة لعشرة أنفاس.',
+        'كتم صوت مجموعة دردشة لا تُقرأ إلا على عجل.',
+        'إرخاء الفك والجبهة للحظة.',
+        'الحركة لدقيقتين بأي طريقة مريحة اليوم.',
+        'حجز ربع ساعة في التقويم للمهمة التي تتأجل باستمرار.',
+        'ضبط الكرسي أو الشاشة أو لوحة المفاتيح لجعل شيء واحد أكثر راحة.',
+        'سلوك الطريق الأطول إلى الاجتماع أو المكالمة التالية، إن أمكن.',
+        'حفظ قالب لرسالة بريد تتكرر كتابتها.',
+        'تعلّم اختصار لوحة مفاتيح واحد للبرنامج الأكثر استخدامًا.',
+        'شرب كوب ماء كامل قبل القهوة أو الشاي التالي.',
+        'رفع الكتفين نحو الأذنين، ثم تركهما ينسدلان.',
+        'الخروج أو فتح نافذة لدقيقة من الهواء النقي.',
+        'خمسة أنفاس بطيئة، مع إطالة كل زفير قليلًا.',
+        'دقيقة هدوء قبل فتح الرسالة التالية.',
+        'تدوين شيء جيد حدث اليوم حتى الآن.',
+        'إغماض العينين لثلاثة أنفاس، والانتباه إلى الشعور الحالي.',
+        'تسمية ثلاثة أشياء ملحوظة الآن، بأي حاسة.',
+        'تدوين شيء يُنتظر بشوق هذا الأسبوع.',
+        'ضبط مؤقت لدقيقتين والجلوس ببساطة بلا شاشة.',
+        'الاستمتاع بشيء صغير قريب، مثل نبتة أو كوب مفضل.',
+        'تذكّر شيء أُنجز جيدًا هذا الأسبوع، والرضا عنه للحظة.',
+        'الاستماع إلى أغنية مفضلة من أولها إلى آخرها، بلا أي شيء آخر مفتوح.',
+        'شهيق لأربع عدّات وزفير لست، ثلاث مرات.',
+        'نفس واحد قبل الرد على الإزعاج الصغير التالي.',
+        'تدوين شيء أضحكك مؤخرًا.',
+        'دقيقة لملاحظة شيء لطيف: صوت، أو رائحة، أو ملمس.',
+        'استحضار مكان محبب وتخيّله لثلاثين ثانية.',
+        'قول "جيد بما يكفي الآن" عن مهمة صغيرة، ثم المضي قدمًا.',
+        'كتابة جملة واحدة عن شيء يبعث على الامتنان.',
+        'تذوّق الرشفة التالية من المشروب والانتباه إلى طعمها.',
+        'استراحة قصيرة بين مهمتين قبل بدء التالية.',
+        'البحث اليوم عن شيء واحد يأتي أفضل من المتوقع.',
+        'اختيار كلمة واحدة تصف الشعور المرجو لفترة ما بعد الظهر.',
+        'إراحة الذهن ستين ثانية، ثم العودة إلى المهمة التالية.',
+        'الإحساس بالقدمين على الأرض، والثبات للحظة.',
+        'تذكّر لطف قدّمه أحدهم لك، والاستمتاع بالذكرى.',
+        'تدوين فكرة للعودة إليها لاحقًا، ثم تركها جانبًا.',
+        'ترتيب زاوية صغيرة من المكتب، واحدة فقط.',
+        'الرد على رسالة واحدة تنتظر منذ مدة.',
+        'كتابة أهم مهمة للغد على ورقة لاصقة أو في الملاحظات.',
+        'إغلاق علامات تبويب المتصفح التي لم تعد لازمة.',
+        'شكر زميل على شيء قام به مؤخرًا.',
+        'أرشفة خمس رسائل قديمة لم تعد لازمة.',
+        'إعادة تسمية ملف واحد غير مرتب لتسهيل العثور عليه لاحقًا.',
+        'إزالة ملف أو ملفين متناثرين من سطح المكتب.',
+        'حذف تذكير قديم لم يعد له داعٍ.',
+        'إضافة عنوان واضح لمستند يُفتح كثيرًا.',
+        'شطب بند صغير من قائمة المهام.',
+        'إلغاء الاشتراك في نشرة بريدية لا تُقرأ أبدًا.',
+        'مسح لوحة المفاتيح أو الشاشة بقطعة قماش ناعمة.',
+        'وضع قلم ودفتر وماء في متناول اليد.',
+        'كتابة ملاحظة قصيرة للغد عن النقطة التي توقف عندها العمل اليوم.',
+        'اختيار أهم مهمة بعد الظهر والبدء بها أولًا.',
+        'إفراغ سلة المهملات أو إعادة التدوير بجانب المكتب.',
+        'تحديث ملاحظة تقدّم واحدة ليعرف الآخرون أين وصلت الأمور.',
+        'ترتيب مجلد التنزيلات بنقل حفنة من الملفات.',
+        'ضبط تذكير لشيء يُنسى كثيرًا.',
+        'إيقاف إشعار واحد لا حاجة حقيقية إليه.',
+        'إضافة صفحة يتكرر البحث عنها إلى المفضلة.',
+        'كتابة ملخص من سطرين لاجتماع ما دامت تفاصيله حاضرة.',
+        'السؤال عمّا إذا كان يمكن تقصير اجتماع متكرر قليلًا.',
+        'تحديد هدف واحد للساعة القادمة وكتابته.',
+        'سؤال زميل عن يومه، والإصغاء حقًا.',
+        'مشاركة رابط مفيد مع شخص قد يستمتع به.',
+        'إلقاء التحية على شخص لم يسبق الحديث معه.',
+        'إرسال كلمة شكر سريعة لشخص قدّم مساعدة مؤخرًا.',
+        'تحية زميل بحرارة في بداية المكالمة التالية.',
+        'سؤال زميل في الفريق عمّا ينتظره بشوق هذا الأسبوع.',
+        'تهنئة شخص على إنجاز صغير لوحظ.',
+        'دعوة زميل إلى دردشة قصيرة على شاي أو قهوة، أو في مكالمة.',
+        'الثناء على زميل لشيء محدد أتقنه.',
+        'السؤال عن اسم شخص يتكرر لقاؤه ولم يُعرف اسمه بعد.',
+        'مشاركة نصيحة مفيدة مع زميل قد يحتاج إليها.',
+        'طلب ترشيح أغنية أو مسلسل أو كتاب من أحدهم.',
+        'الاطمئنان على زميل كان هادئًا مؤخرًا.',
+        'عرض المساعدة في أمر صغير إذا بدا أحدهم مشغولًا.',
+        'تحية الشخص التالي بحرارة.',
+        'نقل كلمة طيبة سُمعت عن زميل إليه.',
+        'سؤال زميل عمّا جعل أسبوعه أسهل.',
+        'إرسال رسالة ودية إلى زميل عمل سابق.',
+        'شكر من يحافظ على المساحات المشتركة منظمة.',
+        'تعريف زميلين قد يسعدهما التعارف.',
+        'سؤال زميل عن طريقة لتسهيل تسليم العمل إليه.',
+        'مشاركة نكتة صغيرة لطيفة مع شخص قريب.',
+        'إضافة قليل من الدفء إلى «من فضلك» و«شكرًا» التاليتين.',
+        'سؤال زميل عمّا يحب فعله خارج العمل.',
+        'الإصغاء الكامل للشخص التالي الذي يتحدث إليك، دون الانشغال بشيء آخر.',
+    ),
+    "done": (
+        'جيد. انتهت هذه.',
+        'رائع. إنهاء شيء ما شعور جميل.',
+        'أحسنت. استراحة قصيرة قبل التالية.',
+        'جيد. المهام الصغيرة المنجزة تتراكم.',
+        'تم ذلك. يحق لك أن تفرح به.',
+        'جيد. شُطبت هذه من قائمتك.',
+    ),
+    "text": {
+        HELP:
+            """يعرض hello-world تحية وفكرة وشيئًا بسيطًا للتجربة.
+
+في السؤال الأخير: plan لكتابة خطة اليوم، و done عند إنجازها، و menu
+(أو m) للخيارات. Enter يغلق البرنامج، وكذلك q و x و close من أي سؤال.
+في سؤال الخطة، same يعيد خطة سابقة لم تكتمل. بعد done تظهر آخر 3
+خطط مكتملة. الخيار 1 في القائمة يعرضها كلها، والخيار 7 يزيل واحدة،
+والخيار 8 يخفي الفكرة والاقتراح. في القائمة، Enter للرجوع.
+يمكن أيضًا تشغيل hello.cmd مع أحد هذه الخيارات:
+  --plain         عرض التحية فقط
+  --stats         عرض ما هو محفوظ على هذا الكمبيوتر
+  --reset         حذف كل ما هو محفوظ (بعد السؤال)
+  --remind on     الفتح مرة يوميًا عند تسجيل الدخول (off لإيقافه)
+  --streak off    إخفاء رسالة الأيام المتتالية (on لإظهارها)
+  --version       عرض الإصدار
+  --check-content FILE
+                  فحص ملف محتوى خاص بالمؤسسة
+  --help          عرض هذا النص
+
+رموز الخروج: 0 عند النجاح، و1 عند فشل أمر أو تعذّر الكتابة على
+الشاشة، و2 لخيار غير معروف.
+
+تبقى الملاحظات المحفوظة على هذا الكمبيوتر، في مجلد المستخدم. لا يُرسل
+أي شيء إلى أي مكان. لكن موظفي تقنية المعلومات الذين يمكنهم قراءة ملفات
+هذا الكمبيوتر قد يقرؤونها.""",
+        MENU_HELP:
+            """كلمات يمكن كتابتها في السؤال الأخير:
+  done  تسجيل خطة اليوم كمكتملة، ثم طلب الخطة التالية
+  plan  كتابة خطة اليوم أو تغييرها
+  menu  فتح هذه الخيارات
+  q     إغلاق النافذة، وكذلك Enter
+في سؤال الخطة، same يعيد خطتك السابقة التي لم تكتمل.
+عند سؤال "هل أنجزتها؟"، تعني n ليس بعد، ويمكن إبقاء الخطة
+لليوم. q يغلق البرنامج من أي سؤال.
+في هذه القائمة، 1 يعرض ما هو محفوظ، و7 يزيل خطة مكتملة،
+و8 يخفي الفكرة والاقتراح.
+يمكن كتابة m لسماع الخيارات مرة أخرى. لا يُرسل أي شيء إلى أي مكان.""",
+        SAVED_PLAN:
+            'تم الحفظ. يمكن كتابة done عند إنجازها، وإلا فسيأتي السؤال عنها في المرة القادمة.',
+        GREETING:
+            'مرحبًا بالعالم!',
+        'hello.cmd is in this folder:':
+            'يوجد hello.cmd في هذا المجلد:',
+        'Shortened to {n} characters.':
+            'عدد الأحرف بعد الاختصار: {n}.',
+        'Your saved file was damaged, so hello-world set it aside as a backup copy and started fresh. Your earlier days and plan could not be read. Menu option 4 deletes the backup.':
+            'كان الملف المحفوظ تالفًا، لذا نقله hello-world جانبًا كنسخة احتياطية وبدأ من جديد. تعذّرت قراءة أيامك وخطتك السابقة. الخيار 4 في القائمة يحذف النسخة الاحتياطية.',
+        'Backup copy: ':
+            'النسخة الاحتياطية: ',
+        'In the folder: ':
+            'في المجلد: ',
+        'Sorry, "{shown}" is not one of the choices.':
+            'عذرًا، "{shown}" ليس من الخيارات المتاحة.',
+        'A plan needs a word or two, so nothing was saved.':
+            'تحتاج الخطة إلى كلمة أو كلمتين، لذا لم يُحفظ شيء.',
+        'The sign-in reminder works on Windows only.':
+            'تذكير تسجيل الدخول يعمل على Windows فقط.',
+        'Your organization has turned off opening at sign-in.':
+            'أوقفت مؤسستك الفتح عند تسجيل الدخول.',
+        'The reminder cannot be set up from this folder.':
+            'لا يمكن إعداد التذكير من هذا المجلد.',
+        'Could not set up the reminder.':
+            'تعذّر إعداد التذكير.',
+        'Done. hello-world will open once a day when you sign in.':
+            'تم. سيُفتح hello-world مرة واحدة يوميًا عند تسجيل الدخول.',
+        'To stop it, choose option 2 in the menu.':
+            'يمكن إيقافه من الخيار 2 في القائمة.',
+        'Could not turn off the sign-in reminder.':
+            'تعذّر إيقاف تذكير تسجيل الدخول.',
+        'Done. The sign-in reminder is off.':
+            'تم. تذكير تسجيل الدخول متوقف.',
+        'Saved on this computer in:':
+            'محفوظ على هذا الكمبيوتر في:',
+        'Saved in your own user folder on this computer.':
+            'محفوظ في مجلد المستخدم الخاص بك على هذا الكمبيوتر.',
+        'Days you opened it in the last {days} days: {n} (last 7 days: {recent})':
+            'أيام الفتح خلال آخر {days} يومًا: {n} (آخر 7 أيام: {recent})',
+        'Times you marked a plan done: {n}':
+            'عدد مرات تسجيل خطة كمكتملة: {n}',
+        'Your current plan: ':
+            'خطتك الحالية: ',
+        'Earlier plan (for same): ':
+            'الخطة السابقة (متاحة عبر same): ',
+        'Days-in-a-row message: shown.':
+            'رسالة الأيام المتتالية: ظاهرة.',
+        'Days-in-a-row message: hidden.':
+            'رسالة الأيام المتتالية: مخفية.',
+        'Opens by itself at sign-in: turned off by your organization.':
+            'الفتح تلقائيًا عند تسجيل الدخول: أوقفته مؤسستك.',
+        'Opens by itself at sign-in: on.':
+            'الفتح تلقائيًا عند تسجيل الدخول: مُفعّل.',
+        'Opens by itself at sign-in: off.':
+            'الفتح تلقائيًا عند تسجيل الدخول: متوقف.',
+        "It never leaves this computer. Others who can read this computer's files, such as IT staff, could read it.":
+            'لا يغادر هذا الكمبيوتر أبدًا. لكن من يمكنه قراءة ملفات هذا الكمبيوتر، مثل موظفي تقنية المعلومات، قد يقرؤه.',
+        'After tidying, the file holds only this:':
+            'بعد الترتيب، لا يحتوي الملف إلا على هذا:',
+        'Delete all saved notes, dates and plans on this computer? (y or n, Enter to cancel) > ':
+            'حذف كل الملاحظات والتواريخ والخطط المحفوظة على هذا الكمبيوتر؟ (y أو n، أو Enter للإلغاء) > ',
+        'Nothing was deleted.':
+            'لم يُحذف شيء.',
+        'Could not delete everything.':
+            'تعذّر حذف كل شيء.',
+        'Delete these yourself:':
+            'يلزم حذف هذه يدويًا:',
+        'Could not list the folder, so backup copies may remain:':
+            'تعذّر عرض محتويات المجلد، لذا قد تبقى نسخ احتياطية:',
+        'Done. Everything saved was deleted.':
+            'تم. حُذف كل ما كان محفوظًا.',
+        'Another open hello-world window cannot put it back.':
+            'لن تتمكن نافذة hello-world أخرى مفتوحة من إعادته.',
+        'Close any other open hello-world window, or it may save its notes again.':
+            'يُرجى إغلاق أي نافذة hello-world أخرى مفتوحة، وإلا فقد تحفظ ملاحظاتها من جديد.',
+        'Everything saved was deleted in another window, so this was not saved.':
+            'حُذف كل ما كان محفوظًا من نافذة أخرى، لذا لم يُحفظ هذا.',
+        'The other open window had also finished a plan.':
+            'النافذة الأخرى المفتوحة أنهت خطة هي أيضًا.',
+        'The other open window changed the plan, so its plan is kept.':
+            'النافذة الأخرى المفتوحة غيّرت الخطة، لذا أُبقي على خطتها.',
+        'Type plan at the last prompt to set one.':
+            'لوضع خطة، يمكن كتابة plan في السؤال الأخير.',
+        'That looks like a command, not a plan, so nothing was saved.':
+            'يبدو هذا أمرًا وليس خطة، لذا لم يُحفظ شيء.',
+        'Type your plan, or press Enter to go back.':
+            'يمكن كتابة الخطة، أو الضغط على Enter للرجوع.',
+        'Finished lately:':
+            'ما اكتمل مؤخرًا:',
+        'Your plan today: ':
+            'خطتك اليوم: ',
+        'Your plan from {date}: ':
+            'خطتك بتاريخ {date}: ',
+        'Earlier plan: ':
+            'الخطة السابقة: ',
+        'Type the next plan, or Enter to close > ':
+            'الخطة التالية، أو Enter للإغلاق > ',
+        'Type the next plan, same to reuse the earlier plan, or Enter to close > ':
+            'الخطة التالية، أو same لإعادة الخطة السابقة، أو Enter للإغلاق > ',
+        "Type today's plan, or Enter to keep it > ":
+            'خطة اليوم، أو Enter لإبقائها > ',
+        "Type today's plan, same to reuse the earlier plan, or Enter to keep it > ":
+            'خطة اليوم، أو same لإعادة الخطة السابقة، أو Enter لإبقائها > ',
+        "Type today's plan, or Enter to go back > ":
+            'خطة اليوم، أو Enter للرجوع > ',
+        "Type today's plan, same to reuse the earlier plan, or Enter to go back > ":
+            'خطة اليوم، أو same لإعادة الخطة السابقة، أو Enter للرجوع > ',
+        'Closing.':
+            'جارٍ الإغلاق.',
+        'There is no earlier plan to reuse yet. Nothing changed.':
+            'لا توجد خطة سابقة لإعادتها بعد. لم يتغير شيء.',
+        'Nothing changed.':
+            'لم يتغير شيء.',
+        'Could not save that on this computer. Your plan is unchanged.':
+            'تعذّر الحفظ على هذا الكمبيوتر. خطتك لم تتغير.',
+        'No finished plans are saved.':
+            'لا توجد خطط مكتملة محفوظة.',
+        'Type the number to forget (1 to {n}), or Enter to keep them all > ':
+            'رقم الخطة المراد إزالتها (من 1 إلى {n})، أو Enter لإبقائها كلها > ',
+        'There is no number "{typed}" on the list. Type a number from 1 to {n}, or press Enter to keep them all.':
+            'لا يوجد رقم "{typed}" في القائمة. يُرجى كتابة رقم من 1 إلى {n}، أو الضغط على Enter لإبقائها كلها.',
+        'Also forget it as the earlier plan for same? (y or n, Enter to keep it for same) > ':
+            'هل تُزال أيضًا من same؟ (y أو n، أو Enter لإبقائها في same) > ',
+        'Type y or n, or press Enter to keep it for same.':
+            'يُرجى كتابة y أو n، أو الضغط على Enter لإبقائها في same.',
+        'That plan was already forgotten. Nothing changed.':
+            'هذه الخطة أُزيلت من قبل. لم يتغير شيء.',
+        'Forgotten: ':
+            'أُزيلت: ',
+        'Same still has it.':
+            'لا تزال متاحة عبر same.',
+        'Could not save that on this computer. Nothing changed.':
+            'تعذّر الحفظ على هذا الكمبيوتر. لم يتغير شيء.',
+        'Options':
+            'الخيارات',
+        'Show what is saved on this computer':
+            'عرض ما هو محفوظ على هذا الكمبيوتر',
+        'Open once a day at sign-in (turned off by your organization)':
+            'الفتح مرة يوميًا عند تسجيل الدخول (أوقفته مؤسستك)',
+        'Turn off: open once a day at sign-in (now on)':
+            'إيقاف: الفتح مرة يوميًا عند تسجيل الدخول (مُفعّل الآن)',
+        'Turn on: open once a day at sign-in (now off)':
+            'تفعيل: الفتح مرة يوميًا عند تسجيل الدخول (متوقف الآن)',
+        'Days-in-a-row message (hidden by your organization)':
+            'رسالة الأيام المتتالية (أخفتها مؤسستك)',
+        'Hide the days-in-a-row message (now shown)':
+            'إخفاء رسالة الأيام المتتالية (ظاهرة الآن)',
+        'Show the days-in-a-row message (now hidden)':
+            'إظهار رسالة الأيام المتتالية (مخفية الآن)',
+        'Delete everything saved':
+            'حذف كل ما هو محفوظ',
+        'Help':
+            'تعليمات',
+        "Set today's plan (turned off by your organization)":
+            'وضع خطة اليوم (أوقفته مؤسستك)',
+        'Forget a finished plan (turned off by your organization)':
+            'إزالة خطة مكتملة (أوقفتها مؤسستك)',
+        "Set or change today's plan":
+            'وضع خطة اليوم أو تغييرها',
+        'Forget one finished plan':
+            'إزالة خطة مكتملة',
+        'Thought and tip (hidden by your organization)':
+            'الفكرة والاقتراح (أخفتهما مؤسستك)',
+        'Hide the thought and tip (now shown)':
+            'إخفاء الفكرة والاقتراح (ظاهران الآن)',
+        'Show the thought and tip (now hidden)':
+            'إظهار الفكرة والاقتراح (مخفيان الآن)',
+        '{date}: ':
+            '{date}: ',
+        'Enter':
+            'Enter',
+        'Back to the last prompt':
+            'الرجوع إلى السؤال الأخير',
+        'Choose 1 to 11, or Enter to go back > ':
+            'رقم من 1 إلى 11، أو Enter للرجوع > ',
+        'Choose 1 to 11, m to list the options, or Enter to go back > ':
+            'رقم من 1 إلى 11، أو m لعرض الخيارات، أو Enter للرجوع > ',
+        'The saved file could not be read just now, so this may be out of date.':
+            'تعذّرت قراءة الملف المحفوظ الآن، لذا قد لا تكون هذه المعلومات محدّثة.',
+        'Type full to see the whole file, or Enter to go on > ':
+            'full لعرض الملف كاملًا، أو Enter للمتابعة > ',
+        'Could not save that choice on this computer.':
+            'تعذّر حفظ هذا الاختيار على هذا الكمبيوتر.',
+        'Your organization has hidden the days-in-a-row message.':
+            'أخفت مؤسستك رسالة الأيام المتتالية.',
+        'Done. The days-in-a-row message is on.':
+            'تم. رسالة الأيام المتتالية مُفعّلة.',
+        'Done. The days-in-a-row message is off.':
+            'تم. رسالة الأيام المتتالية متوقفة.',
+        'Plans are turned off by your organization.':
+            'أوقفت مؤسستك الخطط.',
+        'Your organization has hidden the thought and tip.':
+            'أخفت مؤسستك الفكرة والاقتراح.',
+        'Done. The thought and tip are on.':
+            'تم. الفكرة والاقتراح مُفعّلان.',
+        'Done. The thought and tip are off.':
+            'تم. الفكرة والاقتراح متوقفان.',
+        'Type 1 to 11, or press Enter to go back.':
+            'يُرجى كتابة رقم من 1 إلى 11، أو الضغط على Enter للرجوع.',
+        'Want it to open once a day when you sign in? (y or n, Enter for not now) > ':
+            'هل يُفتح البرنامج مرة يوميًا عند تسجيل الدخول؟ (y أو n، أو Enter لتأجيل ذلك) > ',
+        'Want it to open once a day when you sign in so it can ask about your plan? (y or n, Enter for not now) > ':
+            'هل يُفتح البرنامج مرة يوميًا عند تسجيل الدخول ليسألك عن خطتك؟ (y أو n، أو Enter لتأجيل ذلك) > ',
+        'Type y or n, or press Enter for not now.':
+            'يُرجى كتابة y أو n، أو الضغط على Enter لتأجيل ذلك.',
+        'That was not understood. It will ask again on a later visit.':
+            'لم يُفهم الرد. سيأتي السؤال مرة أخرى في زيارة لاحقة.',
+        'It will ask again on a later visit. Menu option 2 also turns it on.':
+            'سيأتي السؤال مرة أخرى في زيارة لاحقة. ويمكن تفعيله أيضًا من الخيار 2 في القائمة.',
+        'No problem. Menu option 2 turns it on later.':
+            'لا مشكلة. يمكن تفعيله لاحقًا من الخيار 2 في القائمة.',
+        "Okay. It won't ask again. Menu option 2 turns it on.":
+            'حسنًا. لن يتكرر السؤال. يمكن تفعيله من الخيار 2 في القائمة.',
+        'Okay. It will ask again on a later visit. Type n to stop it.':
+            'حسنًا. سيأتي السؤال مرة أخرى في زيارة لاحقة. ولإيقاف السؤال نهائيًا، يمكن كتابة n.',
+        'When did you finish it?':
+            'متى أنجزتها؟',
+        'Today':
+            'اليوم',
+        'Type a number from 1 to {n}, or Enter for 1 > ':
+            'رقم من 1 إلى {n}، أو Enter لاختيار 1 > ',
+        'Type a number from 1 to {n}, or press Enter.':
+            'يُرجى كتابة رقم من 1 إلى {n}، أو الضغط على Enter.',
+        'That looks like more than one thing. Finishing the first part still counts.':
+            'يبدو أن هذه أكثر من مهمة واحدة. إنجاز الجزء الأول وحده يُحتسب.',
+        'There is no plan to mark as done. Type plan to set one.':
+            'لا توجد خطة لتسجيلها كمكتملة. يمكن كتابة plan لوضع خطة.',
+        'Could not save that on this computer. The plan is still open.':
+            'تعذّر الحفظ على هذا الكمبيوتر. الخطة لا تزال معلّقة.',
+        'Your plan from over two weeks ago was put away. Type same at the plan prompt to bring it back.':
+            'خطتك التي مضى عليها أكثر من أسبوعين وُضعت جانبًا. لاستعادتها، يمكن كتابة same في سؤال الخطة.',
+        "Press Enter at each question to skip it, and once more to close. That's it.":
+            'الضغط على Enter عند أي سؤال يتخطاه، وضغطة أخرى تغلق البرنامج. هذا كل شيء.',
+        'Welcome.':
+            'مرحبًا بك.',
+        'Each day you get one thought and one small thing to try, the same for everyone.':
+            'كل يوم فكرة وشيء بسيط للتجربة، والجميع يرون الشيء نفسه.',
+        'If you type a plan, it asks next time how it went. Your notes stay on this computer and are never sent anywhere. Like any work file they are not secret, so keep them to everyday tasks.':
+            'إذا كتبت خطة، فسيسألك في المرة القادمة كيف سارت. تبقى ملاحظاتك على هذا الكمبيوتر ولا تُرسل إلى أي مكان. لكنها، مثل أي ملف عمل، ليست سرية، لذا يُفضّل أن تقتصر على المهام اليومية.',
+        'Type menu at the end for the options.':
+            'يمكن كتابة menu في النهاية لعرض الخيارات.',
+        'Welcome back. Glad you are here.':
+            'أهلًا بعودتك. يسعدنا وجودك هنا.',
+        'You have opened this {row} days in a row. Nice to see you.':
+            'هذا يومك الـ{row} على التوالي. يسعدنا أن نراك.',
+        'Last time you planned: ':
+            'خطتك في المرة الماضية: ',
+        'Did you do it? (y for yes, n for not yet, Enter to skip) > ':
+            'هل أنجزتها؟ (y نعم، n ليس بعد، Enter للتخطي) > ',
+        'Type y or n, or press Enter to skip.':
+            'يُرجى كتابة y أو n، أو الضغط على Enter للتخطي.',
+        'Could not save that on this computer. Your answer was not counted.':
+            'تعذّر الحفظ على هذا الكمبيوتر. لم تُحتسب إجابتك.',
+        'That is fine. Keep it for today? (y or n, Enter to keep it) > ':
+            'لا بأس. هل تبقى لليوم؟ (y أو n، أو Enter لإبقائها) > ',
+        'Type y to keep it, n to clear it, or press Enter to keep it.':
+            'يُرجى كتابة y لإبقائها، أو n لإزالتها، أو الضغط على Enter لإبقائها.',
+        'Cleared. Type same at a plan prompt if you want it back.':
+            'أُزيلت. لاستعادتها، يمكن كتابة same في سؤال الخطة.',
+        'Kept for today.':
+            'ستبقى لليوم.',
+        'That was not understood. Your plan is left as it was.':
+            'لم يُفهم الرد. بقيت خطتك كما هي.',
+        'Your plan is still open.':
+            'خطتك لا تزال معلّقة.',
+        'Thought for today:':
+            'فكرة اليوم:',
+        'Try this today:':
+            'للتجربة اليوم:',
+        'Your plan for today: ':
+            'خطتك لليوم: ',
+        'Still open since {date}:':
+            'معلّقة منذ {date}:',
+        '(Enter to skip)':
+            '(Enter للتخطي)',
+        '(A plan typed here replaces the old one. Enter to skip)':
+            '(أي خطة تُكتب هنا تحل محل القديمة. Enter للتخطي)',
+        '(Type same to reuse it, or Enter to skip)':
+            '(same لإعادة استخدامها، أو Enter للتخطي)',
+        'What is one thing you want to get done today?':
+            'ما الشيء الواحد الذي يستحق الإنجاز اليوم؟',
+        'There is no earlier plan to reuse yet. Nothing was saved.':
+            'لا توجد خطة سابقة لإعادتها بعد. لم يُحفظ شيء.',
+        'Your notes could not be saved on this computer. This screen still works.':
+            'تعذّر حفظ ملاحظاتك على هذا الكمبيوتر. لكن هذه الشاشة لا تزال تعمل.',
+        'Type menu, or Enter to close > ':
+            'menu، أو Enter للإغلاق > ',
+        'Type done, plan or menu, or Enter to close > ':
+            'done أو plan أو menu، أو Enter للإغلاق > ',
+        'Type plan or menu, or Enter to close > ':
+            'plan أو menu، أو Enter للإغلاق > ',
+        'Type done, plan or menu, or press Enter to close.':
+            'يُرجى كتابة done أو plan أو menu، أو الضغط على Enter للإغلاق.',
+        'Type plan or menu, or press Enter to close.':
+            'يُرجى كتابة plan أو menu، أو الضغط على Enter للإغلاق.',
+        "The saved file can't be read right now, or it is damaged.":
+            'تتعذّر قراءة الملف المحفوظ الآن، أو أنه تالف.',
+        'Nothing was changed. Saved in: ':
+            'لم يتغير شيء. محفوظ في: ',
+        'Deleting saved notes needs a person at the keyboard.':
+            'يتطلب حذف الملاحظات المحفوظة وجود شخص أمام لوحة المفاتيح.',
+        '{option} needs on or off. Here are the options.':
+            '{option} يحتاج إلى on أو off. هذه هي الخيارات.',
+        'Unknown option: {option}. Here are the options.':
+            'خيار غير معروف: {option}. هذه هي الخيارات.',
+        '&Done':
+            'تم(&D)',
+        '&Not yet':
+            'ليس بعد(&N)',
+        'S&kip':
+            'تخطي(&K)',
+        '&Save':
+            'حفظ(&S)',
+        '&I did it':
+            'أنجزتها(&I)',
+        '&Options':
+            'الخيارات(&O)',
+        'Close':
+            'إغلاق',
+        'Not today':
+            'ليس اليوم',
+        'Did you do it?':
+            'هل أنجزتها؟',
+        'Done. A reminder comes when you sign in, if there is a plan to ask about.':
+            'تم. سيظهر تذكير عند تسجيل الدخول إذا كانت هناك خطة للسؤال عنها.',
+        'Done. The Start menu opens a window with buttons.':
+            'تم. قائمة ابدأ تفتح الآن نافذة بأزرار.',
+        'Done. The Start menu opens this text screen.':
+            'تم. قائمة ابدأ تفتح الآن هذه الشاشة النصية.',
+        'More options':
+            'خيارات إضافية',
+        'Remind me when I sign in':
+            'تذكيري عند تسجيل الدخول',
+        'Show the thought and tip':
+            'إظهار الفكرة والاقتراح',
+        'Type your plan in the box.':
+            'يمكن كتابة خطتك في المربع.',
+        'Use a window with buttons (now this text screen)':
+            'استخدام نافذة بأزرار (حاليًا هذه الشاشة النصية)',
+        'Use the text screen':
+            'استخدام الشاشة النصية',
+        'Use this text screen (now a window with buttons)':
+            'استخدام هذه الشاشة النصية (حاليًا نافذة بأزرار)',
+        'Want a reminder when you sign in? It shows your plan from last time, and you answer with one click. You can turn it off under Options.':
+            'ما رأيك بتذكير عند تسجيل الدخول؟ يعرض خطتك من المرة الماضية، ويكفي للرد نقرة واحدة. ويمكن إيقافه من الخيارات.',
+        'Window or text screen (set by your organization)':
+            'نافذة أو شاشة نصية (تحددها مؤسستك)',
+        'Your organization has set hello-world to open as a text screen.':
+            'ضبطت مؤسستك hello-world ليُفتح كشاشة نصية.',
+        'Saved.':
+            'تم الحفظ.',
+        'Save your plan before closing?':
+            'حفظ خطتك قبل الإغلاق؟',
+        'Delete all saved notes, dates and plans on this computer?':
+            'حذف كل الملاحظات والتواريخ والخطط المحفوظة على هذا الكمبيوتر؟',
+        'Turn off: reminder when you sign in (now on)':
+            'إيقاف: التذكير عند تسجيل الدخول (مُفعّل الآن)',
+        'Turn on: reminder when you sign in (now off)':
+            'تفعيل: التذكير عند تسجيل الدخول (متوقف الآن)',
+        'Reminder when you sign in (turned off by your organization)':
+            'التذكير عند تسجيل الدخول (أوقفته مؤسستك)',
+        'Reminder when you sign in: on.':
+            'التذكير عند تسجيل الدخول: مُفعّل.',
+        'Reminder when you sign in: off.':
+            'التذكير عند تسجيل الدخول: متوقف.',
+        'Reminder when you sign in: turned off by your organization.':
+            'التذكير عند تسجيل الدخول: أوقفته مؤسستك.',
+        'Show the days-in-a-row message':
+            'إظهار رسالة الأيام المتتالية',
+        'Done. The thought and tip show next time you open hello-world.':
+            'تم. ستظهر الفكرة والاقتراح في المرة القادمة التي يُفتح فيها hello-world.',
+        "Clear today's plan?":
+            'مسح خطة اليوم؟',
+        'Next plan, if you want one:':
+            'الخطة التالية، إن أردت:',
+        'A few things? Put ; between them.':
+            'أكثر من مهمة؟ يُفصل بينها بالرمز ;',
+        'A plan can be up to {n} characters.':
+            'عدد أحرف الخطة لا يتجاوز {n}.',
+        'Did you do them? (y for all, n for not yet, numbers for the ones you did, Enter to skip) > ':
+            'هل أنجزتها؟ (y للكل، n ليس بعد، أو أرقام ما أُنجز، Enter للتخطي) > ',
+        'Last time you planned:':
+            'خطتك في المرة الماضية:',
+        'The rest is kept for today.':
+            'وتبقى البقية لليوم.',
+        'Tick the ones you did, then click Done. With none ticked, Done means all of them.':
+            'تحديد ما أُنجز ثم النقر على «تم». ومن دون تحديد، تعني «تم» الكل.',
+        'Type y for all, n for not yet, or the numbers you did, such as 1 3. Enter skips.':
+            'يُرجى كتابة y للكل، أو n لـ«ليس بعد»، أو أرقام ما أُنجز، مثل 1 3. Enter للتخطي.',
+        'Your settings were kept.':
+            'تم الإبقاء على إعداداتك.',
+        'Language (set by your organization)':
+            'اللغة (تحددها مؤسستك)',
+        'Language (now {name})':
+            'اللغة (حاليًا {name})',
+        'following Windows':
+            'حسب Windows',
+        'Your organization shows hello-world in English.':
+            'تعرض مؤسستك hello-world باللغة الإنجليزية.',
+        'Follow Windows':
+            'حسب Windows',
+        'Type a number from 1 to {n}, or Enter to keep it > ':
+            'رقم من 1 إلى {n}، أو Enter لإبقائها > ',
+        'Done. The new language shows next time you open hello-world.':
+            'تم. ستظهر اللغة الجديدة في المرة القادمة التي يُفتح فيها hello-world.',
+        'Language...':
+            'اللغة...',
+        'Hello, {name}!':
+            'مرحبًا يا {name}!',
+        'One thing to get done today? Open hello-world to plan it.':
+            'مهمة واحدة لإنجازها اليوم؟ يمكن التخطيط لها في hello-world.',
+        '&Open':
+            'فتح(&O)',
+        'Reminder settings...':
+            'إعدادات التذكير...',
+        'Greet me by name':
+            'مناداتي باسمي في التحية',
+        'At sign-in':
+            'عند تسجيل الدخول',
+        'At {at}':
+            'في الساعة {at}',
+        'Also on days with no plan':
+            'في الأيام التي بلا خطة أيضًا',
+        'Open hello-world after I answer':
+            'فتح hello-world بعد الرد',
+        'Not on weekends':
+            'باستثناء عطلة نهاية الأسبوع',
+        'Done. A reminder comes at {at} each day, if there is a plan to ask about.':
+            'تم. سيصل تذكير يوميًا في الساعة {at} إذا كانت هناك خطة للسؤال عنها.',
+        'Send feedback...':
+            'إرسال ملاحظات...',
+        '"holidays" must be a list of at most {n} dates.':
+            '"holidays" يجب أن تكون قائمة لا يتجاوز عدد تواريخها {n}.',
+        '"title" must be 1 to 40 characters of plain text, with no link or address.':
+            '"title" يجب أن يكون نصًا عاديًا من 1 إلى 40 حرفًا، بلا روابط أو عناوين.',
+        '"{list}" must be a list of {low} to {high} lines.':
+            '"{list}" يجب أن تكون قائمة يتراوح عدد أسطرها بين {low} و{high}.',
+        "Can't read {path}: {error}":
+            'تتعذّر قراءة {path}: {error}',
+        'Could not save that on this computer.':
+            'تعذّر الحفظ على هذا الكمبيوتر.',
+        'Days you opened hello-world: {n}':
+            'عدد أيام فتح hello-world: {n}',
+        'Keep a longer history':
+            'الاحتفاظ بسجل أطول',
+        'Keep my numbers':
+            'الاحتفاظ بأرقامي',
+        'Longest run of days: {n}':
+            'أطول سلسلة أيام متتالية: {n}',
+        "Mark today's plan done":
+            'تسجيل خطة اليوم كمكتملة',
+        "Mark today's plan done (plans are turned off)":
+            'تسجيل خطة اليوم كمكتملة (الخطط متوقفة)',
+        'My numbers are off. Turn them on under Options, or with --set numbers on.':
+            'أرقامي متوقفة. يمكن تفعيلها من الخيارات، أو باستخدام --set numbers on.',
+        'My numbers...':
+            'أرقامي...',
+        'Nothing finished yet this week. That is fine.':
+            'لم يكتمل شيء بعد هذا الأسبوع. لا بأس.',
+        'OK: {thoughts} thoughts and {tips} tips.':
+            'صالح: الأفكار {thoughts}، والاقتراحات {tips}.',
+        'Plans finished: {n}':
+            'الخطط المكتملة: {n}',
+        'Save my plans to a file':
+            'حفظ خططي في ملف',
+        'Saved to {path}':
+            'تم الحفظ في {path}',
+        "The file isn't valid JSON, or is over 200,000 characters.":
+            'الملف ليس JSON صالحًا، أو يتجاوز 200,000 حرف.',
+        'The file must hold an object with two lists, "thoughts" and "tips", and may add "holidays" and "title".':
+            'يجب أن يحتوي الملف على كائن فيه قائمتان، "thoughts" و"tips"، ويمكن أن يضيف "holidays" و"title".',
+        'This week you finished {n}:':
+            'ما أنجزته هذا الأسبوع ({n}):',
+        'This week...':
+            'هذا الأسبوع...',
+        'holidays line {line} is not a date like 2026-12-25.':
+            'السطر {line} في holidays ليس تاريخًا مثل 2026-12-25.',
+        '{list} line {line} has a date.':
+            'السطر {line} في {list} يحتوي على تاريخ.',
+        '{list} line {line} has a link or an address.':
+            'السطر {line} في {list} يحتوي على رابط أو عنوان.',
+        '{list} line {line} has control characters or extra spaces.':
+            'السطر {line} في {list} يحتوي على أحرف تحكم أو مسافات زائدة.',
+        '{list} line {line} is not text.':
+            'السطر {line} في {list} ليس نصًا.',
+        '{list} line {line} must be {low} to {high} characters long.':
+            'السطر {line} في {list} يجب أن يتراوح عدد أحرفه بين {low} و{high}.',
     },
 }
 

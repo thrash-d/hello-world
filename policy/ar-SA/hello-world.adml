@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="1.0" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName>hello-world</displayName>
+  <description>Settings for the hello-world daily program.</description>
+  <resources>
+    <stringTable>
+      <string id="HelloWorld">hello-world</string>
+      <string id="SUPPORTED_1_23">hello-world 1.23.0 أو إصدار أحدث</string>
+      <string id="SUPPORTED_1_24">hello-world 1.24.0 أو إصدار أحدث</string>
+      <string id="SUPPORTED_1_25">hello-world 1.25.0 أو إصدار أحدث</string>
+      <string id="DisableSignInLauncher">إيقاف فتح hello-world عند تسجيل الدخول</string>
+      <string id="DisableSignInLauncher_Help">عند تمكين هذا الإعداد، لا يمكن للمستخدمين ضبط hello-world ليُفتح تلقائيًا عند تسجيل الدخول، ولا يعرض البرنامج ذلك أبدًا، وتُزال أداة التشغيل التي فعّلها المستخدم سابقًا في المرة التالية التي يفتح فيها البرنامج.
+
+عند تعطيل هذا الإعداد أو عدم تكوينه، يمكن لكل شخص تفعيل الفتح عند تسجيل الدخول أو إيقافه من الخيار 2 في القائمة.
+
+أداة التشغيل قيمة اسمها hello-world ضمن HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run.</string>
+      <string id="HideThoughtAndTip">إخفاء الفكرة والاقتراح اليوميين</string>
+      <string id="HideThoughtAndTip_Help">عند تمكين هذا الإعداد، لا يعرض hello-world فكرة اليوم ولا الاقتراح المطروح للتجربة. ويظل سؤال الخطة والقائمة يعملان.
+
+عند تعطيل هذا الإعداد أو عدم تكوينه، يمكن لكل شخص إخفاؤهما أو إظهارهما من الخيار 8 في القائمة.</string>
+      <string id="HideDaysInARow">إخفاء رسالة الأيام المتتالية</string>
+      <string id="HideDaysInARow_Help">عند تمكين هذا الإعداد، لا يعرض hello-world أبدًا الرسالة التي تحسب عدد الأيام المتتالية التي فتحه فيها الشخص.
+
+عند تعطيل هذا الإعداد أو عدم تكوينه، لا تظهر الرسالة إلا في اليوم المتتالي الثالث والسابع والرابع عشر، ثم كل 30 يومًا بعد ذلك، ويمكن لكل شخص إخفاؤها من الخيار 3 في القائمة.</string>
+      <string id="DisablePlans">إيقاف الخطط</string>
+      <string id="DisablePlans_Help">عند تمكين هذا الإعداد، لا يطلب hello-world خطة ولا يتابعها، ولا يحتفظ بنص أي خطة أو بالخطط المكتملة أو بعدد الخطط المنجزة. ويُحذف نص الخطط المحفوظ مسبقًا في المرة التالية التي يفتح فيها كل شخص البرنامج. ويظل المستخدمون يرون التحية، والفكرة والاقتراح ما لم تكن مخفية هي أيضًا.
+
+يُستخدم هذا الإعداد حيث يكون حفظ نص الخطط في ملف محلي مصدر قلق يتعلق بالسجلات أو بمجلس العاملين.
+
+عند تعطيل هذا الإعداد أو عدم تكوينه، يمكن للمستخدمين كتابة خطة اختيارية واحدة يوميًا.</string>
+      <string id="ForceEnglish">عرض hello-world باللغة الإنجليزية دائمًا</string>
+      <string id="ForceEnglish_Help">عند تمكين هذا الإعداد، يعرض hello-world شاشاته باللغة الإنجليزية للجميع.
+
+عند تعطيل هذا الإعداد أو عدم تكوينه، يعرض hello-world شاشاته بلغة عرض Windows إذا كانت لها ترجمة فيه، وبالإنجليزية في غير ذلك. ويسرد الملف docs/ENTERPRISE.md اللغات المتوفرة. وكلمات الأوامر في كل لغة، مثل hecho و quitter، تعمل في جميع اللغات.
+
+ملف المحتوى الخاص بالمؤسسة يحل محل الأفكار والاقتراحات في جميع اللغات.</string>
+      <string id="SUPPORTED_1_28">hello-world 1.28.0 أو إصدار أحدث</string>
+      <string id="UseTextScreen">فتح hello-world كشاشة نصية</string>
+      <string id="UseTextScreen_Help">عند تمكين هذا الإعداد، يفتح اختصار قائمة ابدأ hello-world كشاشة نصية في نافذة وحدة التحكم، كما كانت تفعل الإصدارات السابقة للإصدار 1.28، وتفتحه أداة التشغيل عند تسجيل الدخول هناك أيضًا. ولا يمكن لأحد التبديل إلى النافذة.
+
+عند تعطيل هذا الإعداد أو عدم تكوينه، يُفتح hello-world في نافذة بأزرار، ويمكن لكل شخص التبديل إلى الشاشة النصية من الخيارات، أو من الخيار 9 في قائمة الشاشة النصية. وعند تفعيل أداة التشغيل عند تسجيل الدخول، يعرض إصدار النافذة إشعار Windows عند تسجيل الدخول إذا كانت هناك خطة للسؤال عنها، بدلًا من أن يُفتح.
+
+يُستخدم هذا الإعداد حيث لم يختبر مستخدمو قارئ الشاشة سوى الشاشة النصية، أو حيث لا تكون إشعارات Windows مرغوبة.</string>
+      <string id="SUPPORTED_1_31">hello-world 1.31.0 أو إصدار أحدث</string>
+      <string id="TurnOnReminder">تفعيل تذكير تسجيل الدخول للجميع</string>
+      <string id="TurnOnReminder_Help">عند تمكين هذا الإعداد، يفعّل hello-world التذكير لكل شخص في المرة التالية التي يفتحه فيها، ما لم يكن قد أجاب عن سؤال التذكير من قبل. مع النافذة، يكون التذكير إشعار Windows عند تسجيل الدخول إذا كانت هناك خطة للسؤال عنها؛ ومع الشاشة النصية، يُفتح hello-world مرة يوميًا عند تسجيل الدخول. ويظل بإمكان كل شخص إيقافه من الخيارات أو من الخيار 2 في القائمة، ويبقى متوقفًا بعد ذلك.
+
+عند تعطيل هذا الإعداد أو عدم تكوينه، يسأل hello-world كل شخص مرة واحدة.
+
+الإعداد "إيقاف فتح hello-world عند تسجيل الدخول" له الأولوية على هذا الإعداد.</string>
+      <string id="SUPPORTED_1_32">hello-world 1.32.0 أو إصدار أحدث</string>
+      <string id="ReportUsage">كتابة أحداث الاستخدام في سجل الأحداث</string>
+      <string id="ReportUsage_Help">عند تمكين هذا الإعداد، يكتب hello-world حدثًا واحدًا في سجل أحداث التطبيقات، بالمصدر hello-world والحدث 2000، في كل مرة يفتحه فيها شخص أو يضع خطة أو يُنهي واحدة: "hello-world: opened" أو "hello-world: plan set" أو "hello-world: plan finished". لا تحتوي الأحداث على نص أي خطة، ولا يُرسل أي شيء عبر الشبكة؛ ونظام جمع الأحداث لديكم هو الذي يحدد وجهتها.
+
+عند تعطيل هذا الإعداد أو عدم تكوينه، لا يكتب hello-world أي أحداث استخدام.</string>
+      <string id="LogErrors">الاحتفاظ بسجل للأخطاء</string>
+      <string id="LogErrors_Help">عند تمكين هذا الإعداد، يضيف hello-world سطرًا إلى errors.log في مجلد بيانات hello-world الخاص بكل شخص عند حدوث خطأ: الوقت، والإصدار، ونوع الخطأ، وأسطر hello.py المعنية. لا يحتوي السجل على نص أي خطة ويبقى أصغر من 100 كيلوبايت.
+
+عند تعطيل هذا الإعداد أو عدم تكوينه، لا يحتفظ hello-world بسجل للأخطاء.</string>
+      <string id="TimestampBackups">تسمية النسخ الاحتياطية للملف التالف حسب التاريخ والوقت</string>
+      <string id="TimestampBackups_Help">عند تمكين هذا الإعداد، يُنقل ملف notes.json التالف جانبًا باسم notes.json.&lt;date-time&gt;.bak بدلًا من notes.json.bak و notes.json.bak2 وهكذا.
+
+عند تعطيل هذا الإعداد أو عدم تكوينه، تُرقّم النسخ الاحتياطية.</string>
+      <string id="LeaveDamagedFile">ترك الملف التالف كما هو عند عدم وجود أحد أمام الشاشة</string>
+      <string id="LeaveDamagedFile_Help">عند تمكين هذا الإعداد، فإن أي تشغيل لا يوجد فيه أحد أمام لوحة المفاتيح، مثل التشغيل عند تسجيل الدخول بلا وحدة تحكم، يترك ملف notes.json التالف في مكانه بدلًا من نقله جانبًا. وفي الزيارة التالية التي يكون فيها أحد موجودًا، يُنقل جانبًا مع إعلام المستخدم بذلك.
+
+عند تعطيل هذا الإعداد أو عدم تكوينه، يُنقل الملف التالف جانبًا كنسخة احتياطية كلما عُثر عليه.</string>
+      <string id="MaxBackups">الاحتفاظ بعدد أقصى من النسخ الاحتياطية للملف التالف</string>
+      <string id="MaxBackups_Help">عند تمكين هذا الإعداد، يحذف hello-world أقدم النسخ الاحتياطية لملف notes.json التالف التي تتجاوز هذا العدد قبل إنشاء نسخة جديدة.
+
+عند تعطيل هذا الإعداد أو عدم تكوينه، تُحفظ كل النسخ الاحتياطية إلى أن يحذف الشخص كل شيء.</string>
+      <string id="FeedbackAddress">عنوان الملاحظات</string>
+      <string id="FeedbackAddress_Help">عند تمكين هذا الإعداد، تحتوي قائمة الخيارات في النافذة على "إرسال ملاحظات..."، الذي يفتح رسالة جديدة إلى هذا العنوان في برنامج البريد الخاص بالشخص. ولا يرسل hello-world نفسه أي شيء.
+
+عند تعطيل هذا الإعداد أو عدم تكوينه، لا يوجد عنصر للملاحظات.</string>
+    </stringTable>
+    <presentationTable>
+      <presentation id="FeedbackAddress">
+        <textBox refId="FeedbackAddress"><label>العنوان:</label></textBox>
+      </presentation>
+      <presentation id="MaxBackups">
+        <decimalTextBox refId="MaxBackups" defaultValue="5">عدد النسخ الاحتياطية المحفوظة:</decimalTextBox>
+      </presentation>
+    </presentationTable>
+  </resources>
+</policyDefinitionResources>

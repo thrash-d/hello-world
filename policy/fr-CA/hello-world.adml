@@ -70,9 +70,9 @@ Si ce paramètre est désactivé ou non configuré, un fichier endommagé est mi
 
 Si ce paramètre est désactivé ou non configuré, toutes les copies sont gardées jusqu'à ce que la personne supprime tout.</string>
       <string id="FeedbackAddress">Adresse pour les commentaires</string>
-      <string id="FeedbackAddress_Help">Si ce paramètre est activé, le menu Options de la fenêtre propose « Envoyer un commentaire... », qui ouvre un nouveau message à cette adresse dans le logiciel de messagerie de la personne. hello-world n'envoie rien lui-même.
+      <string id="FeedbackAddress_Help">Si ce paramètre est activé, le menu Options de la fenêtre comporte « Envoyer un commentaire... », qui ouvre un nouveau courriel adressé à cette adresse dans le logiciel de courriel de la personne. hello-world n'envoie rien lui-même.
 
-Si ce paramètre est désactivé ou non configuré, il n'y a pas d'option de commentaire.</string>
+Si ce paramètre est désactivé ou n'est pas configuré, aucun élément de commentaire n'apparaît.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">

@@ -61,7 +61,8 @@ everyone. Web criteria apply only where they carry over.
 
 ## Known limits
 
-- English, Spanish, French, Brazilian Portuguese and German only, chosen from
-  the Windows display language.
+- English, Spanish, French (France and Canada), Portuguese (Brazil and Portugal), German, Simplified Chinese, Japanese, Korean, Arabic and Hebrew, chosen from the Windows display language or by
+  the person. The text screen shows English for Chinese, Japanese, Korean,
+  Arabic and Hebrew, which the window draws, Arabic and Hebrew right to left.
 - The program shows text that a console can't draw, such as some scripts and
   emoji on older consoles, as `?`.

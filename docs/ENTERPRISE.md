@@ -152,7 +152,8 @@ read.
 
 Copy `policy\hello-world.admx` to `PolicyDefinitions`, and
 `policy\en-US\hello-world.adml` to `PolicyDefinitions\en-US`, in the central
-store or locally. The `es-ES`, `fr-FR`, `pt-BR` and `de-DE` folders hold
+store or locally. The `es-ES`, `fr-FR`, `fr-CA`, `pt-BR`, `pt-PT`, `de-DE`,
+`zh-CN`, `ja-JP`, `ko-KR`, `ar-SA` and `he-IL` folders hold
 the same templates for administrators who edit policy in those languages; copy
 each to the folder of the same name. Intune can import the same ADMX as a
 custom template. The
@@ -165,7 +166,7 @@ settings are under Computer or User Configuration > Administrative Templates
 | Hide the daily thought and tip | `HideThoughtAndTip` | Shows only the plan question |
 | Hide the days-in-a-row message | `HideDaysInARow` | Never shows the count, and keeps only the latest visit date |
 | Turn off plans | `DisablePlans` | Never asks for a plan, and keeps no plan text, finished plans or done count; text already saved is dropped at each person's next visit |
-| Always show hello-world in English | `ForceEnglish` | Shows English even where the Windows display language is Spanish, French, Portuguese or German |
+| Always show hello-world in English | `ForceEnglish` | Shows English whatever the Windows display language, and hides the language choice |
 | Write usage events to the event log | `ReportUsage` | One Application event, source `hello-world`, ID 2000, for each open, plan set and plan finished. No plan text; nothing goes over a network |
 | Keep an error log | `LogErrors` | `errors.log` in each person's data folder: time, version, error type and `hello.py` line numbers, under 100 KB. No plan text |
 | Name backups of a damaged file by date and time | `TimestampBackups` | `notes.json.<date-time>.bak` instead of numbered backups |
@@ -354,9 +355,14 @@ simulated pilots with screen reader, Magnifier and second-language users.
 Each person can switch to it under Options, and the `UseTextScreen` policy
 sets it for everyone. `docs/ACCESSIBILITY.md` has the details.
 
-The program speaks English, Spanish, French, Brazilian Portuguese and
-German. It follows the Windows display language, and shows English for any
-other language. The `ForceEnglish` policy keeps everyone in English. The words
+The program speaks English, Spanish, French (France and Canada), Portuguese (Brazil and Portugal), German, Simplified Chinese, Japanese, Korean, Arabic and Hebrew. It follows
+the Windows display language, and shows English for any other language. Each
+person can pick another one under Options. The text screen shows English for
+Chinese, Japanese, Korean, Arabic and Hebrew, which older consoles can't draw;
+the window shows them, Arabic and Hebrew mirrored right to left. The Canadian
+French and European Portuguese follow the whole Windows language, such as
+fr-CA, while other French and Portuguese PCs get the France and Brazil
+texts. The `ForceEnglish` policy keeps everyone in English. The words
 people type work in every language: `done`, `hecho`, `fait`, `feito` and
 `erledigt` all mark a plan done, and `salir`, `quitter`, `sair` and `beenden`
 all close. A PC whose language changes needs no retraining, and a help desk

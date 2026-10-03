@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-10-03: seven more languages
+
+Version 1.34.0. Builds the language items in `TODO.md`, which earlier rounds had held back: the window now speaks Simplified Chinese, Japanese, Korean, Arabic and Hebrew, and France and Brazil get company from Canadian French and European Portuguese.
+
+- Each new language was translated by its own agent from the English, with the reviewed Spanish and French as references, then reviewed by the same agent as a native speaker. They changed 51 entries in Chinese, 34 in Japanese, 33 in Korean, 25 in Arabic and 28 in Hebrew on review, such as a feminine noun given masculine status words in Hebrew, "show" read as software in Korean, and a word order error in Chinese. A checker held every file to the exact English keys, placeholders, prompt endings and Alt-key letters. The Japanese window was drawn and checked, and the Arabic one checked mirrored.
+- The register follows each language's Windows: 您 in Chinese, です/ます in Japanese, 해요체 in Korean, and gender-neutral phrasing in Arabic and Hebrew. Command words people type stay in English inside the translations. Buttons use the Windows Alt-key form, such as 完了(&D).
+- Arabic and Hebrew mirror the window, its menus and its message boxes right to left.
+- The text screen shows English for these five, since older consoles draw them as `?` and run right-to-left text backwards. The window and notifications show them.
+- Simplified Chinese follows China and Singapore; Traditional Chinese PCs keep English until there is a translation for them.
+- Canadian French changes 19 strings and 12 thoughts and tips from the France text: fin de semaine, courriel, dîner for lunch, no space before ? and !. European Portuguese is a full translation: ecrã, ficheiro, guardar, no você. Both follow the whole Windows language ID, so other French and Portuguese PCs keep the France and Brazil texts.
+- The window allows for characters that take two columns when it sizes text, after the Japanese instruction line was cut short.
+- Group Policy templates come in fr-CA, pt-PT, zh-CN, ja-JP, ko-KR, ar-SA and he-IL. The `ForceEnglish` help no longer lists four languages; it says the screens follow the Windows display language when there is a translation, and points to `docs/ENTERPRISE.md`, which lists them. The Hebrew and Korean translators caught the old list.
+- Options > Language lists all twelve, each in its own words.
+
+Tests: every language has every string, list and date, and a template with every policy string; the five scripts show in the window and English in the text screen; the regional variants follow the whole language ID; a whole day in each language that the text screen shows, with no English left; and the window opens and closes in all twelve. 242 run here on Windows: 240 pass and 2 are POSIX-only.
+
 ## 2026-10-03: history, numbers, and choices for the text screen
 
 Version 1.33.0. Builds the rest of the employee items in `TODO.md` that need no new language or installer work. Most of them were declined in earlier rounds as against the design; each is now a choice that is off until someone turns it on.

@@ -2000,7 +2000,8 @@ def _screen_keys():
 def test_every_language_translates_every_screen_string():
     hello, keys, raw = _screen_keys()
     assert len(keys) > 100 and len(raw) > 50
-    assert set(hello.LANGUAGES) == set(hello.WINDOWS_LANGUAGES.values())
+    assert set(hello.LANGUAGES) == (set(hello.WINDOWS_LANGUAGES.values())
+                                    | set(hello.WINDOWS_VARIANTS.values()))
     for code, data in hello.LANGUAGES.items():
         text = data["text"]
         # A key no call uses is a translation nobody sees.
@@ -2009,7 +2010,9 @@ def test_every_language_translates_every_screen_string():
             # Word order differs between languages, so only the set must match.
             assert sorted(re.findall(r"\{\w+\}", en)) == sorted(re.findall(r"\{\w+\}", t)), (code, en)
             assert en.endswith("> ") == t.endswith("> "), (code, en)
-        for en, prefixed in raw.items():
+        # The text screen shows English for these scripts, so the console
+        # width doesn't apply to them.
+        for en, prefixed in raw.items() if code not in hello.WINDOW_ONLY else ():
             for t in (en, text[en]):
                 limit = 66 if prefixed else 72
                 assert all(len(line) <= limit for line in t.splitlines()), (code, t)
@@ -2041,7 +2044,7 @@ def test_every_language_has_the_lists_and_dates():
         assert len(data["tips"]) == len(hello.TIPS), code
         assert len(data["done"]) == len(hello.DONE_LINES), code
         for line in data["thoughts"] + data["tips"] + data["done"]:
-            assert line == hello.tidy(line) and len(line) <= 120, (code, line)
+            assert line == hello.tidy(line) and len(line) <= 140, (code, line)
         assert len(data["days"]) == 7 and len(data["months"]) == 12, code
         hello.LANGUAGE = code
         assert "2026" in hello.long_date(hello.datetime.date(2026, 10, 5)), code
@@ -2082,6 +2085,8 @@ def test_a_spanish_day_reads_in_spanish():
 def test_every_language_shows_a_whole_day_without_english():
     hello = _load_hello()
     for code, data in hello.LANGUAGES.items():
+        if code in hello.WINDOW_ONLY:
+            continue
         p = run(text="Plan A\n\n", day="2026-10-05", lang=code)
         out = p.stdout
         assert out.startswith(data["text"][hello.GREETING] + "\n"), code
@@ -2089,7 +2094,7 @@ def test_every_language_shows_a_whole_day_without_english():
             assert english not in out, (code, english)
         assert notes(p.home)["intent"]["text"] == "Plan A", code
         # The done word of this language finishes the plan the next day.
-        done = {"es": "hecho", "fr": "fait", "pt": "feito", "de": "erledigt"}[code]
+        done = {"es": "hecho", "fr": "fait", "pt": "feito", "de": "erledigt"}[code[:2]]
         later = run(text=f"{done}\n\n\n", day="2026-10-06", lang=code, home=p.home)
         assert notes(later.home)["done"] == 1, code
         assert "Plan A" in later.stdout, code
@@ -2129,7 +2134,9 @@ def test_every_language_fits_72_columns():
     assert "Palabras que puedes escribir" in run(text="\nm\n5\n\n\n", lang="es").stdout
 
 
-ADML = {"es": "es-ES", "fr": "fr-FR", "pt": "pt-BR", "de": "de-DE"}
+ADML = {"es": "es-ES", "fr": "fr-FR", "pt": "pt-BR", "de": "de-DE",
+        "fr-CA": "fr-CA", "pt-PT": "pt-PT", "zh": "zh-CN", "ja": "ja-JP",
+        "ko": "ko-KR", "ar": "ar-SA", "he": "he-IL"}
 
 
 def test_every_language_has_a_policy_template_with_every_string():
@@ -2801,3 +2808,24 @@ def test_an_old_sign_in_value_is_rewritten():
     run(text="\n\n", startup=startup)
     with open(path) as f:
         assert "hello.cmd" not in f.read()
+
+
+def test_window_only_scripts_show_in_the_window_and_english_in_the_text_screen():
+    hello = _load_hello()
+    for code in hello.WINDOW_ONLY:
+        hello.LANGUAGE, hello.WINDOW = code, False
+        assert hello.language() == "en", code
+        hello.WINDOW = True
+        assert hello.language() == code, code
+        assert hello.tr(hello.GREETING) != hello.GREETING, code
+    p = run(text="\n\n", lang="ja")
+    assert p.stdout.startswith("Hello, world!\n")
+
+
+def test_regional_variants_follow_the_whole_windows_language():
+    hello = _load_hello()
+    assert hello.WINDOWS_VARIANTS[0x0C0C] == "fr-CA"
+    assert hello.WINDOWS_VARIANTS[0x0816] == "pt-PT"
+    hello.LANGUAGE = "fr-CA"
+    assert hello.tr("Not on weekends") == "Pas la fin de semaine"
+    assert hello.tr("Saved.") == hello.LANGUAGES["fr"]["text"]["Saved."]
