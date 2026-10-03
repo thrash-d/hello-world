@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-10-03: options for IT, and one reminder task per user
+
+Version 1.32.0. Builds the IT items the old backlog had declined as against the design. Each is opt-in by Group Policy, and none of them sends anything over a network or writes plan text anywhere new.
+
+Bug: 1.31.0 named every person's reminder task `hello-world reminder` in the task folder every user shares, so on a PC with several users one person's reminder time replaced another's, or failed to save. Each task now carries the user name.
+
+Policies, with ADMX and ADML strings in all five languages:
+- `ReportUsage`: one Application event, source `hello-world`, ID 2000, for each open, plan set and plan finished.
+- `LogErrors`: `errors.log` in the person's data folder with the time, version, error type and `hello.py` line numbers, under 100 KB.
+- `FeedbackAddress`: Options > Send feedback... opens a new mail to that address in the person's own mail program. Only a plain address is accepted, so the policy can't add recipients or a body.
+- `TimestampBackups` and `MaxBackups`: backups of a damaged file named by date and time, and a cap on how many are kept.
+- `LeaveDamagedFile`: a run with nobody at the keyboard leaves a damaged file for the next visit to set aside.
+
+Also:
+- `notes.json` carries `"schema": 1`. `load()` still checks every field by type.
+- `--count-sign-in off` leaves sign-in runs out of the days-in-a-row count.
+- `uninstall.ps1` turns off every user's reminder, removing only Run values whose data runs `hello.py` or `hello.cmd` with `--startup`, and every reminder task. `-RemoveNotes` deletes each profile's notes files, checking for links before each delete; the script's help names the race that check can't close, which is why 1.23.0 withdrew it, and why it is a switch, not the default. CI runs it as administrator and checks that the notes, the Run value and the task go, and an unrelated file stays.
+
+Tests: usage events only under the policy and with no plan text, the error log with no plan text, feedback addresses refused and accepted, timestamped and capped backups, a damaged file left alone with nobody there, sign-in runs left out of the count, the per-user task name, the frozen list of saved keys with every key added since 1.28.0, and policies with values in the template check. 232 run here on Windows: 230 pass and 2 are POSIX-only.
+
 ## 2026-10-03: reminder choices, days off, and a greeting by name
 
 Version 1.31.0. Builds the reminder and greeting items from the queue in `TODO.md`, which the pilots asked for and the old backlog had declined.

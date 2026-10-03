@@ -132,6 +132,21 @@ jobs:
           Check ("$tip" -eq $sample) 'the installed program uses the organization content'
           powershell -NoProfile -ExecutionPolicy Bypass -File "$dir\uninstall.ps1" -Quiet | Write-Host
           Check ($LASTEXITCODE -eq 0 -and -not (Test-Path $dir)) 'the content install uninstalls'
+
+          # -RemoveNotes deletes this profile's notes, and every reminder goes.
+          Check ((Install $contentHash) -eq 0) 'it installs again'
+          $notesDir = Join-Path $env:LOCALAPPDATA 'hello-world'
+          New-Item -ItemType Directory $notesDir -Force | Out-Null
+          Set-Content (Join-Path $notesDir 'notes.json') '{"visits": []}'
+          Set-Content (Join-Path $notesDir 'keep-me.txt') 'not ours'
+          $run = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+          Set-ItemProperty $run -Name 'hello-world' -Value "`"$dir\python\pythonw.exe`" -I `"$dir\hello.py`" --startup"
+          & "$dir\python\python.exe" -I -c "import sys; sys.path.insert(0, sys.argv[1]); import hello; print(hello.reminder_task('09:00'))" $dir
+          powershell -NoProfile -ExecutionPolicy Bypass -File "$dir\uninstall.ps1" -Quiet -RemoveNotes | Write-Host
+          Check ($LASTEXITCODE -eq 0) 'uninstall -RemoveNotes exits 0'
+          Check (-not (Test-Path (Join-Path $notesDir 'notes.json')) -and (Test-Path (Join-Path $notesDir 'keep-me.txt'))) 'it deletes the notes and nothing else'
+          Check ($null -eq (Get-ItemProperty $run -Name 'hello-world' -ErrorAction SilentlyContinue)) 'it removes the sign-in value'
+          Check (-not (schtasks /Query /FO CSV /NH 2>$null | Select-String 'hello-world reminder')) 'it removes the reminder task'
       # A dead URL or a wrong hash would pass every other check and fail every
       # real install at step 4, so run what the installer will run.
       - name: Check the pinned Python and run hello.py on it

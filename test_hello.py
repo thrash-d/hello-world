@@ -1422,10 +1422,14 @@ def test_the_saved_keys_are_frozen():
     # A new key needs a merge rule in commit() and a test for it, so adding
     # one must change this list on purpose.
     keys = {"visits", "intent", "streak", "offered", "offer_skips",
-            "previous", "done", "finished", "epoch", "tips"}
+            "previous", "done", "finished", "epoch", "tips", "text",
+            "notified", "lang", "nudge", "open_after", "no_weekends", "name",
+            "remind_at", "no_startup_visits"}
     full = {"visits": ["2026-09-30"], "streak": False, "offered": True,
             "offer_skips": 1, "previous": "p", "done": 2, "epoch": "abc",
-            "tips": False,
+            "tips": False, "text": True, "notified": "2026-09-30", "lang": "fr",
+            "nudge": True, "open_after": True, "no_weekends": True,
+            "name": True, "remind_at": "09:00", "no_startup_visits": True,
             "intent": {"text": "x", "date": "2026-09-30", "since": "2026-09-29",
                        "skips": 1},
             "finished": [{"text": "f", "date": "2026-09-30"}]}
@@ -1436,7 +1440,7 @@ def test_the_saved_keys_are_frozen():
         json.dump(full, f)
     state, _ = mod.load()
     out = mod.file_form(state)
-    assert set(out) == keys
+    assert set(out) == keys | {"schema"} and out["schema"] == mod.SCHEMA
     assert set(out["intent"]) == {"text", "date", "since", "skips"}
 
 
@@ -1876,7 +1880,9 @@ def test_hiding_days_in_a_row_keeps_only_the_latest_visit():
 def test_the_policy_template_matches_the_policies_the_program_reads():
     import re
     with open(HELLO, encoding="utf-8") as f:
-        read = set(re.findall(r'policy\("([A-Za-z]+)"\)', f.read()))
+        source = f.read()
+        read = set(re.findall(r'policy\("([A-Za-z]+)"\)', source))
+        read |= set(re.findall(r'policy_value\("([A-Za-z]+)"', source))
     admx = os.path.join(os.path.dirname(HELLO), "policy", "hello-world.admx")
     with open(admx, encoding="utf-8") as f:
         offered = set(re.findall(r'valueName="([A-Za-z]+)"', f.read()))
@@ -2399,7 +2405,7 @@ def test_the_window_shows_what_is_saved_and_deletes_it():
     assert "Write the report" in summary and hello.data_file() in summary
     assert "Everything saved was deleted" in visit.delete_all()
     assert visit.plan() == "" and visit.followup is None
-    assert set(notes(first.home)) == {"visits", "intent", "streak", "epoch"}
+    assert set(notes(first.home)) == {"schema", "visits", "intent", "streak", "epoch"}
 
 
 def test_the_text_menu_names_the_sign_in_choice_by_what_it_does():
@@ -2637,3 +2643,76 @@ def test_the_reminder_task_is_created_and_removed_for_this_user():
     finally:
         assert hello.reminder_task(None)
     assert not hello.task_on()
+
+
+def test_usage_events_and_the_error_log_are_opt_in_and_hold_no_plan_text():
+    first = run(text="Secret plan name\n\n")
+    hello = _window_hello(home=first.home)
+    hello.EVENTS = []
+    hello.Visit().answer("yes")
+    assert hello.EVENTS == []
+    hello.POLICY = {"ReportUsage": 1}
+    first = run(text="Secret plan name\n\n")
+    hello.HOME = first.home
+    hello.Visit().answer("yes")
+    assert hello.EVENTS == ["hello-world: opened", "hello-world: plan finished"]
+    assert not any("Secret" in e for e in hello.EVENTS)
+    hello.POLICY = {"LogErrors": 1}
+    try:
+        raise ValueError("Secret plan name")
+    except ValueError as e:
+        hello.log_error(e)
+    with open(os.path.join(hello.HOME, "errors.log")) as f:
+        logged = f.read()
+    assert "ValueError" in logged and "Secret" not in logged
+
+
+def test_feedback_opens_a_mail_only_to_a_plain_address():
+    hello = _window_hello()
+    hello.STARTED = []
+    assert not hello.send_feedback()
+    for bad in ("not an address", "a@b", "a@b.com?bcc=x@y.com", "a b@c.com"):
+        hello.POLICY = {"FeedbackAddress": bad}
+        assert hello.feedback_address() is None, bad
+    hello.POLICY = {"FeedbackAddress": "helpdesk@example.com"}
+    assert hello.send_feedback()
+    assert hello.STARTED[0].startswith("mailto:helpdesk@example.com?subject=hello-world")
+
+
+def test_backups_can_be_timestamped_and_capped():
+    hello = _load_hello()
+    hello.HOME = mkdtemp()
+    os.makedirs(hello.HOME, exist_ok=True)
+    hello.POLICY = {"TimestampBackups": 1, "MaxBackups": 2}
+    for n in range(4):
+        with open(hello.data_file(), "w") as f:
+            f.write("damaged " + str(n))
+        hello.load()
+    backups = [n for n in os.listdir(hello.HOME) if n.endswith(".bak")]
+    assert len(backups) == 2 and all(n.count(".") == 3 for n in backups)
+
+
+def test_a_damaged_file_can_be_left_alone_when_nobody_is_there():
+    home = mkdtemp()
+    with open(os.path.join(home, "notes.json"), "w") as f:
+        f.write("damaged")
+    run(["--startup"], home=home, policy={"LeaveDamagedFile": 1})
+    assert os.listdir(home) == ["notes.json"]
+    run(["--startup"], home=home)
+    assert "notes.json.bak" in os.listdir(home)
+
+
+def test_sign_in_runs_can_be_left_out_of_the_days_in_a_row():
+    first = run(["--streak", "on"])
+    run(["--count-sign-in", "off"], home=first.home)
+    run(["--startup"], text="\n\n", home=first.home, day="2026-10-02")
+    assert notes(first.home)["visits"] == []
+    run(["--count-sign-in", "on"], home=first.home)
+    run(["--startup"], text="\n\n", home=first.home, day="2026-10-02")
+    assert notes(first.home)["visits"] == ["2026-10-02"]
+
+
+def test_each_user_has_their_own_reminder_task_name():
+    hello = _load_hello()
+    assert hello.TASK_NAME.startswith("hello-world reminder ")
+    assert hello.TASK_NAME != "hello-world reminder "

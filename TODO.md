@@ -33,20 +33,8 @@ Employees:
 - Rewriting a 1.23.0 to 1.27.0 sign-in value to the current one.
 
 For IT:
-- Usage reporting, as an opt-in policy: a count of visits per day written to
-  the Application event log, with no plan text, and nothing sent over a
-  network.
-- An error log, as an opt-in policy.
-- Feedback from the window, as a mail to an address the organization sets.
-- A schema version in `notes.json`.
-- Timestamped backups of a damaged file, and a cap set by policy.
 - Removing the program for one person without an administrator: hiding it
   from their Start menu and turning everything off.
-- `uninstall.ps1 -RemoveNotes`, deleting each profile's notes only through
-  paths with no links, and removing each user's reminder keys.
-- Counting the sign-in `--startup` run as a visit, as an option.
-- Skipping the repair of a damaged file when nobody can see the screen, as an
-  option.
 - Reaching people on laptops: a per-user install for PCs where IT allows it.
 
 Installer, tested as administrator in CI:

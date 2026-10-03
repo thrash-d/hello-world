@@ -48,6 +48,39 @@ Verwenden Sie diese Einstellung, wenn Screenreader-Nutzer nur den Textbildschirm
 Wenn diese Einstellung deaktiviert oder nicht konfiguriert ist, fragt hello-world jede Person einmal.
 
 „Öffnen von hello-world bei der Anmeldung deaktivieren“ hat Vorrang vor dieser Einstellung.</string>
+      <string id="SUPPORTED_1_32">hello-world 1.32.0 oder höher</string>
+      <string id="ReportUsage">Nutzungsereignisse ins Ereignisprotokoll schreiben</string>
+      <string id="ReportUsage_Help">Wenn diese Einstellung aktiviert ist, schreibt hello-world ein Ereignis ins Anwendungsprotokoll, Quelle hello-world, Ereignis 2000, wenn jemand es öffnet, einen Plan festlegt oder einen erledigt: „hello-world: opened“, „hello-world: plan set“ oder „hello-world: plan finished“. Die Ereignisse enthalten keinen Plantext, und nichts wird über ein Netzwerk gesendet; Ihre eigene Ereigniserfassung bestimmt, wohin sie gehen.
+
+Wenn diese Einstellung deaktiviert oder nicht konfiguriert ist, schreibt hello-world keine Nutzungsereignisse.</string>
+      <string id="LogErrors">Fehlerprotokoll führen</string>
+      <string id="LogErrors_Help">Wenn diese Einstellung aktiviert ist, fügt hello-world bei einem Fehler eine Zeile zu errors.log im Datenordner der jeweiligen Person hinzu: Zeit, Version, Fehlerart und die betroffenen Zeilen von hello.py. Sie enthält keinen Plantext und bleibt unter 100 KB.
+
+Wenn diese Einstellung deaktiviert oder nicht konfiguriert ist, führt hello-world kein Fehlerprotokoll.</string>
+      <string id="TimestampBackups">Sicherungen einer beschädigten Datei nach Datum und Uhrzeit benennen</string>
+      <string id="TimestampBackups_Help">Wenn diese Einstellung aktiviert ist, wird eine beschädigte notes.json als notes.json.&lt;Datum-Uhrzeit&gt;.bak beiseitegelegt statt als notes.json.bak, notes.json.bak2 und so weiter.
+
+Wenn diese Einstellung deaktiviert oder nicht konfiguriert ist, werden Sicherungen nummeriert.</string>
+      <string id="LeaveDamagedFile">Beschädigte Datei nicht anfassen, wenn niemand am Bildschirm ist</string>
+      <string id="LeaveDamagedFile_Help">Wenn diese Einstellung aktiviert ist, lässt ein Lauf ohne Person an der Tastatur, etwa bei der Anmeldung ohne Konsole, eine beschädigte notes.json liegen, statt sie beiseitezulegen. Der nächste Besuch mit jemandem am Bildschirm legt sie beiseite und sagt es.
+
+Wenn diese Einstellung deaktiviert oder nicht konfiguriert ist, wird eine beschädigte Datei beiseitegelegt, sobald sie gefunden wird.</string>
+      <string id="MaxBackups">Höchstens so viele Sicherungen einer beschädigten Datei behalten</string>
+      <string id="MaxBackups_Help">Wenn diese Einstellung aktiviert ist, löscht hello-world die ältesten Sicherungen einer beschädigten notes.json über diese Zahl hinaus, bevor es eine neue anlegt.
+
+Wenn diese Einstellung deaktiviert oder nicht konfiguriert ist, bleiben alle Sicherungen, bis die Person alles löscht.</string>
+      <string id="FeedbackAddress">Adresse für Rückmeldungen</string>
+      <string id="FeedbackAddress_Help">Wenn diese Einstellung aktiviert ist, hat das Menü Optionen im Fenster „Rückmeldung senden...“, das eine neue E-Mail an diese Adresse im E-Mail-Programm der Person öffnet. hello-world selbst sendet nichts.
+
+Wenn diese Einstellung deaktiviert oder nicht konfiguriert ist, gibt es keinen Eintrag für Rückmeldungen.</string>
     </stringTable>
+    <presentationTable>
+      <presentation id="FeedbackAddress">
+        <textBox refId="FeedbackAddress"><label>Adresse:</label></textBox>
+      </presentation>
+      <presentation id="MaxBackups">
+        <decimalTextBox refId="MaxBackups" defaultValue="5">Zu behaltende Sicherungen:</decimalTextBox>
+      </presentation>
+    </presentationTable>
   </resources>
 </policyDefinitionResources>

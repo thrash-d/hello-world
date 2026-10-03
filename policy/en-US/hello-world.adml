@@ -48,6 +48,39 @@ Use this setting where screen reader users have tested only the text screen, or 
 When disabled or not configured, hello-world asks each person once.
 
 "Turn off opening hello-world at sign-in" wins over this setting.</string>
+      <string id="SUPPORTED_1_32">hello-world 1.32.0 or later</string>
+      <string id="ReportUsage">Write usage events to the event log</string>
+      <string id="ReportUsage_Help">When enabled, hello-world writes one event to the Application event log, source hello-world, event 2000, each time someone opens it, sets a plan or finishes one: "hello-world: opened", "hello-world: plan set" or "hello-world: plan finished". The events hold no plan text, and nothing is sent over a network; your own event collection decides where they go.
+
+When disabled or not configured, hello-world writes no usage events.</string>
+      <string id="LogErrors">Keep an error log</string>
+      <string id="LogErrors_Help">When enabled, hello-world adds a line to errors.log in each person's hello-world data folder when something goes wrong: the time, the version, the error's type and the lines of hello.py involved. It holds no plan text and stays under 100 KB.
+
+When disabled or not configured, hello-world keeps no error log.</string>
+      <string id="TimestampBackups">Name backups of a damaged file by date and time</string>
+      <string id="TimestampBackups_Help">When enabled, a damaged notes.json is set aside as notes.json.&lt;date-time&gt;.bak instead of notes.json.bak, notes.json.bak2 and so on.
+
+When disabled or not configured, backups are numbered.</string>
+      <string id="LeaveDamagedFile">Leave a damaged file alone when nobody is at the screen</string>
+      <string id="LeaveDamagedFile_Help">When enabled, a run with nobody at the keyboard, such as a sign-in run with no console, leaves a damaged notes.json where it is instead of setting it aside. The next visit with someone there sets it aside and says so.
+
+When disabled or not configured, a damaged file is set aside as a backup whenever it is found.</string>
+      <string id="MaxBackups">Keep at most this many backups of a damaged file</string>
+      <string id="MaxBackups_Help">When enabled, hello-world deletes the oldest backups of a damaged notes.json beyond this number before it makes a new one.
+
+When disabled or not configured, every backup is kept until the person deletes everything.</string>
+      <string id="FeedbackAddress">Address for feedback</string>
+      <string id="FeedbackAddress_Help">When enabled, the window's Options menu has "Send feedback...", which opens a new mail to this address in the person's own mail program. hello-world itself sends nothing.
+
+When disabled or not configured, there is no feedback item.</string>
     </stringTable>
+    <presentationTable>
+      <presentation id="FeedbackAddress">
+        <textBox refId="FeedbackAddress"><label>Address:</label></textBox>
+      </presentation>
+      <presentation id="MaxBackups">
+        <decimalTextBox refId="MaxBackups" defaultValue="5">Backups to keep:</decimalTextBox>
+      </presentation>
+    </presentationTable>
   </resources>
 </policyDefinitionResources>

@@ -48,6 +48,39 @@ Utilisez ce paramètre lorsque les utilisateurs de lecteurs d'écran n'ont test�
 Si ce paramètre est désactivé ou non configuré, hello-world pose la question une fois à chaque personne.
 
 « Désactiver l'ouverture de hello-world à l'ouverture de session » l'emporte sur ce paramètre.</string>
+      <string id="SUPPORTED_1_32">hello-world 1.32.0 ou version ultérieure</string>
+      <string id="ReportUsage">Écrire des événements d'utilisation dans le journal</string>
+      <string id="ReportUsage_Help">Si ce paramètre est activé, hello-world écrit un événement dans le journal Application, source hello-world, événement 2000, chaque fois que quelqu'un l'ouvre, définit un plan ou en termine un : « hello-world: opened », « hello-world: plan set » ou « hello-world: plan finished ». Les événements ne contiennent aucun texte de plan et rien n'est envoyé sur le réseau ; votre propre collecte d'événements décide de leur destination.
+
+Si ce paramètre est désactivé ou non configuré, hello-world n'écrit aucun événement d'utilisation.</string>
+      <string id="LogErrors">Tenir un journal des erreurs</string>
+      <string id="LogErrors_Help">Si ce paramètre est activé, hello-world ajoute une ligne à errors.log dans le dossier de données de chaque personne quand quelque chose échoue : l'heure, la version, le type d'erreur et les lignes de hello.py concernées. Il ne contient aucun texte de plan et reste sous 100 Ko.
+
+Si ce paramètre est désactivé ou non configuré, hello-world ne tient pas de journal des erreurs.</string>
+      <string id="TimestampBackups">Nommer les copies d'un fichier endommagé par date et heure</string>
+      <string id="TimestampBackups_Help">Si ce paramètre est activé, un notes.json endommagé est mis de côté sous le nom notes.json.&lt;date-heure&gt;.bak au lieu de notes.json.bak, notes.json.bak2, etc.
+
+Si ce paramètre est désactivé ou non configuré, les copies sont numérotées.</string>
+      <string id="LeaveDamagedFile">Ne pas toucher un fichier endommagé quand personne n'est devant l'écran</string>
+      <string id="LeaveDamagedFile_Help">Si ce paramètre est activé, une exécution sans personne au clavier, comme celle de la connexion sans console, laisse un notes.json endommagé en place au lieu de le mettre de côté. La visite suivante avec quelqu'un devant l'écran le met de côté et le signale.
+
+Si ce paramètre est désactivé ou non configuré, un fichier endommagé est mis de côté dès qu'il est trouvé.</string>
+      <string id="MaxBackups">Garder au plus ce nombre de copies d'un fichier endommagé</string>
+      <string id="MaxBackups_Help">Si ce paramètre est activé, hello-world supprime les plus anciennes copies d'un notes.json endommagé au-delà de ce nombre avant d'en créer une nouvelle.
+
+Si ce paramètre est désactivé ou non configuré, toutes les copies sont gardées jusqu'à ce que la personne supprime tout.</string>
+      <string id="FeedbackAddress">Adresse pour les commentaires</string>
+      <string id="FeedbackAddress_Help">Si ce paramètre est activé, le menu Options de la fenêtre propose « Envoyer un commentaire... », qui ouvre un nouveau message à cette adresse dans le logiciel de messagerie de la personne. hello-world n'envoie rien lui-même.
+
+Si ce paramètre est désactivé ou non configuré, il n'y a pas d'option de commentaire.</string>
     </stringTable>
+    <presentationTable>
+      <presentation id="FeedbackAddress">
+        <textBox refId="FeedbackAddress"><label>Adresse :</label></textBox>
+      </presentation>
+      <presentation id="MaxBackups">
+        <decimalTextBox refId="MaxBackups" defaultValue="5">Copies à garder :</decimalTextBox>
+      </presentation>
+    </presentationTable>
   </resources>
 </policyDefinitionResources>

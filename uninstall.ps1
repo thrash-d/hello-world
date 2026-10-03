@@ -14,11 +14,19 @@ is changed when it exits 1618. Everything is written to
 %WINDIR%\Logs\hello-world\uninstall.log, and the result goes to the
 Application event log under the source hello-world.
 
-Each user's saved notes stay in their own profile. Users can delete theirs
-with menu option 4 before the program is removed. This script doesn't delete
-inside user profiles, because a user could redirect such a delete elsewhere.
+Each user's sign-in reminder is turned off: the Run value of every signed-in
+user, and every user's reminder task. Each user's saved notes stay in their
+own profile, unless -RemoveNotes is given. Users can delete theirs with
+Delete everything before the program is removed.
+
+-RemoveNotes also deletes each profile's AppData\Local\hello-world files:
+notes.json, its backups and temp copies, notes.lock and errors.log. It checks
+that no folder on the way is a link just before each delete and touches no
+other file, but a user who swaps a folder for a link in the moment between
+the check and the delete could point one delete at another file with one of
+those names. Use your own profile cleanup where that matters.
 #>
-param([switch]$Quiet)
+param([switch]$Quiet, [switch]$RemoveNotes)
 $ErrorActionPreference = 'Stop'
 function Wait-Close { if (-not $Quiet) { Read-Host 'Press Enter to close' } }
 # A 32-bit PowerShell sees Program Files (x86) and the 32-bit registry.
@@ -79,6 +87,49 @@ function Remove-LegacyLauncher([string]$ProfileDir) {
     }
 }
 
+# The folders on the way down from a profile, none of them a link.
+function Get-SafeFolder([string]$ProfileDir, [string[]]$Parts) {
+    $path = $ProfileDir
+    foreach ($part in @('') + $Parts) {
+        if ($part) { $path = Join-Path $path $part }
+        $item = Get-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+        if (-not $item -or -not $item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) { return $null }
+    }
+    return $path
+}
+
+function Remove-UserNotes([string]$ProfileDir) {
+    $parts = 'AppData', 'Local', 'hello-world'
+    $folder = Get-SafeFolder $ProfileDir $parts
+    if (-not $folder) { return }
+    foreach ($file in @(Get-ChildItem -LiteralPath $folder -Force -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -in 'notes.json', 'notes.lock', 'errors.log', 'errors.log.old' -or $_.Name -like 'notes.json.*' })) {
+        # Checked again just before each delete.
+        if (-not (Get-SafeFolder $ProfileDir $parts)) { return }
+        if (-not ($file.Attributes -band [IO.FileAttributes]::ReparsePoint)) { [IO.File]::Delete($file.FullName) }
+    }
+    if (-not (Get-ChildItem -LiteralPath $folder -Force -ErrorAction SilentlyContinue)) {
+        if (Get-SafeFolder $ProfileDir $parts) { [IO.Directory]::Delete($folder) }
+    }
+}
+
+# Only values this program wrote: their data runs hello.py or hello.cmd with
+# --startup. A value of that name pointing anywhere else is left alone.
+function Remove-UserReminders {
+    foreach ($sid in @(Get-ChildItem 'Registry::HKEY_USERS' -ErrorAction SilentlyContinue |
+            Where-Object { $_.PSChildName -match '^S-1-5-21-[\d-]+$' } | ForEach-Object PSChildName)) {
+        $run = "Registry::HKEY_USERS\$sid\Software\Microsoft\Windows\CurrentVersion\Run"
+        $value = (Get-ItemProperty -LiteralPath $run -Name 'hello-world' -ErrorAction SilentlyContinue).'hello-world'
+        if ($value -and $value -match 'hello\.(py|cmd)"? --startup$') {
+            Remove-ItemProperty -LiteralPath $run -Name 'hello-world' -ErrorAction SilentlyContinue
+        }
+    }
+    $schtasks = Join-Path $sys32 'schtasks.exe'
+    $names = @(& $schtasks /Query /FO CSV /NH 2>$null | ForEach-Object { ($_ -split '","')[0].Trim('"') } |
+        Where-Object { $_ -like '\hello-world reminder*' } | Sort-Object -Unique)
+    foreach ($name in $names) { & $schtasks /Delete /F /TN $name 2>$null | Out-Null }
+}
+
 $ps = Join-Path $sys32 'WindowsPowerShell\v1.0\powershell.exe'
 $dir = Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'hello-world'
 if ($PSScriptRoot -ne $dir) {
@@ -91,6 +142,7 @@ if (-not $me.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     try {
         $argList = '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`""
         if ($Quiet) { $argList += '-Quiet' }
+        if ($RemoveNotes) { $argList += '-RemoveNotes' }
         # Waiting passes the elevated copy's exit code back, so -Quiet runs
         # from a management tool see whether the uninstall worked.
         $child = Start-Process $ps -Verb RunAs -ArgumentList $argList -Wait -PassThru
@@ -141,7 +193,13 @@ try {
         if (-not $p) { continue }
         try { Remove-LegacyLauncher ([Environment]::ExpandEnvironmentVariables($p)) }
         catch { Write-Warning "Couldn't check the old launcher in ${p}: $($_.Exception.Message)" }
+        if ($RemoveNotes) {
+            try { Remove-UserNotes ([Environment]::ExpandEnvironmentVariables($p)) }
+            catch { Write-Warning "Couldn't remove the notes in ${p}: $($_.Exception.Message)" }
+        }
     }
+    try { Remove-UserReminders }
+    catch { Write-Warning "Couldn't remove every reminder: $($_.Exception.Message)" }
 
     $lnk = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'hello-world.lnk'
     if (Test-Path -LiteralPath $lnk) { Remove-Item -LiteralPath $lnk }
@@ -158,7 +216,8 @@ try {
     $key = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\hello-world'
     if (Test-Path -LiteralPath $key) { Remove-Item -LiteralPath $key -Recurse }
     Write-Host 'hello-world is uninstalled.' -ForegroundColor Green
-    Write-Host 'Each user keeps their own saved notes in AppData\Local\hello-world. They can delete that folder if they want.'
+    if ($RemoveNotes) { Write-Host "Each user's saved notes were deleted." }
+    else { Write-Host 'Each user keeps their own saved notes in AppData\Local\hello-world. They can delete that folder if they want.' }
     Write-AppEvent 1002 Information 'hello-world was uninstalled.'
 }
 catch {
