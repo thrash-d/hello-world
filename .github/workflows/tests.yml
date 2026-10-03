@@ -42,13 +42,13 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
-          foreach ($f in 'install.ps1', 'uninstall.ps1', 'toolsuild-package.ps1') {
+          foreach ($f in 'install.ps1', 'uninstall.ps1', 'tools\build-package.ps1') {
             $errors = $null
             [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f), [ref]$null, [ref]$errors)
             if ($errors) { $errors | Out-String | Write-Host; throw "$f does not parse." }
           }
           Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser -Force
-          $found = foreach ($f in 'install.ps1', 'uninstall.ps1', 'toolsuild-package.ps1') { Invoke-ScriptAnalyzer -Path $f -Severity Error }
+          $found = foreach ($f in 'install.ps1', 'uninstall.ps1', 'tools\build-package.ps1') { Invoke-ScriptAnalyzer -Path $f -Severity Error }
           if ($found) { $found | Format-Table -AutoSize | Out-String | Write-Host; throw 'PSScriptAnalyzer found errors.' }
       # The runner is an administrator, so the package really installs here:
       # the same package the release workflow publishes, built the same way.
