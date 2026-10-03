@@ -198,10 +198,13 @@ jobs:
           Invoke-WebRequest "$url.sigstore" -OutFile "$zip.sigstore" -UseBasicParsing
           python -m pip install --quiet "sigstore>=3,<5"
           $signed = $false
+          # sigstore reports on stderr, which 'Stop' would turn into a failure.
+          $ErrorActionPreference = 'Continue'
           foreach ($who in @(@('hugo@python.org', 'https://github.com/login/oauth'), @('steve.dower@python.org', 'https://login.microsoftonline.com'))) {
             python -m sigstore verify identity --bundle "$zip.sigstore" --cert-identity $who[0] --cert-oidc-issuer $who[1] $zip 2>&1 | Write-Host
             if ($LASTEXITCODE -eq 0) { $signed = $true; Write-Host "ok: signed by $($who[0])"; break }
           }
+          $ErrorActionPreference = 'Stop'
           if (-not $signed) { throw "The Python zip's sigstore signature didn't verify." }
 
   # Where AllSigned or WDAC script rules apply, only a signed package runs.
