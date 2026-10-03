@@ -55,6 +55,8 @@ jobs:
           ``sbom.cdx.json`` is the CycloneDX bill of materials.
           "@
           $notesFile = Join-Path $env:RUNNER_TEMP 'notes.md'
-          Set-Content -LiteralPath $notesFile -Value ($notes -replace '(?m)^          ', '') -Encoding utf8
+          # UTF-8 without a byte-order mark, which Set-Content -Encoding utf8
+          # adds in Windows PowerShell 5.1 and GitHub shows at the top.
+          [IO.File]::WriteAllText($notesFile, ($notes -replace '(?m)^          ', ''), (New-Object Text.UTF8Encoding $false))
           gh release create $tag $zip (Join-Path $out 'sbom.cdx.json') -R $env:REPO --target $env:SHA --title "hello-world $version" --notes-file $notesFile
           if ($LASTEXITCODE) { throw "gh release create failed with exit $LASTEXITCODE" }
