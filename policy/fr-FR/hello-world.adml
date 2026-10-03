@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="1.0" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName>hello-world</displayName>
+  <description>Paramètres du programme quotidien hello-world.</description>
+  <resources>
+    <stringTable>
+      <string id="HelloWorld">hello-world</string>
+      <string id="SUPPORTED_1_23">hello-world 1.23.0 ou version ultérieure</string>
+      <string id="SUPPORTED_1_24">hello-world 1.24.0 ou version ultérieure</string>
+      <string id="SUPPORTED_1_25">hello-world 1.25.0 ou version ultérieure</string>
+      <string id="DisableSignInLauncher">Désactiver l'ouverture de hello-world à l'ouverture de session</string>
+      <string id="DisableSignInLauncher_Help">Si ce paramètre est activé, personne ne peut configurer hello-world pour qu'il s'ouvre seul à l'ouverture de session, le programme ne le propose jamais, et un lanceur activé auparavant est supprimé la prochaine fois que le programme s'ouvre.
+
+Si ce paramètre est désactivé ou non configuré, chaque personne peut activer ou désactiver l'ouverture à l'ouverture de session avec l'option 2 du menu.
+
+Le lanceur est une valeur nommée hello-world sous HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run.</string>
+      <string id="HideThoughtAndTip">Masquer la pensée et l'astuce du jour</string>
+      <string id="HideThoughtAndTip_Help">Si ce paramètre est activé, hello-world n'affiche ni la pensée du jour ni l'astuce à essayer. La question du plan et le menu fonctionnent toujours.
+
+Si ce paramètre est désactivé ou non configuré, chaque personne peut les masquer ou les afficher avec l'option 8 du menu.</string>
+      <string id="HideDaysInARow">Masquer le message des jours consécutifs</string>
+      <string id="HideDaysInARow_Help">Si ce paramètre est activé, hello-world n'affiche jamais le message qui compte combien de jours de suite quelqu'un l'a ouvert.
+
+Si ce paramètre est désactivé ou non configuré, le message n'apparaît que le 3e, le 7e et le 14e jour consécutif, puis tous les 30 jours, et chaque personne peut le masquer avec l'option 3 du menu.</string>
+      <string id="DisablePlans">Désactiver les plans</string>
+      <string id="DisablePlans_Help">Si ce paramètre est activé, hello-world ne demande pas de plan et n'en assure pas le suivi, et ne conserve ni texte de plan, ni plans terminés, ni nombre de plans faits. Le texte de plan déjà enregistré est supprimé la prochaine fois que chaque personne ouvre le programme. Le message d'accueil reste affiché, ainsi que la pensée et l'astuce, sauf si elles sont aussi masquées.
+
+Utilisez ce paramètre lorsque du texte de plan saisi dans un fichier local poserait un problème d'archivage ou de comité social et économique.
+
+Si ce paramètre est désactivé ou non configuré, chaque personne peut saisir un plan facultatif par jour.</string>
+      <string id="ForceEnglish">Toujours afficher hello-world en anglais</string>
+      <string id="ForceEnglish_Help">Si ce paramètre est activé, hello-world affiche ses écrans en anglais pour tout le monde.
+
+Si ce paramètre est désactivé ou non configuré, hello-world affiche ses écrans en espagnol, français, portugais ou allemand lorsque la langue d'affichage de Windows est l'une d'elles, et en anglais sinon. Les mots de commande de chaque langue, comme fait et quitter, fonctionnent dans toutes les langues.
+
+Un fichier de contenu de l'organisation remplace les pensées et les astuces dans toutes les langues.</string>
+    </stringTable>
+  </resources>
+</policyDefinitionResources>

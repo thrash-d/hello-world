@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="1.0" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName>hello-world</displayName>
+  <description>Configurações do programa diário hello-world.</description>
+  <resources>
+    <stringTable>
+      <string id="HelloWorld">hello-world</string>
+      <string id="SUPPORTED_1_23">hello-world 1.23.0 ou posterior</string>
+      <string id="SUPPORTED_1_24">hello-world 1.24.0 ou posterior</string>
+      <string id="SUPPORTED_1_25">hello-world 1.25.0 ou posterior</string>
+      <string id="DisableSignInLauncher">Desativar a abertura do hello-world ao entrar</string>
+      <string id="DisableSignInLauncher_Help">Se habilitada, ninguém pode configurar o hello-world para abrir sozinho ao entrar no Windows, o programa nunca oferece isso, e um iniciador ativado antes é removido na próxima vez que o programa for aberto.
+
+Se desabilitada ou não configurada, cada pessoa pode ativar ou desativar a abertura ao entrar com a opção 2 do menu.
+
+O iniciador é um valor chamado hello-world em HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run.</string>
+      <string id="HideThoughtAndTip">Ocultar o pensamento e a dica do dia</string>
+      <string id="HideThoughtAndTip_Help">Se habilitada, o hello-world não mostra o pensamento do dia nem a dica para experimentar. A pergunta do plano e o menu continuam funcionando.
+
+Se desabilitada ou não configurada, cada pessoa pode ocultá-los ou mostrá-los com a opção 8 do menu.</string>
+      <string id="HideDaysInARow">Ocultar a mensagem de dias seguidos</string>
+      <string id="HideDaysInARow_Help">Se habilitada, o hello-world nunca mostra a mensagem que conta quantos dias seguidos alguém o abriu.
+
+Se desabilitada ou não configurada, a mensagem só aparece no 3º, 7º e 14º dia seguido e depois a cada 30 dias, e cada pessoa pode ocultá-la com a opção 3 do menu.</string>
+      <string id="DisablePlans">Desativar os planos</string>
+      <string id="DisablePlans_Help">Se habilitada, o hello-world não pede um plano nem faz o acompanhamento, e não guarda texto de planos, planos concluídos nem o número de planos feitos. O texto de planos já salvo é descartado na próxima vez que cada pessoa abrir o programa. A saudação continua aparecendo e, a menos que também estejam ocultos, o pensamento e a dica.
+
+Use esta política quando texto de planos digitado em um arquivo local for uma questão de registros ou de representação dos trabalhadores.
+
+Se desabilitada ou não configurada, cada pessoa pode digitar um plano opcional por dia.</string>
+      <string id="ForceEnglish">Sempre mostrar o hello-world em inglês</string>
+      <string id="ForceEnglish_Help">Se habilitada, o hello-world mostra as telas em inglês para todos.
+
+Se desabilitada ou não configurada, o hello-world mostra as telas em espanhol, francês, português ou alemão quando o idioma de exibição do Windows é um deles, e em inglês nos demais casos. As palavras de comando de cada idioma, como feito e sair, funcionam em todos os idiomas.
+
+Um arquivo de conteúdo da organização substitui os pensamentos e as dicas em todos os idiomas.</string>
+    </stringTable>
+  </resources>
+</policyDefinitionResources>

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="1.0" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName>hello-world</displayName>
+  <description>Einstellungen für das tägliche Programm hello-world.</description>
+  <resources>
+    <stringTable>
+      <string id="HelloWorld">hello-world</string>
+      <string id="SUPPORTED_1_23">hello-world 1.23.0 oder höher</string>
+      <string id="SUPPORTED_1_24">hello-world 1.24.0 oder höher</string>
+      <string id="SUPPORTED_1_25">hello-world 1.25.0 oder höher</string>
+      <string id="DisableSignInLauncher">Öffnen von hello-world bei der Anmeldung deaktivieren</string>
+      <string id="DisableSignInLauncher_Help">Wenn diese Einstellung aktiviert ist, kann niemand hello-world so einrichten, dass es sich bei der Anmeldung selbst öffnet. Das Programm bietet es nie an, und ein früher eingeschalteter Starter wird beim nächsten Öffnen des Programms entfernt.
+
+Wenn diese Einstellung deaktiviert oder nicht konfiguriert ist, kann jede Person das Öffnen bei der Anmeldung mit Menüoption 2 ein- oder ausschalten.
+
+Der Starter ist ein Wert namens hello-world unter HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run.</string>
+      <string id="HideThoughtAndTip">Gedanken und Tipp des Tages ausblenden</string>
+      <string id="HideThoughtAndTip_Help">Wenn diese Einstellung aktiviert ist, zeigt hello-world weder den Gedanken des Tages noch den Tipp zum Ausprobieren. Die Frage nach dem Plan und das Menü funktionieren weiterhin.
+
+Wenn diese Einstellung deaktiviert oder nicht konfiguriert ist, kann jede Person sie mit Menüoption 8 aus- oder einblenden.</string>
+      <string id="HideDaysInARow">Meldung zu Tagen in Folge ausblenden</string>
+      <string id="HideDaysInARow_Help">Wenn diese Einstellung aktiviert ist, zeigt hello-world nie die Meldung, die zählt, an wie vielen Tagen in Folge jemand es geöffnet hat.
+
+Wenn diese Einstellung deaktiviert oder nicht konfiguriert ist, erscheint die Meldung nur am 3., 7. und 14. Tag in Folge und danach alle 30 Tage, und jede Person kann sie mit Menüoption 3 ausblenden.</string>
+      <string id="DisablePlans">Pläne deaktivieren</string>
+      <string id="DisablePlans_Help">Wenn diese Einstellung aktiviert ist, fragt hello-world nicht nach einem Plan und fragt auch nicht nach, und es speichert keinen Plantext, keine erledigten Pläne und keine Anzahl erledigter Pläne. Bereits gespeicherter Plantext wird beim nächsten Öffnen durch die jeweilige Person verworfen. Die Begrüßung bleibt, ebenso Gedanke und Tipp, sofern sie nicht auch ausgeblendet sind.
+
+Verwenden Sie diese Einstellung, wenn in eine lokale Datei getippter Plantext ein Thema für Aufbewahrungspflichten oder den Betriebsrat wäre.
+
+Wenn diese Einstellung deaktiviert oder nicht konfiguriert ist, kann jede Person einen freiwilligen Plan pro Tag eingeben.</string>
+      <string id="ForceEnglish">hello-world immer auf Englisch anzeigen</string>
+      <string id="ForceEnglish_Help">Wenn diese Einstellung aktiviert ist, zeigt hello-world seine Bildschirme für alle auf Englisch.
+
+Wenn diese Einstellung deaktiviert oder nicht konfiguriert ist, zeigt hello-world seine Bildschirme auf Spanisch, Französisch, Portugiesisch oder Deutsch, wenn die Windows-Anzeigesprache eine davon ist, und sonst auf Englisch. Die Befehlswörter jeder Sprache, etwa erledigt und beenden, funktionieren in allen Sprachen.
+
+Eine Inhaltsdatei der Organisation ersetzt die Gedanken und Tipps in allen Sprachen.</string>
+    </stringTable>
+  </resources>
+</policyDefinitionResources>

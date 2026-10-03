@@ -14,6 +14,7 @@ so web criteria apply only where they carry over to text in a console.
 | Simulated 30-day pilot with an NVDA user, a Magnifier user at 200 to 300 percent, an ADHD user and a second-language reader | 1.19.0 to 1.21.0 | Findings fixed in 1.20.0 to 1.22.0; see `docs/PILOT.md` |
 | JAWS, by the owner | 1.24.0 | Passed |
 | Spanish screens, simulated review by a native speaker | 1.25.0 | Findings fixed in 1.25.0 |
+| French, Portuguese and German screens, simulated review by native speakers | 1.26.0 | Findings fixed in 1.26.0 |
 
 ## What it does
 
@@ -40,6 +41,7 @@ so web criteria apply only where they carry over to text in a console.
 
 ## Known limits
 
-- English and Spanish only, chosen from the Windows display language.
+- English, Spanish, French, Brazilian Portuguese and German only, chosen from
+  the Windows display language.
 - The program shows text that a console can't draw, such as some scripts and
   emoji on older consoles, as `?`.

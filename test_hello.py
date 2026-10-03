@@ -1930,7 +1930,7 @@ def test_todays_pair_ends_when_every_thought_shares_the_tips_topic():
     assert "water" in thought and "water" in tip
 
 
-def test_every_translated_string_has_spanish():
+def _screen_keys():
     import ast
     hello = _load_hello()
     with open(HELLO, encoding="utf-8") as f:
@@ -1939,13 +1939,6 @@ def test_every_translated_string_has_spanish():
             if isinstance(n, ast.Call) and getattr(n.func, "id", "") == "tr"
             and isinstance(n.args[0], ast.Constant)]
     keys += [hello.HELP, hello.MENU_HELP, hello.SAVED_PLAN, hello.GREETING]
-    assert len(keys) > 100
-    assert [k for k in keys if k not in hello.ES] == []
-    # A key no call uses is a translation nobody sees.
-    assert [k for k in hello.ES if k not in keys] == []
-    for en, es in hello.ES.items():
-        assert re.findall(r"\{\w+\}", en) == re.findall(r"\{\w+\}", es), en
-        assert en.endswith("> ") == es.endswith("> "), en
     # say() doesn't wrap, so what it prints as is must fit 72 columns, less
     # the "  2  " in front of a menu line.
     raw = {n.args[0].value: isinstance(call.args[0], ast.BinOp)
@@ -1955,11 +1948,24 @@ def test_every_translated_string_has_spanish():
            for n in ast.walk(call.args[0])
            if isinstance(n, ast.Call) and getattr(n.func, "id", "") == "tr"
            and isinstance(n.args[0], ast.Constant)}
-    assert len(raw) > 50
-    for en, prefixed in raw.items():
-        for text in (en, hello.ES[en]):
-            limit = 66 if prefixed else 72
-            assert all(len(line) <= limit for line in text.splitlines()), text
+    return hello, set(keys), raw
+
+
+def test_every_language_translates_every_screen_string():
+    hello, keys, raw = _screen_keys()
+    assert len(keys) > 100 and len(raw) > 50
+    assert set(hello.LANGUAGES) == set(hello.WINDOWS_LANGUAGES.values())
+    for code, data in hello.LANGUAGES.items():
+        text = data["text"]
+        # A key no call uses is a translation nobody sees.
+        assert set(text) == keys, (code, sorted(keys ^ set(text))[:3])
+        for en, t in text.items():
+            assert re.findall(r"\{\w+\}", en) == re.findall(r"\{\w+\}", t), (code, en)
+            assert en.endswith("> ") == t.endswith("> "), (code, en)
+        for en, prefixed in raw.items():
+            for t in (en, text[en]):
+                limit = 66 if prefixed else 72
+                assert all(len(line) <= limit for line in t.splitlines()), (code, t)
 
 
 def test_nothing_on_screen_skips_the_translation():
@@ -1981,13 +1987,36 @@ def test_nothing_on_screen_skips_the_translation():
             assert not plain, f"{fn.name} line {n.lineno} is not translated"
 
 
-def test_spanish_lists_match_the_english_ones():
+def test_every_language_has_the_lists_and_dates():
     hello = _load_hello()
-    assert len(hello.THOUGHTS_ES) == len(hello.THOUGHTS)
-    assert len(hello.TIPS_ES) == len(hello.TIPS)
-    assert len(hello.DONE_LINES_ES) == len(hello.DONE_LINES)
-    for line in hello.THOUGHTS_ES + hello.TIPS_ES + hello.DONE_LINES_ES:
-        assert line == hello.tidy(line) and len(line) <= 120, line
+    for code, data in hello.LANGUAGES.items():
+        assert len(data["thoughts"]) == len(hello.THOUGHTS), code
+        assert len(data["tips"]) == len(hello.TIPS), code
+        assert len(data["done"]) == len(hello.DONE_LINES), code
+        for line in data["thoughts"] + data["tips"] + data["done"]:
+            assert line == hello.tidy(line) and len(line) <= 120, (code, line)
+        assert len(data["days"]) == 7 and len(data["months"]) == 12, code
+        hello.LANGUAGE = code
+        assert "2026" in hello.long_date(hello.datetime.date(2026, 10, 5)), code
+    first = hello.datetime.date(2026, 10, 1)
+    for code, expected in (("fr", "jeudi 1er octobre 2026"), ("de", "Donnerstag, 1. Oktober 2026"),
+                           ("pt", "quinta-feira, 1º de outubro de 2026")):
+        hello.LANGUAGE = code
+        assert hello.long_date(first) == expected
+
+
+def test_command_words_mean_one_thing_in_every_language():
+    hello = _load_hello()
+    groups = {"yes": hello.STRICT_YES, "no": hello.NO, "quit": hello.QUIT_WORDS,
+              "plan": hello.PLAN_WORDS, "menu": hello.MENU_WORDS,
+              "help": hello.HELP_WORDS, "same": hello.SAME_WORDS,
+              "done": hello.DONE_WORDS}
+    seen = {}
+    for name, words in groups.items():
+        for word in words:
+            assert word not in seen, f"{word} is both {seen[word]} and {name}"
+            seen[word] = name
+    assert not set(hello.DECLINE_WORDS) & (set(hello.COMMAND_WORDS) | set(hello.SAME_WORDS))
 
 
 def test_a_spanish_day_reads_in_spanish():
@@ -1997,47 +2026,77 @@ def test_a_spanish_day_reads_in_spanish():
     assert "Te damos la bienvenida." in out and "Idea para hoy:" in out
     assert "¿Qué cosa quieres terminar hoy?" in out
     assert "Guardado. Escribe hecho" in out
-    for english in ("Welcome", "Thought for today", "Type ", "Saved."):
-        assert english not in out, english
     later = run(text="hecho\n\n\n", day="2026-10-06", lang="es", home=p.home)
     assert "¿Lo hiciste?" in later.stdout
     assert notes(p.home)["done"] == 1
 
 
-def test_spanish_words_work_in_english_too():
-    p = run(text="Send the invoice\nhecho\nsalir\n")
+def test_every_language_shows_a_whole_day_without_english():
+    hello = _load_hello()
+    for code, data in hello.LANGUAGES.items():
+        p = run(text="Plan A\n\n", day="2026-10-05", lang=code)
+        out = p.stdout
+        assert out.startswith(data["text"][hello.GREETING] + "\n"), code
+        for english in ("Welcome", "Thought for today", "Type ", "Saved."):
+            assert english not in out, (code, english)
+        assert notes(p.home)["intent"]["text"] == "Plan A", code
+        # The done word of this language finishes the plan the next day.
+        done = {"es": "hecho", "fr": "fait", "pt": "feito", "de": "erledigt"}[code]
+        later = run(text=f"{done}\n\n\n", day="2026-10-06", lang=code, home=p.home)
+        assert notes(later.home)["done"] == 1, code
+        assert "Plan A" in later.stdout, code
+
+
+def test_other_languages_words_work_in_english_too():
+    for done, quit_word in (("hecho", "salir"), ("fait", "quitter"),
+                            ("feito", "sair"), ("erledigt", "beenden")):
+        p = run(text=f"Send the invoice\n{done}\n{quit_word}\n")
+        assert notes(p.home)["done"] == 1, done
+        assert p.stdout.rstrip().endswith("Closing."), quit_word
+    for same in ("repetir", "reprendre", "wieder"):
+        q = run(text="Old plan\n\n", day="2026-09-20")
+        r = run(text=f"n\nn\n{same}\n\n", home=q.home)
+        assert notes(r.home)["intent"]["text"] == "Old plan", same
+
+
+def test_force_english_policy_wins_over_every_language():
+    hello = _load_hello()
+    for code in hello.LANGUAGES:
+        p = run(lang=code, policy={"ForceEnglish": 1})
+        assert p.stdout.startswith("Hello, world!\n"), code
+        assert run(["--plain"], lang=code).stdout == "Hello, world!\n", code
+    assert run(["--help"], lang="es").stdout.startswith("hello-world muestra")
+
+
+def test_every_language_fits_72_columns():
+    hello = _load_hello()
+    for code in hello.LANGUAGES:
+        for args in (["--help"], ["--bogus"]):
+            out = run(args, lang=code).stdout
+            assert all(len(line) <= 72 for line in out.splitlines()), (code, args)
+        menu = run(text="\nplan\nm\nm\n5\n\n\n", lang=code).stdout
+        # Prompts run into the next line here, since piped input has no echo.
+        assert all(len(line) <= 72 for line in menu.splitlines()
+                   if "> " not in line), code
+    assert "Palabras que puedes escribir" in run(text="\nm\n5\n\n\n", lang="es").stdout
+
+
+ADML = {"es": "es-ES", "fr": "fr-FR", "pt": "pt-BR", "de": "de-DE"}
+
+
+def test_every_language_has_a_policy_template_with_every_string():
+    hello = _load_hello()
+    root = os.path.join(os.path.dirname(HELLO), "policy")
+    ids = {}
+    for folder in ["en-US"] + [ADML[code] for code in hello.LANGUAGES]:
+        with open(os.path.join(root, folder, "hello-world.adml"), encoding="utf-8") as f:
+            ids[folder] = re.findall(r'<string id="(\w+)"', f.read())
+    assert all(found == ids["en-US"] for found in ids.values()) and ids["en-US"]
+
+def test_quote_marks_around_a_typed_word_are_ignored():
+    p = run(text='Send the invoice\n„erledigt“\n"q"\n')
     assert notes(p.home)["done"] == 1
     assert p.stdout.rstrip().endswith("Closing.")
-    q = run(text="Old plan\n\n", day="2026-09-20")
-    r = run(text="n\nn\nrepetir\n\n", home=q.home)
-    assert notes(r.home)["intent"]["text"] == "Old plan"
-
-
-def test_force_english_policy_wins_over_spanish():
-    p = run(lang="es", policy={"ForceEnglish": 1})
-    assert p.stdout.startswith("Hello, world!\n")
-    assert run(["--help"], lang="es").stdout.startswith("hello-world muestra")
-    assert run(["--plain"], lang="es").stdout == "Hello, world!\n"
-
-
-def test_spanish_help_fits_72_columns():
-    for args in (["--help"], ["--bogus"]):
-        out = run(args, lang="es").stdout
-        assert all(len(line) <= 72 for line in out.splitlines()), args
-    menu = run(text="\nplan\nmenú\nmenú\n5\n\n\n", lang="es").stdout
-    assert "Palabras que puedes escribir" in menu
-    assert "Eso parece un comando" in menu
-    # Prompts run into the next line here, since piped input has no echo.
-    assert all(len(line) <= 72 for line in menu.splitlines() if "> " not in line)
-
-
-def test_spanish_policy_template_has_every_english_string():
-    root = os.path.join(os.path.dirname(HELLO), "policy")
-    ids = []
-    for lang in ("en-US", "es-ES"):
-        with open(os.path.join(root, lang, "hello-world.adml"), encoding="utf-8") as f:
-            ids.append(re.findall(r'<string id="(\w+)"', f.read()))
-    assert ids[0] == ids[1] and ids[0]
 
 
 if __name__ == "__main__":

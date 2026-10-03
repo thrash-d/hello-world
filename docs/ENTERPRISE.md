@@ -134,8 +134,10 @@ read.
 
 Copy `policy\hello-world.admx` to `PolicyDefinitions`, and
 `policy\en-US\hello-world.adml` to `PolicyDefinitions\en-US`, in the central
-store or locally. `policy\es-ES\hello-world.adml` goes to
-`PolicyDefinitions\es-ES` for administrators who edit policy in Spanish. Intune can import the same ADMX as a custom template. The
+store or locally. The `es-ES`, `fr-FR`, `pt-BR` and `de-DE` folders hold
+the same templates for administrators who edit policy in those languages; copy
+each to the folder of the same name. Intune can import the same ADMX as a
+custom template. The
 settings are under Computer or User Configuration > Administrative Templates
 > hello-world, and the computer setting wins.
 
@@ -145,7 +147,7 @@ settings are under Computer or User Configuration > Administrative Templates
 | Hide the daily thought and tip | `HideThoughtAndTip` | Shows only the plan question |
 | Hide the days-in-a-row message | `HideDaysInARow` | Never shows the count, and keeps only the latest visit date |
 | Turn off plans | `DisablePlans` | Never asks for a plan, and keeps no plan text, finished plans or done count; text already saved is dropped at each person's next visit |
-| Always show hello-world in English | `ForceEnglish` | Shows English even where the Windows display language is Spanish |
+| Always show hello-world in English | `ForceEnglish` | Shows English even where the Windows display language is Spanish, French, Portuguese or German |
 
 `DisablePlans` and `HideDaysInARow` together leave only the latest visit date
 and the settings in each `notes.json`. Use them where typed plan text or a
@@ -290,10 +292,12 @@ in simulated pilots with screen reader, Magnifier and second-language users.
 The owner also passed it with NVDA and JAWS; `docs/ACCESSIBILITY.md` has the
 details.
 
-The program speaks English and Spanish. It shows Spanish when the Windows
-display language is Spanish, and English otherwise. The `ForceEnglish` policy
-keeps everyone in English. The words people type, such as `hecho` (done),
-`menú` and `salir` (quit), work in either language, so a PC whose language
-changes needs no retraining. `--check-content`, which is for administrators,
+The program speaks English, Spanish, French, Brazilian Portuguese and
+German. It follows the Windows display language, and shows English for any
+other language. The `ForceEnglish` policy keeps everyone in English. The words
+people type work in every language: `done`, `hecho`, `fait`, `feito` and
+`erledigt` all mark a plan done, and `salir`, `quitter`, `sair` and `beenden`
+all close. A PC whose language changes needs no retraining, and a help desk
+can talk anyone through it with the English words. `--check-content`, which is for administrators,
 answers in English, and `--plain` always prints `Hello, world!` so scripts can
 rely on it.

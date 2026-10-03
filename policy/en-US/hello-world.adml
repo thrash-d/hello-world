@@ -31,7 +31,7 @@ When disabled or not configured, people can type one optional plan a day.</strin
       <string id="ForceEnglish">Always show hello-world in English</string>
       <string id="ForceEnglish_Help">When enabled, hello-world shows its screens in English for everyone.
 
-When disabled or not configured, hello-world shows its screens in Spanish when the Windows display language is Spanish, and in English otherwise. Spanish words such as hecho and salir work in either language.
+When disabled or not configured, hello-world shows its screens in Spanish, French, Portuguese or German when the Windows display language is one of those, and in English otherwise. The command words of every language, such as hecho and quitter, work in every language.
 
 An organization content file replaces the thoughts and tips in every language.</string>
     </stringTable>

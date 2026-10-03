@@ -17,10 +17,11 @@ their reasons are in `BACKLOG.md`.
 
 The three items from the product review of 1.23.0 shipped in 1.25.0.
 
-1. A real native speaker's pass over the Spanish screens. The review in
-   1.25.0 was simulated.
-2. A third language, if the organization asks for one. Adding one is a word
-   table, three lists and an ADML file.
+1. A real native speaker's pass over the Spanish, French, Portuguese and
+   German screens. The reviews in 1.25.0 and 1.26.0 were simulated.
+2. Another language, if the organization asks for one. Adding one is a
+   `LANGUAGES` block at the end of `hello.py`, its command words, its Windows
+   language ID, and an ADML file.
 
 ## Later, when the problem shows up
 
