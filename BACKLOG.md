@@ -22,6 +22,8 @@ Changes considered and declined, with the reason. On 2 October 2026 the list fro
 - Python 2, or Python before 3.6: f-strings fail closed with a `SyntaxError`.
 
 - Reaching people on their laptop on site days (simulated pilot): installing it on the laptop is IT's call, not a program change.
+- Closing the window after `done` and the next plan (simulated pilot): the last prompt comes back on purpose, so the result can be read first.
+- A `same` that knows when the parts of an earlier plan were finished separately (simulated pilot): the program can't tell. Option 7 or a new plan clears it.
 
 ## Claims that turned out wrong or already true
 

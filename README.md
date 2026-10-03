@@ -28,20 +28,26 @@ At the last prompt:
 - Press Enter to close. `q`, `quit`, `exit`, `x` and `close` also close.
 - Type `done` when you finish today's plan. It shows your last three finished
   plans, then asks for the next one. Enter there closes.
-- Type `plan` to set or change today's plan. At any plan prompt, `same`
-  brings back your earlier plan if you didn't finish it. A finished plan is
-  never offered back.
+- Type `plan` to set or change today's plan. Changing today's plan simply
+  replaces it. At any plan prompt, `same` brings back a plan from an earlier
+  day that you didn't finish. A finished plan is never offered back.
 - Type `menu` (or `m`) for the options: see what is saved, open once a day at
   sign-in, hide the "in a row" line, delete everything, help, set today's plan,
-  and forget one finished plan. The options are read once; type `m` to hear
-  them again. Enter at the menu goes back.
+  forget one finished plan, and hide the thought and tip. The options are read
+  once; type `m` to hear them again. Enter at the menu goes back.
 
-`q` closes the window from any question, and today's visit still counts.
+`q` closes the window from any question, the menu included, and today's visit
+still counts. So do `x` and `close`.
 
-If you don't type `done`, the next day asks "Did you do it?". A yes is
-counted on the spot, dated the day the plan was for. "Not yet" lets you keep
-the plan for today, as many days as you need. A plan first set more than two
-weeks ago is put away, and `same` brings it back.
+If you don't type `done`, the next visit asks "Did you do it?". A yes is
+counted on the spot. If the plan is more than a day old, it asks which day you
+finished it. "Not yet" lets you keep the plan for today, as many days as you
+need. Press Enter to skip the question; after two skips it stops asking and
+shows the plan as still open, and `done` still works. A plan first set more
+than two weeks ago is put away, and `same` brings it back.
+
+If a plan sounds like several things joined together, it says once that
+finishing the first part still counts.
 
 The "in a row" line shows only on your 3rd, 7th and 14th visit in a row, then
 every 30th. A visit within four days of the last one counts, so weekends and
@@ -88,7 +94,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.20.0'
+$tag = 'v1.21.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

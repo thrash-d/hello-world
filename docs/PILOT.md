@@ -65,6 +65,31 @@ stick.
 | "Cleared. It stays as same until you delete everything." and "it asks tomorrow" on a Friday | Dana | Reworded |
 | A thought assumed it was afternoon, and one assumed a quiet desk | Ruth | Reworded |
 
+## Second round, on 1.20.0
+
+The same five used 1.20.0 from 4 to 17 November, with fresh notes. Before
+that round they had been told that IT updated the program. All five said the
+fixes above landed: finished plans stay finished, "not yet" no longer puts a
+plan away, a yes is answered at once, and `q` closes the morning questions.
+All five would keep using it.
+
+| Finding | Who | In 1.21.0 |
+|---|---|---|
+| A plan confirmed days later was dated to the plan day, not the day it was done | Marcus, Jun | A plan more than a day old asks which day it was finished |
+| A typo fixed with `plan` came back as "Earlier plan" after `done` | Jun | Changing today's plan replaces it; only a plan from an earlier day is kept for `same` |
+| `q` at the menu went back instead of closing | Jun | `q`, `x` and `close` close from every question, the menu included |
+| After `q` at "Did you do it?", a second open the same day skipped the question | Sam | The question is asked until it is answered |
+| Skipping the question every day kept it coming back | Sam | Two skips stop the question; the plan shows as still open |
+| The finished list after every yes was too much each morning, under a changing heading | Ruth, Dana | A yes gets the praise only; the list comes with `done`, under one heading |
+| No way to turn off the thought and tip | Dana | Menu option 8 |
+| Forget didn't say which plan it removed | Jun | It names the plan |
+| Plans of several things joined with "and" or "+" | Sam | One gentle line that finishing the first part still counts |
+| The first-day welcome was long | Ruth | One paragraph |
+| "That is 2 times you have marked a plan done" read clumsily | Dana | "That is 2 done so far." |
+
+Their notes starting fresh was part of how the simulation was run, not
+something the program does: an update keeps `notes.json`.
+
 ## Not changed, and why
 
 - NVDA saying "greater" at the end of every prompt (Ruth). It's unclear
@@ -73,3 +98,8 @@ stick.
   See `BACKLOG.md`.
 - Reaching people on their laptop on site days (Marcus). That is where IT
   installs it, not a program change.
+- Closing after `done` and the next plan (Marcus). The last prompt comes back
+  on purpose, so the result can be read before the window closes.
+- A smarter `same` that knows when the parts of an earlier plan were done
+  separately (Sam). The program can't tell, and option 7 or a new plan clears
+  it.
