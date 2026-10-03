@@ -26,7 +26,7 @@ written to install.log. The exit code is 0 on success and 1 on failure, so a
 management tool can run the installer unattended. It never asks questions.
 
 .EXAMPLE
-$tag = 'v1.20.0'
+$tag = 'v1.21.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
@@ -309,7 +309,7 @@ try {
     # the working install alone. Both sit in Program Files, which only
     # administrators can write to.
     Write-Step '[5/6] Building, testing and installing'
-    foreach ($leftover in $new, $old) { if (Test-Path -LiteralPath $leftover) { Remove-Tree $leftover } }
+    foreach ($leftover in $new, $old, "$dir.failed") { if (Test-Path -LiteralPath $leftover) { Remove-Tree $leftover } }
     New-Item -ItemType Directory $new | Out-Null
     # Drop inherited entries. Administrators and SYSTEM get full control, Users
     # get read and run. Files created below inherit this.
@@ -390,6 +390,10 @@ foreach ($name in $dwords.Keys) { New-ItemProperty $key -Name $name -Value $dwor
 # Start menu, and after the Apps entry, so a half-finished install still has
 # an Uninstall button. hello.py waits for Enter before it closes its window; the
 # shortcut adds a pause only when hello.cmd fails, so an error message stays readable.
+# Saving overwrites the old install's shortcut, so keep a copy for a rollback.
+# The setup folder is admin-only, like the Start menu folder.
+$lnkBackup = Join-Path $PSScriptRoot 'hello-world.lnk.bak'
+if (Test-Path -LiteralPath $lnk) { Copy-Item -LiteralPath $lnk -Destination $lnkBackup -Force }
 $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk)
 $shortcut.TargetPath = Join-Path $sys32 'cmd.exe'
 $shortcut.Arguments = "/d /c `"title hello-world & `"$dir\hello.cmd`" & if errorlevel 1 pause`""
@@ -406,24 +410,35 @@ try { Assert-AdminOnly $lnk $edit }
 catch { Remove-Item -LiteralPath $lnk -Force -ErrorAction SilentlyContinue; throw }
 }
 catch {
-    # An upgrade that fails here puts the old install and its Apps entry back,
-    # so the PC keeps a working install. A first install keeps its new files,
-    # and running the installer again finishes it.
+    # An upgrade that fails here puts the old install, its shortcut and its
+    # Apps entry back, so the PC keeps a working install. A first install
+    # keeps its new files, and running the installer again finishes it.
+    $stepError = $_
     if ($hadOld -and (Test-Path -LiteralPath $old)) {
-        Write-Warning "Step 6 failed, so the previous install is put back: $($_.Exception.Message)"
-        Remove-Tree $dir
-        Rename-Retry $old (Split-Path $dir -Leaf)
-        Remove-Item -LiteralPath $key -Recurse -Force -ErrorAction SilentlyContinue
-        if ($prevEntry) {
-            New-Item $key -Force | Out-Null
-            foreach ($p in $prevEntry.PSObject.Properties | Where-Object Name -notlike 'PS*') {
-                $type = if ($p.Value -is [int]) { 'DWord' } else { 'String' }
-                New-ItemProperty $key -Name $p.Name -Value $p.Value -PropertyType $type -Force | Out-Null
+        Write-Warning "Step 6 failed, so the previous install is put back: $($stepError.Exception.Message)"
+        try {
+            # Renamed aside, not deleted, so a file held open can't leave a
+            # half-deleted folder in the way of the old install.
+            $failed = "$dir.failed"
+            if (Test-Path -LiteralPath $failed) { Remove-Tree $failed }
+            Rename-Retry $dir (Split-Path $failed -Leaf)
+            Rename-Retry $old (Split-Path $dir -Leaf)
+            if (Test-Path -LiteralPath $lnkBackup) { Copy-Item -LiteralPath $lnkBackup -Destination $lnk -Force }
+            Remove-Item -LiteralPath $key -Recurse -Force -ErrorAction SilentlyContinue
+            if ($prevEntry) {
+                New-Item $key -Force | Out-Null
+                foreach ($p in $prevEntry.PSObject.Properties | Where-Object Name -notlike 'PS*') {
+                    $type = if ($p.Value -is [int]) { 'DWord' } else { 'String' }
+                    New-ItemProperty $key -Name $p.Name -Value $p.Value -PropertyType $type -Force | Out-Null
+                }
             }
+            try { Remove-Tree $failed } catch { Write-Warning "Couldn't remove $failed. The next run clears it." }
         }
+        catch { Write-Warning "Couldn't put the previous install back: $($_.Exception.Message)" }
     }
-    throw
+    throw $stepError
 }
+Remove-Item -LiteralPath $lnkBackup -Force -ErrorAction SilentlyContinue
 # Step 6 worked, so the old install can go. A leftover .old is only a warning.
 if ($hadOld) {
     try { Remove-Tree $old }

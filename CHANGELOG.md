@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-10-03: a deleted plan stays deleted, q closes from every question, a late yes asks which day
+
+Version 1.21.0. Two sources this round: a fresh correctness review of the code, and the simulated pilot's second round on 1.20.0 (`docs/PILOT.md`).
+
+From the review:
+- Medium, "a plan deleted in another window comes back": answering y at "Did you do it?" after another window ran Delete everything wrote the old plan back under the new marker. The failed save now takes the plan from the state, not from a copy held earlier. Test: a delete during that question.
+- "A second identical finish on the same day loses its row": `commit()` now counts finished rows as a multiset, so the same words finished twice in a day are two rows and a count of two. Test.
+- "'q closes from any question' is false": `q`, `x` and `close` now close from every question. That covers the menu, a plan prompt, option 7's number, and the delete confirmation, where `q` also cancels. Typing `close` at the first plan question no longer saves "close" as the plan. One catch around the last prompt replaces the menu-only one. Tests for each.
+- "HELP says done lists your last 7": it says 3, and it says option 8 hides the thought and tip.
+- "The installer's step 6 rollback can leave things worse": the old Start menu shortcut is copied into the admin-only setup folder before it's overwritten, and restored on rollback. The failed new folder is renamed to `.failed` instead of deleted, so a file held open can't leave a half-deleted folder in the old install's way. A rollback that fails reports itself and keeps the original error. The next run and the uninstaller clear `.failed`.
+
+From the pilot's second round:
+- A plan confirmed days later was dated to the plan day (Marcus, Jun). A plan more than a day old now asks once which day it was finished: Enter for the plan's day, `y` for yesterday, `t` for today.
+- A typo fixed with `plan` came back as "Earlier plan" (Jun). Changing today's plan replaces it; only a plan from an earlier day is kept for `same`.
+- A second open the same day skipped an unanswered question (Sam). The question is asked until answered, and two Enter skips stop it. The plan then shows as "Still open from ..." with `done` offered. The skip count lives inside the plan.
+- The finished list after every yes was too much (Ruth, Dana). A yes gets the praise and the count; the list comes with `done`, always under "Finished lately:".
+- Menu option 8 hides the thought and tip (Dana), saved as `tips`. Forget names the plan it removed (Jun). A plan joined with "and", "&" or "+" gets one line that finishing the first part still counts (Sam). The first-day welcome is one paragraph (Ruth). The count reads "That is 2 done so far." (Dana).
+
+Declined (see `BACKLOG.md`): closing right after `done` and a new plan, and a `same` that knows the parts of a plan were done separately. The `>` question still waits on a real NVDA check.
+
+Tested here: all 153 tests pass on Windows 11, Python 3.13, under both pytest and the plain runner, and ruff is clean. Both PowerShell scripts parse in Windows PowerShell 5.1. Not tested: the new rollback path in a real failed upgrade.
+
 ## 2026-10-02: the pilot's round. Finished plans stay finished, a yes is answered at once, and q closes from anywhere
 
 Version 1.20.0. A simulated 30-day pilot (`docs/PILOT.md`) ran five simulated employees, one of them an NVDA user, through the real 1.19.0 from 5 October to 3 November. This round answers what they found. The owner also ran the spare-PC gate for 1.19.0, and it passed; `PLAN.md` records it.

@@ -65,7 +65,7 @@ try {
     # harmlessly, and the Apps entry goes last.
     $lnk = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'hello-world.lnk'
     if (Test-Path -LiteralPath $lnk) { Remove-Item -LiteralPath $lnk }
-    foreach ($f in "$dir.new", "$dir.old") {
+    foreach ($f in "$dir.new", "$dir.old", "$dir.failed") {
         if (Test-Path -LiteralPath $f) { Remove-Tree $f }
     }
     if (Test-Path -LiteralPath $dir) {

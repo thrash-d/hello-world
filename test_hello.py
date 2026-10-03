@@ -696,7 +696,7 @@ def test_plans_done_are_counted_and_shown_privately():
     first = run(text="One\n\n")
     run(text="y\nTwo\n\n", home=first.home, day="2026-10-02")
     p = run(text="y\n\n", home=first.home, day="2026-10-03")
-    assert "That is 2 times you have marked a plan done." in p.stdout
+    assert "That is 2 done so far." in p.stdout
     p = run(text="m\n1\n\n\n", home=first.home, day="2026-10-03")
     assert "Times you marked a plan done: 2" in p.stdout
     assert "IT staff, could read it" in p.stdout
@@ -979,7 +979,7 @@ def test_done_with_no_plan_says_so_and_done_is_not_offered():
 
 def test_menu_accepts_q_and_help_and_names_a_wrong_word():
     p = run(text="\nm\nbanana\nhelp\nq\n")
-    assert 'That was not one of the choices: "banana". Type 1 to 7' in p.stdout
+    assert 'That was not one of the choices: "banana". Type 1 to 8' in p.stdout
     assert "Words you can type at the last prompt" in p.stdout
     assert p.returncode == 0
 
@@ -1060,7 +1060,7 @@ def test_counts_only_add_and_skips_from_two_windows_both_count():
 def test_one_finished_plan_can_be_forgotten():
     first = run(text="A\ndone\nB\ndone\n\n")
     p = run(text="m\n7\n1\ny\n\n\n", home=first.home)
-    assert "Forgotten. That plan is no longer saved." in p.stdout
+    assert "Forgotten: B" in p.stdout
     saved = notes(first.home)
     assert [i["text"] for i in saved["finished"]] == ["A"]
     assert "previous" not in saved and saved["done"] == 2
@@ -1075,7 +1075,7 @@ def test_forgetting_from_the_list_keeps_same_unless_asked():
         json.dump({"visits": ["2026-10-01"], "previous": "A", "done": 1,
                    "finished": [{"text": "A", "date": "2026-10-01"}]}, f)
     p = run(text="m\n7\n1\n\n\n\n", home=home)
-    assert "same still has it" in p.stdout
+    assert "Same still has it." in p.stdout
     saved = notes(home)
     assert "finished" not in saved and saved["previous"] == "A"
 
@@ -1129,8 +1129,9 @@ def test_the_launcher_is_not_written_from_a_folder_cmd_would_misread():
 
 def test_help_names_same_the_finished_list_and_the_menu_enter():
     out = run(["--help"]).stdout
-    assert "same reuses" in out and "finished plans" in out
-    assert "x and close" in " ".join(out.split())
+    flat = " ".join(out.split())
+    assert "same brings back" in flat and "last 3 finished plans" in flat
+    assert "q, x and close" in " ".join(out.split())
     assert "Enter goes back" in out
 
 
@@ -1372,10 +1373,12 @@ def test_the_saved_keys_are_frozen():
     # A new key needs a merge rule in commit() and a test for it, so adding
     # one must change this list on purpose.
     keys = {"visits", "intent", "streak", "offered", "offer_skips",
-            "previous", "done", "finished", "epoch"}
+            "previous", "done", "finished", "epoch", "tips"}
     full = {"visits": ["2026-09-30"], "streak": False, "offered": True,
             "offer_skips": 1, "previous": "p", "done": 2, "epoch": "abc",
-            "intent": {"text": "x", "date": "2026-09-30", "since": "2026-09-29"},
+            "tips": False,
+            "intent": {"text": "x", "date": "2026-09-30", "since": "2026-09-29",
+                       "skips": 1},
             "finished": [{"text": "f", "date": "2026-09-30"}]}
     assert set(full) == keys
     mod = _load_hello()
@@ -1385,7 +1388,7 @@ def test_the_saved_keys_are_frozen():
     state, _ = mod.load()
     out = mod.file_form(state)
     assert set(out) == keys
-    assert set(out["intent"]) == {"text", "date", "since"}
+    assert set(out["intent"]) == {"text", "date", "since", "skips"}
 
 
 
@@ -1404,7 +1407,6 @@ def test_a_plan_carried_for_two_weeks_is_put_away():
 def test_after_done_only_the_last_three_finished_plans_are_read():
     p = run(text="A\ndone\nB\ndone\nC\ndone\nD\ndone\n\n")
     last = p.stdout.split("Finished lately")[-1]
-    assert "lists all of them" in last
     assert ": D" in last and ": B" in last and ": A" not in last
     assert len(notes(p.home)["finished"]) == 4
 
@@ -1432,7 +1434,8 @@ def test_yes_is_answered_at_once_and_dated_to_the_plan_day():
     shown = [p.stdout.index(line) for line in _load_hello().DONE_LINES
              if line in p.stdout]
     assert shown and shown[0] < p.stdout.index("Thought for today:")
-    assert "Finished lately" in p.stdout.split("Thought for today:")[0]
+    # A yes gets the praise only; the list comes with done and in option 1.
+    assert "Finished lately" not in p.stdout
     assert notes(first.home)["finished"] == [{"text": "Send the invoice",
                                                "date": "2026-10-01"}]
 
@@ -1478,6 +1481,99 @@ def test_option_1_reads_no_file_path():
     assert "Saved in your own user folder" in p.stdout
     assert home not in p.stdout
     assert home in run(["--stats"], home=home).stdout
+
+
+def test_a_yes_after_a_delete_in_another_window_does_not_bring_the_plan_back():
+    mod = _load_hello()
+    home = mod.HOME = tempfile.mkdtemp()
+    mod.FORCE_INTERACTIVE = True
+    mod.say = lambda text="": None
+    state, _ = mod.load()
+    state["visits"] = ["2026-09-30"]
+    state["intent"] = {"text": "secret plan", "date": "2026-09-30"}
+    assert mod.save(state)
+
+    def ask(prompt):
+        if prompt.startswith("Did you do it"):
+            other, _ = mod.load()
+            mod.ask = lambda prompt: "y"
+            assert mod.reset(other)
+            mod.ask = ask
+            return "y"
+        return ""
+
+    mod.ask = ask
+    mod.daily(startup=False)
+    assert "secret plan" not in json.dumps(notes(home))
+
+
+def test_the_same_plan_finished_twice_in_a_day_is_two_rows():
+    p = run(text="email\ndone\nemail\ndone\n\n")
+    saved = notes(p.home)
+    assert saved["done"] == 2 and [i["text"] for i in saved["finished"]] == ["email", "email"]
+
+
+def test_q_closes_from_the_menu_plan_forget_and_delete_prompts():
+    for text in ("\nm\nq\n", "\nplan\nq\n", "\nm\n6\nq\n", "\nm\n4\nq\n"):
+        p = run(text=text)
+        assert p.stdout.rstrip().endswith("Closing."), text
+    first = run(text="A\ndone\n\n")
+    p = run(text="m\n7\nq\n", home=first.home)
+    assert p.stdout.rstrip().endswith("Closing.")
+    p = run(text="close\n")
+    assert p.stdout.rstrip().endswith("Closing.") and notes(p.home)["intent"] is None
+
+
+def test_a_plan_corrected_the_same_day_is_not_kept_for_same():
+    p = run(text="Reaplce the keyboard\nplan\nReplace the keyboard\ndone\n\n")
+    saved = notes(p.home)
+    assert "previous" not in saved
+    assert [i["text"] for i in saved["finished"]] == ["Replace the keyboard"]
+
+
+def test_a_late_yes_asks_which_day_it_was_finished():
+    first = run(text="Send the invoice\n\n")
+    p = run(text="y\nt\n\n\n", home=first.home, day="2026-10-05")
+    assert "When did you finish it?" in p.stdout
+    assert notes(first.home)["finished"][0]["date"] == "2026-10-05"
+    first = run(text="Send the invoice\n\n")
+    run(text="y\n\n\n\n", home=first.home, day="2026-10-05")
+    assert notes(first.home)["finished"][0]["date"] == "2026-10-01"
+    first = run(text="Send the invoice\n\n")
+    p = run(text="y\n\n\n", home=first.home, day="2026-10-02")
+    assert "When did you finish it?" not in p.stdout
+
+
+def test_two_skips_stop_the_question_and_the_plan_stays_open():
+    first = run(text="Write it\n\n")
+    run(text="\n\n\n", home=first.home, day="2026-10-02")
+    run(text="\n\n\n", home=first.home, day="2026-10-03")
+    p = run(text="\ndone\n\n", home=first.home, day="2026-10-04")
+    assert "Did you do it?" not in p.stdout
+    assert "Still open from Thursday, 1 October 2026: Write it" in p.stdout
+    assert notes(first.home)["done"] == 1
+
+
+def test_q_at_the_question_asks_again_on_a_second_open_the_same_day():
+    first = run(text="Write it\n\n")
+    run(text="q\n", home=first.home, day="2026-10-02")
+    p = run(text="y\n\n", home=first.home, day="2026-10-02")
+    assert "Did you do it?" in p.stdout and notes(first.home)["done"] == 1
+
+
+def test_option_8_hides_the_thought_and_tip():
+    first = run(text="\nm\n8\n\n\n")
+    assert notes(first.home)["tips"] is False
+    p = run(text="\n\n", home=first.home, day="2026-10-02")
+    assert "Thought for today" not in p.stdout and "Try this today" not in p.stdout
+    run(text="m\n8\n\n\n", home=first.home, day="2026-10-02")
+    assert "tips" not in notes(first.home)
+
+
+def test_a_plan_of_several_things_gets_one_gentle_nudge():
+    p = run(text="Write the deck and fix the banner\n\n")
+    assert p.stdout.count("more than one thing") == 1
+    assert "more than one thing" not in run(text="Write the deck\n\n").stdout
 
 
 if __name__ == "__main__":

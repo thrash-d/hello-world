@@ -9,6 +9,7 @@ nothing is sent anywhere. Exit 0 when the text was written, 1 when stdout
 could not be written or a command (--reset, --stats, --remind, --streak)
 failed, 2 for an unknown option.
 """
+import collections
 import copy
 import datetime
 import json
@@ -244,11 +245,11 @@ DONE_LINES = (
 HELP = """hello-world prints a greeting, a thought, and a small thing to try.
 
 At the last prompt, type plan for today's plan, done when you finish
-it, or menu (or m) for options. Enter closes, and so do q, quit, exit,
-x and close. At a plan prompt, same reuses the earlier plan. At the
-menu, Enter goes back to the last prompt. After done it lists your last
-7 finished plans. Menu option 1 shows them too, and option 7 forgets
-one.
+it, or menu (or m) for options. Enter closes, and q, x and close
+close it from any question. At a plan prompt, same brings back an
+unfinished earlier plan. After done it lists your last 3 finished
+plans. Menu option 1 shows all of them, option 7 forgets one, and
+option 8 hides the thought and tip. At the menu, Enter goes back.
 You can also run hello.cmd with one of these:
   --plain         Print only the greeting
   --stats         Show what is saved on this computer
@@ -272,7 +273,8 @@ MENU_HELP = """Words you can type at the last prompt:
 At a plan prompt, same brings back your earlier unfinished plan.
 When it asks "Did you do it?", n means not yet, and you can keep the
 plan for today. q closes from any question.
-In this menu, 1 shows what is saved and 7 forgets one finished plan.
+In this menu, 1 shows what is saved, 7 forgets one finished plan,
+and 8 hides the thought and tip.
 Type m to hear the options again. Nothing is sent anywhere."""
 
 
@@ -295,7 +297,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return HELP + "\n\nhello.cmd is in this folder:\n  " + here
 
-VERSION = "1.20.0"
+VERSION = "1.21.0"
 MAX_VISITS = 400
 MAX_FILE = 1_000_000
 YES = ("y", "yes", "yep", "ya", "yeah", "done")
@@ -316,7 +318,7 @@ class Quit(Exception):
     """The person typed q at a question, so the window closes."""
 
 
-QUIT_WORDS = ("q", "quit", "exit")
+QUIT_WORDS = ("q", "quit", "exit", "x", "close")
 
 
 class OutputClosed(Exception):
@@ -446,6 +448,8 @@ def load(repair=True):
         return state, True
     if raw.get("streak") is False:
         state["streak"] = False
+    if raw.get("tips") is False:
+        state["tips"] = False
     if raw.get("offered") is True:
         state["offered"] = True
     # Changes only when everything is deleted. commit() compares it, so a
@@ -484,6 +488,9 @@ def load(repair=True):
                         state["intent"]["since"] = since
                 except ValueError:
                     pass
+                skips = intent.get("skips")
+                if isinstance(skips, int) and not isinstance(skips, bool) and 0 < skips < 10:
+                    state["intent"]["skips"] = skips
     except ValueError:
         pass
     finished = []
@@ -773,8 +780,11 @@ def reset(state):
     """True when deleted, False when a delete failed, None when declined."""
     answer = ask("Delete all saved notes, dates and plans on this computer? "
                  "(y or n, Enter to cancel) > ")
-    if (answer or "").lower().strip(" .!") not in STRICT_YES:
+    word = (answer or "").lower().strip(" .!")
+    if word not in STRICT_YES:
         say("Nothing was deleted.")
+        if word in QUIT_WORDS:
+            raise Quit
         return None
     leftovers = [data_file()]
     failed = []
@@ -879,19 +889,20 @@ def commit(state, base, can_save, soft=()):
     fresh["visits"] = sorted(set(fresh["visits"]) | set(state["visits"]))[-MAX_VISITS:]
     mine, before = state.get("finished", []), base.get("finished", [])
     theirs = fresh.get("finished", [])
-    added = [i for i in mine if i not in before]
-    # Each finished row came with one done. A row the other window already
-    # saved with the same words and date is one finish, not two.
-    repeats = sum(1 for i in added if i in theirs)
+    added = row_counts(mine) - row_counts(before)
+    removed = row_counts(before) - row_counts(mine)
+    # Each finished row came with one done. A row the other window also added
+    # with the same words and date is one finish, not two.
+    repeats = added & (row_counts(theirs) - row_counts(before))
     for key, cap in (("done", 99999), ("offer_skips", MAX_OFFER_SKIPS)):
         gained = state.get(key, 0) - base.get(key, 0)
         if key == "done":
-            gained -= repeats
+            gained -= sum(repeats.values())
         if gained > 0:
             fresh[key] = min(fresh.get(key, 0) + gained, cap)
-    finished = [i for i in theirs if i in mine or i not in before]
-    finished += [i for i in added if i not in finished]
-    finished.sort(key=lambda i: i["date"])
+    rows = {json.dumps(r, sort_keys=True): r for r in theirs + mine}
+    kept = (row_counts(theirs) - removed) + (added - repeats)
+    finished = sorted((rows[k] for k in kept.elements()), key=lambda r: r["date"])
     if finished:
         fresh["finished"] = finished[-MAX_FINISHED:]
     else:
@@ -901,6 +912,11 @@ def commit(state, base, can_save, soft=()):
     state.clear()
     state.update(fresh)
     return True
+
+
+def row_counts(rows):
+    """Finished rows counted as a multiset, since dicts can't go in a Counter."""
+    return collections.Counter(json.dumps(r, sort_keys=True) for r in rows)
 
 
 def undo(state, base):
@@ -937,11 +953,7 @@ def show_finished(state, limit=MAX_FINISHED):
     if not items:
         return
     say()
-    if len(items) > limit:
-        say("Finished lately (menu option 1 lists all of them):")
-    else:
-        say(f"Finished lately (the last {MAX_FINISHED} are kept, only on this "
-            "computer):")
+    say("Finished lately:")
     for item in list(reversed(items))[:limit]:
         say(wrapped("  " + long_date(datetime.date.fromisoformat(
             item["date"])) + ": ", item["text"]))
@@ -973,9 +985,11 @@ def set_plan(state, can_save, iso=None, after_done=False):
                 "Type today's plan" + hint
                 + (", or Enter to keep it > " if old else ", or Enter to go back > "))
     word = (typed or "").lower().strip(" .!")
-    if after_done and (not word or word in ("q", "quit", "exit", "x", "close")):
+    if after_done and not word:
         say("Closing.")
         return True
+    if word in QUIT_WORDS:
+        raise Quit
     # Another window may have saved while this prompt waited.
     refresh(state, can_save)
     old = state["intent"]
@@ -989,11 +1003,14 @@ def set_plan(state, can_save, iso=None, after_done=False):
         say("Nothing changed.")
         return False
     base = copy.deepcopy(state)
-    if old and old["text"] != text:
+    # Changing today's plan is a correction, so only a plan carried over from
+    # an earlier day is kept for same.
+    if old and old["text"] != text and old["date"] != iso:
         state["previous"] = old["text"]
     state["intent"] = {"text": text, "date": iso}
     if commit(state, base, can_save):
         say(SAVED_PLAN)
+        nudge_if_several(text)
     else:
         undo(state, base)
         say("Could not save that on this computer. Your plan is unchanged.")
@@ -1014,6 +1031,8 @@ def forget_finished(state, can_save):
     for _ in range(3):
         choice = ask(f"Type the number to forget (1 to {len(shown)}), "
                      "or Enter to keep them all > ")
+        if (choice or "").lower().strip(" .!") in QUIT_WORDS:
+            raise Quit
         if not choice or choice in numbers:
             break
         say(f'There is no number "{tidy(choice)[:30]}" on the list. Type a '
@@ -1037,8 +1056,9 @@ def forget_finished(state, can_save):
         state.pop("previous")
     kept = state.get("previous") == item["text"]
     if commit(state, base, can_save):
-        say("Forgotten. " + ("It is off the list, and same still has it."
-                             if kept else "That plan is no longer saved."))
+        say(wrapped("Forgotten: ", item["text"]))
+        if kept:
+            say("Same still has it.")
     else:
         undo(state, base)
         say("Could not save that on this computer. Nothing changed.")
@@ -1064,14 +1084,19 @@ def menu(state, can_save=True, iso=None):
             say("  5  Help")
             say("  6  Set or change today's plan")
             say("  7  Forget one finished plan")
+            say("  8  " + ("Hide the thought and tip (now shown)"
+                           if state.get("tips", True) else
+                           "Show the thought and tip (now hidden)"))
             say("  Enter  Back to the last prompt")
             listed = True
-            choice = ask("Choose 1 to 7, or Enter to go back > ")
+            choice = ask("Choose 1 to 8, or Enter to go back > ")
         else:
-            choice = ask("Choose 1 to 7, m to list the options, or Enter to "
+            choice = ask("Choose 1 to 8, m to list the options, or Enter to "
                          "go back > ")
-        if not choice or choice.lower() in ("q", "quit", "exit"):
+        if not choice:
             return
+        if choice.lower().strip(" .!") in QUIT_WORDS:
+            raise Quit
         if choice.lower() in ("m", "menu", "list"):
             listed = False
             continue
@@ -1113,8 +1138,21 @@ def menu(state, can_save=True, iso=None):
             set_plan(state, can_save, iso)
         elif choice == "7":
             forget_finished(state, can_save)
+        elif choice == "8":
+            refresh(state, can_save)
+            base = copy.deepcopy(state)
+            if state.get("tips", True):
+                state["tips"] = False
+            else:
+                state.pop("tips", None)
+            if commit(state, base, can_save):
+                say("Done. The thought and tip are "
+                    + ("on." if state.get("tips", True) else "off."))
+            else:
+                undo(state, base)
+                say("Could not save that choice on this computer.")
         else:
-            not_a_choice(choice, "Type 1 to 7, or press Enter to go back.")
+            not_a_choice(choice, "Type 1 to 8, or press Enter to go back.")
 
 
 def offer_reminder(state, can_save, planned=False):
@@ -1174,8 +1212,38 @@ def done_lines(state, d):
     nobody is congratulated for something that was not recorded."""
     lines = [DONE_LINES[d.toordinal() % len(DONE_LINES)]]
     if state.get("done", 0) > 1:
-        lines.append(f"That is {state['done']} times you have marked a plan done.")
+        lines.append(f"That is {state['done']} done so far.")
     return lines
+
+
+def finish_day(plan_day, d):
+    """The day a plan was finished. Asked only when it was set over a day ago,
+    since the next morning almost always means the plan's own day."""
+    if (d - plan_day).days <= 1:
+        return plan_day
+    yesterday = d - datetime.timedelta(days=1)
+    for _ in range(3):
+        answer = ask(f"When did you finish it? (Enter for {long_date(plan_day)}, "
+                     "y for yesterday, t for today) > ")
+        word = (answer or "").lower().strip(" .!")
+        if not word:
+            return plan_day
+        if word in QUIT_WORDS:
+            raise Quit
+        if word in ("y", "yes", "yesterday"):
+            return yesterday
+        if word in ("t", "today"):
+            return d
+        not_a_choice(answer, "Press Enter, or type y or t.")
+    return plan_day
+
+
+def nudge_if_several(text):
+    """A plan of several things joined together is hard to finish."""
+    padded = f" {text.lower()} "
+    if any(joint in padded for joint in (" and ", " & ")) or "+" in text:
+        para("That looks like more than one thing. Finishing the first part "
+             "still counts.")
 
 
 def mark_done_now(state, can_save, d):
@@ -1233,15 +1301,11 @@ def daily(startup):
         para("Press Enter at each question to skip it, and once more to "
              "close. That's it.")
         say()
-        para("Welcome. Each day this gives you one thought and one small "
-             "thing to try. Everyone sees the same ones on the same day. If "
-             "you type a plan for today, it asks next time how it went.")
-        say()
-        para("It saves a few notes on this computer, in your own user folder, "
-             "and sends nothing anywhere. Do not type passwords or private "
-             "details. Others who can read this computer's files, such as IT "
-             "staff, could read the notes. Type menu at the last prompt for "
-             "the options.")
+        para("Welcome. Each day you get one thought and one small thing to "
+             "try, the same for everyone. If you type a plan, it asks next "
+             "time how it went. Notes stay in your user folder and it sends "
+             "nothing anywhere, but IT staff could read them, so skip private "
+             "details. Type menu for the options.")
         say()
     elif not seen_today:
         last = datetime.date.fromisoformat(state["visits"][-1])
@@ -1256,26 +1320,29 @@ def daily(startup):
 
     quitting = False
     try:
-        if not seen_today and intent and intent["date"] < iso:
+        # Asked until it is answered, also on a second open the same day,
+        # but two skips mean "stop asking"; the plan then shows as still open.
+        if intent and intent["date"] < iso and intent.get("skips", 0) < 2:
             say(wrapped("Last time you planned: ", intent["text"]))
             answer = ask_choice(
                 "Did you do it? (y for yes, n for not yet, Enter to skip) > ",
                 YES, NO, "Type y or n, or press Enter to skip.")
             if answer == "yes":
                 answered = True
-                # Dated to the day it was planned for, which is when it was
-                # most likely done, and saved now so the answer is heard now.
-                finish_plan(state, intent["text"],
-                            datetime.date.fromisoformat(intent["date"]))
+                when = finish_day(datetime.date.fromisoformat(intent["date"]), d)
+                # Saved now, so the answer is heard now.
+                finish_plan(state, intent["text"], when)
                 state["intent"] = None
                 if commit(state, base, can_save):
                     base = copy.deepcopy(state)
                     intent = None
                     for line in done_lines(state, d):
                         say(line)
-                    show_finished(state, SHOWN_AFTER_DONE)
                 else:
+                    # A delete in another window also lands here, so take
+                    # the plan from the state, never the copy held above.
                     undo(state, base)
+                    intent = state["intent"]
                     say("Could not save that on this computer. Your answer was "
                         "not counted.")
             elif answer == "no":
@@ -1295,26 +1362,28 @@ def daily(startup):
             elif answer is None and person:
                 say("That was not understood. Your plan is left as it was.")
             elif answer is not None:
+                intent = dict(intent, skips=intent.get("skips", 0) + 1)
                 say("Left as it was.")
             say()
 
-        thought, tip = todays_pair(d)
-        say("Thought for today:")
-        say(indent(thought))
-        say()
-        say("Try this today:")
-        say(indent(tip))
-        say()
+        if state.get("tips", True):
+            thought, tip = todays_pair(d)
+            say("Thought for today:")
+            say(indent(thought))
+            say()
+            say("Try this today:")
+            say(indent(tip))
+            say()
 
         if intent and intent["date"] == iso:
             say(wrapped("Your plan for today: ", intent["text"]))
             say()
-        elif seen_today and intent:
-            # Left unanswered this morning; it must not vanish on a second open.
+        elif intent:
+            # Not answered, or skipped twice; it must not vanish.
             when = long_date(datetime.date.fromisoformat(intent["date"]))
             say(wrapped(f"Still open from {when}: ", intent["text"]))
             say()
-        elif not seen_today:
+        if not seen_today and not (intent and intent["date"] == iso):
             skip = ("(Enter to skip)" if not intent else
                     "(A plan typed here replaces the old one. Enter to skip)")
             if state.get("previous") and not intent:
@@ -1358,6 +1427,7 @@ def daily(startup):
             intent = state["intent"]
             if typed_new:
                 say(SAVED_PLAN)
+                nudge_if_several(intent["text"])
                 say()
             if not seen_today and not quitting:
                 try:
@@ -1372,6 +1442,14 @@ def daily(startup):
 
     # A message at the very end must stay on screen until the person has read
     # it, because the window closes as soon as the program exits.
+    try:
+        last_prompt(state, can_save, intent, person, d, iso)
+    except Quit:
+        say("Closing.")
+
+
+def last_prompt(state, can_save, intent, person, d, iso):
+    """Loop at the last prompt until the person closes the window."""
     while True:
         planned = bool(intent and person and state["intent"] is intent)
         prompt = ("Type done, plan, menu or q, or Enter to close > "
@@ -1392,11 +1470,7 @@ def daily(startup):
             intent = state["intent"]
             continue
         elif answer in ("m", "menu", "h", "help", "?"):
-            try:
-                menu(state, can_save, iso)
-            except Quit:
-                say("Closing.")
-                break
+            menu(state, can_save, iso)
             intent = state["intent"]
             continue
         elif answer in ("q", "quit", "exit", "x", "close"):
@@ -1441,7 +1515,10 @@ def run(argv):
             return 1
         state, _ = load(repair=False)
         # Answering no is the person's choice; only a failed delete is an error.
-        return 1 if reset(state) is False else 0
+        try:
+            return 1 if reset(state) is False else 0
+        except Quit:
+            return 0
     if len(argv) == 2 and argv[0] == "--remind" and argv[1] in ("on", "off"):
         return 0 if remind(argv[1] == "on") else 1
     if len(argv) == 2 and argv[0] == "--streak" and argv[1] in ("on", "off"):
