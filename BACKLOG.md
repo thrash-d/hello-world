@@ -18,6 +18,7 @@ Changes considered and declined, with the reason. On 2 October 2026 the list fro
 - Renumbering the menu or a "Mark done" menu item: renumbering breaks saved habits, and `done` at the last prompt covers it.
 - Keeping direction marks in plan text: they can reorder text on screen.
 - Forcing UTF-8 output: Python already writes Unicode to a Windows console whatever the code page, and forcing it would change the bytes piped output and the tests read.
+- Stopping the review rounds, or freezing the program after a weak pilot (Round 44 panel): the project exists for steady improvement through review, and the rounds cost nothing. A weak pilot steers what the next rounds work on.
 - Python 2, or Python before 3.6: f-strings fail closed with a `SyntaxError`.
 
 ## Claims that turned out wrong or already true
