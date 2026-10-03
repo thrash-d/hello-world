@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-10-03: history, numbers, and choices for the text screen
+
+Version 1.33.0. Builds the rest of the employee items in `TODO.md` that need no new language or installer work. Most of them were declined in earlier rounds as against the design; each is now a choice that is off until someone turns it on.
+
+In the window's Options:
+- **This week...**: what was finished since Monday.
+- **My numbers...** with **Keep my numbers**: days opened, the longest run of days, plans finished. Counted only while it's on, so nothing is counted for anyone who doesn't ask.
+- **Save my plans to a file**: the current and finished plans as Markdown in Documents.
+- **Keep a longer history**: 60 finished plans instead of 7.
+
+Every on-or-off choice also has `--set NAME on|off`, which is how the text screen reaches the ones without a menu line: `hide_finished`, `expire_same` (`same` lets go of an earlier plan after 30 days), `no_count`, `close_after_done` and `colon_prompts` (prompts ending in `:`, which the simulated NVDA user asked for in 1.21.0). `--week`, `--numbers` and `--export` do the same as the window from a command line.
+
+Also:
+- The text menu's option 11 marks today's plan done.
+- The status line and the answer to "Did you do it?" are UI Automation live regions, set through the Dynamic Annotation API, so screen readers announce them when they change. This was declined in 1.28.0 as needing more than `ctypes` could reach.
+- Left-to-right and right-to-left marks stay in plan text; the override characters are still removed.
+- `--utf8` writes UTF-8 whatever the console's code page, and `--plain-local` prints the greeting in the person's language. `--check-content FILE --local` answers in the Windows display language; without it, the answers stay in English for administrators' tickets.
+- `retomar` works as `same` too, as the Spanish reviewer suggested in 1.25.0.
+- A sign-in value from 1.23.0 to 1.27.0, which opened a console, is rewritten to the current one the next time hello-world opens.
+- Placeholders in a translation may come in a different order from the English; the test now checks the set.
+
+Tests: the longer history, numbers and the weekly list over nine days, the export file, no done count and no finished list, `same` expiring, colon prompts, closing after the next plan, direction marks, `--check-content --local` and `--plain-local`, Mark done from the menu, and the old sign-in value rewritten. 240 run here on Windows: 238 pass and 2 are POSIX-only.
+
 ## 2026-10-03: options for IT, and one reminder task per user
 
 Version 1.32.0. Builds the IT items the old backlog had declined as against the design. Each is opt-in by Group Policy, and none of them sends anything over a network or writes plan text anywhere new.

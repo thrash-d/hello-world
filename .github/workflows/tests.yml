@@ -140,6 +140,8 @@ jobs:
           Set-Content (Join-Path $notesDir 'notes.json') '{"visits": []}'
           Set-Content (Join-Path $notesDir 'keep-me.txt') 'not ours'
           $run = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+          # A fresh runner profile may not have the Run key yet.
+          if (-not (Test-Path $run)) { New-Item $run | Out-Null }
           Set-ItemProperty $run -Name 'hello-world' -Value "`"$dir\python\pythonw.exe`" -I `"$dir\hello.py`" --startup"
           & "$dir\python\python.exe" -I -c "import sys; sys.path.insert(0, sys.argv[1]); import hello; print(hello.reminder_task('09:00'))" $dir
           powershell -NoProfile -ExecutionPolicy Bypass -File "$dir\uninstall.ps1" -Quiet -RemoveNotes | Write-Host

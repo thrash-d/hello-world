@@ -47,7 +47,22 @@ to open the window. With no plan, it stays quiet, unless you choose
 moves the reminder to 8:00, 9:00, 10:00 or 13:00 instead of sign-in, opens
 the window after you answer, and keeps weekends quiet. Days your organization
 lists as holidays are quiet too. **Options > Greet me by name** puts your
-first name at the top. **Options** in the window
+first name at the top.
+
+Options also has **This week...** (what you finished since Monday), **My
+numbers...** (days opened, your longest run and plans finished, once you turn
+on **Keep my numbers**), **Save my plans to a file** (a Markdown file in
+Documents), and **Keep a longer history** (60 finished plans instead of 7).
+
+Every on-or-off choice also works from the command line, for example
+`hello.cmd --set numbers on`. The names are `nudge`, `open_after`,
+`no_weekends`, `name`, `no_startup_visits`, `long_history`, `hide_finished`
+(no finished list in the text screen), `expire_same` (`same` forgets an
+earlier plan after 30 days), `no_count` (no done count kept), `numbers`,
+`close_after_done` (the text screen closes after `done` and the next plan)
+and `colon_prompts` (prompts end in `:` instead of `>`). `--week`,
+`--numbers` and `--export` print or save the same as the window, and
+`--plain-local` prints the greeting in your language. **Options** in the window
 turns the reminder off, hides the thought and tip, turns on the days-in-a-row
 message, picks a language other than the Windows one, shows what is saved,
 deletes everything (your settings stay), or switches to the text screen. In
@@ -182,7 +197,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.32.0'
+$tag = 'v1.33.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

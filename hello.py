@@ -319,53 +319,60 @@ MAX_HOLIDAYS = 100
 CONTENT_LENGTH = (10, 120)
 
 
-def content_problems(data):
-    """What is wrong with organization content, as plain sentences."""
+def content_problems(data, t=lambda text: text):
+    """What is wrong with organization content, as plain sentences. `t`
+    translates them; the default keeps them in English."""
     if (not isinstance(data, dict) or not {"thoughts", "tips"} <= set(data)
             or not set(data) <= {"thoughts", "tips", "holidays", "title"}):
-        return ['The file must hold an object with two lists, "thoughts" and '
-                '"tips", and may add "holidays" and "title".']
+        return [t('The file must hold an object with two lists, "thoughts" and '
+                  '"tips", and may add "holidays" and "title".')]
     problems = []
     holidays = data.get("holidays", [])
     if not isinstance(holidays, list) or len(holidays) > MAX_HOLIDAYS:
-        problems.append(f'"holidays" must be a list of at most {MAX_HOLIDAYS} dates.')
+        problems.append(t('"holidays" must be a list of at most {n} dates.')
+                        .format(n=MAX_HOLIDAYS))
     else:
         for n, value in enumerate(holidays, 1):
             try:
                 day(value)
             except ValueError:
-                problems.append(f'holidays line {n} is not a date like 2026-12-25.')
+                problems.append(t("holidays line {line} is not a date like "
+                                  "2026-12-25.").format(line=n))
     title = data.get("title", "Hello, world!")
     if (not isinstance(title, str) or not 1 <= len(tidy(title)) <= 40
             or tidy(title) != title.strip()
             or any(mark in title.lower() for mark in ("http", "www.", "://", "@"))):
-        problems.append('"title" must be 1 to 40 characters of plain text, '
-                        'with no link or address.')
+        problems.append(t('"title" must be 1 to 40 characters of plain text, '
+                          'with no link or address.'))
     low_months = [m.lower() for m in MONTHS if m != "May"] + [
         m.lower() for data in LANGUAGES.values() for m in data["months"]]
     for key in ("thoughts", "tips"):
         items = data[key]
         if not isinstance(items, list) or not MIN_CONTENT <= len(items) <= MAX_CONTENT:
-            problems.append(f'"{key}" must be a list of {MIN_CONTENT} to '
-                            f"{MAX_CONTENT} lines.")
+            problems.append(t('"{list}" must be a list of {low} to {high} lines.')
+                            .format(list=key, low=MIN_CONTENT, high=MAX_CONTENT))
             continue
         for n, item in enumerate(items, 1):
-            where = f"{key} line {n}"
+            where = {"list": key, "line": n}
             if not isinstance(item, str):
-                problems.append(f"{where} is not text.")
+                problems.append(t("{list} line {line} is not text.").format(**where))
                 continue
             text, low = tidy(item), tidy(item).lower()
             if text != item.strip():
-                problems.append(f"{where} has control characters or extra spaces.")
+                problems.append(t("{list} line {line} has control characters or "
+                                  "extra spaces.").format(**where))
             if not CONTENT_LENGTH[0] <= len(text) <= CONTENT_LENGTH[1]:
-                problems.append(f"{where} must be {CONTENT_LENGTH[0]} to "
-                                f"{CONTENT_LENGTH[1]} characters long.")
+                problems.append(t("{list} line {line} must be {low} to {high} "
+                                  "characters long.").format(
+                                      low=CONTENT_LENGTH[0], high=CONTENT_LENGTH[1],
+                                      **where))
             if any(mark in low for mark in ("http", "www.", "://", "@")):
-                problems.append(f"{where} has a link or an address.")
+                problems.append(t("{list} line {line} has a link or an address.")
+                                .format(**where))
             if any(m in low.split() or m + "," in low for m in low_months) or any(
                     c.isdigit() and next_c in "/-." and after.isdigit()
                     for c, next_c, after in zip(text, text[1:], text[2:], strict=False)):
-                problems.append(f"{where} has a date.")
+                problems.append(t("{list} line {line} has a date.").format(**where))
     return problems
 
 
@@ -436,7 +443,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.32.0"
+VERSION = "1.33.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -461,7 +468,7 @@ NO = NO_WORDS + NOT_YET + ("not really", "not done")
 MAX_OFFER_SKIPS = 1
 NO_THANKS = NO_WORDS + ("no thanks", "never", "stop", "no gracias", "nunca",
                   "non merci", "jamais", "não obrigado", "nein danke", "nie")
-SAME_WORDS = ("same", "repetir", "reprendre", "wieder")
+SAME_WORDS = ("same", "repetir", "retomar", "reprendre", "wieder")
 PLAN_WORDS = ("p", "plan", "plano")
 MENU_WORDS = ("m", "menu", "menú", "menü")
 HELP_WORDS = ("h", "help", "?", "ayuda", "aide", "ajuda", "hilfe")
@@ -486,6 +493,8 @@ CLOSE_WINDOW_AFTER = None
 WINDOW = False
 # When Ctrl+C last skipped a question, for "twice in a row closes".
 INTERRUPTED = 0.0
+# "colon_prompts": prompts end in ":" instead of " >".
+PROMPT_COLON = False
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 # Where the reminder's name and its answer links are registered for the user.
 CLASSES_KEY = r"Software\Classes"
@@ -685,9 +694,13 @@ def launcher_on():
 
 
 # Choices, not notes: Delete everything keeps them.
+# On-or-off choices, each false unless turned on. --set NAME on|off changes
+# any of them; the window's Options has the ones people look for.
+SWITCHES = ("nudge", "open_after", "no_weekends", "name", "no_startup_visits",
+            "long_history", "hide_finished", "expire_same", "no_count",
+            "numbers", "close_after_done", "colon_prompts")
 SETTINGS = ("streak", "tips", "text", "offered", "offer_skips", "lang",
-            "nudge", "open_after", "no_weekends", "name", "remind_at",
-            "no_startup_visits")
+            "remind_at") + SWITCHES
 
 
 def new_state():
@@ -699,6 +712,12 @@ MAX_PLAN = 200
 MAX_PARTS = 5
 SAVED_PLAN = "Saved. Type done when you finish it, or it asks next time you open this."
 MAX_FINISHED = 7
+# With "long_history" on, finished plans are kept this long instead.
+LONG_FINISHED = 60
+
+
+def finished_cap(state):
+    return LONG_FINISHED if state.get("long_history") else MAX_FINISHED
 SHOWN_AFTER_DONE = 3
 
 
@@ -757,7 +776,8 @@ def tidy(text):
         kind = unicodedata.category(c)
         # ZWNJ and ZWJ are format marks, but Persian, Indic scripts and emoji
         # sequences need them.
-        if kind in DROPPED and c not in "\u200c\u200d":
+        # LRM and RLM only steer the text next to them, unlike overrides.
+        if kind in DROPPED and c not in "\u200c\u200d\u200e\u200f":
             continue
         # A pile of combining marks on one letter draws over the lines above.
         marks = marks + 1 if kind in ("Mn", "Me") else 0
@@ -869,10 +889,19 @@ def load(repair=True):
         state["offered"] = True
     if raw.get("text") is True:
         state["text"] = True
-    for key in ("nudge", "open_after", "no_weekends", "name",
-                "no_startup_visits"):
+    for key in SWITCHES:
         if raw.get(key) is True:
             state[key] = True
+    global PROMPT_COLON
+    PROMPT_COLON = bool(state.get("colon_prompts"))
+    for key in ("opens", "run", "best_run"):
+        n = raw.get(key)
+        if isinstance(n, int) and not isinstance(n, bool) and 0 < n < 100000:
+            state[key] = n
+    try:
+        state["previous_date"] = day(raw.get("previous_date"))
+    except ValueError:
+        pass
     if raw.get("remind_at") in REMINDER_TIMES:
         state["remind_at"] = raw["remind_at"]
     global CHOSEN_LANGUAGE
@@ -943,7 +972,12 @@ def load(repair=True):
         except ValueError:
             pass
     if finished:
-        state["finished"] = finished[-MAX_FINISHED:]
+        state["finished"] = finished[-finished_cap(state):]
+    if (state.get("expire_same") and state.get("previous")
+            and state.get("previous_date", "9999")
+            < (today() - datetime.timedelta(days=30)).isoformat()):
+        state.pop("previous")
+        state.pop("previous_date")
     # With plans turned off by policy, plan text is neither shown nor kept: it
     # is dropped here, so the next save leaves it out of the file.
     if plans_off():
@@ -1090,6 +1124,8 @@ def ask(prompt):
     """
     if not interactive():
         return None
+    if PROMPT_COLON and prompt.endswith(" > "):
+        prompt = prompt[:-3] + ": "
     lines = []
     for part in prompt.split("\n"):
         lines += textwrap.wrap(part, width(), break_on_hyphens=False,
@@ -1479,6 +1515,12 @@ def commit(state, base, can_save, soft=()):
     """
     if not can_save:
         return False
+    # The day an earlier plan was put aside, so same can let go of it.
+    if state.get("previous") != base.get("previous"):
+        if state.get("previous"):
+            state["previous_date"] = today().isoformat()
+        else:
+            state.pop("previous_date", None)
     with file_lock():
         return merge_and_save(state, base, soft)
 
@@ -1533,7 +1575,7 @@ def merge_and_save(state, base, soft):
     kept = (row_counts(theirs) - removed) + (added - repeats)
     finished = sorted((rows[k] for k in kept.elements()), key=lambda r: r["date"])
     if finished:
-        fresh["finished"] = finished[-MAX_FINISHED:]
+        fresh["finished"] = finished[-finished_cap(state):]
     else:
         fresh.pop("finished", None)
     if not save(fresh):
@@ -1589,7 +1631,7 @@ def show_finished(state, limit=MAX_FINISHED):
     lists every one kept.
     """
     items = state.get("finished") or []
-    if not items:
+    if not items or state.get("hide_finished"):
         return
     say()
     say(tr("Finished lately:"))
@@ -1770,12 +1812,14 @@ def menu(state, can_save=True, iso=None, alone=False):
                            tr("Language (now {name})").format(
                                name=LANGUAGE_NAMES.get(state.get("lang"))
                                or tr("following Windows"))))
+            say(" 11  " + (tr("Mark today's plan done (plans are turned off)")
+                           if plans_off() else tr("Mark today's plan done")))
             say("  " + tr("Enter") + "  " + (tr("Close") if alone else
                                              tr("Back to the last prompt")))
             listed = True
-            choice = ask(tr("Choose 1 to 10, or Enter to go back > "))
+            choice = ask(tr("Choose 1 to 11, or Enter to go back > "))
         else:
-            choice = ask(tr("Choose 1 to 10, m to list the options, or Enter to "
+            choice = ask(tr("Choose 1 to 11, m to list the options, or Enter to "
                             "go back > "))
         if not choice:
             return
@@ -1843,6 +1887,10 @@ def menu(state, can_save=True, iso=None, alone=False):
             else:
                 undo(state, base)
                 say(tr("Could not save that choice on this computer."))
+        elif choice == "11" and plans_off():
+            say(tr("Plans are turned off by your organization."))
+        elif choice == "11":
+            mark_done_now(state, can_save, today())
         elif choice == "10" and policy("ForceEnglish"):
             say(tr("Your organization shows hello-world in English."))
         elif choice == "10":
@@ -1863,7 +1911,7 @@ def menu(state, can_save=True, iso=None, alone=False):
                 undo(state, base)
                 say(tr("Could not save that choice on this computer."))
         else:
-            not_a_choice(choice, tr("Type 1 to 10, or press Enter to go back."))
+            not_a_choice(choice, tr("Type 1 to 11, or press Enter to go back."))
 
 
 def set_language(state, can_save, code):
@@ -1969,9 +2017,10 @@ def _finish_plan(state, text, d, parts=None):
     every = plan_parts(text)
     chosen = [every[i] for i in sorted(set(parts))] if parts else every
     for part in chosen:
-        state["done"] = min(state.get("done", 0) + 1, 99999)
+        if not state.get("no_count"):
+            state["done"] = min(state.get("done", 0) + 1, 99999)
         state["finished"] = (state.get("finished", [])
-                             + [{"text": part, "date": d.isoformat()}])[-MAX_FINISHED:]
+                             + [{"text": part, "date": d.isoformat()}])[-finished_cap(state):]
     return "; ".join(part for i, part in enumerate(every)
                      if parts and i not in parts)
 
@@ -2086,8 +2135,87 @@ def policy_reminder(state):
             state["offered"] = True
 
 
+def count_visit(state, d):
+    """With "numbers" on, count a new day: the days opened, the current run
+    (each visit within four days of the last) and the longest run."""
+    if not state.get("numbers") or d.isoformat() in state["visits"]:
+        return
+    last = state["visits"][-1] if state["visits"] else None
+    close = last and (d - datetime.date.fromisoformat(last)).days <= 4
+    state["opens"] = min(state.get("opens", 0) + 1, 99999)
+    state["run"] = min(state.get("run", 0) + 1, 99999) if close else 1
+    state["best_run"] = max(state.get("best_run", 0), state["run"])
+
+
+def numbers_text(state):
+    """"My numbers", for the window and --numbers."""
+    if not state.get("numbers"):
+        return tr("My numbers are off. Turn them on under Options, or with "
+                  "--set numbers on.")
+    return "\n".join([
+        tr("Days you opened hello-world: {n}").format(n=state.get("opens", 0)),
+        tr("Longest run of days: {n}").format(n=state.get("best_run", 0)),
+        tr("Plans finished: {n}").format(n=state.get("done", 0))])
+
+
+def week_text(state, d):
+    """What was finished since Monday."""
+    monday = (d - datetime.timedelta(days=d.weekday())).isoformat()
+    items = [i for i in state.get("finished", []) if i["date"] >= monday]
+    if not items:
+        return tr("Nothing finished yet this week. That is fine.")
+    return "\n".join([tr("This week you finished {n}:").format(n=len(items))] + [
+        "  " + tr("{date}: ").format(date=long_date(datetime.date.fromisoformat(
+            i["date"]))) + i["text"] for i in items])
+
+
+# Where --export and Options save the plans; None is the Documents folder.
+EXPORT_DIR = None
+
+
+def export_plans(state):
+    """Write the current and finished plans to a Markdown file in the
+    person's Documents folder. Returns the path, or None."""
+    folder = EXPORT_DIR or os.path.join(os.path.expanduser("~"), "Documents")
+    path = os.path.join(folder, "hello-world plans.md")
+    lines = ["# hello-world", ""]
+    if state["intent"]:
+        lines += ["## " + tr("Your current plan: ").strip(), ""]
+        lines += [f"- {part}" for part in plan_parts(state["intent"]["text"])] + [""]
+    if state.get("finished"):
+        lines += ["## " + tr("Finished lately:"), ""]
+        lines += [f"- {i['date']}: {i['text']}" for i in reversed(state["finished"])]
+    try:
+        os.makedirs(folder, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines).rstrip() + "\n")
+        return path
+    except OSError:
+        return None
+
+
+def launcher_value():
+    """The Run value's text, or the test launcher file's, or ""."""
+    kind, where = launcher_place()
+    try:
+        if kind == "file":
+            with open(where, encoding="ascii") as f:
+                return f.read()
+        if kind == "run":
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, where) as key:
+                return winreg.QueryValueEx(key, RUN_VALUE)[0]
+    except (OSError, UnicodeDecodeError):
+        pass
+    return ""
+
+
 def tidy_launcher():
-    """Apply the launcher policy, and move a pre-1.23 launcher to the Run value."""
+    """Apply the launcher policy, move a pre-1.23 launcher to the Run value,
+    and rewrite a 1.23.0 to 1.27.0 value, which opened a console, to the one
+    that starts pythonw.exe."""
+    if launcher_on() and "hello.cmd --startup" in launcher_value():
+        remind(True, quiet=True)
     if policy("DisableSignInLauncher"):
         if launcher_on() or legacy_launcher() and os.path.isfile(legacy_launcher()):
             remind(False, quiet=True)
@@ -2171,6 +2299,8 @@ def daily(startup):
         return
     tidy_launcher()
     policy_reminder(state)
+    if not seen_today:
+        count_visit(state, d)
     first = not state["visits"]
     intent, expired = plan_on_open(state, d)
 
@@ -2392,7 +2522,7 @@ def last_prompt(state, can_save, intent, person, d, iso, open_menu=False):
                 say()
                 closing = set_plan(state, can_save, iso, after_done=True)
             intent = state["intent"]
-            if closing:
+            if closing or state.get("close_after_done") and intent:
                 break
             continue
         elif answer in PLAN_WORDS and person:
@@ -2418,6 +2548,8 @@ def run(argv):
     # Before lowercasing, so a path keeps its case.
     if len(argv) == 2 and argv[0].lower() == "--check-content":
         return check_content(argv[1])
+    if len(argv) == 3 and argv[0].lower() == "--check-content" and argv[2].lower() == "--local":
+        return check_content(argv[1], local=True)
     argv = [a.lower() for a in argv]
     if argv[:1] == ["--console"]:
         # The window opens the text screens with this, in a console of their own.
@@ -2436,6 +2568,33 @@ def run(argv):
         argv = ["--help"]
     if argv == ["--plain"]:
         say(GREETING)
+        return 0
+    if argv == ["--plain-local"]:
+        say(tr(GREETING))
+        return 0
+    if len(argv) == 3 and argv[0] == "--set" and argv[1] in SWITCHES and argv[2] in ("on", "off"):
+        state, can_save = load()
+        base = copy.deepcopy(state)
+        if argv[2] == "on":
+            state[argv[1]] = True
+        else:
+            state.pop(argv[1], None)
+        if commit(state, base, can_save):
+            say(tr("Saved."))
+            return 0
+        say(tr("Could not save that choice on this computer."))
+        return 1
+    if argv in (["--week"], ["--numbers"], ["--export"]):
+        state, _ = load(repair=False)
+        if argv == ["--week"]:
+            say(week_text(state, today()))
+        elif argv == ["--numbers"]:
+            say(numbers_text(state))
+        else:
+            path = export_plans(state)
+            say(tr("Saved to {path}").format(path=path) if path else
+                tr("Could not save that on this computer."))
+            return 0 if path else 1
         return 0
     if argv in (["--version"], ["-v"]):
         say("hello-world " + VERSION)
@@ -2503,27 +2662,36 @@ def run(argv):
     return 2
 
 
-def check_content(path):
-    """--check-content: say whether an organization content file is usable."""
+def check_content(path, local=False):
+    """--check-content: say whether an organization content file is usable.
+    In English, for administrators' tickets, unless --local is added."""
+    t = tr if local else (lambda text: text)
     try:
         with open(path, encoding="utf-8-sig") as f:
             data = json.loads(f.read(200_001))
     except OSError as e:
-        say(f"Can't read {tidy(path)}: {e.strerror}")
+        say(t("Can't read {path}: {error}").format(path=tidy(path), error=e.strerror))
         return 1
     except (ValueError, RecursionError):
-        say("The file isn't valid JSON, or is over 200,000 characters.")
+        say(t("The file isn't valid JSON, or is over 200,000 characters."))
         return 1
-    problems = content_problems(data)
+    problems = content_problems(data, t)
     for problem in problems:
         say(problem)
     if problems:
         return 1
-    say(f"OK: {len(data['thoughts'])} thoughts and {len(data['tips'])} tips.")
+    say(t("OK: {thoughts} thoughts and {tips} tips.").format(
+        thoughts=len(data["thoughts"]), tips=len(data["tips"])))
     return 0
 
 
 def main():
+    if "--utf8" in [a.lower() for a in sys.argv[1:]]:
+        sys.argv = [a for a in sys.argv if a.lower() != "--utf8"]
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+        except (AttributeError, OSError, ValueError):
+            pass
     args = [a.lower() for a in sys.argv[1:]]
     # pythonw.exe has no stdout, so the window and the sign-in run start here.
     if (args == ["--window"] or args[:1] == ["--answer"] and len(args) == 2
@@ -2939,6 +3107,7 @@ class Visit:
         state["intent"] = intent
         report_usage("opened")
         if not seen:
+            count_visit(state, d)
             state["visits"] = (state["visits"] + [self.iso])[-MAX_VISITS:]
         saved, said = quietly(commit, state, base, self.can_save,
                               ("intent", "previous"))
@@ -3107,7 +3276,7 @@ class Visit:
                 self.state.pop("tips", None)
         elif key == "streak":
             self.state["streak"] = not self.state["streak"]
-        elif key in ("nudge", "open_after", "no_weekends", "name"):
+        elif key in SWITCHES:
             if self.state.pop(key, None) is None:
                 self.state[key] = True
         elif self.state.pop("text", None) is None:
@@ -3116,6 +3285,48 @@ class Visit:
         if not saved:
             undo(self.state, base)
         return saved
+
+
+def live_region(hwnd):
+    """Mark a label as a polite UI Automation live region, through the
+    Dynamic Annotation API, so its changes are announced. Quietly does
+    nothing where that isn't available."""
+    import ctypes
+    import uuid
+
+    class GUID(ctypes.Structure):
+        _fields_ = [("data", ctypes.c_byte * 16)]
+
+    class VARIANT(ctypes.Structure):
+        _fields_ = [("vt", ctypes.c_ushort), ("r1", ctypes.c_ushort),
+                    ("r2", ctypes.c_ushort), ("r3", ctypes.c_ushort),
+                    ("value", ctypes.c_longlong), ("pad", ctypes.c_longlong)]
+
+    def guid(text):
+        return GUID((ctypes.c_byte * 16).from_buffer_copy(uuid.UUID(text).bytes_le))
+
+    try:
+        ole = ctypes.OleDLL("ole32")
+        ole.CoInitialize(None)
+        services = ctypes.c_void_p()
+        clsid = guid("b5f8350b-0548-48b1-a6ee-88bd00b4a5e7")
+        iid = guid("6e26e776-04f0-495d-80e4-3330352e3169")
+        ole.CoCreateInstance(ctypes.byref(clsid), None, 1, ctypes.byref(iid),
+                             ctypes.byref(services))
+        vtable = ctypes.cast(ctypes.cast(services, ctypes.POINTER(ctypes.c_void_p))[0],
+                             ctypes.POINTER(ctypes.c_void_p))
+        # IAccPropServices::SetHwndProp is the seventh method.
+        set_prop = ctypes.WINFUNCTYPE(
+            ctypes.c_long, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_ulong,
+            ctypes.c_ulong, GUID, VARIANT)(vtable[6])
+        # LiveSetting_Property_GUID; 1 is Polite, VT_I4 is 3.
+        set_prop(services, hwnd, 0xFFFFFFFC, 0,
+                 guid("c12bcd8e-2a8e-4950-8ae7-3625111d58eb"), VARIANT(3, 0, 0, 0, 1, 0))
+        release = ctypes.WINFUNCTYPE(ctypes.c_ulong, ctypes.c_void_p)(vtable[2])
+        release(services)
+        return True
+    except (AttributeError, OSError, ValueError):
+        return False
 
 
 class Window:
@@ -3325,6 +3536,13 @@ class Window:
 
     def set_text(self, cid, text):
         self.user.SetWindowTextW(self.item(cid), text)
+        if cid in (self.STATUS, self.PLANNED) and text:
+            # UIA_LiveRegionChangedEventId through MSAA: screen readers read
+            # the new text without the person moving to it.
+            try:
+                self.user.NotifyWinEvent(0x8019, self.item(cid), -4, 0)
+            except (AttributeError, OSError):
+                pass
 
     def show(self, cid, visible):
         self.user.ShowWindow(self.item(cid), 5 if visible else 0)
@@ -3372,6 +3590,9 @@ class Window:
                     user.SendMessageW(self.item(cid), 0x30, font, 1)  # WM_SETFONT
         if self.item(self.PLAN):
             user.SendMessageW(self.item(self.PLAN), 0xC5, MAX_PLAN, 0)  # EM_LIMITTEXT
+        for cid in (self.STATUS, self.PLANNED):
+            if self.item(cid):
+                live_region(self.item(cid))
         self.show(self.DID_IT, bool(self.visit.plan()))
         if self.visit.followup:
             self.focus(self.DONE)
@@ -3575,6 +3796,13 @@ class Window:
             entries.append((0, 8, tr("Language...")))
         entries.append((0, 5, tr("Show what is saved on this computer")))
         entries.append((0, 6, tr("Delete everything saved")))
+        entries.append((0, 12, tr("This week...")))
+        entries.append((0, 13, tr("My numbers...")))
+        entries.append((0, 14, tr("Save my plans to a file")))
+        entries.append((checked if v.state.get("long_history") else 0, 15,
+                        tr("Keep a longer history")))
+        entries.append((checked if v.state.get("numbers") else 0, 16,
+                        tr("Keep my numbers")))
         if feedback_address():
             entries.append((0, 11, tr("Send feedback...")))
         entries.append((0x800, 0, None))  # MF_SEPARATOR
@@ -3588,6 +3816,18 @@ class Window:
             self.reminder_settings()
         elif choice == 11:
             send_feedback()
+        elif choice == 12:
+            self.inform(week_text(v.state, v.d))
+        elif choice == 13:
+            self.inform(numbers_text(v.state))
+        elif choice == 14:
+            path = export_plans(v.state)
+            self.set_text(self.STATUS, tr("Saved to {path}").format(path=path)
+                          if path else tr("Could not save that on this computer."))
+        elif choice in (15, 16):
+            saved = v.toggle("long_history" if choice == 15 else "numbers")
+            self.set_text(self.STATUS, tr("Saved.") if saved else
+                          tr("Could not save that choice on this computer."))
         elif choice == 10:
             saved = v.toggle("name")
             self.set_text(self.STATUS, tr("Saved.") if saved else
@@ -4080,10 +4320,10 @@ sitio.""",
             'Enter',
         'Back to the last prompt':
             'Volver a la última pregunta',
-        'Choose 1 to 10, or Enter to go back > ':
-            'Elige del 1 al 10, o Enter para volver > ',
-        'Choose 1 to 10, m to list the options, or Enter to go back > ':
-            'Elige del 1 al 10, m para ver las opciones, o Enter para volver > ',
+        'Choose 1 to 11, or Enter to go back > ':
+            'Elige del 1 al 11, o Enter para volver > ',
+        'Choose 1 to 11, m to list the options, or Enter to go back > ':
+            'Elige del 1 al 11, m para ver las opciones, o Enter para volver > ',
         'The saved file could not be read just now, so this may be out of date.':
             'El archivo guardado no se pudo leer ahora, así que esto puede no estar al día.',
         'Type full to see the whole file, or Enter to go on > ':
@@ -4104,8 +4344,8 @@ sitio.""",
             'Listo. La idea y la sugerencia están activadas.',
         'Done. The thought and tip are off.':
             'Listo. La idea y la sugerencia están desactivadas.',
-        'Type 1 to 10, or press Enter to go back.':
-            'Escribe del 1 al 10, o pulsa Enter para volver.',
+        'Type 1 to 11, or press Enter to go back.':
+            'Escribe del 1 al 11, o pulsa Enter para volver.',
         'Want it to open once a day when you sign in? (y or n, Enter for not now) > ':
             '¿Quieres que se abra una vez al día al iniciar sesión? (s o n, Enter para más tarde) > ',
         'Want it to open once a day when you sign in so it can ask about your plan? (y or n, Enter for not now) > ':
@@ -4338,6 +4578,62 @@ sitio.""",
             'Listo. Cada día a las {at} llega un aviso si hay un plan sobre el que preguntar.',
         'Send feedback...':
             'Enviar comentarios...',
+        '"holidays" must be a list of at most {n} dates.':
+            '"holidays" debe ser una lista de {n} fechas como máximo.',
+        '"title" must be 1 to 40 characters of plain text, with no link or address.':
+            '"title" debe tener de 1 a 40 caracteres de texto simple, sin enlaces ni direcciones.',
+        '"{list}" must be a list of {low} to {high} lines.':
+            '"{list}" debe ser una lista de {low} a {high} líneas.',
+        "Can't read {path}: {error}":
+            'No se puede leer {path}: {error}',
+        'Could not save that on this computer.':
+            'No se pudo guardar en este equipo.',
+        'Days you opened hello-world: {n}':
+            'Días que abriste hello-world: {n}',
+        'Keep a longer history':
+            'Guardar un historial más largo',
+        'Keep my numbers':
+            'Guardar mis cifras',
+        'Longest run of days: {n}':
+            'Racha más larga de días: {n}',
+        "Mark today's plan done":
+            'Marcar como hecho el plan de hoy',
+        "Mark today's plan done (plans are turned off)":
+            'Marcar como hecho el plan de hoy (planes desactivados)',
+        'My numbers are off. Turn them on under Options, or with --set numbers on.':
+            'Tus cifras están desactivadas. Actívalas en Opciones o con --set numbers on.',
+        'My numbers...':
+            'Mis cifras...',
+        'Nothing finished yet this week. That is fine.':
+            'Esta semana aún no has terminado nada. No pasa nada.',
+        'OK: {thoughts} thoughts and {tips} tips.':
+            'Correcto: {thoughts} ideas y {tips} sugerencias.',
+        'Plans finished: {n}':
+            'Planes terminados: {n}',
+        'Save my plans to a file':
+            'Guardar mis planes en un archivo',
+        'Saved to {path}':
+            'Guardado en {path}',
+        "The file isn't valid JSON, or is over 200,000 characters.":
+            'El archivo no es JSON válido o pasa de 200.000 caracteres.',
+        'The file must hold an object with two lists, "thoughts" and "tips", and may add "holidays" and "title".':
+            'El archivo debe contener un objeto con dos listas, "thoughts" y "tips", y puede añadir "holidays" y "title".',
+        'This week you finished {n}:':
+            'Esta semana terminaste {n}:',
+        'This week...':
+            'Esta semana...',
+        'holidays line {line} is not a date like 2026-12-25.':
+            'La línea {line} de holidays no es una fecha como 2026-12-25.',
+        '{list} line {line} has a date.':
+            'La línea {line} de {list} tiene una fecha.',
+        '{list} line {line} has a link or an address.':
+            'La línea {line} de {list} tiene un enlace o una dirección.',
+        '{list} line {line} has control characters or extra spaces.':
+            'La línea {line} de {list} tiene caracteres de control o espacios de más.',
+        '{list} line {line} is not text.':
+            'La línea {line} de {list} no es texto.',
+        '{list} line {line} must be {low} to {high} characters long.':
+            'La línea {line} de {list} debe tener de {low} a {high} caracteres.',
     },
 }
 
@@ -4773,10 +5069,10 @@ Digite m para ver as opções de novo. Nada é enviado para lugar nenhum.""",
             'Enter',
         'Back to the last prompt':
             'Voltar à última pergunta',
-        'Choose 1 to 10, or Enter to go back > ':
-            'Escolha de 1 a 10, ou Enter para voltar > ',
-        'Choose 1 to 10, m to list the options, or Enter to go back > ':
-            'Escolha de 1 a 10, m para listar as opções, ou Enter para voltar > ',
+        'Choose 1 to 11, or Enter to go back > ':
+            'Escolha de 1 a 11, ou Enter para voltar > ',
+        'Choose 1 to 11, m to list the options, or Enter to go back > ':
+            'Escolha de 1 a 11, m para listar as opções, ou Enter para voltar > ',
         'The saved file could not be read just now, so this may be out of date.':
             'Não foi possível ler o arquivo salvo agora, então isto pode estar desatualizado.',
         'Type full to see the whole file, or Enter to go on > ':
@@ -4797,8 +5093,8 @@ Digite m para ver as opções de novo. Nada é enviado para lugar nenhum.""",
             'Concluído. O pensamento e a dica estão ativados.',
         'Done. The thought and tip are off.':
             'Concluído. O pensamento e a dica estão desativados.',
-        'Type 1 to 10, or press Enter to go back.':
-            'Digite de 1 a 10, ou pressione Enter para voltar.',
+        'Type 1 to 11, or press Enter to go back.':
+            'Digite de 1 a 11, ou pressione Enter para voltar.',
         'Want it to open once a day when you sign in? (y or n, Enter for not now) > ':
             'Quer que o hello-world abra uma vez por dia ao iniciar a sessão? (s ou n, Enter para agora não) > ',
         'Want it to open once a day when you sign in so it can ask about your plan? (y or n, Enter for not now) > ':
@@ -5031,6 +5327,62 @@ Digite m para ver as opções de novo. Nada é enviado para lugar nenhum.""",
             'Pronto. Todo dia às {at} aparece um lembrete se houver um plano para acompanhar.',
         'Send feedback...':
             'Enviar comentários...',
+        '"holidays" must be a list of at most {n} dates.':
+            '"holidays" deve ser uma lista de no máximo {n} datas.',
+        '"title" must be 1 to 40 characters of plain text, with no link or address.':
+            '"title" deve ter de 1 a 40 caracteres de texto simples, sem links nem endereços.',
+        '"{list}" must be a list of {low} to {high} lines.':
+            '"{list}" deve ser uma lista de {low} a {high} linhas.',
+        "Can't read {path}: {error}":
+            'Não é possível ler {path}: {error}',
+        'Could not save that on this computer.':
+            'Não foi possível salvar neste computador.',
+        'Days you opened hello-world: {n}':
+            'Dias em que você abriu o hello-world: {n}',
+        'Keep a longer history':
+            'Manter um histórico mais longo',
+        'Keep my numbers':
+            'Manter meus números',
+        'Longest run of days: {n}':
+            'Maior sequência de dias: {n}',
+        "Mark today's plan done":
+            'Marcar o plano de hoje como feito',
+        "Mark today's plan done (plans are turned off)":
+            'Marcar o plano de hoje como feito (planos desativados)',
+        'My numbers are off. Turn them on under Options, or with --set numbers on.':
+            'Seus números estão desativados. Ative em Opções ou com --set numbers on.',
+        'My numbers...':
+            'Meus números...',
+        'Nothing finished yet this week. That is fine.':
+            'Nada concluído ainda esta semana. Tudo bem.',
+        'OK: {thoughts} thoughts and {tips} tips.':
+            'OK: {thoughts} pensamentos e {tips} dicas.',
+        'Plans finished: {n}':
+            'Planos concluídos: {n}',
+        'Save my plans to a file':
+            'Salvar meus planos em um arquivo',
+        'Saved to {path}':
+            'Salvo em {path}',
+        "The file isn't valid JSON, or is over 200,000 characters.":
+            'O arquivo não é JSON válido ou tem mais de 200.000 caracteres.',
+        'The file must hold an object with two lists, "thoughts" and "tips", and may add "holidays" and "title".':
+            'O arquivo deve conter um objeto com duas listas, "thoughts" e "tips", e pode incluir "holidays" e "title".',
+        'This week you finished {n}:':
+            'Esta semana você concluiu {n}:',
+        'This week...':
+            'Esta semana...',
+        'holidays line {line} is not a date like 2026-12-25.':
+            'A linha {line} de holidays não é uma data como 2026-12-25.',
+        '{list} line {line} has a date.':
+            'A linha {line} de {list} tem uma data.',
+        '{list} line {line} has a link or an address.':
+            'A linha {line} de {list} tem um link ou um endereço.',
+        '{list} line {line} has control characters or extra spaces.':
+            'A linha {line} de {list} tem caracteres de controle ou espaços a mais.',
+        '{list} line {line} is not text.':
+            'A linha {line} de {list} não é texto.',
+        '{list} line {line} must be {low} to {high} characters long.':
+            'A linha {line} de {list} deve ter de {low} a {high} caracteres.',
     },
 }
 
@@ -5467,10 +5819,10 @@ Tapez m pour revoir les options. Rien n'est envoyé nulle part.""",
             'Entrée',
         'Back to the last prompt':
             'Revenir à la dernière question',
-        'Choose 1 to 10, or Enter to go back > ':
-            'Choisissez de 1 à 10, ou Entrée pour revenir > ',
-        'Choose 1 to 10, m to list the options, or Enter to go back > ':
-            'Choisissez de 1 à 10, m pour afficher les options, ou Entrée pour revenir > ',
+        'Choose 1 to 11, or Enter to go back > ':
+            'Choisissez de 1 à 11, ou Entrée pour revenir > ',
+        'Choose 1 to 11, m to list the options, or Enter to go back > ':
+            'Choisissez de 1 à 11, m pour afficher les options, ou Entrée pour revenir > ',
         'The saved file could not be read just now, so this may be out of date.':
             "Le fichier enregistré n'a pas pu être lu pour l'instant, ces informations ne sont donc peut-être pas à jour.",
         'Type full to see the whole file, or Enter to go on > ':
@@ -5491,8 +5843,8 @@ Tapez m pour revoir les options. Rien n'est envoyé nulle part.""",
             "C'est fait. La pensée et l'astuce sont activées.",
         'Done. The thought and tip are off.':
             "C'est fait. La pensée et l'astuce sont désactivées.",
-        'Type 1 to 10, or press Enter to go back.':
-            'Tapez un chiffre de 1 à 10, ou appuyez sur Entrée pour revenir.',
+        'Type 1 to 11, or press Enter to go back.':
+            'Tapez un chiffre de 1 à 11, ou appuyez sur Entrée pour revenir.',
         'Want it to open once a day when you sign in? (y or n, Enter for not now) > ':
             "Voulez-vous que hello-world s'ouvre une fois par jour à votre connexion ? (o ou n, Entrée pour plus tard) > ",
         'Want it to open once a day when you sign in so it can ask about your plan? (y or n, Enter for not now) > ':
@@ -5725,6 +6077,62 @@ Tapez m pour revoir les options. Rien n'est envoyé nulle part.""",
             "C'est fait. Un rappel s'affiche chaque jour à {at} s'il y a un plan à suivre.",
         'Send feedback...':
             'Envoyer un commentaire...',
+        '"holidays" must be a list of at most {n} dates.':
+            '"holidays" doit être une liste d\'au plus {n} dates.',
+        '"title" must be 1 to 40 characters of plain text, with no link or address.':
+            '"title" doit compter de 1 à 40 caractères de texte simple, sans lien ni adresse.',
+        '"{list}" must be a list of {low} to {high} lines.':
+            '"{list}" doit être une liste de {low} à {high} lignes.',
+        "Can't read {path}: {error}":
+            'Impossible de lire {path} : {error}',
+        'Could not save that on this computer.':
+            "Impossible d'enregistrer sur cet ordinateur.",
+        'Days you opened hello-world: {n}':
+            'Jours où vous avez ouvert hello-world : {n}',
+        'Keep a longer history':
+            'Garder un historique plus long',
+        'Keep my numbers':
+            'Garder mes chiffres',
+        'Longest run of days: {n}':
+            'Plus longue suite de jours : {n}',
+        "Mark today's plan done":
+            "Marquer le plan d'aujourd'hui comme fait",
+        "Mark today's plan done (plans are turned off)":
+            "Marquer le plan d'aujourd'hui comme fait (plans désactivés)",
+        'My numbers are off. Turn them on under Options, or with --set numbers on.':
+            'Vos chiffres sont désactivés. Activez-les sous Options ou avec --set numbers on.',
+        'My numbers...':
+            'Mes chiffres...',
+        'Nothing finished yet this week. That is fine.':
+            "Rien de terminé cette semaine pour l'instant. Ce n'est pas grave.",
+        'OK: {thoughts} thoughts and {tips} tips.':
+            'OK : {thoughts} pensées et {tips} astuces.',
+        'Plans finished: {n}':
+            'Plans terminés : {n}',
+        'Save my plans to a file':
+            'Enregistrer mes plans dans un fichier',
+        'Saved to {path}':
+            'Enregistré dans {path}',
+        "The file isn't valid JSON, or is over 200,000 characters.":
+            "Le fichier n'est pas du JSON valide ou dépasse 200 000 caractères.",
+        'The file must hold an object with two lists, "thoughts" and "tips", and may add "holidays" and "title".':
+            'Le fichier doit contenir un objet avec deux listes, "thoughts" et "tips", et peut ajouter "holidays" et "title".',
+        'This week you finished {n}:':
+            'Cette semaine, vous avez terminé {n} :',
+        'This week...':
+            'Cette semaine...',
+        'holidays line {line} is not a date like 2026-12-25.':
+            "La ligne {line} de holidays n'est pas une date comme 2026-12-25.",
+        '{list} line {line} has a date.':
+            'La ligne {line} de {list} contient une date.',
+        '{list} line {line} has a link or an address.':
+            'La ligne {line} de {list} contient un lien ou une adresse.',
+        '{list} line {line} has control characters or extra spaces.':
+            'La ligne {line} de {list} contient des caractères de contrôle ou des espaces en trop.',
+        '{list} line {line} is not text.':
+            "La ligne {line} de {list} n'est pas du texte.",
+        '{list} line {line} must be {low} to {high} characters long.':
+            'La ligne {line} de {list} doit compter de {low} à {high} caractères.',
     },
 }
 
@@ -6160,10 +6568,10 @@ irgendwohin gesendet.""",
             'Eingabetaste',
         'Back to the last prompt':
             'Zurück zur letzten Frage',
-        'Choose 1 to 10, or Enter to go back > ':
-            '1 bis 10 wählen oder Eingabetaste zum Zurückkehren > ',
-        'Choose 1 to 10, m to list the options, or Enter to go back > ':
-            '1 bis 10 wählen, m für die Optionen oder Eingabetaste zum Zurückkehren > ',
+        'Choose 1 to 11, or Enter to go back > ':
+            '1 bis 11 wählen oder Eingabetaste zum Zurückkehren > ',
+        'Choose 1 to 11, m to list the options, or Enter to go back > ':
+            '1 bis 11 wählen, m für die Optionen oder Eingabetaste zum Zurückkehren > ',
         'The saved file could not be read just now, so this may be out of date.':
             'Die gespeicherte Datei konnte gerade nicht gelesen werden, daher ist dies eventuell nicht aktuell.',
         'Type full to see the whole file, or Enter to go on > ':
@@ -6184,8 +6592,8 @@ irgendwohin gesendet.""",
             'Fertig. Gedanke und Tipp sind eingeschaltet.',
         'Done. The thought and tip are off.':
             'Fertig. Gedanke und Tipp sind ausgeschaltet.',
-        'Type 1 to 10, or press Enter to go back.':
-            'Geben Sie 1 bis 10 ein, oder drücken Sie die Eingabetaste, um zurückzukehren.',
+        'Type 1 to 11, or press Enter to go back.':
+            'Geben Sie 1 bis 11 ein, oder drücken Sie die Eingabetaste, um zurückzukehren.',
         'Want it to open once a day when you sign in? (y or n, Enter for not now) > ':
             'Soll sich hello-world einmal täglich bei der Anmeldung öffnen? (j oder n, Eingabetaste für später) > ',
         'Want it to open once a day when you sign in so it can ask about your plan? (y or n, Enter for not now) > ':
@@ -6418,6 +6826,62 @@ irgendwohin gesendet.""",
             'Fertig. Jeden Tag um {at} kommt eine Erinnerung, wenn es einen Plan zum Nachfragen gibt.',
         'Send feedback...':
             'Rückmeldung senden...',
+        '"holidays" must be a list of at most {n} dates.':
+            '"holidays" muss eine Liste mit höchstens {n} Daten sein.',
+        '"title" must be 1 to 40 characters of plain text, with no link or address.':
+            '"title" muss 1 bis 40 Zeichen einfacher Text sein, ohne Link oder Adresse.',
+        '"{list}" must be a list of {low} to {high} lines.':
+            '"{list}" muss eine Liste mit {low} bis {high} Zeilen sein.',
+        "Can't read {path}: {error}":
+            '{path} kann nicht gelesen werden: {error}',
+        'Could not save that on this computer.':
+            'Das konnte auf diesem Computer nicht gespeichert werden.',
+        'Days you opened hello-world: {n}':
+            'Tage, an denen Sie hello-world geöffnet haben: {n}',
+        'Keep a longer history':
+            'Längeren Verlauf behalten',
+        'Keep my numbers':
+            'Meine Zahlen behalten',
+        'Longest run of days: {n}':
+            'Längste Folge von Tagen: {n}',
+        "Mark today's plan done":
+            'Heutigen Plan als erledigt markieren',
+        "Mark today's plan done (plans are turned off)":
+            'Heutigen Plan als erledigt markieren (Pläne aus)',
+        'My numbers are off. Turn them on under Options, or with --set numbers on.':
+            'Ihre Zahlen sind aus. Schalten Sie sie unter Optionen oder mit --set numbers on ein.',
+        'My numbers...':
+            'Meine Zahlen...',
+        'Nothing finished yet this week. That is fine.':
+            'Diese Woche noch nichts erledigt. Das ist in Ordnung.',
+        'OK: {thoughts} thoughts and {tips} tips.':
+            'OK: {thoughts} Gedanken und {tips} Tipps.',
+        'Plans finished: {n}':
+            'Erledigte Pläne: {n}',
+        'Save my plans to a file':
+            'Meine Pläne in einer Datei speichern',
+        'Saved to {path}':
+            'Gespeichert in {path}',
+        "The file isn't valid JSON, or is over 200,000 characters.":
+            'Die Datei ist kein gültiges JSON oder hat mehr als 200.000 Zeichen.',
+        'The file must hold an object with two lists, "thoughts" and "tips", and may add "holidays" and "title".':
+            'Die Datei muss ein Objekt mit zwei Listen enthalten, "thoughts" und "tips", und darf "holidays" und "title" ergänzen.',
+        'This week you finished {n}:':
+            'Diese Woche haben Sie {n} erledigt:',
+        'This week...':
+            'Diese Woche...',
+        'holidays line {line} is not a date like 2026-12-25.':
+            'Zeile {line} von holidays ist kein Datum wie 2026-12-25.',
+        '{list} line {line} has a date.':
+            'Zeile {line} von {list} enthält ein Datum.',
+        '{list} line {line} has a link or an address.':
+            'Zeile {line} von {list} enthält einen Link oder eine Adresse.',
+        '{list} line {line} has control characters or extra spaces.':
+            'Zeile {line} von {list} enthält Steuerzeichen oder zu viele Leerzeichen.',
+        '{list} line {line} is not text.':
+            'Zeile {line} von {list} ist kein Text.',
+        '{list} line {line} must be {low} to {high} characters long.':
+            'Zeile {line} von {list} muss {low} bis {high} Zeichen lang sein.',
     },
 }
 
