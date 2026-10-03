@@ -25,7 +25,10 @@ so you can compare notes with a coworker.
 
 If Windows is set to Spanish, French, Portuguese or German, hello-world
 speaks that language. The words you type work in every language, so `done`,
-`hecho`, `fait`, `feito` and `erledigt` all mark a plan done.
+`hecho`, `fait`, `feito` and `erledigt` all mark a plan done. One-letter
+answers are the exception: `s` means yes only in Spanish and Portuguese, `o`
+only in French and `j` only in German, so a stray key in English never
+finishes a plan.
 
 At the last prompt:
 
@@ -38,13 +41,15 @@ At the last prompt:
 - Type `menu` (or `m`) for the options: see what is saved, open once a day at
   sign-in, hide the days-in-a-row message, delete everything, help, set today's plan,
   forget one finished plan, and hide the thought and tip. The options are read
-  once; type `m` to hear them again. Enter at the menu goes back.
+  once; type `m` to hear them again. Enter at the menu goes back. Typing
+  `menu` at the plan question opens the menu too.
 
 `q` closes the window from any question, the menu included, and today's visit
 still counts. So do `x` and `close`.
 
 If you don't type `done`, the next visit asks "Did you do it?". A yes is
-counted on the spot. If the plan is more than a day old, it lists the days
+counted on the spot, and `ok`, `sure`, `did it` and `finished` are yes
+too; `nah` and `not really` are "not yet". If the plan is more than a day old, it lists the days
 since and you pick one by number. "Not yet" lets you keep the plan for today, as many days as you
 need. Press Enter to skip the question; after two skips it stops asking and
 shows the plan as still open, and `done` still works. A plan first set more
@@ -130,7 +135,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.26.0'
+$tag = 'v1.27.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

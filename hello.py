@@ -375,7 +375,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.26.0"
+VERSION = "1.27.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -384,13 +384,19 @@ MAX_FILE = 1_000_000
 # language changes needs no retraining.
 DONE_WORDS = ("done", "hecho", "listo", "fait", "feito", "erledigt")
 # The sign-in offer starts something, so a stray "done" must not count.
-STRICT_YES = ("y", "yes", "yep", "ya", "yeah", "s", "si", "sí", "sim", "o",
-              "oui", "j", "ja")
-YES = STRICT_YES + DONE_WORDS
+STRICT_YES = ("y", "yes", "yep", "ya", "yeah", "yup", "ok", "okay", "sure",
+              "si", "sí", "vale", "sim", "claro", "oui", "d'accord", "ja",
+              "klar")
+# One-letter yes words work only in their own language: in English, s or o
+# is a slip or "skip", and must not finish a plan.
+LETTER_YES = {"es": ("s",), "pt": ("s",), "fr": ("o",), "de": ("j",)}
+# Natural ways to say a plan is finished, for "Did you do it?" only.
+DID_WORDS = ("did it", "i did", "i did it", "done it", "finished", "lo hice",
+             "terminé", "fiz", "geschafft")
 NOT_YET = ("not yet", "todavía no", "aún no", "aun no", "pas encore",
            "ainda não", "ainda nao", "noch nicht")
-NO_WORDS = ("n", "no", "nope", "non", "não", "nao", "nein")
-NO = NO_WORDS + NOT_YET
+NO_WORDS = ("n", "no", "nope", "nah", "non", "não", "nao", "nein")
+NO = NO_WORDS + NOT_YET + ("not really", "not done")
 MAX_OFFER_SKIPS = 1
 NO_THANKS = NO_WORDS + ("no thanks", "never", "stop", "no gracias", "nunca",
                   "non merci", "jamais", "não obrigado", "nein danke", "nie")
@@ -875,8 +881,13 @@ def ask(prompt):
         return None
 
 
+def strict_yes():
+    """Yes words, with the one-letter yes of the person's language."""
+    return STRICT_YES + LETTER_YES.get(language(), ())
+
+
 def is_yes(text):
-    return (text or "").lower().strip(TRIM) in YES
+    return (text or "").lower().strip(TRIM) in strict_yes() + DONE_WORDS + DID_WORDS
 
 
 def is_no(text):
@@ -888,7 +899,7 @@ def not_a_choice(word, choices):
     shown = tidy(word)
     if len(shown) > 30:
         shown = shown[:30] + "..."
-    say(tr('That was not one of the choices: "{shown}".').format(shown=shown)
+    say(tr('Sorry, "{shown}" is not one of the choices.').format(shown=shown)
         + " " + choices)
 
 
@@ -1095,7 +1106,7 @@ def reset(state):
     answer = ask(tr("Delete all saved notes, dates and plans on this "
                     "computer? (y or n, Enter to cancel) > "))
     word = (answer or "").lower().strip(TRIM)
-    if word not in STRICT_YES:
+    if word not in strict_yes():
         say(tr("Nothing was deleted."))
         if word in QUIT_WORDS:
             raise Quit
@@ -1315,6 +1326,12 @@ def is_command(text, again=None):
         para(tr("That looks like a command, not a plan, so nothing was saved.")
              + " " + (again or tr("Type plan at the last prompt to set one.")))
         return True
+    # A menu number typed one question too early, or a stray key.
+    if word and not any(c.isalpha() for c in word) and all(
+            c.isdigit() or c.isspace() or unicodedata.category(c).startswith("P")
+            for c in word):
+        para(tr("A plan needs a word or two, so nothing was saved."))
+        return True
     return False
 
 
@@ -1435,7 +1452,7 @@ def forget_finished(state, can_save):
     also_same = state.get("previous") == item["text"] and ask_choice(
         tr("Also forget it as the earlier plan for same? "
            "(y or n, Enter to keep it for same) > "),
-        STRICT_YES, NO_WORDS,
+        strict_yes(), NO_WORDS,
         tr("Type y or n, or press Enter to keep it for same.")) == "yes"
     refresh(state, can_save)
     if item not in state.get("finished", []):
@@ -1584,7 +1601,7 @@ def offer_reminder(state, can_save, planned=False):
         if plans_off() else
         tr("Want it to open once a day when you sign in so it can ask about "
            "your plan? (y or n, Enter for not now) > "),
-        STRICT_YES, NO_THANKS,
+        strict_yes(), NO_THANKS,
         tr("Type y or n, or press Enter for not now."))
     if answer is None:
         say(tr("That was not understood. It will ask again on a later visit."))
@@ -1736,10 +1753,11 @@ def daily(startup):
                               "thing to try, the same for everyone."))
         if not plans_off():
             welcome.append(tr("If you type a plan, it asks next time how it "
-                              "went. Notes stay in your user folder and it "
-                              "sends nothing anywhere, but IT staff could read "
-                              "them, so skip private details."))
-        welcome.append(tr("Type menu at the last prompt for the options."))
+                              "went. Your notes stay on this computer and are "
+                              "never sent anywhere. Like any work file they "
+                              "are not secret, so keep them to everyday "
+                              "tasks."))
+        welcome.append(tr("Type menu at the end for the options."))
         para(" ".join(welcome))
         say()
     elif not seen_today:
@@ -1756,6 +1774,7 @@ def daily(startup):
             say()
 
     quitting = False
+    wants_menu = False
     try:
         # Asked until it is answered, also on a second open the same day,
         # but two skips mean "stop asking"; the plan then shows as still open.
@@ -1764,7 +1783,8 @@ def daily(startup):
             say(wrapped(tr("Last time you planned: "), intent["text"]))
             answer = ask_choice(
                 tr("Did you do it? (y for yes, n for not yet, Enter to skip) > "),
-                YES, NO, tr("Type y or n, or press Enter to skip."))
+                strict_yes() + DONE_WORDS + DID_WORDS, NO,
+                tr("Type y or n, or press Enter to skip."))
             if answer == "yes":
                 answered = True
                 when = finish_day(datetime.date.fromisoformat(intent["date"]), d)
@@ -1788,7 +1808,7 @@ def daily(startup):
                 keep = ask_choice(
                     tr("That is fine. Keep it for today? (y or n, Enter to "
                        "keep it) > "),
-                    STRICT_YES + NOT_YET, NO_WORDS,
+                    strict_yes() + NOT_YET, NO_WORDS,
                     tr("Type y to keep it, n to clear it, or press Enter to "
                        "keep it."))
                 if keep == "no":
@@ -1834,11 +1854,11 @@ def daily(startup):
             question = (tr("What is one thing you want to get done today?")
                         + "\n" + skip + " > ")
             text = ask(question)
-            # The welcome mentions the menu, so someone may type it here first.
+            # The welcome mentions the menu, so someone may type it here
+            # first. It opens, rather than being told where it lives.
             if (text or "").lower().strip(TRIM) in MENU_WORDS + HELP_WORDS:
-                para(tr("The menu comes at the last prompt, after this question. "
-                        "Type menu there."))
-                text = ask(question)
+                wants_menu = True
+                text = ""
             if (text or "").lower().strip(TRIM) in QUIT_WORDS:
                 raise Quit
             if is_same(text) and not state.get("previous"):
@@ -1877,7 +1897,7 @@ def daily(startup):
                 para(tr(SAVED_PLAN))
                 nudge_if_several(intent["text"])
                 say()
-            if not seen_today and not quitting:
+            if not seen_today and not quitting and not wants_menu:
                 try:
                     offer_reminder(state, can_save, planned=typed_new)
                 except Quit:
@@ -1891,19 +1911,24 @@ def daily(startup):
     # A message at the very end must stay on screen until the person has read
     # it, because the window closes as soon as the program exits.
     try:
-        last_prompt(state, can_save, intent, person, d, iso)
+        last_prompt(state, can_save, intent, person, d, iso, wants_menu)
     except Quit:
         say(tr("Closing."))
 
 
-def last_prompt(state, can_save, intent, person, d, iso):
+def last_prompt(state, can_save, intent, person, d, iso, open_menu=False):
     """Loop at the last prompt until the person closes the window."""
+    if open_menu:
+        menu(state, can_save, iso)
+        intent = state["intent"]
     while True:
         planned = bool(intent and person and state["intent"] is intent)
-        prompt = (tr("Type menu or q, or Enter to close > ") if plans_off() else
-                  tr("Type done, plan, menu or q, or Enter to close > ")
+        # q, x and the other close words still work; naming them only
+        # added a letter nobody could guess the meaning of.
+        prompt = (tr("Type menu, or Enter to close > ") if plans_off() else
+                  tr("Type done, plan or menu, or Enter to close > ")
                   if planned else
-                  tr("Type plan, menu or q, or Enter to close > "))
+                  tr("Type plan or menu, or Enter to close > "))
         answer = (ask(prompt) or "").lower().strip(TRIM)
         if answer in DONE_WORDS + PLAN_WORDS and plans_off():
             say(tr("Plans are turned off by your organization."))
@@ -1928,10 +1953,10 @@ def last_prompt(state, can_save, intent, person, d, iso):
         elif answer in QUIT_WORDS:
             pass
         elif answer:
-            not_a_choice(answer, tr("Type done, plan, menu or q, or press "
+            not_a_choice(answer, tr("Type done, plan or menu, or press "
                                     "Enter to close.")
                          if planned else
-                         tr("Type plan, menu or q, or press Enter to close."))
+                         tr("Type plan or menu, or press Enter to close."))
             continue
         break
 
@@ -2330,8 +2355,10 @@ sitio.""",
             'Copia de seguridad: ',
         'In the folder: ':
             'En la carpeta: ',
-        'That was not one of the choices: "{shown}".':
-            'No es una de las opciones: "{shown}".',
+        'Sorry, "{shown}" is not one of the choices.':
+            'Perdona, "{shown}" no es una de las opciones.',
+        'A plan needs a word or two, so nothing was saved.':
+            'Un plan necesita una o dos palabras, así que no se guardó nada.',
         'The sign-in reminder works on Windows only.':
             'El aviso al iniciar sesión solo funciona en Windows.',
         'Your organization has turned off opening at sign-in.':
@@ -2552,10 +2579,10 @@ sitio.""",
             'Te damos la bienvenida.',
         'Each day you get one thought and one small thing to try, the same for everyone.':
             'Cada día verás una idea y algo sencillo que probar, igual para todo el mundo.',
-        'If you type a plan, it asks next time how it went. Notes stay in your user folder and it sends nothing anywhere, but IT staff could read them, so skip private details.':
-            'Si escribes un plan, la próxima vez te pregunta cómo fue. Las notas se quedan en tu carpeta de usuario y no se envía nada a ningún sitio, pero el personal de TI podría leerlas, así que no escribas datos privados.',
-        'Type menu at the last prompt for the options.':
-            'Escribe menú en la última pregunta para ver las opciones.',
+        'If you type a plan, it asks next time how it went. Your notes stay on this computer and are never sent anywhere. Like any work file they are not secret, so keep them to everyday tasks.':
+            'Si escribes un plan, la próxima vez te pregunta cómo fue. Tus notas se quedan en este equipo y nunca se envían a ningún sitio. Como cualquier archivo del trabajo, no son secretas, así que úsalas solo para tareas del día a día.',
+        'Type menu at the end for the options.':
+            'Escribe menú al final para ver las opciones.',
         'Welcome back. Glad you are here.':
             'Qué bien verte de nuevo.',
         'You have opened this {row} times in a row. Nice to see you.':
@@ -2596,22 +2623,20 @@ sitio.""",
             '(Escribe repetir para usarlo, o Enter para saltar)',
         'What is one thing you want to get done today?':
             '¿Qué cosa quieres terminar hoy?',
-        'The menu comes at the last prompt, after this question. Type menu there.':
-            'El menú está en la última pregunta, después de esta. Escribe menú allí.',
         'There is no earlier plan to reuse yet. Nothing was saved.':
             'Todavía no hay un plan anterior para repetir. No se guardó nada.',
         'Your notes could not be saved on this computer. This screen still works.':
             'Tus notas no se pudieron guardar en este equipo. Esta pantalla sigue funcionando.',
-        'Type menu or q, or Enter to close > ':
-            'Escribe menú o q, o Enter para cerrar > ',
-        'Type done, plan, menu or q, or Enter to close > ':
-            'Escribe hecho, plan, menú o q, o Enter para cerrar > ',
-        'Type plan, menu or q, or Enter to close > ':
-            'Escribe plan, menú o q, o Enter para cerrar > ',
-        'Type done, plan, menu or q, or press Enter to close.':
-            'Escribe hecho, plan, menú o q, o pulsa Enter para cerrar.',
-        'Type plan, menu or q, or press Enter to close.':
-            'Escribe plan, menú o q, o pulsa Enter para cerrar.',
+        'Type menu, or Enter to close > ':
+            'Escribe menú, o Enter para cerrar > ',
+        'Type done, plan or menu, or Enter to close > ':
+            'Escribe hecho, plan o menú, o Enter para cerrar > ',
+        'Type plan or menu, or Enter to close > ':
+            'Escribe plan o menú, o Enter para cerrar > ',
+        'Type done, plan or menu, or press Enter to close.':
+            'Escribe hecho, plan o menú, o pulsa Enter para cerrar.',
+        'Type plan or menu, or press Enter to close.':
+            'Escribe plan o menú, o pulsa Enter para cerrar.',
         "The saved file can't be read right now, or it is damaged.":
             'El archivo guardado no se puede leer ahora, o está dañado.',
         'Nothing was changed. Saved in: ':
@@ -2897,8 +2922,10 @@ Digite m para ver as opções de novo. Nada é enviado para lugar nenhum.""",
             'Cópia de segurança: ',
         'In the folder: ':
             'Na pasta: ',
-        'That was not one of the choices: "{shown}".':
-            'Essa não era uma das opções: "{shown}".',
+        'Sorry, "{shown}" is not one of the choices.':
+            'Desculpe, "{shown}" não é uma das opções.',
+        'A plan needs a word or two, so nothing was saved.':
+            'Um plano precisa de uma ou duas palavras, então nada foi salvo.',
         'The sign-in reminder works on Windows only.':
             'O lembrete ao iniciar a sessão só funciona no Windows.',
         'Your organization has turned off opening at sign-in.':
@@ -3119,10 +3146,10 @@ Digite m para ver as opções de novo. Nada é enviado para lugar nenhum.""",
             'Boas-vindas.',
         'Each day you get one thought and one small thing to try, the same for everyone.':
             'Todo dia você recebe um pensamento e algo simples para experimentar, iguais para todas as pessoas.',
-        'If you type a plan, it asks next time how it went. Notes stay in your user folder and it sends nothing anywhere, but IT staff could read them, so skip private details.':
-            'Se você digitar um plano, na próxima vez ele pergunta como foi. As notas ficam na sua pasta de usuário e nada é enviado para lugar nenhum, mas a equipe de TI poderia lê-las, então não escreva detalhes pessoais.',
-        'Type menu at the last prompt for the options.':
-            'Digite menu na última pergunta para ver as opções.',
+        'If you type a plan, it asks next time how it went. Your notes stay on this computer and are never sent anywhere. Like any work file they are not secret, so keep them to everyday tasks.':
+            'Se você digitar um plano, na próxima vez ele pergunta como foi. Suas notas ficam neste computador e nunca são enviadas para lugar nenhum. Como qualquer arquivo de trabalho, elas não são secretas, então use-as só para tarefas do dia a dia.',
+        'Type menu at the end for the options.':
+            'Digite menu no final para ver as opções.',
         'Welcome back. Glad you are here.':
             'Olá de novo. Que bom ter você aqui.',
         'You have opened this {row} times in a row. Nice to see you.':
@@ -3163,22 +3190,20 @@ Digite m para ver as opções de novo. Nada é enviado para lugar nenhum.""",
             '(Digite repetir para usá-lo de novo, ou Enter para pular)',
         'What is one thing you want to get done today?':
             'Que tarefa você quer concluir hoje? Basta uma.',
-        'The menu comes at the last prompt, after this question. Type menu there.':
-            'O menu fica na última pergunta, depois desta. Digite menu lá.',
         'There is no earlier plan to reuse yet. Nothing was saved.':
             'Ainda não há um plano anterior para repetir. Nada foi salvo.',
         'Your notes could not be saved on this computer. This screen still works.':
             'Não foi possível salvar as suas notas neste computador. Esta tela continua funcionando.',
-        'Type menu or q, or Enter to close > ':
-            'Digite menu ou q, ou Enter para fechar > ',
-        'Type done, plan, menu or q, or Enter to close > ':
-            'Digite feito, plano, menu ou q, ou Enter para fechar > ',
-        'Type plan, menu or q, or Enter to close > ':
-            'Digite plano, menu ou q, ou Enter para fechar > ',
-        'Type done, plan, menu or q, or press Enter to close.':
-            'Digite feito, plano, menu ou q, ou pressione Enter para fechar.',
-        'Type plan, menu or q, or press Enter to close.':
-            'Digite plano, menu ou q, ou pressione Enter para fechar.',
+        'Type menu, or Enter to close > ':
+            'Digite menu, ou Enter para fechar > ',
+        'Type done, plan or menu, or Enter to close > ':
+            'Digite feito, plano ou menu, ou Enter para fechar > ',
+        'Type plan or menu, or Enter to close > ':
+            'Digite plano ou menu, ou Enter para fechar > ',
+        'Type done, plan or menu, or press Enter to close.':
+            'Digite feito, plano ou menu, ou pressione Enter para fechar.',
+        'Type plan or menu, or press Enter to close.':
+            'Digite plano ou menu, ou pressione Enter para fechar.',
         "The saved file can't be read right now, or it is damaged.":
             'Não é possível ler o arquivo salvo agora, ou ele está danificado.',
         'Nothing was changed. Saved in: ':
@@ -3465,8 +3490,10 @@ Tapez m pour revoir les options. Rien n'est envoyé nulle part.""",
             'Copie de sauvegarde : ',
         'In the folder: ':
             'Dans le dossier : ',
-        'That was not one of the choices: "{shown}".':
-            '« {shown} » ne fait pas partie des choix.',
+        'Sorry, "{shown}" is not one of the choices.':
+            'Pardon, « {shown} » ne fait pas partie des choix.',
+        'A plan needs a word or two, so nothing was saved.':
+            "Un plan a besoin d'un mot ou deux, donc rien n'a été enregistré.",
         'The sign-in reminder works on Windows only.':
             'Le rappel à la connexion fonctionne uniquement sous Windows.',
         'Your organization has turned off opening at sign-in.':
@@ -3687,10 +3714,10 @@ Tapez m pour revoir les options. Rien n'est envoyé nulle part.""",
             'Bienvenue.',
         'Each day you get one thought and one small thing to try, the same for everyone.':
             'Chaque jour, vous recevez une pensée et une petite chose à essayer, les mêmes pour tout le monde.',
-        'If you type a plan, it asks next time how it went. Notes stay in your user folder and it sends nothing anywhere, but IT staff could read them, so skip private details.':
-            "Si vous tapez un plan, la prochaine fois on vous demandera comment ça s'est passé. Les notes restent dans votre dossier utilisateur et rien n'est envoyé nulle part, mais le personnel informatique pourrait les lire : évitez les détails privés.",
-        'Type menu at the last prompt for the options.':
-            'Tapez menu à la dernière question pour voir les options.',
+        'If you type a plan, it asks next time how it went. Your notes stay on this computer and are never sent anywhere. Like any work file they are not secret, so keep them to everyday tasks.':
+            "Si vous tapez un plan, la prochaine fois on vous demandera comment ça s'est passé. Vos notes restent sur cet ordinateur et ne sont jamais envoyées nulle part. Comme tout fichier de travail, elles ne sont pas secrètes : tenez-vous-en aux tâches courantes.",
+        'Type menu at the end for the options.':
+            'Tapez menu à la fin pour voir les options.',
         'Welcome back. Glad you are here.':
             'Bon retour parmi nous. Ça fait plaisir de vous revoir.',
         'You have opened this {row} times in a row. Nice to see you.':
@@ -3731,22 +3758,20 @@ Tapez m pour revoir les options. Rien n'est envoyé nulle part.""",
             '(Tapez reprendre pour le réutiliser, ou Entrée pour passer)',
         'What is one thing you want to get done today?':
             "Quelle tâche voulez-vous accomplir aujourd'hui ?",
-        'The menu comes at the last prompt, after this question. Type menu there.':
-            'Le menu est proposé à la dernière question, après celle-ci. Tapez menu à ce moment-là.',
         'There is no earlier plan to reuse yet. Nothing was saved.':
             "Pas encore de plan antérieur à reprendre. Rien n'a été enregistré.",
         'Your notes could not be saved on this computer. This screen still works.':
             "Vos notes n'ont pas pu être enregistrées sur cet ordinateur. Cet écran fonctionne quand même.",
-        'Type menu or q, or Enter to close > ':
-            'Tapez menu ou q, ou Entrée pour fermer > ',
-        'Type done, plan, menu or q, or Enter to close > ':
-            'Tapez fait, plan, menu ou q, ou Entrée pour fermer > ',
-        'Type plan, menu or q, or Enter to close > ':
-            'Tapez plan, menu ou q, ou Entrée pour fermer > ',
-        'Type done, plan, menu or q, or press Enter to close.':
-            'Tapez fait, plan, menu ou q, ou appuyez sur Entrée pour fermer.',
-        'Type plan, menu or q, or press Enter to close.':
-            'Tapez plan, menu ou q, ou appuyez sur Entrée pour fermer.',
+        'Type menu, or Enter to close > ':
+            'Tapez menu, ou Entrée pour fermer > ',
+        'Type done, plan or menu, or Enter to close > ':
+            'Tapez fait, plan ou menu, ou Entrée pour fermer > ',
+        'Type plan or menu, or Enter to close > ':
+            'Tapez plan ou menu, ou Entrée pour fermer > ',
+        'Type done, plan or menu, or press Enter to close.':
+            'Tapez fait, plan ou menu, ou appuyez sur Entrée pour fermer.',
+        'Type plan or menu, or press Enter to close.':
+            'Tapez plan ou menu, ou appuyez sur Entrée pour fermer.',
         "The saved file can't be read right now, or it is damaged.":
             "Le fichier enregistré est illisible pour l'instant, ou endommagé.",
         'Nothing was changed. Saved in: ':
@@ -4032,8 +4057,10 @@ irgendwohin gesendet.""",
             'Sicherungskopie: ',
         'In the folder: ':
             'Im Ordner: ',
-        'That was not one of the choices: "{shown}".':
-            'Das war keine der Möglichkeiten: „{shown}“.',
+        'Sorry, "{shown}" is not one of the choices.':
+            'Entschuldigung, „{shown}“ ist keine der Möglichkeiten.',
+        'A plan needs a word or two, so nothing was saved.':
+            'Ein Plan braucht ein oder zwei Wörter, daher wurde nichts gespeichert.',
         'The sign-in reminder works on Windows only.':
             'Die Erinnerung bei der Anmeldung funktioniert nur unter Windows.',
         'Your organization has turned off opening at sign-in.':
@@ -4254,10 +4281,10 @@ irgendwohin gesendet.""",
             'Willkommen.',
         'Each day you get one thought and one small thing to try, the same for everyone.':
             'Jeden Tag gibt es einen Gedanken und einen kleinen Tipp, für alle gleich.',
-        'If you type a plan, it asks next time how it went. Notes stay in your user folder and it sends nothing anywhere, but IT staff could read them, so skip private details.':
-            'Wenn Sie einen Plan eingeben, fragt hello-world beim nächsten Mal, wie es lief. Notizen bleiben in Ihrem Benutzerordner und es wird nichts gesendet, aber die IT-Abteilung könnte sie lesen. Lassen Sie private Details also weg.',
-        'Type menu at the last prompt for the options.':
-            'Geben Sie bei der letzten Frage „menü“ ein, um die Optionen zu sehen.',
+        'If you type a plan, it asks next time how it went. Your notes stay on this computer and are never sent anywhere. Like any work file they are not secret, so keep them to everyday tasks.':
+            'Wenn Sie einen Plan eingeben, fragt hello-world beim nächsten Mal, wie es lief. Ihre Notizen bleiben auf diesem Computer und werden nie gesendet. Wie jede Arbeitsdatei sind sie nicht geheim, also bleiben Sie bei alltäglichen Aufgaben.',
+        'Type menu at the end for the options.':
+            'Geben Sie am Ende „menü“ ein, um die Optionen zu sehen.',
         'Welcome back. Glad you are here.':
             'Willkommen zurück. Schön, dass Sie da sind.',
         'You have opened this {row} times in a row. Nice to see you.':
@@ -4298,22 +4325,20 @@ irgendwohin gesendet.""",
             '(Mit „wieder“ übernehmen, oder Eingabetaste zum Überspringen)',
         'What is one thing you want to get done today?':
             'Was möchten Sie heute erledigen? Eine Sache genügt.',
-        'The menu comes at the last prompt, after this question. Type menu there.':
-            'Das Menü gibt es bei der letzten Frage, nach dieser hier. Geben Sie dort „menü“ ein.',
         'There is no earlier plan to reuse yet. Nothing was saved.':
             'Es gibt noch keinen früheren Plan. Es wurde nichts gespeichert.',
         'Your notes could not be saved on this computer. This screen still works.':
             'Ihre Notizen konnten auf diesem Computer nicht gespeichert werden. Diese Anzeige funktioniert trotzdem.',
-        'Type menu or q, or Enter to close > ':
-            '„menü“ oder q eingeben, oder Eingabetaste zum Schließen > ',
-        'Type done, plan, menu or q, or Enter to close > ':
-            '„erledigt“, „plan“, „menü“ oder q eingeben, oder Eingabetaste zum Schließen > ',
-        'Type plan, menu or q, or Enter to close > ':
-            '„plan“, „menü“ oder q eingeben, oder Eingabetaste zum Schließen > ',
-        'Type done, plan, menu or q, or press Enter to close.':
-            'Geben Sie „erledigt“, „plan“, „menü“ oder q ein, oder drücken Sie die Eingabetaste zum Schließen.',
-        'Type plan, menu or q, or press Enter to close.':
-            'Geben Sie „plan“, „menü“ oder q ein, oder drücken Sie die Eingabetaste zum Schließen.',
+        'Type menu, or Enter to close > ':
+            '„menü“ eingeben, oder Eingabetaste zum Schließen > ',
+        'Type done, plan or menu, or Enter to close > ':
+            '„erledigt“, „plan“ oder „menü“ eingeben, oder Eingabetaste zum Schließen > ',
+        'Type plan or menu, or Enter to close > ':
+            '„plan“ oder „menü“ eingeben, oder Eingabetaste zum Schließen > ',
+        'Type done, plan or menu, or press Enter to close.':
+            'Geben Sie „erledigt“, „plan“ oder „menü“ ein, oder drücken Sie die Eingabetaste zum Schließen.',
+        'Type plan or menu, or press Enter to close.':
+            'Geben Sie „plan“ oder „menü“ ein, oder drücken Sie die Eingabetaste zum Schließen.',
         "The saved file can't be read right now, or it is damaged.":
             'Die gespeicherte Datei ist gerade nicht lesbar oder beschädigt.',
         'Nothing was changed. Saved in: ':
