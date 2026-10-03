@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-10-03: several things in one plan, and nothing declined
+
+Version 1.30.0. The owner set a new rule for this project: nothing is declined. Every idea from a review, a pilot or the owner gets built, and anything that touches privacy or safety is built as an opt-in setting or policy that keeps the safe default. `BACKLOG.md`, the list of declined ideas, is gone. Its items are the build queue in `TODO.md`, and its "turned out wrong" notes are under "Checked and already fine" there. This round builds the pilot's asks first.
+
+- A plan can be a few things with `;` between them: "Call Ana; send the report". Rafael typed "1) ... 2) ... 3)" into one line all week. Each thing is finished on its own and gets its own line in the finished list and its own done.
+- Partly done. The window shows a tick box for each thing in yesterday's plan; Done finishes the ticked ones and keeps the rest for today, saying "The rest is kept for today." With none ticked, Done means all. The text screen lists them by number, and `1 3` finishes the first and third. (Priya, Rafael)
+- The window's empty status line says "A few things? Put ; between them." `;` doesn't get the "more than one thing" note, since the list is on purpose. A plan can be 200 characters, up from 120, to fit a short list.
+- The notification has Skip as well as Done and Not yet. (Priya)
+- Reaching the length limit in the box says "A plan can be up to 200 characters." instead of just stopping. (Tom)
+- Delete everything keeps the person's settings (the days-in-a-row message, the thought and tip, window or text screen, the reminder question and the language) and says "Your settings were kept." (Mónica)
+- A language other than the Windows one, per person: Options > Language in the window, or menu option 10 in the text screen. Each language is listed in its own words. `ForceEnglish` still wins. The menu prompts say 1 to 10.
+- Pressing Ctrl+C twice within two seconds closes the text screen. Once still skips the question.
+
+Every new string is translated into Spanish, French, Portuguese and German; one French and one Portuguese line were shortened to fit 72 columns.
+
+Tests: splitting a plan, finishing some parts from the text screen and the window, all of them, a wrong answer, Skip on the notification, settings kept through delete, choosing a language and `ForceEnglish` over it, and Ctrl+C once and twice. 220 run here on Windows with Python 3.13: 218 pass and 2 are POSIX-only. The window with three tick boxes, one with `&` in it, was drawn and checked.
+
 ## 2026-10-03: a simulated week with five people, twice
 
 Version 1.29.0. The owner's assistive technology checks of the window and the notification passed: Narrator, NVDA, JAWS, Magnifier at 200 percent and high contrast. The native speaker review of the translations passed too. Both are recorded in `docs/ACCESSIBILITY.md`. The owner then asked for five employees simulated by fresh agents, each with only a persona and a tool that drives the real window: a warehouse shift lead on a shared PC, an accounts receivable analyst in Portuguese, a support agent with ADHD, an HR coordinator in Spanish who checks privacy, and a developer who pokes at everything. Each ran a work week, then all five ran it again on the fixes. `docs/PILOT.md` has who found what.

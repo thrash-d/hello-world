@@ -377,7 +377,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.29.0"
+VERSION = "1.30.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -425,6 +425,8 @@ SHOWN = None
 CLOSE_WINDOW_AFTER = None
 # True while the window runs, so nothing waits for typed input.
 WINDOW = False
+# When Ctrl+C last skipped a question, for "twice in a row closes".
+INTERRUPTED = 0.0
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 # Where the reminder's name and its answer links are registered for the user.
 CLASSES_KEY = r"Software\Classes"
@@ -538,11 +540,17 @@ def launcher_on():
     return False
 
 
+# Choices, not notes: Delete everything keeps them.
+SETTINGS = ("streak", "tips", "text", "offered", "offer_skips", "lang")
+
+
 def new_state():
     return {"visits": [], "intent": None, "streak": False}
 
 
-MAX_PLAN = 120
+MAX_PLAN = 200
+# A plan can be a few things with ; between them, each finished on its own.
+MAX_PARTS = 5
 SAVED_PLAN = "Saved. Type done when you finish it, or it asks next time you open this."
 MAX_FINISHED = 7
 SHOWN_AFTER_DONE = 3
@@ -551,6 +559,11 @@ SHOWN_AFTER_DONE = 3
 # Windows primary language IDs, for the translations at the end of this file.
 WINDOWS_LANGUAGES = {0x0A: "es", 0x0C: "fr", 0x16: "pt", 0x07: "de"}
 LANGUAGES = {}
+# Each in its own language, so anyone can find theirs.
+LANGUAGE_NAMES = {"en": "English", "es": "Español", "fr": "Français",
+                  "pt": "Português", "de": "Deutsch"}
+# The language this person chose, read from their file; None follows Windows.
+CHOSEN_LANGUAGE = None
 
 
 def language():
@@ -558,6 +571,8 @@ def language():
     there is a translation for it, else "en". Policy can force English."""
     if policy("ForceEnglish"):
         return "en"
+    if CHOSEN_LANGUAGE in LANGUAGE_NAMES:
+        return CHOSEN_LANGUAGE
     if LANGUAGE is not None:
         return LANGUAGE
     if os.name != "nt":
@@ -685,6 +700,10 @@ def load(repair=True):
         state["offered"] = True
     if raw.get("text") is True:
         state["text"] = True
+    global CHOSEN_LANGUAGE
+    CHOSEN_LANGUAGE = None
+    if raw.get("lang") in LANGUAGE_NAMES:
+        state["lang"] = CHOSEN_LANGUAGE = raw["lang"]
     try:
         if day(raw.get("notified")) <= today().isoformat():
             state["notified"] = day(raw["notified"])
@@ -897,10 +916,17 @@ def ask(prompt):
                                break_long_words=False) or [""]
     for line in lines[:-1]:
         say(line)
+    global INTERRUPTED
     try:
-        return input(lines[-1] + " ").strip()
+        answer = input(lines[-1] + " ").strip()
+        INTERRUPTED = 0.0
+        return answer
     except KeyboardInterrupt:
         say()  # the prompt is still on this line; start the next one cleanly
+        # One press skips the question; a second within two seconds closes.
+        if time.monotonic() - INTERRUPTED < 2:
+            raise Quit from None
+        INTERRUPTED = time.monotonic()
         return None
     except (EOFError, OSError, UnicodeError):
         return None
@@ -1177,12 +1203,16 @@ def delete_everything(state):
             say(tr("Could not list the folder, so backup copies may remain:"))
             say("  " + data_dir())
         return False
+    settings = {k: state[k] for k in SETTINGS if k in state}
     state.clear()
     state.update(new_state())
+    state.update(settings)
     # A marker with a new epoch instead of no file, so another open window
     # can tell the notes were deleted.
     state["epoch"] = os.urandom(8).hex()
     say(tr("Done. Everything saved was deleted."))
+    if settings:
+        say(tr("Your settings were kept."))
     if save(state):
         say(tr("Another open hello-world window cannot put it back."))
     else:
@@ -1553,12 +1583,17 @@ def menu(state, can_save=True, iso=None, alone=False):
                            tr("Use a window with buttons (now this text screen)")
                            if state.get("text") else
                            tr("Use this text screen (now a window with buttons)")))
+            say(" 10  " + (tr("Language (set by your organization)")
+                           if policy("ForceEnglish") else
+                           tr("Language (now {name})").format(
+                               name=LANGUAGE_NAMES.get(state.get("lang"))
+                               or tr("following Windows"))))
             say("  " + tr("Enter") + "  " + (tr("Close") if alone else
                                              tr("Back to the last prompt")))
             listed = True
-            choice = ask(tr("Choose 1 to 9, or Enter to go back > "))
+            choice = ask(tr("Choose 1 to 10, or Enter to go back > "))
         else:
-            choice = ask(tr("Choose 1 to 9, m to list the options, or Enter to "
+            choice = ask(tr("Choose 1 to 10, m to list the options, or Enter to "
                             "go back > "))
         if not choice:
             return
@@ -1626,6 +1661,10 @@ def menu(state, can_save=True, iso=None, alone=False):
             else:
                 undo(state, base)
                 say(tr("Could not save that choice on this computer."))
+        elif choice == "10" and policy("ForceEnglish"):
+            say(tr("Your organization shows hello-world in English."))
+        elif choice == "10":
+            choose_language(state, can_save)
         elif choice == "9" and policy("UseTextScreen"):
             say(tr("Your organization has set hello-world to open as a text "
                    "screen."))
@@ -1642,7 +1681,41 @@ def menu(state, can_save=True, iso=None, alone=False):
                 undo(state, base)
                 say(tr("Could not save that choice on this computer."))
         else:
-            not_a_choice(choice, tr("Type 1 to 9, or press Enter to go back."))
+            not_a_choice(choice, tr("Type 1 to 10, or press Enter to go back."))
+
+
+def set_language(state, can_save, code):
+    """Save a language for this person, or None to follow Windows. Returns
+    True when saved. It shows from the next open."""
+    refresh(state, can_save)
+    base = copy.deepcopy(state)
+    if code:
+        state["lang"] = code
+    else:
+        state.pop("lang", None)
+    if commit(state, base, can_save):
+        return True
+    undo(state, base)
+    return False
+
+
+def choose_language(state, can_save):
+    """Menu option 10: pick a language by number."""
+    codes = list(LANGUAGE_NAMES) + [None]
+    for n, code in enumerate(codes, 1):
+        say(f"  {n}  " + (LANGUAGE_NAMES[code] if code else tr("Follow Windows")))
+    answer = ask(tr("Type a number from 1 to {n}, or Enter to keep it > ")
+                 .format(n=len(codes)))
+    word = (answer or "").strip(TRIM)
+    if word.lower() in QUIT_WORDS:
+        raise Quit
+    if word not in [str(n) for n in range(1, len(codes) + 1)]:
+        say(tr("Nothing changed."))
+        return
+    if set_language(state, can_save, codes[int(word) - 1]):
+        say(tr("Done. The new language shows next time you open hello-world."))
+    else:
+        say(tr("Could not save that choice on this computer."))
 
 
 def offer_reminder(state, can_save, planned=False):
@@ -1691,13 +1764,29 @@ def offer_reminder(state, can_save, planned=False):
     say()
 
 
-def finish_plan(state, text, d):
-    """Count a finished plan, dated d. `same` only ever holds unfinished plans."""
+def plan_parts(text):
+    """The things in one plan: "Call Ana; send the report" is two. A plan
+    of more than MAX_PARTS keeps the extra ones together in the last part."""
+    parts = [part.strip() for part in text.split(";") if part.strip()]
+    if len(parts) > MAX_PARTS:
+        parts = parts[:MAX_PARTS - 1] + ["; ".join(parts[MAX_PARTS - 1:])]
+    return parts or [text]
+
+
+def finish_plan(state, text, d, parts=None):
+    """Count a finished plan, dated d, one finished row and one done for each
+    thing in it. `parts` finishes only those indexes; returns the rest of the
+    plan, or "". `same` only ever holds unfinished plans."""
     if state.get("previous") == text:
         state.pop("previous")
-    state["done"] = min(state.get("done", 0) + 1, 99999)
-    state["finished"] = (state.get("finished", [])
-                         + [{"text": text, "date": d.isoformat()}])[-MAX_FINISHED:]
+    every = plan_parts(text)
+    chosen = [every[i] for i in sorted(set(parts))] if parts else every
+    for part in chosen:
+        state["done"] = min(state.get("done", 0) + 1, 99999)
+        state["finished"] = (state.get("finished", [])
+                             + [{"text": part, "date": d.isoformat()}])[-MAX_FINISHED:]
+    return "; ".join(part for i, part in enumerate(every)
+                     if parts and i not in parts)
 
 
 def done_lines(state, d):
@@ -1706,6 +1795,38 @@ def done_lines(state, d):
     data = translation()
     lines = data["done"] if data else DONE_LINES
     return [lines[d.toordinal() % len(lines)]]
+
+
+def ask_parts(parts):
+    """"Did you do them?" for a plan of several things. Returns (answer,
+    parts done): ("yes", None) for all, ("yes", [0, 2]) for some, or the
+    "no", "" or None of ask_choice()."""
+    say(tr("Last time you planned:"))
+    for n, part in enumerate(parts, 1):
+        say(wrapped(f"  {n}  ", part))
+    numbers = [str(n) for n in range(1, len(parts) + 1)]
+    hint = tr("Type y for all, n for not yet, or the numbers you did, such "
+              "as 1 3. Enter skips.")
+    for _ in range(3):
+        typed = ask(tr("Did you do them? (y for all, n for not yet, numbers "
+                       "for the ones you did, Enter to skip) > "))
+        if typed is None:
+            return None, None
+        text = typed.lower().strip(TRIM)
+        words = text.replace(",", " ").split()
+        if not text:
+            return "", None
+        if text in QUIT_WORDS:
+            raise Quit
+        if words and all(w in numbers for w in words):
+            done = sorted({int(w) - 1 for w in words})
+            return "yes", (None if len(done) == len(parts) else done)
+        if text in strict_yes() + DONE_WORDS + DID_WORDS:
+            return "yes", None
+        if text in NO:
+            return "no", None
+        not_a_choice(typed, hint)
+    return None, None
 
 
 def finish_day(plan_day, d):
@@ -1738,7 +1859,10 @@ def finish_day(plan_day, d):
 
 
 def nudge_if_several(text):
-    """A plan of several things joined together is hard to finish."""
+    """A plan of several things joined together is hard to finish. A list
+    with ; is several on purpose, and each part is finished on its own."""
+    if ";" in text:
+        return
     padded = f" {text.lower()} "
     if any(joint in padded for joint in (" and ", " & ", " y ")) or "+" in text:
         para(tr("That looks like more than one thing. Finishing the first "
@@ -1799,12 +1923,14 @@ def asks_followup(intent, d):
                 and intent.get("skips", 0) < 2 and not plans_off())
 
 
-def answer_plan(state, can_save, d, choice, text):
+def answer_plan(state, can_save, d, choice, text, parts=None):
     """Answer "Did you do it?" for the plan `text` from the window or the
     sign-in reminder: "yes", "no" (not yet, kept for today) or "skip".
 
     Returns (saved, message). Finishing counts on day d, the day it was
     answered, which is the date people expect to see in the finished list.
+    With `parts`, "yes" finishes only those things and keeps the rest for
+    today.
     """
     refresh(state, can_save)
     intent = state["intent"]
@@ -1812,9 +1938,12 @@ def answer_plan(state, can_save, d, choice, text):
         return False, tr("The other open window changed the plan, so its plan "
                          "is kept.")
     base = copy.deepcopy(state)
+    rest = ""
     if choice == "yes":
-        finish_plan(state, text, d)
-        state["intent"] = None
+        rest = finish_plan(state, text, d, parts)
+        state["intent"] = rest and {"text": rest, "date": d.isoformat(),
+                                    "since": intent.get("since", intent["date"])}
+        state["intent"] = state["intent"] or None
     elif choice == "no":
         state["intent"] = {"text": text, "date": d.isoformat(),
                            "since": intent.get("since", intent["date"])}
@@ -1825,7 +1954,8 @@ def answer_plan(state, can_save, d, choice, text):
         return False, tr("Could not save that on this computer. Your answer "
                          "was not counted.")
     if choice == "yes":
-        return True, done_lines(state, d)[0]
+        return True, done_lines(state, d)[0] + (
+            " " + tr("The rest is kept for today.") if rest else "")
     return True, tr("Kept for today.") if choice == "no" else tr(
         "Your plan is still open.")
 
@@ -1892,22 +2022,31 @@ def daily(startup):
         # but two skips mean "stop asking"; the plan then shows as still open.
         if (intent and intent["date"] < iso and intent.get("skips", 0) < 2
                 and not plans_off()):
-            say(wrapped(tr("Last time you planned: "), intent["text"]))
-            answer = ask_choice(
-                tr("Did you do it? (y for yes, n for not yet, Enter to skip) > "),
-                strict_yes() + DONE_WORDS + DID_WORDS, NO,
-                tr("Type y or n, or press Enter to skip."))
+            parts = plan_parts(intent["text"])
+            if len(parts) == 1:
+                say(wrapped(tr("Last time you planned: "), intent["text"]))
+                answer = ask_choice(
+                    tr("Did you do it? (y for yes, n for not yet, Enter to skip) > "),
+                    strict_yes() + DONE_WORDS + DID_WORDS, NO,
+                    tr("Type y or n, or press Enter to skip."))
+                some = None
+            else:
+                answer, some = ask_parts(parts)
             if answer == "yes":
                 answered = True
                 when = finish_day(datetime.date.fromisoformat(intent["date"]), d)
                 # Saved now, so the answer is heard now.
-                finish_plan(state, intent["text"], when)
-                state["intent"] = None
+                rest = finish_plan(state, intent["text"], when, some)
+                state["intent"] = rest and {
+                    "text": rest, "date": iso,
+                    "since": intent.get("since", intent["date"])} or None
                 if commit(state, base, can_save):
                     base = copy.deepcopy(state)
-                    intent = None
+                    intent = state["intent"]
                     for line in done_lines(state, d):
                         say(line)
+                    if rest:
+                        say(tr("The rest is kept for today."))
                 else:
                     # A delete in another window also lands here, so take
                     # the plan from the state, never the copy held above.
@@ -2362,6 +2501,8 @@ def show_reminder(text):
            'activationType="protocol" arguments="hello-world:done"/>'
            f'<action content="{escape(tr("&Not yet").replace("&", ""))}" '
            'activationType="protocol" arguments="hello-world:notyet"/>'
+           f'<action content="{escape(tr("S&kip").replace("&", ""))}" '
+           'activationType="protocol" arguments="hello-world:skip"/>'
            '</actions></toast>')
 
 
@@ -2405,15 +2546,15 @@ def answer_reminder(link):
     word = link[len(APP_ID) + 1:] if link.startswith(APP_ID + ":") else ""
     if word == "open":
         return show_window()
-    if word not in ("done", "notyet"):
+    if word not in ("done", "notyet", "skip"):
         return 2
     d = today()
     state, can_save = load()
     intent = state["intent"]
     if asks_followup(intent, d):
-        saved, message = answer_plan(state, can_save, d,
-                                     "yes" if word == "done" else "no",
-                                     intent["text"])
+        saved, message = answer_plan(
+            state, can_save, d,
+            {"done": "yes", "notyet": "no"}.get(word, "skip"), intent["text"])
         if saved and word == "done":
             # The window says this out loud; the reminder had no way to.
             notify('<toast><visual><binding template="ToastGeneric">'
@@ -2478,10 +2619,11 @@ class Visit:
         intent = self.state["intent"]
         return intent["text"] if intent and intent["date"] == self.iso else ""
 
-    def answer(self, choice):
-        """"yes", "no" or "skip" to "Did you do it?". Returns the message."""
+    def answer(self, choice, parts=None):
+        """"yes", "no" or "skip" to "Did you do it?", with `parts` for the
+        things done when only some were. Returns the message."""
         (saved, message), _ = quietly(answer_plan, self.state, self.can_save,
-                                      self.d, choice, self.followup)
+                                      self.d, choice, self.followup, parts)
         if saved:
             self.followup = None
         return message
@@ -2614,6 +2756,7 @@ class Window:
     TITLE, DATE, NOTE, PLANNED, ASK, DONE, NOT_YET, SKIP = range(100, 108)
     THOUGHT_LABEL, THOUGHT, TIP_LABEL, TIP = range(110, 114)
     PLAN_LABEL, PLAN, STATUS, OPTIONS, DID_IT = range(120, 125)
+    TICK = 130  # to 134, one tick box for each thing in yesterday's plan
     SAVE, CLOSE = 1, 2  # IDOK and IDCANCEL, so Enter and Esc work
 
     def __init__(self, visit):
@@ -2649,9 +2792,23 @@ class Window:
         para(self.DATE, header[0].upper() + header[1:], 8)
         if v.note:
             para(self.NOTE, v.note, 8)
-        if v.followup:
+        parts = plan_parts(v.followup) if v.followup else []
+        if len(parts) > 1:
+            para(self.PLANNED, tr("Last time you planned:"), 2)
+            para(self.ASK, tr("Tick the ones you did, then click Done. With "
+                              "none ticked, Done means all of them."), 2)
+            for n, part in enumerate(parts):
+                h = self.lines(part) * line
+                # A tick box draws & as an underline, so it is doubled.
+                add(button, self.TICK + n, part.replace("&", "&&"),
+                    tab | 0x3 | 0x2000, m + 6, h,
+                    w - 6)  # BS_AUTOCHECKBOX | BS_MULTILINE
+                y += h + 2
+            y += 4
+        elif v.followup:
             para(self.PLANNED, tr("Last time you planned: ") + v.followup, 2)
             para(self.ASK, tr("Did you do it?"), 4)
+        if v.followup:
             for n, (cid, label) in enumerate(((self.DONE, tr("&Done")),
                                               (self.NOT_YET, tr("&Not yet")),
                                               (self.SKIP, tr("S&kip")))):
@@ -2666,7 +2823,8 @@ class Window:
             para(self.PLAN_LABEL, self.plan_label(), 2)
             add(edit, self.PLAN, v.plan(), tab | 0x800000 | 0x80, m, 15)
             y += 19
-        add(static, self.STATUS, "", text_style, m, 2 * line)
+        add(static, self.STATUS, "" if plans_off() else tr(
+            "A few things? Put ; between them."), text_style, m, 2 * line)
         y += 2 * line + 6
         add(button, self.OPTIONS, tr("&Options"), tab, m, 16, 64)
         right = m + w
@@ -2820,6 +2978,10 @@ class Window:
         if msg == 0x111 and (wparam >> 16) == 0:  # WM_COMMAND, BN_CLICKED
             self.command(wparam & 0xFFFF)
             return 1
+        if msg == 0x111 and (wparam >> 16) == 0x501:  # EN_MAXTEXT
+            self.set_text(self.STATUS, tr("A plan can be up to {n} characters.")
+                          .format(n=MAX_PLAN))
+            return 1
         return 0
 
     def init_dialog(self):
@@ -2850,14 +3012,19 @@ class Window:
     def command(self, cid):
         v = self.visit
         if cid in (self.DONE, self.NOT_YET, self.SKIP):
-            message = v.answer({self.DONE: "yes", self.NOT_YET: "no"}.get(cid, "skip"))
+            ticks = [n for n in range(MAX_PARTS) if self.item(self.TICK + n)
+                     and self.user.SendMessageW(self.item(self.TICK + n), 0xF0, 0, 0)]
+            message = v.answer({self.DONE: "yes", self.NOT_YET: "no"}.get(cid, "skip"),
+                               ticks if cid == self.DONE and ticks else None)
             if v.followup:
                 self.set_text(self.STATUS, message)
                 return
-            for hidden in (self.ASK, self.DONE, self.NOT_YET, self.SKIP):
+            for hidden in (self.ASK, self.DONE, self.NOT_YET, self.SKIP) + tuple(
+                    self.TICK + n for n in range(MAX_PARTS)):
                 self.show(hidden, False)
             # The question's line stays as space under the answer.
-            self.collapse(self.DONE, self.SKIP)
+            first = self.TICK if self.item(self.TICK) else self.DONE
+            self.collapse(first, self.SKIP)
             self.asking = False
             self.set_text(self.PLANNED, message)
             self.refresh_plan()
@@ -2898,7 +3065,7 @@ class Window:
             if self.asking:
                 # A new plan replaces the one asked about, which same keeps.
                 for hidden in (self.PLANNED, self.ASK, self.DONE, self.NOT_YET,
-                               self.SKIP):
+                               self.SKIP) + tuple(self.TICK + n for n in range(MAX_PARTS)):
                     self.show(hidden, False)
                 self.collapse(self.PLANNED, self.SKIP)
                 self.asking = False
@@ -3006,6 +3173,8 @@ class Window:
         if not policy("HideDaysInARow"):
             entries.append((checked if v.state["streak"] else 0, 7,
                             tr("Show the days-in-a-row message")))
+        if not policy("ForceEnglish"):
+            entries.append((0, 8, tr("Language...")))
         entries.append((0, 5, tr("Show what is saved on this computer")))
         entries.append((0, 6, tr("Delete everything saved")))
         entries.append((0x800, 0, None))  # MF_SEPARATOR
@@ -3034,6 +3203,18 @@ class Window:
                 else tr("Done. The days-in-a-row message is on.")
                 if v.state["streak"] else
                 tr("Done. The days-in-a-row message is off.")))
+        elif choice == 8:
+            codes = list(LANGUAGE_NAMES) + [None]
+            current = v.state.get("lang")
+            picked = self.popup([(0x8 if code == current else 0, 100 + n,
+                                  LANGUAGE_NAMES[code] if code else tr("Follow Windows"))
+                                 for n, code in enumerate(codes)])
+            if picked:
+                saved, _ = quietly(set_language, v.state, v.can_save,
+                                   codes[picked - 100])
+                self.set_text(self.STATUS, tr(
+                    "Done. The new language shows next time you open hello-world.")
+                    if saved else tr("Could not save that choice on this computer."))
         elif choice == 5:
             self.inform(v.saved_summary())
         elif choice == 6:
@@ -3489,10 +3670,10 @@ sitio.""",
             'Enter',
         'Back to the last prompt':
             'Volver a la última pregunta',
-        'Choose 1 to 9, or Enter to go back > ':
-            'Elige del 1 al 9, o Enter para volver > ',
-        'Choose 1 to 9, m to list the options, or Enter to go back > ':
-            'Elige del 1 al 9, m para ver las opciones, o Enter para volver > ',
+        'Choose 1 to 10, or Enter to go back > ':
+            'Elige del 1 al 10, o Enter para volver > ',
+        'Choose 1 to 10, m to list the options, or Enter to go back > ':
+            'Elige del 1 al 10, m para ver las opciones, o Enter para volver > ',
         'The saved file could not be read just now, so this may be out of date.':
             'El archivo guardado no se pudo leer ahora, así que esto puede no estar al día.',
         'Type full to see the whole file, or Enter to go on > ':
@@ -3513,8 +3694,8 @@ sitio.""",
             'Listo. La idea y la sugerencia están activadas.',
         'Done. The thought and tip are off.':
             'Listo. La idea y la sugerencia están desactivadas.',
-        'Type 1 to 9, or press Enter to go back.':
-            'Escribe del 1 al 9, o pulsa Enter para volver.',
+        'Type 1 to 10, or press Enter to go back.':
+            'Escribe del 1 al 10, o pulsa Enter para volver.',
         'Want it to open once a day when you sign in? (y or n, Enter for not now) > ':
             '¿Quieres que se abra una vez al día al iniciar sesión? (s o n, Enter para más tarde) > ',
         'Want it to open once a day when you sign in so it can ask about your plan? (y or n, Enter for not now) > ':
@@ -3691,6 +3872,38 @@ sitio.""",
             '¿Borrar el plan de hoy?',
         'Next plan, if you want one:':
             'Siguiente plan, si quieres:',
+        'A few things? Put ; between them.':
+            '¿Varias cosas? Sepáralas con ;',
+        'A plan can be up to {n} characters.':
+            'Un plan puede tener hasta {n} caracteres.',
+        'Did you do them? (y for all, n for not yet, numbers for the ones you did, Enter to skip) > ':
+            '¿Las hiciste? (s para todas, n para todavía no, los números de las que hiciste, Enter para saltar) > ',
+        'Last time you planned:':
+            'Tu último plan:',
+        'The rest is kept for today.':
+            'Lo demás se mantiene para hoy.',
+        'Tick the ones you did, then click Done. With none ticked, Done means all of them.':
+            'Marca las que hiciste y haz clic en Hecho. Sin ninguna marcada, Hecho vale para todas.',
+        'Type y for all, n for not yet, or the numbers you did, such as 1 3. Enter skips.':
+            'Escribe s para todas, n para todavía no, o los números de las que hiciste, como 1 3. Enter salta.',
+        'Your settings were kept.':
+            'Tus ajustes se han mantenido.',
+        'Language (set by your organization)':
+            'Idioma (lo decide tu organización)',
+        'Language (now {name})':
+            'Idioma (ahora {name})',
+        'following Windows':
+            'según Windows',
+        'Your organization shows hello-world in English.':
+            'Tu organización muestra hello-world en inglés.',
+        'Follow Windows':
+            'Según Windows',
+        'Type a number from 1 to {n}, or Enter to keep it > ':
+            'Escribe un número del 1 al {n}, o Enter para mantenerlo > ',
+        'Done. The new language shows next time you open hello-world.':
+            'Listo. El nuevo idioma se verá la próxima vez que abras hello-world.',
+        'Language...':
+            'Idioma...',
     },
 }
 
@@ -4126,10 +4339,10 @@ Digite m para ver as opções de novo. Nada é enviado para lugar nenhum.""",
             'Enter',
         'Back to the last prompt':
             'Voltar à última pergunta',
-        'Choose 1 to 9, or Enter to go back > ':
-            'Escolha de 1 a 9, ou Enter para voltar > ',
-        'Choose 1 to 9, m to list the options, or Enter to go back > ':
-            'Escolha de 1 a 9, m para listar as opções, ou Enter para voltar > ',
+        'Choose 1 to 10, or Enter to go back > ':
+            'Escolha de 1 a 10, ou Enter para voltar > ',
+        'Choose 1 to 10, m to list the options, or Enter to go back > ':
+            'Escolha de 1 a 10, m para listar as opções, ou Enter para voltar > ',
         'The saved file could not be read just now, so this may be out of date.':
             'Não foi possível ler o arquivo salvo agora, então isto pode estar desatualizado.',
         'Type full to see the whole file, or Enter to go on > ':
@@ -4150,8 +4363,8 @@ Digite m para ver as opções de novo. Nada é enviado para lugar nenhum.""",
             'Concluído. O pensamento e a dica estão ativados.',
         'Done. The thought and tip are off.':
             'Concluído. O pensamento e a dica estão desativados.',
-        'Type 1 to 9, or press Enter to go back.':
-            'Digite de 1 a 9, ou pressione Enter para voltar.',
+        'Type 1 to 10, or press Enter to go back.':
+            'Digite de 1 a 10, ou pressione Enter para voltar.',
         'Want it to open once a day when you sign in? (y or n, Enter for not now) > ':
             'Quer que o hello-world abra uma vez por dia ao iniciar a sessão? (s ou n, Enter para agora não) > ',
         'Want it to open once a day when you sign in so it can ask about your plan? (y or n, Enter for not now) > ':
@@ -4328,6 +4541,38 @@ Digite m para ver as opções de novo. Nada é enviado para lugar nenhum.""",
             'Apagar o plano de hoje?',
         'Next plan, if you want one:':
             'Próximo plano, se quiser:',
+        'A few things? Put ; between them.':
+            'Várias coisas? Separe com ;',
+        'A plan can be up to {n} characters.':
+            'Um plano pode ter até {n} caracteres.',
+        'Did you do them? (y for all, n for not yet, numbers for the ones you did, Enter to skip) > ':
+            'Você fez? (s para todas, n para ainda não, os números das que fez, Enter para pular) > ',
+        'Last time you planned:':
+            'O seu último plano:',
+        'The rest is kept for today.':
+            'O resto fica para hoje.',
+        'Tick the ones you did, then click Done. With none ticked, Done means all of them.':
+            'Marque as que você fez e clique em Feito. Sem nenhuma marcada, Feito vale para todas.',
+        'Type y for all, n for not yet, or the numbers you did, such as 1 3. Enter skips.':
+            'Digite s para todas, n para ainda não, ou os números das que fez, como 1 3. Enter pula.',
+        'Your settings were kept.':
+            'Suas configurações foram mantidas.',
+        'Language (set by your organization)':
+            'Idioma (definido pela sua organização)',
+        'Language (now {name})':
+            'Idioma (agora {name})',
+        'following Windows':
+            'segue o Windows',
+        'Your organization shows hello-world in English.':
+            'Sua organização mostra o hello-world em inglês.',
+        'Follow Windows':
+            'Seguir o Windows',
+        'Type a number from 1 to {n}, or Enter to keep it > ':
+            'Digite um número de 1 a {n}, ou Enter para manter > ',
+        'Done. The new language shows next time you open hello-world.':
+            'Pronto. O novo idioma aparece quando você abrir o hello-world de novo.',
+        'Language...':
+            'Idioma...',
     },
 }
 
@@ -4764,10 +5009,10 @@ Tapez m pour revoir les options. Rien n'est envoyé nulle part.""",
             'Entrée',
         'Back to the last prompt':
             'Revenir à la dernière question',
-        'Choose 1 to 9, or Enter to go back > ':
-            'Choisissez de 1 à 9, ou Entrée pour revenir > ',
-        'Choose 1 to 9, m to list the options, or Enter to go back > ':
-            'Choisissez de 1 à 9, m pour afficher les options, ou Entrée pour revenir > ',
+        'Choose 1 to 10, or Enter to go back > ':
+            'Choisissez de 1 à 10, ou Entrée pour revenir > ',
+        'Choose 1 to 10, m to list the options, or Enter to go back > ':
+            'Choisissez de 1 à 10, m pour afficher les options, ou Entrée pour revenir > ',
         'The saved file could not be read just now, so this may be out of date.':
             "Le fichier enregistré n'a pas pu être lu pour l'instant, ces informations ne sont donc peut-être pas à jour.",
         'Type full to see the whole file, or Enter to go on > ':
@@ -4788,8 +5033,8 @@ Tapez m pour revoir les options. Rien n'est envoyé nulle part.""",
             "C'est fait. La pensée et l'astuce sont activées.",
         'Done. The thought and tip are off.':
             "C'est fait. La pensée et l'astuce sont désactivées.",
-        'Type 1 to 9, or press Enter to go back.':
-            'Tapez un chiffre de 1 à 9, ou appuyez sur Entrée pour revenir.',
+        'Type 1 to 10, or press Enter to go back.':
+            'Tapez un chiffre de 1 à 10, ou appuyez sur Entrée pour revenir.',
         'Want it to open once a day when you sign in? (y or n, Enter for not now) > ':
             "Voulez-vous que hello-world s'ouvre une fois par jour à votre connexion ? (o ou n, Entrée pour plus tard) > ",
         'Want it to open once a day when you sign in so it can ask about your plan? (y or n, Enter for not now) > ':
@@ -4966,6 +5211,38 @@ Tapez m pour revoir les options. Rien n'est envoyé nulle part.""",
             "Effacer le plan d'aujourd'hui ?",
         'Next plan, if you want one:':
             'Plan suivant, si vous voulez :',
+        'A few things? Put ; between them.':
+            'Plusieurs choses ? Séparez-les par ;',
+        'A plan can be up to {n} characters.':
+            "Un plan peut compter jusqu'à {n} caractères.",
+        'Did you do them? (y for all, n for not yet, numbers for the ones you did, Enter to skip) > ':
+            'Les avez-vous faites ? (o pour toutes, n pour pas encore, les numéros de celles faites, Entrée pour passer) > ',
+        'Last time you planned:':
+            'Votre dernier plan :',
+        'The rest is kept for today.':
+            "Le reste est gardé pour aujourd'hui.",
+        'Tick the ones you did, then click Done. With none ticked, Done means all of them.':
+            'Cochez celles que vous avez faites, puis cliquez sur Fait. Sans case cochée, Fait vaut pour toutes.',
+        'Type y for all, n for not yet, or the numbers you did, such as 1 3. Enter skips.':
+            'Tapez o pour toutes, n pour pas encore, ou les numéros de celles faites, par exemple 1 3. Entrée pour passer.',
+        'Your settings were kept.':
+            'Vos réglages ont été conservés.',
+        'Language (set by your organization)':
+            'Langue (définie par votre organisation)',
+        'Language (now {name})':
+            'Langue (actuellement {name})',
+        'following Windows':
+            'selon Windows',
+        'Your organization shows hello-world in English.':
+            'Votre organisation affiche hello-world en anglais.',
+        'Follow Windows':
+            'Suivre Windows',
+        'Type a number from 1 to {n}, or Enter to keep it > ':
+            'Tapez un chiffre de 1 à {n}, ou Entrée pour la garder > ',
+        'Done. The new language shows next time you open hello-world.':
+            "C'est fait. La nouvelle langue s'affichera à la prochaine ouverture.",
+        'Language...':
+            'Langue...',
     },
 }
 
@@ -5401,10 +5678,10 @@ irgendwohin gesendet.""",
             'Eingabetaste',
         'Back to the last prompt':
             'Zurück zur letzten Frage',
-        'Choose 1 to 9, or Enter to go back > ':
-            '1 bis 9 wählen oder Eingabetaste zum Zurückkehren > ',
-        'Choose 1 to 9, m to list the options, or Enter to go back > ':
-            '1 bis 9 wählen, m für die Optionen oder Eingabetaste zum Zurückkehren > ',
+        'Choose 1 to 10, or Enter to go back > ':
+            '1 bis 10 wählen oder Eingabetaste zum Zurückkehren > ',
+        'Choose 1 to 10, m to list the options, or Enter to go back > ':
+            '1 bis 10 wählen, m für die Optionen oder Eingabetaste zum Zurückkehren > ',
         'The saved file could not be read just now, so this may be out of date.':
             'Die gespeicherte Datei konnte gerade nicht gelesen werden, daher ist dies eventuell nicht aktuell.',
         'Type full to see the whole file, or Enter to go on > ':
@@ -5425,8 +5702,8 @@ irgendwohin gesendet.""",
             'Fertig. Gedanke und Tipp sind eingeschaltet.',
         'Done. The thought and tip are off.':
             'Fertig. Gedanke und Tipp sind ausgeschaltet.',
-        'Type 1 to 9, or press Enter to go back.':
-            'Geben Sie 1 bis 9 ein, oder drücken Sie die Eingabetaste, um zurückzukehren.',
+        'Type 1 to 10, or press Enter to go back.':
+            'Geben Sie 1 bis 10 ein, oder drücken Sie die Eingabetaste, um zurückzukehren.',
         'Want it to open once a day when you sign in? (y or n, Enter for not now) > ':
             'Soll sich hello-world einmal täglich bei der Anmeldung öffnen? (j oder n, Eingabetaste für später) > ',
         'Want it to open once a day when you sign in so it can ask about your plan? (y or n, Enter for not now) > ':
@@ -5603,6 +5880,38 @@ irgendwohin gesendet.""",
             'Den Plan für heute löschen?',
         'Next plan, if you want one:':
             'Nächster Plan, falls Sie möchten:',
+        'A few things? Put ; between them.':
+            'Mehrere Dinge? Trennen Sie sie mit ;',
+        'A plan can be up to {n} characters.':
+            'Ein Plan darf bis zu {n} Zeichen lang sein.',
+        'Did you do them? (y for all, n for not yet, numbers for the ones you did, Enter to skip) > ':
+            'Haben Sie sie geschafft? (j für alle, n für noch nicht, die Nummern der erledigten, Eingabetaste zum Überspringen) > ',
+        'Last time you planned:':
+            'Ihr letzter Plan:',
+        'The rest is kept for today.':
+            'Der Rest bleibt für heute.',
+        'Tick the ones you did, then click Done. With none ticked, Done means all of them.':
+            'Haken Sie die erledigten an und klicken Sie auf Erledigt. Ohne Haken gilt Erledigt für alle.',
+        'Type y for all, n for not yet, or the numbers you did, such as 1 3. Enter skips.':
+            'Geben Sie j für alle ein, n für noch nicht, oder die Nummern der erledigten, etwa 1 3. Eingabetaste überspringt.',
+        'Your settings were kept.':
+            'Ihre Einstellungen wurden behalten.',
+        'Language (set by your organization)':
+            'Sprache (von Ihrer Organisation festgelegt)',
+        'Language (now {name})':
+            'Sprache (jetzt {name})',
+        'following Windows':
+            'wie Windows',
+        'Your organization shows hello-world in English.':
+            'Ihre Organisation zeigt hello-world auf Englisch.',
+        'Follow Windows':
+            'Wie Windows',
+        'Type a number from 1 to {n}, or Enter to keep it > ':
+            'Geben Sie eine Zahl von 1 bis {n} ein, oder Eingabetaste zum Behalten > ',
+        'Done. The new language shows next time you open hello-world.':
+            'Fertig. Die neue Sprache erscheint beim nächsten Öffnen von hello-world.',
+        'Language...':
+            'Sprache...',
     },
 }
 
