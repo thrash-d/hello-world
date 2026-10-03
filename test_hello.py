@@ -821,11 +821,13 @@ def test_plan_with_no_plan_to_finish_does_not_close_the_window():
 
 
 def test_command_words_are_not_saved_as_the_plan():
-    for word in ("menu", "done"):
-        p = run(text=word + "\n\n")
-        assert "looks like a command" in p.stdout
-        assert "at the last prompt" in p.stdout
-        assert notes(p.home)["intent"] is None
+    p = run(text="done\n\n")
+    assert "looks like a command" in p.stdout and "at the last prompt" in p.stdout
+    assert notes(p.home)["intent"] is None
+    # menu there says where the menu is and asks the plan question again.
+    p = run(text="menu\nWrite it\n\n")
+    assert "The menu comes at the last prompt" in p.stdout
+    assert notes(p.home)["intent"]["text"] == "Write it"
     p = run(text="\nplan\nmenu\n\n")
     assert "Type your plan, or press Enter to go back." in p.stdout
     assert notes(p.home)["intent"] is None
@@ -1795,6 +1797,38 @@ def test_policy_turns_off_the_sign_in_launcher():
     p = run(text="m\n2\n\n\n\n", home=home, startup=startup, policy=pol)
     assert "turned off by your organization" in p.stdout
     assert os.listdir(startup) == []
+
+
+def test_policy_turns_plans_off_and_drops_saved_plan_text():
+    home = mkdtemp()
+    with open(os.path.join(home, "notes.json"), "w") as f:
+        json.dump({"visits": ["2026-09-30"], "previous": "old secret",
+                   "intent": {"text": "secret plan", "date": "2026-09-30"},
+                   "done": 3, "finished": [{"text": "done secret", "date": "2026-09-29"}]}, f)
+    pol = {"DisablePlans": 1}
+    p = run(text="m\n6\n\n\n", home=home, policy=pol)
+    assert "Did you do it?" not in p.stdout and "What is one thing" not in p.stdout
+    assert "Type menu or q, or Enter to close >" in p.stdout
+    assert "Plans are turned off by your organization." in p.stdout
+    saved = json.dumps(notes(home))
+    assert "secret" not in saved and '"done"' not in saved
+    p = run(text="plan\n\n", home=home, policy=pol, day="2026-10-02")
+    assert "Plans are turned off by your organization." in p.stdout
+
+
+def test_the_first_run_welcome_matches_the_policies():
+    p = run(text="\n\n", policy={"HideThoughtAndTip": 1, "DisablePlans": 1})
+    welcome = " ".join(p.stdout.split("Welcome.")[1].split())
+    assert "thought" not in welcome.split("Type menu")[0]
+    assert "plan" not in welcome.split("Type menu")[0]
+    assert "Type menu at the last prompt" in welcome
+
+
+def test_hiding_days_in_a_row_keeps_only_the_latest_visit():
+    home = mkdtemp()
+    for day in ("2026-10-01", "2026-10-02", "2026-10-03"):
+        run(text="\n\n", home=home, day=day, policy={"HideDaysInARow": 1})
+    assert len(notes(home)["visits"]) <= 2
 
 
 def test_the_policy_template_matches_the_policies_the_program_reads():

@@ -299,7 +299,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return HELP + "\n\nhello.cmd is in this folder:\n  " + here
 
-VERSION = "1.23.0"
+VERSION = "1.24.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -375,6 +375,11 @@ def policy(name):
         except OSError:
             pass
     return False
+
+
+def plans_off():
+    """Group Policy can turn plans off, for records or works-council rules."""
+    return policy("DisablePlans")
 
 
 def launcher_place():
@@ -586,6 +591,15 @@ def load(repair=True):
             pass
     if finished:
         state["finished"] = finished[-MAX_FINISHED:]
+    # With plans turned off by policy, plan text is neither shown nor kept: it
+    # is dropped here, so the next save leaves it out of the file.
+    if plans_off():
+        state["intent"] = None
+        for key in ("previous", "done", "finished"):
+            state.pop(key, None)
+    # Without the days-in-a-row count, only the latest visit is needed.
+    if policy("HideDaysInARow"):
+        state["visits"] = state["visits"][-1:]
     return state, True
 
 
@@ -1311,8 +1325,12 @@ def menu(state, can_save=True, iso=None):
                            "Show the days-in-a-row message (now hidden)"))
             say("  4  Delete everything saved")
             say("  5  Help")
-            say("  6  Set or change today's plan")
-            say("  7  Forget one finished plan")
+            if plans_off():
+                say("  6  Set today's plan (turned off by your organization)")
+                say("  7  Forget a finished plan (turned off by your organization)")
+            else:
+                say("  6  Set or change today's plan")
+                say("  7  Forget one finished plan")
             say("  8  " + ("Thought and tip (hidden by your organization)"
                            if policy("HideThoughtAndTip") else
                            "Hide the thought and tip (now shown)"
@@ -1367,6 +1385,8 @@ def menu(state, can_save=True, iso=None):
             reset(state)
         elif choice == "5":
             say(MENU_HELP)
+        elif choice in ("6", "7") and plans_off():
+            say("Plans are turned off by your organization.")
         elif choice == "6":
             set_plan(state, can_save, iso)
         elif choice == "7":
@@ -1401,8 +1421,10 @@ def offer_reminder(state, can_save, planned=False):
             or not (planned or len(state["visits"]) >= 2)):
         return
     answer = ask_choice(
-        "Want it to open once a day when you sign in so it can ask about "
-        "your plan? (y or n, Enter for not now) > ",
+        ("Want it to open once a day when you sign in? "
+         if plans_off() else
+         "Want it to open once a day when you sign in so it can ask about "
+         "your plan? ") + "(y or n, Enter for not now) > ",
         STRICT_YES, ("n", "no", "nope", "no thanks", "never", "stop"),
         "Type y or n, or press Enter for not now.")
     if answer is None:
@@ -1544,11 +1566,17 @@ def daily(startup):
         para("Press Enter at each question to skip it, and once more to "
              "close. That's it.")
         say()
-        para("Welcome. Each day you get one thought and one small thing to "
-             "try, the same for everyone. If you type a plan, it asks next "
-             "time how it went. Notes stay in your user folder and it sends "
-             "nothing anywhere, but IT staff could read them, so skip private "
-             "details. Type menu for the options.")
+        welcome = ["Welcome."]
+        if not policy("HideThoughtAndTip"):
+            welcome.append("Each day you get one thought and one small thing "
+                           "to try, the same for everyone.")
+        if not plans_off():
+            welcome.append("If you type a plan, it asks next time how it "
+                           "went. Notes stay in your user folder and it sends "
+                           "nothing anywhere, but IT staff could read them, so "
+                           "skip private details.")
+        welcome.append("Type menu at the last prompt for the options.")
+        para(" ".join(welcome))
         say()
     elif not seen_today:
         last = datetime.date.fromisoformat(state["visits"][-1])
@@ -1566,7 +1594,8 @@ def daily(startup):
     try:
         # Asked until it is answered, also on a second open the same day,
         # but two skips mean "stop asking"; the plan then shows as still open.
-        if intent and intent["date"] < iso and intent.get("skips", 0) < 2:
+        if (intent and intent["date"] < iso and intent.get("skips", 0) < 2
+                and not plans_off()):
             say(wrapped("Last time you planned: ", intent["text"]))
             answer = ask_choice(
                 "Did you do it? (y for yes, n for not yet, Enter to skip) > ",
@@ -1628,14 +1657,20 @@ def daily(startup):
             say(f"Still open since {when}:")
             say(indent(intent["text"]))
             say()
-        if not seen_today and not (intent and intent["date"] == iso):
+        if (not seen_today and not plans_off()
+                and not (intent and intent["date"] == iso)):
             skip = ("(Enter to skip)" if not intent else
                     "(A plan typed here replaces the old one. Enter to skip)")
             if state.get("previous") and not intent:
                 say(wrapped("Earlier plan: ", state["previous"]))
                 skip = "(Type same to reuse it, or Enter to skip)"
-            text = ask("What is one thing you want to get done today?\n"
-                       + skip + " > ")
+            question = "What is one thing you want to get done today?\n" + skip + " > "
+            text = ask(question)
+            # The welcome mentions the menu, so someone may type it here first.
+            if (text or "").lower().strip(" .!") in ("menu", "m", "help", "h", "?"):
+                say("The menu comes at the last prompt, after this question. "
+                    "Type menu there.")
+                text = ask(question)
             if (text or "").lower().strip(" .!") in QUIT_WORDS:
                 raise Quit
             if (text or "").lower() == "same" and not state.get("previous"):
@@ -1697,10 +1732,14 @@ def last_prompt(state, can_save, intent, person, d, iso):
     """Loop at the last prompt until the person closes the window."""
     while True:
         planned = bool(intent and person and state["intent"] is intent)
-        prompt = ("Type done, plan, menu or q, or Enter to close > "
+        prompt = ("Type menu or q, or Enter to close > " if plans_off() else
+                  "Type done, plan, menu or q, or Enter to close > "
                   if planned else
                   "Type plan, menu or q, or Enter to close > ")
         answer = (ask(prompt) or "").lower().strip()
+        if answer in ("done", "p", "plan") and plans_off():
+            say("Plans are turned off by your organization.")
+            continue
         if answer == "done" and person:
             closing = False
             if mark_done_now(state, can_save, d):

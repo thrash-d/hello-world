@@ -110,7 +110,12 @@ settings are under Computer or User Configuration > Administrative Templates
 |---|---|---|
 | Turn off opening hello-world at sign-in | `DisableSignInLauncher` | Never offers it, refuses to turn it on, and removes an existing one at the next run |
 | Hide the daily thought and tip | `HideThoughtAndTip` | Shows only the plan question |
-| Hide the days-in-a-row message | `HideDaysInARow` | Never shows the count |
+| Hide the days-in-a-row message | `HideDaysInARow` | Never shows the count, and keeps only the latest visit date |
+| Turn off plans | `DisablePlans` | Never asks for a plan, and keeps no plan text, finished plans or done count; text already saved is dropped at each person's next visit |
+
+`DisablePlans` and `HideDaysInARow` together leave only the latest visit date
+and the settings in each `notes.json`. Use them where typed plan text or a
+history of visits would be a records, legal hold or works-council concern.
 
 The values live under `HKLM` or `HKCU\SOFTWARE\Policies\hello-world`, where
 only administrators and Group Policy can write.
@@ -121,10 +126,20 @@ The scripts aren't signed in the repository, because signing needs your
 organization's certificate.
 
 - Execution policy: a `MachinePolicy` of AllSigned overrides
-  `-ExecutionPolicy Bypass`. Sign `install.ps1` and `uninstall.ps1` with your
-  code-signing certificate and a timestamp, then run
-  `tools\build-package.ps1` from that tree. Signing changes the files, so the
-  rebuilt package has a new package hash; record that one.
+  `-ExecutionPolicy Bypass`. Build a signed package with your code-signing
+  certificate:
+
+  ```powershell
+  tools\build-package.ps1 -OutDir <empty folder> -CertificateThumbprint <thumbprint> -TimestampServer <RFC 3161 URL>
+  ```
+
+  It signs `install.ps1` and `uninstall.ps1` with SHA-256 before hashing,
+  checks both signatures, and prints the signed package's own hash; record
+  that one. A signed package isn't reproducible from the commit alone, since
+  the signature and timestamp differ each time. CI builds a signed package
+  with a throwaway certificate, sets the runner to AllSigned, and checks that
+  it installs and uninstalls with no `-ExecutionPolicy Bypass` while an
+  unsigned one is refused.
 - WDAC and AppLocker script enforcement: unsigned scripts run in
   Constrained Language Mode, where the installer fails. Sign the scripts, or
   allow them by hash.
@@ -172,6 +187,8 @@ organization's certificate.
 Each user's `notes.json` holds the days they opened the program in the last
 60 days, their current plan, one unfinished earlier plan, a count of plans
 marked done, their last seven finished plans with dates, and three settings.
+The `DisablePlans` and `HideDaysInARow` policies cut that to the latest visit
+date and the settings.
 It holds no names, computer names or times. It's plain text, protected by the
 user's own profile permissions; administrators and backup tools can read it,
 and the program tells employees so on the first day.

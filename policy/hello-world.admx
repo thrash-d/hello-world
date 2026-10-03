@@ -7,6 +7,7 @@
   <supportedOn>
     <definitions>
       <definition name="SUPPORTED_1_23" displayName="$(string.SUPPORTED_1_23)" />
+      <definition name="SUPPORTED_1_24" displayName="$(string.SUPPORTED_1_24)" />
     </definitions>
   </supportedOn>
   <categories>
@@ -28,6 +29,12 @@
     <policy name="HideDaysInARow" class="Both" displayName="$(string.HideDaysInARow)" explainText="$(string.HideDaysInARow_Help)" key="SOFTWARE\Policies\hello-world" valueName="HideDaysInARow">
       <parentCategory ref="HelloWorld" />
       <supportedOn ref="SUPPORTED_1_23" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+    <policy name="DisablePlans" class="Both" displayName="$(string.DisablePlans)" explainText="$(string.DisablePlans_Help)" key="SOFTWARE\Policies\hello-world" valueName="DisablePlans">
+      <parentCategory ref="HelloWorld" />
+      <supportedOn ref="SUPPORTED_1_24" />
       <enabledValue><decimal value="1" /></enabledValue>
       <disabledValue><decimal value="0" /></disabledValue>
     </policy>

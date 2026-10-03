@@ -126,7 +126,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.23.0'
+$tag = 'v1.24.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
@@ -204,6 +204,8 @@ Get-ItemProperty HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\hello
 - `tools/build-package.ps1`: builds the offline release package.
 - `policy/`: Group Policy templates (ADMX and ADML).
 - `docs/ENTERPRISE.md`: deploying to a large fleet, and the security model.
+- `docs/ROLLOUT.md`: an announcement, an employee FAQ, and a page for privacy reviewers.
+- `docs/ACCESSIBILITY.md`: how it meets accessibility expectations, and how that was checked.
 - `test_hello.py`: run with `python test_hello.py` (Python 3.11 or later).
 - `VERSION`: the release version; a new version on `main` gets a tag.
 - `CHANGELOG.md`, `BACKLOG.md`, `reviews/`: change history, declined changes

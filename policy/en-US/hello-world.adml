@@ -6,6 +6,7 @@
     <stringTable>
       <string id="HelloWorld">hello-world</string>
       <string id="SUPPORTED_1_23">hello-world 1.23.0 or later</string>
+      <string id="SUPPORTED_1_24">hello-world 1.24.0 or later</string>
       <string id="DisableSignInLauncher">Turn off opening hello-world at sign-in</string>
       <string id="DisableSignInLauncher_Help">When enabled, people can't set hello-world to open by itself when they sign in, it never offers to, and a launcher they turned on earlier is removed the next time they open the program.
 
@@ -20,6 +21,12 @@ When disabled or not configured, each person can hide or show them with menu opt
       <string id="HideDaysInARow_Help">When enabled, hello-world never shows the message that counts how many days in a row someone opened it.
 
 When disabled or not configured, the message shows only on the 3rd, 7th and 14th day in a row and every 30th after that, and each person can hide it with menu option 3.</string>
+      <string id="DisablePlans">Turn off plans</string>
+      <string id="DisablePlans_Help">When enabled, hello-world doesn't ask for a plan or follow one up, and keeps no plan text, finished plans or count of plans done. Plan text already saved is dropped the next time each person opens the program. People still see the greeting and, unless that is also hidden, the thought and tip.
+
+Use this where plan text typed into a local file would be a records or works-council concern.
+
+When disabled or not configured, people can type one optional plan a day.</string>
     </stringTable>
   </resources>
 </policyDefinitionResources>

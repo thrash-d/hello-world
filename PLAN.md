@@ -75,6 +75,11 @@ For 1.19.0 the owner ran the spare-PC gate, and it passed: an install of
 entry, a forced step 6 failure that put the old install back, and a smoke run
 as a standard user.
 
+On 3 October 2026 the owner reported that all pending manual tests passed
+on 1.23.0, including the NVDA check of the prompts and a pilot-ring deployment.
+CI now also installs, upgrades, refuses and uninstalls the package on every
+push, signed and unsigned.
+
 Run the same gate again before a release that changes saving, the installer
 or the uninstaller. Not recorded as checked: console input outside ASCII, the
 shortcut's `if errorlevel 1 pause` line, and removing launchers from several
