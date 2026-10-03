@@ -116,7 +116,7 @@ changes below.
 | "In-a-row line" didn't say what it was | Amara | It's called the days-in-a-row message |
 
 Not changed: the days-in-a-row message stays on by default, and removing the
-program still needs an administrator. `BACKLOG.md` has the reasons. Two of
+program still needs an administrator. `TODO.md` has the work. Two of
 Glenn's points, an answer and the next question sharing a line, came from how
 the simulation fed in answers without echoing them; a real console starts a
 new line after Enter.
@@ -164,7 +164,8 @@ The second round found:
 Rafael 6 and 6, Priya 5 and 6, Mónica 5 and 5, Tom 6 and 6. Every one of them
 named the sign-in notification as the part they'd keep.
 
-What they asked for that wasn't built is in `BACKLOG.md`: a checklist of
+What they asked for that 1.29.0 didn't build went to `TODO.md`, and 1.30.0
+started on it: a checklist of
 several plans (Rafael), "partly done" (Priya, Rafael), tips for shift work
 (Dana; an organization content file does that), public holidays (Mónica,
 Rafael), a different title than "Hello, world!" (Dana, Rafael), and Skip on
@@ -175,7 +176,7 @@ the notification (Priya).
 - NVDA saying "greater" at the end of every prompt (Ruth). It's unclear
   whether NVDA reads `>` at its default punctuation level, and a simulated user
   saying so isn't enough to change every prompt. A real NVDA check decides it.
-  See `BACKLOG.md`.
+  See `TODO.md`.
 - Reaching people on their laptop on site days (Marcus). That is where IT
   installs it, not a program change.
 - Closing after `done` and the next plan (Marcus). The last prompt comes back

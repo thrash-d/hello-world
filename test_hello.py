@@ -503,8 +503,8 @@ def test_visits_dated_after_today_are_dropped_from_the_file():
 def test_a_plan_of_only_joiners_is_empty_and_a_long_plan_says_it_was_cut():
     hello = _load_hello()
     assert hello.clean("\u200d \u200c") == ""
-    p = run(text="x" * 130 + "\n\n")
-    assert "Shortened to 120 characters." in p.stdout
+    p = run(text="x" * 210 + "\n\n")
+    assert "Shortened to 200 characters." in p.stdout
 
 
 def test_a_second_damaged_file_does_not_overwrite_the_first_backup():
@@ -605,7 +605,8 @@ def test_stats_does_not_move_a_damaged_file():
 
 def test_cut_plan_has_no_trailing_space():
     import hello
-    assert hello.clean("a" * 119 + " b") == "a" * 119
+    n = hello.MAX_PLAN
+    assert hello.clean("a" * (n - 1) + " b") == "a" * (n - 1)
 
 
 def test_second_damaged_file_notice_names_the_real_backup():
@@ -1027,7 +1028,7 @@ def test_done_with_no_plan_says_so_and_done_is_not_offered():
 
 def test_menu_accepts_q_and_help_and_names_a_wrong_word():
     p = run(text="\nm\nbanana\nhelp\nq\n")
-    assert 'Sorry, "banana" is not one of the choices. Type 1 to 9' in p.stdout
+    assert 'Sorry, "banana" is not one of the choices. Type 1 to 10' in p.stdout
     assert "Words you can type at the last prompt" in p.stdout
     assert p.returncode == 0
 
@@ -2306,8 +2307,9 @@ def test_the_sign_in_reminder_asks_about_a_plan_once_a_day():
     texts = [t.text for t in toast.iter("text")]
     assert texts == ["Last time you planned: Report & slides", "Did you do it?"]
     assert [a.get("arguments") for a in toast.iter("action")] == [
-        "hello-world:done", "hello-world:notyet"]
-    assert [a.get("content") for a in toast.iter("action")] == ["Done", "Not yet"]
+        "hello-world:done", "hello-world:notyet", "hello-world:skip"]
+    assert [a.get("content") for a in toast.iter("action")] == [
+        "Done", "Not yet", "Skip"]
     assert notes(first.home)["notified"] == "2026-10-02"
     hello.sign_in()
     assert len(hello.SHOWN) == 1
@@ -2439,3 +2441,106 @@ def test_done_on_the_reminder_says_thank_you():
     hello.SHOWN = []
     hello.answer_reminder("hello-world:notyet")
     assert hello.SHOWN == []
+
+
+def test_a_plan_of_several_things_is_split_and_each_is_finished_on_its_own():
+    hello = _load_hello()
+    assert hello.plan_parts("Call Ana; ; send the report ") == ["Call Ana", "send the report"]
+    assert hello.plan_parts("one thing") == ["one thing"]
+    assert len(hello.plan_parts(";".join("abcdefg"))) == hello.MAX_PARTS
+    first = run(text="Call Ana; send the report; book travel\n\n")
+    p = run(text="1 3\n\n", day="2026-10-02", home=first.home)
+    assert "1  Call Ana" in p.stdout and "The rest is kept for today." in p.stdout
+    saved = notes(first.home)
+    assert [f["text"] for f in saved["finished"]] == ["Call Ana", "book travel"]
+    assert saved["done"] == 2
+    assert saved["intent"]["text"] == "send the report"
+    assert saved["intent"]["since"] == "2026-10-01"
+    p = run(text="y\n\n\n", day="2026-10-03", home=first.home)
+    assert notes(first.home)["done"] == 3
+
+
+def test_all_of_a_plan_of_several_things_and_not_yet():
+    first = run(text="Call Ana; send the report\n\n")
+    run(text="y\n\n\n", day="2026-10-02", home=first.home)
+    assert notes(first.home)["done"] == 2 and notes(first.home)["intent"] is None
+    first = run(text="Call Ana; send the report\n\n")
+    p = run(text="1 2\n\n\n", day="2026-10-02", home=first.home)
+    assert "The rest is kept" not in p.stdout and notes(first.home)["done"] == 2
+    first = run(text="Call Ana; send the report\n\n")
+    p = run(text="banana\nn\n\n\n", day="2026-10-02", home=first.home)
+    assert 'Sorry, "banana" is not one of the choices.' in p.stdout
+    assert notes(first.home)["intent"]["text"] == "Call Ana; send the report"
+
+
+def test_the_window_ticks_some_things_done_and_keeps_the_rest():
+    first = run(text="Call Ana; send the report; book travel\n\n")
+    hello = _window_hello(home=first.home)
+    visit = hello.Visit()
+    message = visit.answer("yes", [1])
+    assert message.endswith("The rest is kept for today.")
+    saved = notes(first.home)
+    assert [f["text"] for f in saved["finished"]] == ["send the report"]
+    assert visit.plan() == "Call Ana; book travel"
+    assert visit.did_it("Call Ana; book travel") in hello.DONE_LINES
+    assert notes(first.home)["done"] == 3
+
+
+def test_skip_on_the_reminder_counts_a_skip():
+    first = run(text="Write the report\n\n")
+    p = run(["--answer", "hello-world:skip"], day="2026-10-02", home=first.home)
+    assert p.returncode == 0 and notes(first.home)["intent"]["skips"] == 1
+
+
+def test_delete_everything_keeps_the_settings():
+    first = run(text="Write the report\n\n")
+    hello = _window_hello(home=first.home)
+    visit = hello.Visit()
+    assert visit.toggle("streak") and visit.toggle("tips")
+    said = visit.delete_all()
+    assert "Your settings were kept." in said
+    saved = notes(first.home)
+    assert saved["streak"] is True and saved["tips"] is False
+    assert saved["intent"] is None and "finished" not in saved
+
+
+def test_ctrl_c_twice_closes_and_once_only_skips():
+    hello = _load_hello()
+    hello.FORCE_INTERACTIVE = True
+    calls = []
+
+    def interrupted(prompt=""):
+        calls.append(prompt)
+        raise KeyboardInterrupt
+
+    hello.say = lambda text="": None
+    import builtins
+    real = builtins.input
+    builtins.input = interrupted
+    try:
+        assert hello.ask("Question > ") is None
+        try:
+            hello.ask("Question > ")
+            raise AssertionError("a second Ctrl+C should close")
+        except hello.Quit:
+            pass
+        hello.INTERRUPTED = 0.0
+        assert hello.ask("Question > ") is None
+    finally:
+        builtins.input = real
+
+
+def test_a_person_can_choose_their_language():
+    p = run(text="\nm\n10\n2\n\n\n")
+    assert "Language (now following Windows)" in p.stdout
+    assert "2  Español" in p.stdout
+    assert "The new language shows next time" in p.stdout
+    assert notes(p.home)["lang"] == "es"
+    p = run(text="\n\n", home=p.home, day="2026-10-02")
+    assert "¡Hola, mundo!" in p.stdout
+    p = run(text="\n\n", home=p.home, day="2026-10-03", policy={"ForceEnglish": 1})
+    assert "Hello, world!" in p.stdout
+    hello = _window_hello(home=p.home)
+    visit = hello.Visit()
+    assert hello.set_language(visit.state, visit.can_save, None)
+    assert "lang" not in notes(p.home)

@@ -129,5 +129,5 @@ The tester's findings were fixed and each has a test. The ones that mattered:
 - `README.md`: the employee page, what is saved, and the install steps.
 - `PLAN.md`: the findings, their status, and the rollout plan.
 - `CHANGELOG.md`: what changed in each release and why.
-- `BACKLOG.md`: changes considered and declined, with reasons.
+- `TODO.md`: the build queue. Nothing is declined.
 - `reviews/`: the saved review of each installer round.

@@ -24,9 +24,14 @@ you want to get done today. Type it and press Enter, or click **Not today**.
 That's all you need. Everyone sees the same thought and tip on the same day,
 so you can compare notes with a coworker.
 
-Saving says "Saved." and leaves the window open; Enter again closes it.
+A few things for one day go in the same box with `;` between them, such as
+`Call Ana; send the report`. Saving says "Saved." and leaves the window open;
+Enter again closes it.
 The next day the window asks "Did you do it?" with three buttons: **Done**,
 **Not yet** (keeps the plan for today) and **Skip** (asks again next time).
+For a plan of a few things, tick the ones you did before clicking Done, and
+the rest are kept for today. The text screen asks the same with numbers:
+`1 3` means the first and third are done.
 When today's plan is finished, click **I did it**; if you changed the words in
 the box first, the new words are what's marked done. To drop a plan, empty
 the box and click **Save**. Typing a new plan instead of answering keeps the
@@ -36,11 +41,13 @@ After your first plan it asks once whether you want a reminder when you sign
 in. With it on, a Windows notification appears at your first sign-in of the
 day, only when there is a plan to ask about: "Last time you planned: ... Did
 you do it?". Click **Done** or **Not yet** on it and that's the answer; nothing
-else opens, and Done brings a short thank-you. Click the notification itself
+else opens, and Done brings a short thank-you. Skip is there too. Click the notification itself
 to open the window. With no plan, it stays quiet. **Options** in the window
 turns the reminder off, hides the thought and tip, turns on the days-in-a-row
-message, shows what is saved, deletes everything, or switches to the text
-screen.
+message, picks a language other than the Windows one, shows what is saved,
+deletes everything (your settings stay), or switches to the text screen. In
+the text screen, menu option 10 picks the language, and pressing Ctrl+C twice
+closes it.
 
 ### The text screen
 
@@ -170,7 +177,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.29.0'
+$tag = 'v1.30.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
@@ -253,7 +260,7 @@ Get-ItemProperty HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\hello
 - `docs/ACCESSIBILITY.md`: how it meets accessibility expectations, and how that was checked.
 - `test_hello.py`: run with `python test_hello.py` (Python 3.11 or later).
 - `VERSION`: the release version; a new version on `main` gets a tag.
-- `CHANGELOG.md`, `BACKLOG.md`, `reviews/`: change history, declined changes
+- `CHANGELOG.md`, `TODO.md`, `reviews/`: change history, the build queue
   with reasons, and the saved review of each round.
 - `PLAN.md`: the value and rollout plan.
 - `TODO.md`: what a six-voice panel agreed should be done next.
