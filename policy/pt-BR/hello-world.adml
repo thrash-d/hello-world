@@ -48,6 +48,39 @@ Use esta política quando os usuários de leitores de tela tiverem testado apena
 Se desabilitada ou não configurada, o hello-world pergunta uma vez a cada pessoa.
 
 "Desativar a abertura do hello-world ao entrar" prevalece sobre esta política.</string>
+      <string id="SUPPORTED_1_32">hello-world 1.32.0 ou posterior</string>
+      <string id="ReportUsage">Gravar eventos de uso no log de eventos</string>
+      <string id="ReportUsage_Help">Se habilitada, o hello-world grava um evento no log Aplicativo, origem hello-world, evento 2000, sempre que alguém o abre, define um plano ou conclui um: "hello-world: opened", "hello-world: plan set" ou "hello-world: plan finished". Os eventos não têm o texto dos planos e nada é enviado pela rede; a sua própria coleta de eventos decide para onde vão.
+
+Se desabilitada ou não configurada, o hello-world não grava eventos de uso.</string>
+      <string id="LogErrors">Manter um log de erros</string>
+      <string id="LogErrors_Help">Se habilitada, o hello-world acrescenta uma linha a errors.log na pasta de dados de cada pessoa quando algo dá errado: a hora, a versão, o tipo do erro e as linhas do hello.py envolvidas. Não tem o texto dos planos e fica abaixo de 100 KB.
+
+Se desabilitada ou não configurada, o hello-world não mantém log de erros.</string>
+      <string id="TimestampBackups">Nomear as cópias de um arquivo danificado por data e hora</string>
+      <string id="TimestampBackups_Help">Se habilitada, um notes.json danificado é separado como notes.json.&lt;data-hora&gt;.bak em vez de notes.json.bak, notes.json.bak2 e assim por diante.
+
+Se desabilitada ou não configurada, as cópias são numeradas.</string>
+      <string id="LeaveDamagedFile">Não mexer num arquivo danificado quando ninguém está na tela</string>
+      <string id="LeaveDamagedFile_Help">Se habilitada, uma execução sem ninguém no teclado, como a de entrada sem console, deixa um notes.json danificado onde está em vez de separá-lo. A próxima visita com alguém na tela o separa e avisa.
+
+Se desabilitada ou não configurada, um arquivo danificado é separado como cópia sempre que é encontrado.</string>
+      <string id="MaxBackups">Manter no máximo este número de cópias de um arquivo danificado</string>
+      <string id="MaxBackups_Help">Se habilitada, o hello-world apaga as cópias mais antigas de um notes.json danificado além deste número antes de criar uma nova.
+
+Se desabilitada ou não configurada, todas as cópias ficam até a pessoa apagar tudo.</string>
+      <string id="FeedbackAddress">Endereço para comentários</string>
+      <string id="FeedbackAddress_Help">Se habilitada, o menu Opções da janela tem "Enviar comentários...", que abre um novo e-mail para este endereço no programa de e-mail da pessoa. O hello-world não envia nada.
+
+Se desabilitada ou não configurada, não há opção de comentários.</string>
     </stringTable>
+    <presentationTable>
+      <presentation id="FeedbackAddress">
+        <textBox refId="FeedbackAddress"><label>Endereço:</label></textBox>
+      </presentation>
+      <presentation id="MaxBackups">
+        <decimalTextBox refId="MaxBackups" defaultValue="5">Cópias a manter:</decimalTextBox>
+      </presentation>
+    </presentationTable>
   </resources>
 </policyDefinitionResources>

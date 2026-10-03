@@ -436,7 +436,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.31.0"
+VERSION = "1.32.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -557,6 +557,91 @@ def policy(name):
     return False
 
 
+def policy_value(name, kind):
+    """A Group Policy value of `kind` ("text" or "number"), HKLM first, or
+    None when it isn't set."""
+    if POLICY is not None:
+        value = POLICY.get(name)
+        return value if isinstance(value, str if kind == "text" else int) else None
+    if os.name != "nt":
+        return None
+    import winreg
+    want = (winreg.REG_SZ,) if kind == "text" else (winreg.REG_DWORD,)
+    for hive in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+        try:
+            with winreg.OpenKey(hive, POLICY_KEY) as key:
+                value, found = winreg.QueryValueEx(key, name)
+            if found in want:
+                return value
+        except OSError:
+            pass
+    return None
+
+
+def feedback_address():
+    """The address the FeedbackAddress policy sets, when it looks like one."""
+    value = policy_value("FeedbackAddress", "text") or ""
+    local, _, domain = value.strip().partition("@")
+    if (local and "." in domain and len(value) <= 254
+            and not any(c.isspace() or c in '<>"?&%,;' for c in value)):
+        return value.strip()
+    return None
+
+
+# A list in tests: the usage events that would go to the event log.
+EVENTS = None
+
+
+def report_usage(what):
+    """Under the ReportUsage policy, write one line to the Application event
+    log, source hello-world: "opened", "plan set" or "plan finished". Never
+    plan text, and nothing goes over a network."""
+    if not policy("ReportUsage"):
+        return
+    message = f"hello-world: {what}"
+    if EVENTS is not None:
+        EVENTS.append(message)
+        return
+    if os.name != "nt":
+        return
+    try:
+        import ctypes
+        api = ctypes.windll.advapi32
+        api.RegisterEventSourceW.restype = ctypes.c_void_p
+        source = api.RegisterEventSourceW(None, "hello-world")
+        if source:
+            strings = (ctypes.c_wchar_p * 1)(message)
+            # EVENTLOG_INFORMATION_TYPE, event 2000
+            api.ReportEventW(ctypes.c_void_p(source), 4, 0, 2000, None, 1, 0,
+                             strings, None)
+            api.DeregisterEventSource(ctypes.c_void_p(source))
+    except (AttributeError, OSError):
+        pass
+
+
+def log_error(error):
+    """Under the LogErrors policy, add what went wrong to errors.log in the
+    data folder, kept under 100 KB. Never plan text: only the error's type
+    and where in hello.py it happened."""
+    if not policy("LogErrors"):
+        return
+    import traceback
+    where = [f"line {f.lineno} in {f.name}"
+             for f in traceback.extract_tb(error.__traceback__)
+             if f.filename == os.path.abspath(__file__)]
+    line = (f"{datetime.datetime.now().isoformat(timespec='seconds')} "
+            f"{VERSION} {type(error).__name__}: {', '.join(where[-3:])}\n")
+    path = os.path.join(data_dir(), "errors.log")
+    try:
+        os.makedirs(data_dir(), mode=0o700, exist_ok=True)
+        if os.path.exists(path) and os.path.getsize(path) > 100_000:
+            os.replace(path, path + ".old")
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(line)
+    except OSError:
+        pass
+
+
 def plans_off():
     """Group Policy can turn plans off, for records or works-council rules."""
     return policy("DisablePlans")
@@ -601,7 +686,8 @@ def launcher_on():
 
 # Choices, not notes: Delete everything keeps them.
 SETTINGS = ("streak", "tips", "text", "offered", "offer_skips", "lang",
-            "nudge", "open_after", "no_weekends", "name", "remind_at")
+            "nudge", "open_after", "no_weekends", "name", "remind_at",
+            "no_startup_visits")
 
 
 def new_state():
@@ -702,7 +788,30 @@ def day(value):
 
 
 def backup_name(path):
-    """notes.json.bak, or a numbered name when an earlier backup exists."""
+    """notes.json.bak, or a numbered name when an earlier backup exists. Under
+    the TimestampBackups policy, notes.json.<date-time>.bak instead. The
+    MaxBackups policy deletes the oldest beyond that many first."""
+    keep = policy_value("MaxBackups", "number")
+    if keep:
+        folder, base = os.path.split(path)
+        try:
+            old = sorted((os.path.getmtime(os.path.join(folder, n)), n)
+                         for n in os.listdir(folder)
+                         if n.startswith(base + ".") and ".bak" in n)
+        except OSError:
+            old = []
+        for _, n in old[:max(0, len(old) - keep + 1)]:
+            try:
+                os.remove(os.path.join(folder, n))
+            except OSError:
+                pass
+    if policy("TimestampBackups"):
+        stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        name, n = f"{path}.{stamp}.bak", 1
+        while os.path.exists(name):
+            n += 1
+            name = f"{path}.{stamp}-{n}.bak"
+        return name
     name, n = path + ".bak", 1
     while os.path.exists(name):
         n += 1
@@ -760,7 +869,8 @@ def load(repair=True):
         state["offered"] = True
     if raw.get("text") is True:
         state["text"] = True
-    for key in ("nudge", "open_after", "no_weekends", "name"):
+    for key in ("nudge", "open_after", "no_weekends", "name",
+                "no_startup_visits"):
         if raw.get(key) is True:
             state[key] = True
     if raw.get("remind_at") in REMINDER_TIMES:
@@ -847,9 +957,14 @@ def load(repair=True):
     return state, True
 
 
+# The layout of notes.json. load() still checks every field by type.
+SCHEMA = 1
+
+
 def file_form(state):
     """What goes in the file: the state, holding at most MAX_VISITS dates."""
-    out = {k: v for k, v in state.items() if not (k == "epoch" and not v)}
+    out = {"schema": SCHEMA}
+    out.update({k: v for k, v in state.items() if not (k == "epoch" and not v)})
     out["visits"] = sorted(set(state["visits"]))[-MAX_VISITS:]
     # The same rule as load(): with no days-in-a-row count, one date.
     if policy("HideDaysInARow") or not state.get("streak"):
@@ -1841,6 +1956,11 @@ def plan_parts(text):
 
 
 def finish_plan(state, text, d, parts=None):
+    report_usage("plan finished")
+    return _finish_plan(state, text, d, parts)
+
+
+def _finish_plan(state, text, d, parts=None):
     """Count a finished plan, dated d, one finished row and one done for each
     thing in it. `parts` finishes only those indexes; returns the rest of the
     plan, or "". `same` only ever holds unfinished plans."""
@@ -2040,9 +2160,10 @@ def answer_plan(state, can_save, d, choice, text, parts=None):
 def daily(startup):
     d = today()
     iso = d.isoformat()
-    state, can_save = load()
-    base = copy.deepcopy(state)
     person = interactive()
+    # Repairing sets the file aside with a notice nobody might read.
+    state, can_save = load(repair=person or not policy("LeaveDamagedFile"))
+    base = copy.deepcopy(state)
     seen_today = iso in state["visits"]
     typed_new = False
     answered = False
@@ -2209,7 +2330,10 @@ def daily(startup):
     # With nobody at the keyboard, such as a launch with no console, show the
     # screen but keep today's questions for the next real visit.
     if person:
-        if not seen_today:
+        report_usage("opened")
+        if typed_new:
+            report_usage("plan set")
+        if not seen_today and not (startup and state.get("no_startup_visits")):
             state["visits"] = (state["visits"] + [iso])[-MAX_VISITS:]
         state["intent"] = intent
         # A plan only tidied here (a future date made today, an old plan
@@ -2345,6 +2469,18 @@ def run(argv):
             return 0
     if len(argv) == 2 and argv[0] == "--remind" and argv[1] in ("on", "off"):
         return 0 if remind(argv[1] == "on") else 1
+    if len(argv) == 2 and argv[0] == "--count-sign-in" and argv[1] in ("on", "off"):
+        state, can_save = load()
+        base = copy.deepcopy(state)
+        if argv[1] == "on":
+            state.pop("no_startup_visits", None)
+        else:
+            state["no_startup_visits"] = True
+        if commit(state, base, can_save):
+            say(tr("Saved."))
+            return 0
+        say(tr("Could not save that choice on this computer."))
+        return 1
     if len(argv) == 2 and argv[0] == "--streak" and argv[1] in ("on", "off"):
         state, can_save = load()
         base = copy.deepcopy(state)
@@ -2394,7 +2530,8 @@ def main():
             or args == ["--startup"] and sys.stdout is None):
         try:
             return gui(args)
-        except Exception:
+        except Exception as e:
+            log_error(e)
             return 1
     try:
         # print() silently does nothing when stdout is None (fd 1 closed at start).
@@ -2423,6 +2560,7 @@ def main():
     except KeyboardInterrupt:
         return 1
     except Exception as e:
+        log_error(e)
         try:
             print(f"hello.py: something went wrong ({type(e).__name__}). "
                   "Contact IT.", file=sys.stderr, flush=True)
@@ -2484,6 +2622,28 @@ def gui(args):
         return show_window()
 
 
+# A list in tests: what would have been opened with the default program.
+STARTED = None
+
+
+def send_feedback():
+    """Open a new mail to the FeedbackAddress policy's address in the
+    person's own mail program. hello-world itself sends nothing."""
+    address = feedback_address()
+    if not address:
+        return False
+    from urllib.parse import quote
+    link = f"mailto:{address}?subject={quote('hello-world ' + VERSION)}"
+    if STARTED is not None:
+        STARTED.append(link)
+        return True
+    try:
+        os.startfile(link)
+        return True
+    except (AttributeError, OSError):
+        return False
+
+
 def show_window():
     state, _ = load(repair=False)
     if os.name != "nt" or text_screen(state):
@@ -2491,7 +2651,8 @@ def show_window():
         return 0
     try:
         Window(Visit()).run()
-    except Exception:
+    except Exception as e:
+        log_error(e)
         # A PC where the window can't be drawn still gets the text screens.
         open_console()
     return 0
@@ -2505,7 +2666,9 @@ APP_ID = "hello-world"
 # A list in tests: the reminder tasks that would be created, by time, and
 # None for a removed one. Nothing outside the program sets it.
 TASKS = None
-TASK_NAME = "hello-world reminder"
+# The task folder is shared by everyone on the PC, so each person's task
+# carries their user name.
+TASK_NAME = "hello-world reminder " + (os.environ.get("USERNAME") or "user")
 REMINDER_TIMES = ("08:00", "09:00", "10:00", "13:00")
 
 
@@ -2774,6 +2937,7 @@ class Visit:
                 notes.append(tr("You have opened this {row} days in a row. "
                                 "Nice to see you.").format(row=row))
         state["intent"] = intent
+        report_usage("opened")
         if not seen:
             state["visits"] = (state["visits"] + [self.iso])[-MAX_VISITS:]
         saved, said = quietly(commit, state, base, self.can_save,
@@ -3411,6 +3575,8 @@ class Window:
             entries.append((0, 8, tr("Language...")))
         entries.append((0, 5, tr("Show what is saved on this computer")))
         entries.append((0, 6, tr("Delete everything saved")))
+        if feedback_address():
+            entries.append((0, 11, tr("Send feedback...")))
         entries.append((0x800, 0, None))  # MF_SEPARATOR
         entries.append((grayed if policy("UseTextScreen") else 0, 3,
                         tr("Use the text screen")))
@@ -3420,6 +3586,8 @@ class Window:
             self.set_text(self.STATUS, v.set_reminder(not reminder_on()))
         elif choice == 9:
             self.reminder_settings()
+        elif choice == 11:
+            send_feedback()
         elif choice == 10:
             saved = v.toggle("name")
             self.set_text(self.STATUS, tr("Saved.") if saved else
@@ -4168,6 +4336,8 @@ sitio.""",
             'No los fines de semana',
         'Done. A reminder comes at {at} each day, if there is a plan to ask about.':
             'Listo. Cada día a las {at} llega un aviso si hay un plan sobre el que preguntar.',
+        'Send feedback...':
+            'Enviar comentarios...',
     },
 }
 
@@ -4859,6 +5029,8 @@ Digite m para ver as opções de novo. Nada é enviado para lugar nenhum.""",
             'Não nos fins de semana',
         'Done. A reminder comes at {at} each day, if there is a plan to ask about.':
             'Pronto. Todo dia às {at} aparece um lembrete se houver um plano para acompanhar.',
+        'Send feedback...':
+            'Enviar comentários...',
     },
 }
 
@@ -5551,6 +5723,8 @@ Tapez m pour revoir les options. Rien n'est envoyé nulle part.""",
             'Pas le week-end',
         'Done. A reminder comes at {at} each day, if there is a plan to ask about.':
             "C'est fait. Un rappel s'affiche chaque jour à {at} s'il y a un plan à suivre.",
+        'Send feedback...':
+            'Envoyer un commentaire...',
     },
 }
 
@@ -6242,6 +6416,8 @@ irgendwohin gesendet.""",
             'Nicht am Wochenende',
         'Done. A reminder comes at {at} each day, if there is a plan to ask about.':
             'Fertig. Jeden Tag um {at} kommt eine Erinnerung, wenn es einen Plan zum Nachfragen gibt.',
+        'Send feedback...':
+            'Rückmeldung senden...',
     },
 }
 

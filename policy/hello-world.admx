@@ -11,6 +11,7 @@
       <definition name="SUPPORTED_1_25" displayName="$(string.SUPPORTED_1_25)" />
       <definition name="SUPPORTED_1_28" displayName="$(string.SUPPORTED_1_28)" />
       <definition name="SUPPORTED_1_31" displayName="$(string.SUPPORTED_1_31)" />
+      <definition name="SUPPORTED_1_32" displayName="$(string.SUPPORTED_1_32)" />
     </definitions>
   </supportedOn>
   <categories>
@@ -58,6 +59,40 @@
       <supportedOn ref="SUPPORTED_1_31" />
       <enabledValue><decimal value="1" /></enabledValue>
       <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+    <policy name="ReportUsage" class="Both" displayName="$(string.ReportUsage)" explainText="$(string.ReportUsage_Help)" key="SOFTWARE\Policies\hello-world" valueName="ReportUsage">
+      <parentCategory ref="HelloWorld" />
+      <supportedOn ref="SUPPORTED_1_32" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+    <policy name="LogErrors" class="Both" displayName="$(string.LogErrors)" explainText="$(string.LogErrors_Help)" key="SOFTWARE\Policies\hello-world" valueName="LogErrors">
+      <parentCategory ref="HelloWorld" />
+      <supportedOn ref="SUPPORTED_1_32" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+    <policy name="TimestampBackups" class="Both" displayName="$(string.TimestampBackups)" explainText="$(string.TimestampBackups_Help)" key="SOFTWARE\Policies\hello-world" valueName="TimestampBackups">
+      <parentCategory ref="HelloWorld" />
+      <supportedOn ref="SUPPORTED_1_32" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+    <policy name="LeaveDamagedFile" class="Both" displayName="$(string.LeaveDamagedFile)" explainText="$(string.LeaveDamagedFile_Help)" key="SOFTWARE\Policies\hello-world" valueName="LeaveDamagedFile">
+      <parentCategory ref="HelloWorld" />
+      <supportedOn ref="SUPPORTED_1_32" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+    <policy name="MaxBackups" class="Both" displayName="$(string.MaxBackups)" explainText="$(string.MaxBackups_Help)" presentation="$(presentation.MaxBackups)" key="SOFTWARE\Policies\hello-world">
+      <parentCategory ref="HelloWorld" />
+      <supportedOn ref="SUPPORTED_1_32" />
+      <elements><decimal id="MaxBackups" valueName="MaxBackups" minValue="1" maxValue="100" /></elements>
+    </policy>
+    <policy name="FeedbackAddress" class="Both" displayName="$(string.FeedbackAddress)" explainText="$(string.FeedbackAddress_Help)" presentation="$(presentation.FeedbackAddress)" key="SOFTWARE\Policies\hello-world">
+      <parentCategory ref="HelloWorld" />
+      <supportedOn ref="SUPPORTED_1_32" />
+      <elements><text id="FeedbackAddress" valueName="FeedbackAddress" maxLength="254" /></elements>
     </policy>
   </policies>
 </policyDefinitions>

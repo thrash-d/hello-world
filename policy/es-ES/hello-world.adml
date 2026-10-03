@@ -48,6 +48,39 @@ Use esta directiva cuando los usuarios de lectores de pantalla solo hayan probad
 Si se deshabilita o no se configura, hello-world pregunta una vez a cada persona.
 
 "Desactivar la apertura de hello-world al iniciar sesión" prevalece sobre esta directiva.</string>
+      <string id="SUPPORTED_1_32">hello-world 1.32.0 o posterior</string>
+      <string id="ReportUsage">Escribir eventos de uso en el registro de eventos</string>
+      <string id="ReportUsage_Help">Si se habilita, hello-world escribe un evento en el registro de aplicaciones, origen hello-world, evento 2000, cada vez que alguien lo abre, crea un plan o termina uno: "hello-world: opened", "hello-world: plan set" o "hello-world: plan finished". Los eventos no contienen el texto de los planes y nada se envía por la red; su propia recogida de eventos decide adónde van.
+
+Si se deshabilita o no se configura, hello-world no escribe eventos de uso.</string>
+      <string id="LogErrors">Mantener un registro de errores</string>
+      <string id="LogErrors_Help">Si se habilita, hello-world añade una línea a errors.log en la carpeta de datos de cada persona cuando algo falla: la hora, la versión, el tipo de error y las líneas de hello.py implicadas. No contiene el texto de los planes y no pasa de 100 KB.
+
+Si se deshabilita o no se configura, hello-world no mantiene registro de errores.</string>
+      <string id="TimestampBackups">Nombrar las copias de un archivo dañado por fecha y hora</string>
+      <string id="TimestampBackups_Help">Si se habilita, un notes.json dañado se aparta como notes.json.&lt;fecha-hora&gt;.bak en lugar de notes.json.bak, notes.json.bak2, etc.
+
+Si se deshabilita o no se configura, las copias se numeran.</string>
+      <string id="LeaveDamagedFile">No tocar un archivo dañado cuando no hay nadie ante la pantalla</string>
+      <string id="LeaveDamagedFile_Help">Si se habilita, una ejecución sin nadie al teclado, como la del inicio de sesión sin consola, deja un notes.json dañado donde está en lugar de apartarlo. La siguiente visita con alguien delante lo aparta y lo dice.
+
+Si se deshabilita o no se configura, un archivo dañado se aparta como copia siempre que se encuentra.</string>
+      <string id="MaxBackups">Guardar como máximo este número de copias de un archivo dañado</string>
+      <string id="MaxBackups_Help">Si se habilita, hello-world borra las copias más antiguas de un notes.json dañado que pasen de este número antes de crear una nueva.
+
+Si se deshabilita o no se configura, se guardan todas las copias hasta que la persona borra todo.</string>
+      <string id="FeedbackAddress">Dirección para comentarios</string>
+      <string id="FeedbackAddress_Help">Si se habilita, el menú Opciones de la ventana tiene "Enviar comentarios...", que abre un correo nuevo a esta dirección en el programa de correo de la persona. hello-world no envía nada.
+
+Si se deshabilita o no se configura, no hay opción de comentarios.</string>
     </stringTable>
+    <presentationTable>
+      <presentation id="FeedbackAddress">
+        <textBox refId="FeedbackAddress"><label>Dirección:</label></textBox>
+      </presentation>
+      <presentation id="MaxBackups">
+        <decimalTextBox refId="MaxBackups" defaultValue="5">Copias que guardar:</decimalTextBox>
+      </presentation>
+    </presentationTable>
   </resources>
 </policyDefinitionResources>

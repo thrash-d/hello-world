@@ -123,6 +123,15 @@ Use the `QuietUninstallString` from the Apps entry, never the plain
 
 ## Logs and events
 
+`uninstall.ps1` turns off every user's reminder: the `hello-world` Run value
+of each signed-in user, when its data runs `hello.py` or `hello.cmd` with
+`--startup`, and every `hello-world reminder` scheduled task. With
+`-RemoveNotes` it also deletes each profile's `AppData\Local\hello-world`
+files (`notes.json` and its backups, `notes.lock`, `errors.log`), checking
+that no folder on the way is a link just before each delete. The script's
+help says what that check can't rule out.
+
+
 - `%WINDIR%\Logs\hello-world\install.log` and `uninstall.log`, readable by
   administrators only. One earlier install log is kept as `install.log.old`.
 - Application event log, source `hello-world`:
@@ -156,6 +165,12 @@ settings are under Computer or User Configuration > Administrative Templates
 | Hide the days-in-a-row message | `HideDaysInARow` | Never shows the count, and keeps only the latest visit date |
 | Turn off plans | `DisablePlans` | Never asks for a plan, and keeps no plan text, finished plans or done count; text already saved is dropped at each person's next visit |
 | Always show hello-world in English | `ForceEnglish` | Shows English even where the Windows display language is Spanish, French, Portuguese or German |
+| Write usage events to the event log | `ReportUsage` | One Application event, source `hello-world`, ID 2000, for each open, plan set and plan finished. No plan text; nothing goes over a network |
+| Keep an error log | `LogErrors` | `errors.log` in each person's data folder: time, version, error type and `hello.py` line numbers, under 100 KB. No plan text |
+| Name backups of a damaged file by date and time | `TimestampBackups` | `notes.json.<date-time>.bak` instead of numbered backups |
+| Keep at most this many backups of a damaged file | `MaxBackups` (DWORD 1 to 100) | Deletes the oldest backups beyond that number before making a new one |
+| Leave a damaged file alone when nobody is at the screen | `LeaveDamagedFile` | A run with nobody at the keyboard leaves a damaged file in place for the next visit |
+| Address for feedback | `FeedbackAddress` (string) | Adds Options > Send feedback..., which opens a new mail to that address in the person's own mail program |
 | Turn on the sign-in reminder for everyone | `TurnOnReminder` | Turns the reminder on at each person's next open unless they already answered the question; each person can still turn it off |
 | Open hello-world as a text screen | `UseTextScreen` | The Start menu opens the text screen in a console, as before 1.28.0, and the sign-in launcher opens it instead of showing a notification |
 
