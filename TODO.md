@@ -21,6 +21,8 @@ Items 3 to 8 from the panel's list, plus the installer code for item 2:
 
 1. A simulated 30-day pilot ran instead of waiting a month, with a second two-week round on 1.20.0. `docs/PILOT.md` has what they found, and 1.20.0 and 1.21.0 answer it. A real pilot can still follow.
 2. Check with a real NVDA user whether `>` at the end of each prompt is spoken as "greater". The simulated NVDA user said it is.
+3. Before an enterprise rollout: sign `install.ps1` and `uninstall.ps1` with the organization's certificate, rebuild the package, and run a pilot ring through Intune or MECM with the settings in `docs/ENTERPRISE.md`.
+4. Pin the actions in the three workflows the shared kit installs (`auto-tag`, `devkit-quality`, `dependabot-automerge`), where the kit is kept.
 
 The spare-PC session passed for 1.19.0: upgrade from 1.18.0, a forced step 6 rollback, and a standard-user smoke run. `PLAN.md` records it.
 

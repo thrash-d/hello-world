@@ -42,14 +42,60 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
-          foreach ($f in 'install.ps1', 'uninstall.ps1') {
+          foreach ($f in 'install.ps1', 'uninstall.ps1', 'toolsuild-package.ps1') {
             $errors = $null
             [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f), [ref]$null, [ref]$errors)
             if ($errors) { $errors | Out-String | Write-Host; throw "$f does not parse." }
           }
           Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser -Force
-          $found = foreach ($f in 'install.ps1', 'uninstall.ps1') { Invoke-ScriptAnalyzer -Path $f -Severity Error }
+          $found = foreach ($f in 'install.ps1', 'uninstall.ps1', 'toolsuild-package.ps1') { Invoke-ScriptAnalyzer -Path $f -Severity Error }
           if ($found) { $found | Format-Table -AutoSize | Out-String | Write-Host; throw 'PSScriptAnalyzer found errors.' }
+      # The runner is an administrator, so the package really installs here:
+      # the same package the release workflow publishes, built the same way.
+      - name: Install, reinstall, refuse, retry and uninstall the package
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $pf = [Environment]::GetFolderPath('ProgramFiles')
+          $dir = Join-Path $pf 'hello-world'
+          $key = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\hello-world'
+          $version = (Get-Content VERSION).Trim()
+          $built = Join-Path $env:RUNNER_TEMP 'package'
+          $hash = (powershell -NoProfile -ExecutionPolicy Bypass -File tools\build-package.ps1 -OutDir $built | Select-Object -Last 1).Trim()
+          $setup = Join-Path $pf 'hello-setup'
+          New-Item -ItemType Directory $setup | Out-Null
+          icacls $setup /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F' | Out-Null
+          Copy-Item "$built\*" $setup
+          function Install([string]$Hash) {
+            powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $setup 'install.ps1') -PackageHash $Hash -Quiet | Write-Host
+            return $LASTEXITCODE
+          }
+          function Check([bool]$Ok, [string]$What) { if (-not $Ok) { throw "Failed: $What" }; Write-Host "ok: $What" }
+
+          Check ((Install $hash) -eq 0) 'a clean install exits 0'
+          $entry = Get-ItemProperty $key
+          Check ($entry.DisplayVersion -eq $version -and $entry.PackageHash -eq $hash) 'the Apps entry records the version and package hash'
+          Check ("$(& cmd.exe /d /c "`"$dir\hello.cmd`" --plain")" -eq 'Hello, world!') 'the installed program runs'
+          Check (-not (Get-ChildItem "$dir\python" -Filter 'libssl-*.dll')) 'OpenSSL is stripped from the bundled Python'
+          Check (Test-Path "$env:WINDIR\Logs\hello-world\install.log") 'the log is in Windows\Logs'
+          Check ([bool](Get-EventLog -LogName Application -Source 'hello-world' -InstanceId 1000 -Newest 1)) 'the install is in the event log'
+
+          Check ((Install $hash) -eq 0) 'a reinstall exits 0'
+          Check ((Install ('0' * 64)) -eq 1) 'a wrong package hash is refused'
+          Check ((Get-ItemProperty $key).PackageHash -eq $hash) 'a refused install changes nothing'
+
+          Set-ItemProperty $key -Name DisplayVersion -Value '99.0.0'
+          Check ((Install $hash) -eq 1) 'a downgrade is refused'
+          Set-ItemProperty $key -Name DisplayVersion -Value $version
+
+          $busy = Start-Process "$dir\python\python.exe" -ArgumentList '-I', '-c', 'import time; time.sleep(120)' -PassThru -WindowStyle Hidden
+          try { Check ((Install $hash) -eq 1618) 'an open window gives 1618' }
+          finally { Stop-Process -Id $busy.Id -Force; Start-Sleep -Seconds 2 }
+          Check (Test-Path "$dir\hello.cmd") 'the install is still there after 1618'
+
+          powershell -NoProfile -ExecutionPolicy Bypass -File "$dir\uninstall.ps1" -Quiet | Write-Host
+          Check ($LASTEXITCODE -eq 0) 'uninstall exits 0'
+          Check (-not (Test-Path $dir) -and -not (Test-Path $key)) 'uninstall removes the folder and the Apps entry'
       # A dead URL or a wrong hash would pass every other check and fail every
       # real install at step 4, so run what the installer will run.
       - name: Check the pinned Python and run hello.py on it

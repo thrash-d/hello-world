@@ -13,6 +13,8 @@ Changes considered and declined, with the reason. On 2 October 2026 the list fro
 - A schema version: `load()` checks every field by type, which is the schema. A lock file was added in 1.22.0 after a review showed a delete could land between another window's read and write.
 - Turning the days-in-a-row message off by default (simulated pilot, the manager): it shows only on milestones, the pilot users mostly liked it, and option 3 hides it. Revisit if real employees read it as being counted.
 - Removing the program without an administrator (simulated pilot, the manager): an all-users install needs one to remove. The README says how to stop using it without IT.
+- Deleting every user's notes from the uninstaller (`-RemoveNotes`, added in 1.22.0, withdrawn in 1.23.0): an administrator deleting inside user profiles can be pointed elsewhere by a link a user controls, and that can't be checked away. Users delete their own notes with option 4; `docs/ENTERPRISE.md` tells IT to use their own profile cleanup.
+- Signing the scripts in this repository: it needs the deploying organization's certificate. `docs/ENTERPRISE.md` says how to sign and rebuild the package.
 - Not counting the sign-in `--startup` window as a visit: it would change what "in a row" means.
 - Skip repairing a damaged file when nobody can see the screen: the file is set aside as a backup, never deleted.
 - Ctrl+C ending the whole visit: Ctrl+C skips one prompt, which is safer for someone who pressed it by accident.

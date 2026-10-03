@@ -89,18 +89,44 @@ file, so don't type passwords or private details.
 Menu option 1 shows all of it, and whether it opens by itself at sign-in.
 Option 7 forgets one finished plan, and option 4 deletes everything. After a delete the file holds only a random marker, so
 another open window can't write the notes back. A damaged file is kept as
-`notes.json.bak` until you delete everything. Uninstalling asks the
-administrator whether to delete everyone's notes too; if not, delete the
-folder yourself if you don't want it.
+`notes.json.bak` until you delete everything. Uninstalling leaves your notes
+in place, so if you don't want them kept, delete them with option 4 first.
 
 ## For IT: install
+
+There are two ways to install. Both check every file before anything changes,
+install for all users under Program Files, and exit 0 on success, 1618 when an
+open hello-world window blocks an upgrade, and 1 on any other failure.
+
+- **From the release package**, for deployment tools and for PCs without Git
+  or internet access. `docs/ENTERPRISE.md` covers Intune, MECM and Group
+  Policy, detection rules, signing, logging and the security model.
+- **From a git clone** at a reviewed commit, below.
+
+### From the release package
+
+Each release on GitHub has a package zip and, in its notes, the package hash.
+Unzip the package into a folder only administrators can write, such as
+`C:\Program Files\hello-setup`, then run this as administrator or SYSTEM, with
+the package hash from the release you reviewed:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File install.ps1 -PackageHash <package hash> -Quiet
+```
+
+The package hash is the SHA-256 of the package's `SHA256SUMS`, which lists the
+hash of every file. Anyone can rebuild the package from the reviewed commit
+with `tools\build-package.ps1` and get the same hash, so the hash doesn't rest
+on the release alone.
+
+### From a git clone
 
 Run these in one PowerShell window opened as administrator, each line on its own. Change the
 first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.22.0'
+$tag = 'v1.23.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
@@ -112,46 +138,57 @@ cd $d; Set-ExecutionPolicy -Scope Process Bypass -Force
 .\install.ps1 -Commit $commit
 ```
 
-Employees can then turn on a once-a-day sign-in reminder themselves. It lives
-in their own Startup folder, needs no administrator rights, and the uninstaller
-removes it.
+This way needs Git for Windows installed for all users and internet access to
+download Python. The permission checks on Git can take several minutes, so let
+them finish.
 
-The installer needs Git for Windows installed for all users and internet
-access. It checks six steps and prints `[1/6]` to `[6/6]` as it goes. The
-permission checks on Git can take several minutes, so let them finish. The
-result line says whether this was a new install, a reinstall, or an upgrade
-from an earlier version.
+### What the installer does
 
-For an unattended run, add `-Quiet`. It prints only warnings, errors and the
-result line, never asks a question, and exits 0 on success and 1 on failure.
-Everything is also written to `install.log` in the setup folder, and a copy
-is kept in the install folder.
+It checks six steps and prints `[1/6]` to `[6/6]` as it goes. The result line
+says whether this was a new install, a reinstall, or an upgrade. It refuses to
+install an older version over a newer one unless you add `-AllowDowngrade`.
+`-Publisher` sets the name shown in Settings > Apps.
+
+For an unattended run, add `-Quiet`. It prints only warnings and the result
+line, and never asks a question. Everything is written to
+`%WINDIR%\Logs\hello-world\install.log`, which only administrators can read,
+and the result goes to the Application event log under the source
+`hello-world`.
+
+Employees can turn on a once-a-day opening at sign-in themselves. It's a value
+under their own `HKCU\...\Run` key that starts the installed program and does
+nothing once the program is gone. Group Policy can turn it off; see
+`docs/ENTERPRISE.md`.
 
 ### Update to a new release
 
-An update is a fresh install of the new release. The installer upgrades in
-place. Run each line on its own:
+An update is a fresh install of the new release, and the installer upgrades in
+place. With the package, unzip the new one and run its `install.ps1` with its
+package hash. With a clone, delete the setup folder first, running each line
+on its own:
 
 ```powershell
 cd \
 Remove-Item -Recurse -Force $d
 ```
 
-Then repeat the install steps with the new tag and commit. A fresh clone is
-deliberate: it keeps the reviewed commit the only source.
+Then repeat the clone steps with the new tag and commit.
 
 ### If something fails
 
-The last line starts with `FAILED:` and says what to fix. The full record is in
-`install.log` in the setup folder. A failed run leaves any working install as
-it was. An upgrade that fails at step 6 (the Apps entry or the shortcut) puts
-the previous install back. A first install that fails there keeps its files,
-so run the installer again. If it fails when replacing the folder, it says how
-many hello-world windows are open. Close them and run it again.
+The last line starts with `FAILED:` and says what to fix, and the log has the
+full record. A failed run leaves any working install as it was:
 
-Each PC's Apps entry records the installed version, the commit and the
-install date, and has a `QuietUninstallString` for unattended removal. This
-shows what is installed:
+- An upgrade that fails at step 6 (the Apps entry or the shortcut) puts the
+  previous install back.
+- A first install that fails there leaves no Apps entry or shortcut, so a
+  deployment tool's detection sees it as not installed and tries again.
+- If an open hello-world window holds a file, it exits 1618 and says how many
+  windows are open. Close them, or let the deployment tool retry later.
+
+Each PC's Apps entry records the installed version, the package hash or
+commit, the bundled Python version and the install date, and has a
+`QuietUninstallString` for unattended removal. This shows what is installed:
 
 ```powershell
 Get-ItemProperty HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\hello-world
@@ -161,6 +198,9 @@ Get-ItemProperty HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\hello
 
 - `hello.py`: the program. `hello.cmd --help` lists its options, such as `--plain`, which prints only the greeting and saves nothing.
 - `install.ps1`, `uninstall.ps1`: deploy and remove it.
+- `tools/build-package.ps1`: builds the offline release package.
+- `policy/`: Group Policy templates (ADMX and ADML).
+- `docs/ENTERPRISE.md`: deploying to a large fleet, and the security model.
 - `test_hello.py`: run with `python test_hello.py` (Python 3.11 or later).
 - `VERSION`: the release version; a new version on `main` gets a tag.
 - `CHANGELOG.md`, `BACKLOG.md`, `reviews/`: change history, declined changes

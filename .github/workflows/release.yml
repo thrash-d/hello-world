@@ -1,0 +1,57 @@
+# Builds the offline install package for each new version on main and
+# publishes it as a GitHub release. The release notes carry the package hash,
+# which IT passes to install.ps1 -PackageHash. Runs on push to main, not on the
+# tag, because a tag pushed by another workflow's token starts no workflows.
+name: release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build and publish the package if this version has no release yet
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content VERSION).Trim()
+          $tag = "v$version"
+          gh release view $tag -R $env:REPO 2>$null | Out-Null
+          if ($LASTEXITCODE -eq 0) { Write-Host "$tag already has a release."; exit 0 }
+          $global:LASTEXITCODE = 0
+          $out = Join-Path $env:RUNNER_TEMP "hello-world-$version"
+          $hash = (powershell -NoProfile -ExecutionPolicy Bypass -File tools\build-package.ps1 -OutDir $out | Select-Object -Last 1).Trim()
+          if ($hash -notmatch '^[0-9a-f]{64}$') { throw "The build printed no package hash: $hash" }
+          $zip = Join-Path $env:RUNNER_TEMP "hello-world-$version.zip"
+          Compress-Archive -Path "$out\*" -DestinationPath $zip
+          $notes = @"
+          Offline install package for hello-world $version, built from commit $env:SHA.
+
+          Package hash (SHA-256 of SHA256SUMS): ``$hash``
+
+          Unzip into a folder only administrators can write, then run as administrator or SYSTEM:
+
+          ``````
+          powershell -NoProfile -ExecutionPolicy Bypass -File install.ps1 -PackageHash $hash -Quiet
+          ``````
+
+          ``sbom.cdx.json`` is the CycloneDX bill of materials.
+          "@
+          $notesFile = Join-Path $env:RUNNER_TEMP 'notes.md'
+          Set-Content -LiteralPath $notesFile -Value ($notes -replace '(?m)^          ', '') -Encoding utf8
+          gh release create $tag $zip (Join-Path $out 'sbom.cdx.json') -R $env:REPO --target $env:SHA --title "hello-world $version" --notes-file $notesFile
+          if ($LASTEXITCODE) { throw "gh release create failed with exit $LASTEXITCODE" }

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<policyDefinitions xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="1.0" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <policyNamespaces>
+    <target prefix="helloworld" namespace="HelloWorld.Policies" />
+  </policyNamespaces>
+  <resources minRequiredRevision="1.0" />
+  <supportedOn>
+    <definitions>
+      <definition name="SUPPORTED_1_23" displayName="$(string.SUPPORTED_1_23)" />
+    </definitions>
+  </supportedOn>
+  <categories>
+    <category name="HelloWorld" displayName="$(string.HelloWorld)" />
+  </categories>
+  <policies>
+    <policy name="DisableSignInLauncher" class="Both" displayName="$(string.DisableSignInLauncher)" explainText="$(string.DisableSignInLauncher_Help)" key="SOFTWARE\Policies\hello-world" valueName="DisableSignInLauncher">
+      <parentCategory ref="HelloWorld" />
+      <supportedOn ref="SUPPORTED_1_23" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+    <policy name="HideThoughtAndTip" class="Both" displayName="$(string.HideThoughtAndTip)" explainText="$(string.HideThoughtAndTip_Help)" key="SOFTWARE\Policies\hello-world" valueName="HideThoughtAndTip">
+      <parentCategory ref="HelloWorld" />
+      <supportedOn ref="SUPPORTED_1_23" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+    <policy name="HideDaysInARow" class="Both" displayName="$(string.HideDaysInARow)" explainText="$(string.HideDaysInARow_Help)" key="SOFTWARE\Policies\hello-world" valueName="HideDaysInARow">
+      <parentCategory ref="HelloWorld" />
+      <supportedOn ref="SUPPORTED_1_23" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+  </policies>
+</policyDefinitions>

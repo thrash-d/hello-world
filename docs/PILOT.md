@@ -108,7 +108,7 @@ changes below.
 | The file kept up to 400 dates someone opened it, which reads as an attendance record if anyone pulled it | Priya | Only the last 60 days are kept |
 | "That is 4 done so far" after each finish felt like scoring | Priya | The tally is gone; the count stays in option 1 |
 | Option 1 didn't show whether the sign-in opening is on | Priya | It does |
-| Uninstalling left everyone's notes | Priya | It asks the administrator whether to delete them, and `-RemoveNotes` does it unattended |
+| Uninstalling left everyone's notes | Priya | 1.22.0 let the uninstaller delete them; 1.23.0 withdrew that after a security review showed a user could redirect the delete. Users delete their own with option 4 |
 | Long prompts ran past a magnified window, with the choices at the far end | Glenn | Prompts wrap to the window, and only the last line waits for the answer |
 | In "When did you finish it?", `y` meant yesterday right after `y` meant yes | Glenn, Amara | The days since the plan are listed by number |
 | The plan sat after a long date label | Glenn | "Still open since ..." puts the plan on its own line |
