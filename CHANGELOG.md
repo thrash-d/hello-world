@@ -1,5 +1,37 @@
 # Changelog
 
+## 2026-10-03: a simulated week with five people, twice
+
+Version 1.29.0. The owner's assistive technology checks of the window and the notification passed: Narrator, NVDA, JAWS, Magnifier at 200 percent and high contrast. The native speaker review of the translations passed too. Both are recorded in `docs/ACCESSIBILITY.md`. The owner then asked for five employees simulated by fresh agents, each with only a persona and a tool that drives the real window: a warehouse shift lead on a shared PC, an accounts receivable analyst in Portuguese, a support agent with ADHD, an HR coordinator in Spanish who checks privacy, and a developer who pokes at everything. Each ran a work week, then all five ran it again on the fixes. `docs/PILOT.md` has who found what.
+
+Bugs:
+- **I did it** marked the old plan done when the box had been edited. The words in the box are what's finished now. (Priya: "it marked the old plan as done and threw away my edit.")
+- Saving a new plan while yesterday's question was still showing, then clicking Done, said "The other open window changed the plan, so its plan is kept." with no other window open. Saving a new plan now removes the question, and the old plan is kept for `same`. (Tom)
+- Turning off the thought and tip said "Done. The thought and tip are off." while they stayed on screen. They go at once now; turning them on says they show next time. (Dana, Tom)
+- Tab went right to left across the bottom buttons. They are in reading order now, with a test that every control is.
+- The text menu named the reminder "open once a day at sign-in" and "Opens by itself at sign-in", though with the window it is a notification. It says "reminder when you sign in" now, unless the person chose the text screen. (Priya, Rafael, Tom)
+- The text menu opened from the window said "Enter  Back to the last prompt"; it says "Enter  Close".
+- "You have opened this 3 times in a row" counted days, not opens. It says days, in English and French. (Dana, Priya)
+
+Changes:
+- Save says "Saved." and leaves the window open, with "That looks like more than one thing" when it does; Enter again closes. In 1.28.0 it closed at once and two people couldn't tell whether it had saved. (Dana, Priya)
+- Esc or Close with an edited plan asks "Save your plan before closing?". (Tom)
+- Emptying the box and clicking Save asks "Clear today's plan?", the first way to drop a plan in the window. (Tom)
+- After **I did it** the box is labelled "Next plan, if you want one:" and the button says Close, not "Not today". (Dana, Rafael)
+- The cursor goes to the end of the plan instead of selecting it, so a stray key adds instead of replacing. (Priya)
+- Options can show what is saved, in words with the file's location, and delete everything, without the black text menu. (Mónica, Rafael; then Dana, Priya and Rafael on the first version, which showed the raw file.)
+- Done on the notification brings a short notification with a done line. (Priya: "it just disappeared. No little 'nice!' at all.")
+- Done in the window or on the notification counts on the day it was said, which is the date the finished list shows. Three people read the plan's own date as wrong. (Mónica, Priya, Tom)
+- The days-in-a-row message is off until someone turns it on, under Options or with menu option 3, and with it off the file keeps only the latest visit date, not 60 days of them. Files saved before 1.29.0 keep it on, since they recorded it as on. This was in `BACKLOG.md` as "revisit if real employees read it as being counted"; two of five simulated employees did, one of them twice. (Mónica: "To a coworker that reads as 'it counts my attendance.'") It is removed from the backlog.
+
+Declined, with reasons in `BACKLOG.md`: a checklist of several plans, "partly done", Skip on the notification, public holidays, a different title, tips for shift work (`content.json` covers it), a warning at the 120-character limit, and keeping settings through Delete everything.
+
+The pilot tool itself had three bugs, none in the program. Its windows took keyboard focus while off screen, so typing on the real desktop most likely landed in their plan boxes as "th", "s s" and "fix"; it now runs them on a desktop of its own. It couldn't click OK on a message box, so all five stalled on "Show what is saved" until it was fixed and they reran the step. And one sign-in in text-screen mode opened a real console; the owner's own data folder was checked and nothing was written.
+
+TODO: the native speaker and assistive technology items are done, and the employee week was simulated twice. A real pilot stays, for when the organization is ready.
+
+Tests: I did it with edited words, a refused number, Saved and the several-things note, the save result for each kind of input, clearing a plan, showing and deleting what is saved, the days-in-a-row message off by default with one date kept and on for old files, the reminder named by what it does in each mode, Enter closing the text menu opened from the window, the thank-you notification on Done only, the finished date, and the window's controls in reading order. 213 run here on Windows with Python 3.13: 211 pass and 2 are POSIX-only.
+
 ## 2026-10-03: a window with buttons, and a sign-in reminder
 
 Version 1.28.0. The 1.27.0 review gave the console to a simulated new user, 64, accounts payable, 25 years of Outlook and Excel, who rated the chance of still opening it in two weeks at 2 out of 10: "a black window looks like an error", and typed words have to be remembered. `TODO.md` planned a window and a morning notification. Each open decision went back to the same simulated user, and their answers decided it.

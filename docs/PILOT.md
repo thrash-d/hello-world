@@ -121,6 +121,55 @@ Glenn's points, an answer and the next question sharing a line, came from how
 the simulation fed in answers without echoing them; a real console starts a
 new line after Enter.
 
+## The window, two simulated rounds in October 2026
+
+In October 2026 the window and sign-in reminder had a simulated week with
+five more people, each a fresh agent given only a persona and a tool that
+drives the real window: a warehouse shift lead on a shared PC (Dana), an
+accounts receivable analyst in Portuguese (Rafael), a support agent with ADHD
+(Priya), an HR coordinator in Spanish who checks privacy (Mónica), and a
+developer who pokes at everything (Tom). Each ran Monday 5 to Monday 12
+October, signing in each morning and opening hello-world only when that
+person would. They ran twice: on 1.28.0, then on the fixes below.
+
+The first round found:
+- **I did it** marked the old plan done when the box had been edited (Priya).
+- Turning off the thought and tip said "off" while they stayed on screen
+  (Dana, Tom).
+- Save and Enter closed with no sign anything was saved (Dana, Priya).
+- Esc and Close dropped an edited plan without asking (Tom).
+- Tab went right to left across the bottom buttons (found while building
+  the tool).
+- "You have opened this 3 times in a row" counted days, not opens (Dana,
+  Priya).
+- Showing or deleting what is saved needed the black text menu (Mónica,
+  Rafael).
+- The text menu called the reminder "open once a day at sign-in" (Priya,
+  Rafael, Tom).
+
+The second round found:
+- Saving a new plan and then clicking Done on the old one said "The other open
+  window changed the plan", with no other window (Tom).
+- There was no way to drop a plan (Tom).
+- "Show what is saved" showed the raw file (Dana, Priya, Rafael).
+- The days-in-a-row message read as being counted, and the program kept 60
+  days of dates for it even when it was hidden (Dana, Mónica).
+- The finished list dated a plan by the day it was set, not the day it was
+  marked done (Mónica, Priya, Tom).
+- Done on the notification had no reply (Priya).
+- After **I did it**, the box asked for another plan as if one were owed
+  (Dana, Rafael).
+
+1.29.0 fixes all of these. Ratings, first round then second: Dana 6 and 5,
+Rafael 6 and 6, Priya 5 and 6, Mónica 5 and 5, Tom 6 and 6. Every one of them
+named the sign-in notification as the part they'd keep.
+
+What they asked for that wasn't built is in `BACKLOG.md`: a checklist of
+several plans (Rafael), "partly done" (Priya, Rafael), tips for shift work
+(Dana; an organization content file does that), public holidays (Mónica,
+Rafael), a different title than "Hello, world!" (Dana, Rafael), and Skip on
+the notification (Priya).
+
 ## Not changed, and why
 
 - NVDA saying "greater" at the end of every prompt (Ruth). It's unclear

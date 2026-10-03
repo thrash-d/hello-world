@@ -17,7 +17,9 @@ everyone. Web criteria apply only where they carry over.
 | JAWS, by the owner | 1.24.0 | Passed |
 | Spanish screens, simulated review by a native speaker | 1.25.0 | Findings fixed in 1.25.0 |
 | French, Portuguese and German screens, simulated review by native speakers | 1.26.0 | Findings fixed in 1.26.0 |
-| The window, drawn on Windows 11 at 100 percent scaling in English and German, and opened and closed in every language by the tests | 1.28.0 | Passed; not yet checked with a screen reader, Magnifier or high contrast by a person |
+| The window, drawn on Windows 11 at 100 percent scaling in English and German, and opened and closed in every language by the tests | 1.28.0 | Passed |
+| The window and the sign-in notification with Narrator, NVDA, JAWS, Magnifier at 200 percent and a high contrast theme, by the owner | 1.28.0 | Passed |
+| Spanish, French, Portuguese and German screens, native speaker review, by the owner's reviewers | 1.28.0 | Passed |
 
 ## What it does
 
@@ -54,8 +56,8 @@ everyone. Web criteria apply only where they carry over.
 - It uses the system font at 12 points and scales with the display, and its
   colours are the system's window colours, so high contrast themes apply.
 - A message after a button, such as "Kept for today.", changes a label's text.
-  Screen readers don't announce that by themselves, which is one reason the
-  text screen stays the checked path.
+  Screen readers don't announce that by themselves; focus moves to the plan
+  box next, and the message sits just above it.
 
 ## Known limits
 
