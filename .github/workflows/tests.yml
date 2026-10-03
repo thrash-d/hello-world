@@ -90,9 +90,11 @@ jobs:
           Check ((Install $hash) -eq 1) 'a downgrade is refused'
           Set-ItemProperty $key -Name DisplayVersion -Value $version
 
-          $busy = Start-Process "$dir\python\python.exe" -ArgumentList '-I', '-c', 'import time; time.sleep(120)' -PassThru -WindowStyle Hidden
+          $busy = Start-Process "$dir\python\python.exe" -ArgumentList '-I -c "import time; time.sleep(120)"' -PassThru -WindowStyle Hidden
+          Start-Sleep -Seconds 2
+          Check (-not $busy.HasExited) 'the stand-in window is running'
           try { Check ((Install $hash) -eq 1618) 'an open window gives 1618' }
-          finally { Stop-Process -Id $busy.Id -Force; Start-Sleep -Seconds 2 }
+          finally { Stop-Process -Id $busy.Id -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2 }
           Check (Test-Path "$dir\hello.cmd") 'the install is still there after 1618'
 
           powershell -NoProfile -ExecutionPolicy Bypass -File "$dir\uninstall.ps1" -Quiet | Write-Host
