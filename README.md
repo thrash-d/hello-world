@@ -42,7 +42,12 @@ in. With it on, a Windows notification appears at your first sign-in of the
 day, only when there is a plan to ask about: "Last time you planned: ... Did
 you do it?". Click **Done** or **Not yet** on it and that's the answer; nothing
 else opens, and Done brings a short thank-you. Skip is there too. Click the notification itself
-to open the window. With no plan, it stays quiet. **Options** in the window
+to open the window. With no plan, it stays quiet, unless you choose
+**Options > Reminder settings > Also on days with no plan**. The same menu
+moves the reminder to 8:00, 9:00, 10:00 or 13:00 instead of sign-in, opens
+the window after you answer, and keeps weekends quiet. Days your organization
+lists as holidays are quiet too. **Options > Greet me by name** puts your
+first name at the top. **Options** in the window
 turns the reminder off, hides the thought and tip, turns on the days-in-a-row
 message, picks a language other than the Windows one, shows what is saved,
 deletes everything (your settings stay), or switches to the text screen. In
@@ -177,7 +182,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.30.0'
+$tag = 'v1.31.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

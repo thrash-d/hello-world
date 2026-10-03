@@ -10,6 +10,7 @@
       <definition name="SUPPORTED_1_24" displayName="$(string.SUPPORTED_1_24)" />
       <definition name="SUPPORTED_1_25" displayName="$(string.SUPPORTED_1_25)" />
       <definition name="SUPPORTED_1_28" displayName="$(string.SUPPORTED_1_28)" />
+      <definition name="SUPPORTED_1_31" displayName="$(string.SUPPORTED_1_31)" />
     </definitions>
   </supportedOn>
   <categories>
@@ -49,6 +50,12 @@
     <policy name="UseTextScreen" class="Both" displayName="$(string.UseTextScreen)" explainText="$(string.UseTextScreen_Help)" key="SOFTWARE\Policies\hello-world" valueName="UseTextScreen">
       <parentCategory ref="HelloWorld" />
       <supportedOn ref="SUPPORTED_1_28" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+    <policy name="TurnOnReminder" class="Both" displayName="$(string.TurnOnReminder)" explainText="$(string.TurnOnReminder_Help)" key="SOFTWARE\Policies\hello-world" valueName="TurnOnReminder">
+      <parentCategory ref="HelloWorld" />
+      <supportedOn ref="SUPPORTED_1_31" />
       <enabledValue><decimal value="1" /></enabledValue>
       <disabledValue><decimal value="0" /></disabledValue>
     </policy>

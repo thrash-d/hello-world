@@ -41,6 +41,13 @@ An organization content file replaces the thoughts and tips in every language.</
 When disabled or not configured, hello-world opens in a window with buttons, and each person can switch to the text screen under Options, or with option 9 in the text screen's menu. With the sign-in launcher on, the window version shows a Windows notification at sign-in when there is a plan to ask about, instead of opening.
 
 Use this setting where screen reader users have tested only the text screen, or where Windows notifications are not wanted.</string>
+      <string id="SUPPORTED_1_31">hello-world 1.31.0 or later</string>
+      <string id="TurnOnReminder">Turn on the sign-in reminder for everyone</string>
+      <string id="TurnOnReminder_Help">When enabled, hello-world turns on its reminder for each person the next time they open it, unless they already answered the reminder question. With the window, the reminder is a Windows notification at sign-in when there is a plan to ask about; with the text screen, hello-world opens once a day at sign-in. Each person can still turn it off under Options or with menu option 2, and it stays off.
+
+When disabled or not configured, hello-world asks each person once.
+
+"Turn off opening hello-world at sign-in" wins over this setting.</string>
     </stringTable>
   </resources>
 </policyDefinitionResources>

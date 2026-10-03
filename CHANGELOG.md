@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-10-03: reminder choices, days off, and a greeting by name
+
+Version 1.31.0. Builds the reminder and greeting items from the queue in `TODO.md`, which the pilots asked for and the old backlog had declined.
+
+- **Options > Reminder settings** in the window:
+  - **At sign-in** (as before), or **At 8:00**, **9:00**, **10:00** or **13:00**. A set time is a scheduled task in the person's own task folder, so it needs no administrator. It runs at the next sign-in when the PC was off at that time. Picking sign-in, or turning the reminder off, removes it. ("I don't know what time I'll get in" was the 1.28.0 user's reason for sign-in; now both are there.)
+  - **Also on days with no plan**: "One thing to get done today? Open hello-world to plan it." with an Open button. (Dana and Priya, 1.29.0 pilot: "once you miss a day it quietly stops nudging you.")
+  - **Open hello-world after I answer**, instead of the thank-you.
+  - **Not on weekends**.
+- `content.json` can list `"holidays"`, days the reminder stays quiet (Mónica and Rafael, on 12 October), and a `"title"` that replaces "Hello, world!" at the top of the window and text screen (Dana, Rafael). `--plain` still prints "Hello, world!". `--check-content` checks both.
+- **Options > Greet me by name** puts the person's first name from Windows at the top: "Hello, Ana!". It falls back to the title on a PC outside a domain.
+- The new `TurnOnReminder` policy turns the reminder on for everyone who hasn't answered the reminder question yet; anyone can still turn it off, and it stays off. ADML strings in all five languages.
+- `docs/ENTERPRISE.md` lists the scheduled task for persistence allow-lists, and the new content keys.
+
+Every new string is translated. Tests: the no-plan reminder, weekends, holidays and the title from `content.json`, the content checks for the new keys, a set time replacing sign-in and back, opening after an answer, the greeting by name, the policy turning the reminder on once and staying off after, and on Windows a real scheduled task created and removed as the signed-in user. 226 run here on Windows: 224 pass and 2 are POSIX-only.
+
 ## 2026-10-03: several things in one plan, and nothing declined
 
 Version 1.30.0. The owner set a new rule for this project: nothing is declined. Every idea from a review, a pilot or the owner gets built, and anything that touches privacy or safety is built as an opt-in setting or policy that keeps the safe default. `BACKLOG.md`, the list of declined ideas, is gone. Its items are the build queue in `TODO.md`, and its "turned out wrong" notes are under "Checked and already fine" there. This round builds the pilot's asks first.

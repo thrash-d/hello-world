@@ -41,6 +41,13 @@ Um arquivo de conteúdo da organização substitui os pensamentos e as dicas em 
 Se desabilitada ou não configurada, o hello-world abre em uma janela com botões, e cada pessoa pode mudar para a tela de texto em Opções ou com a opção 9 do menu da tela de texto. Com o iniciador ao entrar ativado, a versão em janela mostra uma notificação do Windows ao entrar quando há um plano para acompanhar, em vez de abrir.
 
 Use esta política quando os usuários de leitores de tela tiverem testado apenas a tela de texto, ou quando notificações do Windows não forem desejadas.</string>
+      <string id="SUPPORTED_1_31">hello-world 1.31.0 ou posterior</string>
+      <string id="TurnOnReminder">Ativar o lembrete ao entrar para todos</string>
+      <string id="TurnOnReminder_Help">Se habilitada, o hello-world ativa o lembrete para cada pessoa na próxima vez que ela o abrir, a menos que já tenha respondido à pergunta do lembrete. Com a janela, o lembrete é uma notificação do Windows ao entrar quando há um plano para acompanhar; com a tela de texto, o hello-world abre uma vez por dia ao entrar. Cada pessoa pode desativá-lo em Opções ou com a opção 2 do menu, e ele continua desativado.
+
+Se desabilitada ou não configurada, o hello-world pergunta uma vez a cada pessoa.
+
+"Desativar a abertura do hello-world ao entrar" prevalece sobre esta política.</string>
     </stringTable>
   </resources>
 </policyDefinitionResources>

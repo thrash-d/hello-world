@@ -41,6 +41,13 @@ Un fichier de contenu de l'organisation remplace les pensées et les astuces dan
 Si ce paramètre est désactivé ou non configuré, hello-world s'ouvre dans une fenêtre avec des boutons, et chaque personne peut passer à l'écran texte sous Options, ou avec l'option 9 du menu de l'écran texte. Si le lanceur est activé, la version fenêtre affiche une notification Windows à l'ouverture de session lorsqu'il y a un plan à suivre, au lieu de s'ouvrir.
 
 Utilisez ce paramètre lorsque les utilisateurs de lecteurs d'écran n'ont testé que l'écran texte, ou lorsque les notifications Windows ne sont pas souhaitées.</string>
+      <string id="SUPPORTED_1_31">hello-world 1.31.0 ou version ultérieure</string>
+      <string id="TurnOnReminder">Activer le rappel à la connexion pour tout le monde</string>
+      <string id="TurnOnReminder_Help">Si ce paramètre est activé, hello-world active son rappel pour chaque personne à sa prochaine ouverture, sauf si elle a déjà répondu à la question du rappel. Avec la fenêtre, le rappel est une notification Windows à la connexion lorsqu'il y a un plan à suivre ; avec l'écran texte, hello-world s'ouvre une fois par jour à la connexion. Chaque personne peut le désactiver sous Options ou avec l'option 2 du menu, et il reste désactivé.
+
+Si ce paramètre est désactivé ou non configuré, hello-world pose la question une fois à chaque personne.
+
+« Désactiver l'ouverture de hello-world à l'ouverture de session » l'emporte sur ce paramètre.</string>
     </stringTable>
   </resources>
 </policyDefinitionResources>

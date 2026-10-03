@@ -9,15 +9,6 @@ opt-in setting or policy with the safe default kept.
 ## Building next
 
 Employees:
-- A reminder at a set time, such as 9:00, as well as at sign-in.
-- A reminder on days with no plan, as an opt-in: "Good morning. One thing to
-  get done today?"
-- An option to open the window after answering the reminder.
-- A reminder that is on for everyone, as a Group Policy setting.
-- Days off: no reminder on weekends or on holidays the organization lists in
-  `content.json`.
-- A personal greeting with the person's first name, and an organization title
-  in `content.json`, keeping `--plain` as "Hello, world!".
 - Built-in tips for shift and floor work, as a second list people can choose.
 - A longer history of finished plans, a weekly recap, and a Markdown export.
 - A switch to hide the finished list, `same` that expires after 30 days, and

@@ -315,15 +315,32 @@ def todays_pair(d):
 # announcements: no links, no addresses, no dates, nothing long.
 CONTENT = None
 MIN_CONTENT, MAX_CONTENT = 7, 200
+MAX_HOLIDAYS = 100
 CONTENT_LENGTH = (10, 120)
 
 
 def content_problems(data):
     """What is wrong with organization content, as plain sentences."""
-    if not isinstance(data, dict) or set(data) != {"thoughts", "tips"}:
-        return ['The file must hold an object with exactly two lists: '
-                '"thoughts" and "tips".']
+    if (not isinstance(data, dict) or not {"thoughts", "tips"} <= set(data)
+            or not set(data) <= {"thoughts", "tips", "holidays", "title"}):
+        return ['The file must hold an object with two lists, "thoughts" and '
+                '"tips", and may add "holidays" and "title".']
     problems = []
+    holidays = data.get("holidays", [])
+    if not isinstance(holidays, list) or len(holidays) > MAX_HOLIDAYS:
+        problems.append(f'"holidays" must be a list of at most {MAX_HOLIDAYS} dates.')
+    else:
+        for n, value in enumerate(holidays, 1):
+            try:
+                day(value)
+            except ValueError:
+                problems.append(f'holidays line {n} is not a date like 2026-12-25.')
+    title = data.get("title", "Hello, world!")
+    if (not isinstance(title, str) or not 1 <= len(tidy(title)) <= 40
+            or tidy(title) != title.strip()
+            or any(mark in title.lower() for mark in ("http", "www.", "://", "@"))):
+        problems.append('"title" must be 1 to 40 characters of plain text, '
+                        'with no link or address.')
     low_months = [m.lower() for m in MONTHS if m != "May"] + [
         m.lower() for data in LANGUAGES.values() for m in data["months"]]
     for key in ("thoughts", "tips"):
@@ -352,20 +369,62 @@ def content_problems(data):
     return problems
 
 
-def content_lists():
-    """The organization's thoughts and tips if it shipped valid ones, else
-    the built-in lists. A file that breaks the rules is ignored whole."""
+def org_content():
+    """The organization's content.json when it is valid, else None. A file
+    that breaks the rules is ignored whole."""
     path = CONTENT or os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                    "content.json")
     try:
         with open(path, encoding="utf-8-sig") as f:
             data = json.loads(f.read(200_000))
     except (OSError, ValueError, RecursionError):
-        return built_in_lists()
-    if content_problems(data):
+        return None
+    return None if content_problems(data) else data
+
+
+def content_lists():
+    """The organization's thoughts and tips if it shipped valid ones, else
+    the built-in lists."""
+    data = org_content()
+    if not data:
         return built_in_lists()
     return (tuple(tidy(x) for x in data["thoughts"]),
             tuple(tidy(x) for x in data["tips"]))
+
+
+def holiday(d):
+    """True on a day the organization's content.json lists as a holiday."""
+    data = org_content() or {}
+    return d.isoformat() in {day(x) for x in data.get("holidays", [])}
+
+
+def first_name():
+    """The first word of this person's Windows display name, or None."""
+    if os.name != "nt":
+        return None
+    try:
+        import ctypes
+        size = ctypes.c_ulong(256)
+        buffer = ctypes.create_unicode_buffer(256)
+        # NameDisplay is 3. It fails on PCs outside a domain.
+        if not ctypes.windll.secur32.GetUserNameExW(3, buffer, ctypes.byref(size)):
+            return None
+    except (AttributeError, OSError):
+        return None
+    words = tidy(buffer.value).replace(",", " ").split()
+    # "Surname, Given" is a common directory order.
+    name = words[-1] if "," in buffer.value and len(words) > 1 else (words or [None])[0]
+    return name[:30] if name else None
+
+
+def greeting(state):
+    """The heading: the person's name if they asked for it, then the
+    organization's title, then "Hello, world!". --plain always says the last."""
+    name = first_name() if state.get("name") else None
+    if name:
+        return tr("Hello, {name}!").format(name=name)
+    title = (org_content() or {}).get("title")
+    return tidy(title) if title else tr(GREETING)
 
 
 def built_in_lists():
@@ -377,7 +436,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.30.0"
+VERSION = "1.31.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -541,7 +600,8 @@ def launcher_on():
 
 
 # Choices, not notes: Delete everything keeps them.
-SETTINGS = ("streak", "tips", "text", "offered", "offer_skips", "lang")
+SETTINGS = ("streak", "tips", "text", "offered", "offer_skips", "lang",
+            "nudge", "open_after", "no_weekends", "name", "remind_at")
 
 
 def new_state():
@@ -700,6 +760,11 @@ def load(repair=True):
         state["offered"] = True
     if raw.get("text") is True:
         state["text"] = True
+    for key in ("nudge", "open_after", "no_weekends", "name"):
+        if raw.get(key) is True:
+            state[key] = True
+    if raw.get("remind_at") in REMINDER_TIMES:
+        state["remind_at"] = raw["remind_at"]
     global CHOSEN_LANGUAGE
     CHOSEN_LANGUAGE = None
     if raw.get("lang") in LANGUAGE_NAMES:
@@ -1071,7 +1136,9 @@ def remind(on, quiet=False, window=False):
         except (OSError, UnicodeEncodeError):
             say(tr("Could not set up the reminder."))
             return False
-        if window:
+        if quiet:
+            pass
+        elif window:
             para(tr("Done. A reminder comes when you sign in, if there is a "
                     "plan to ask about."))
         else:
@@ -1889,6 +1956,16 @@ def mark_done_now(state, can_save, d):
     return True
 
 
+def policy_reminder(state):
+    """Under the TurnOnReminder policy, the reminder starts on for anyone who
+    hasn't made a choice yet. Turning it off afterwards stays off."""
+    if (policy("TurnOnReminder") and not state.get("offered")
+            and not policy("DisableSignInLauncher") and launcher_place()[0]
+            and not reminder_on()):
+        if remind(True, quiet=True, window=not text_screen(state)):
+            state["offered"] = True
+
+
 def tidy_launcher():
     """Apply the launcher policy, and move a pre-1.23 launcher to the Run value."""
     if policy("DisableSignInLauncher"):
@@ -1972,10 +2049,11 @@ def daily(startup):
     if startup and seen_today:
         return
     tidy_launcher()
+    policy_reminder(state)
     first = not state["visits"]
     intent, expired = plan_on_open(state, d)
 
-    say(tr(GREETING))
+    say(greeting(state))
     header = long_date(d)
     say(header[0].upper() + header[1:])
     say()
@@ -2424,6 +2502,78 @@ def show_window():
 APP_ID = "hello-world"
 
 
+# A list in tests: the reminder tasks that would be created, by time, and
+# None for a removed one. Nothing outside the program sets it.
+TASKS = None
+TASK_NAME = "hello-world reminder"
+REMINDER_TIMES = ("08:00", "09:00", "10:00", "13:00")
+
+
+def reminder_task(at):
+    """Create the daily reminder task at "HH:MM", or remove it for None.
+    It runs as this user, so it needs no administrator. True when it worked."""
+    if TASKS is not None:
+        TASKS.append(at)
+        return True
+    if os.name != "nt":
+        return False
+    import subprocess
+    import tempfile
+    from xml.sax.saxutils import escape
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    if not at:
+        r = subprocess.run(["schtasks", "/Delete", "/F", "/TN", TASK_NAME],
+                           capture_output=True, creationflags=flags)
+        return r.returncode == 0 or not task_on()
+    # StartWhenAvailable runs it at the next sign-in when the PC was off at
+    # the time, which schtasks /Create can only set from XML.
+    xml = ('<?xml version="1.0" encoding="UTF-16"?>'
+           '<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">'
+           f'<Triggers><CalendarTrigger><StartBoundary>2026-01-01T{at}:00</StartBoundary>'
+           '<ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay>'
+           '</CalendarTrigger></Triggers><Settings>'
+           '<StartWhenAvailable>true</StartWhenAvailable>'
+           '<DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>'
+           '<StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>'
+           '<ExecutionTimeLimit>PT5M</ExecutionTimeLimit>'
+           '<MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>'
+           '</Settings><Actions><Exec>'
+           f'<Command>{escape(window_python())}</Command>'
+           f'<Arguments>-I "{escape(os.path.abspath(__file__))}" --startup</Arguments>'
+           '</Exec></Actions></Task>')
+    fd, path = tempfile.mkstemp(suffix=".xml")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-16") as f:
+            f.write(xml)
+        r = subprocess.run(["schtasks", "/Create", "/F", "/TN", TASK_NAME,
+                            "/XML", path], capture_output=True, creationflags=flags)
+        return r.returncode == 0
+    except OSError:
+        return False
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
+def task_on():
+    if TASKS is not None:
+        return bool(TASKS and TASKS[-1])
+    if os.name != "nt":
+        return False
+    import subprocess
+    return subprocess.run(["schtasks", "/Query", "/TN", TASK_NAME],
+                          capture_output=True,
+                          creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)
+                          ).returncode == 0
+
+
+def reminder_on():
+    """True when the reminder comes at sign-in or at a set time."""
+    return launcher_on() or task_on()
+
+
 def reminder_keys(on):
     """Register, or remove, the reminder's name and its answer links for this
     user. Neither needs administrator rights."""
@@ -2453,16 +2603,24 @@ def reminder_keys(on):
 
 
 def reminder_due(state, d):
-    """The plan the sign-in reminder asks about, or None.
+    """What the reminder says today: the plan to ask about, "" for "One thing
+    to get done today?" when the person asked for that on days with no plan,
+    or None for nothing.
 
-    Only a plan waiting for "Did you do it?", once a day, and not after
-    hello-world was opened that day. With no plan it stays quiet.
+    Once a day, not after hello-world was opened that day, not on weekends
+    when the person chose that, and not on the organization's holidays.
     """
     iso = d.isoformat()
-    if iso in state["visits"] or state.get("notified") == iso:
+    if (iso in state["visits"] or state.get("notified") == iso or holiday(d)
+            or state.get("no_weekends") and d.weekday() >= 5):
         return None
     intent, expired = plan_on_open(copy.deepcopy(state), d)
-    return intent["text"] if asks_followup(intent, d) and not expired else None
+    if asks_followup(intent, d) and not expired:
+        return intent["text"]
+    if state.get("nudge") and not plans_off() and not (
+            intent and intent["date"] == iso):
+        return ""
+    return None
 
 
 def sign_in():
@@ -2473,14 +2631,27 @@ def sign_in():
         open_console("--startup")
         return 0
     text = reminder_due(state, d)
-    if not text:
+    if text is None:
         return 0
     base = copy.deepcopy(state)
     state["notified"] = d.isoformat()
     # Unsaved, it would come again at the next sign-in today.
-    if commit(state, base, can_save) and not show_reminder(text):
+    if commit(state, base, can_save) and not (
+            show_reminder(text) if text else show_nudge()):
         show_window()
     return 0
+
+
+def show_nudge():
+    """The reminder on a day with no plan: one line, and Open."""
+    return notify(
+        '<toast activationType="protocol" launch="hello-world:open">'
+        '<visual><binding template="ToastGeneric">'
+        f'<text>{xml_text(tr("One thing to get done today? Open hello-world to plan it."))}</text>'
+        '</binding></visual><actions>'
+        f'<action content="{xml_text(tr("&Open").replace("&", ""))}" '
+        'activationType="protocol" arguments="hello-world:open"/>'
+        '</actions></toast>')
 
 
 def xml_text(text):
@@ -2555,10 +2726,12 @@ def answer_reminder(link):
         saved, message = answer_plan(
             state, can_save, d,
             {"done": "yes", "notyet": "no"}.get(word, "skip"), intent["text"])
-        if saved and word == "done":
+        if saved and word == "done" and not state.get("open_after"):
             # The window says this out loud; the reminder had no way to.
             notify('<toast><visual><binding template="ToastGeneric">'
                    f'<text>{xml_text(message)}</text></binding></visual></toast>')
+    if state.get("open_after"):
+        return show_window()
     return 0
 
 
@@ -2575,6 +2748,7 @@ class Visit:
         seen = self.iso in state["visits"]
         first = not state["visits"]
         quietly(tidy_launcher)
+        quietly(policy_reminder, state)
         intent, expired = plan_on_open(state, d)
         notes = [said] if said else []
         if expired:
@@ -2715,7 +2889,10 @@ class Visit:
                     and not launcher_on())
 
     def set_reminder(self, on):
-        """Turn the sign-in reminder on or off. Returns the message."""
+        """Turn the reminder on at sign-in, or off. Returns the message."""
+        if self.state.get("remind_at") or task_on():
+            quietly(reminder_task, None)
+            self.setting("remind_at", None)
         worked, said = quietly(remind, on)
         quietly(refresh, self.state, self.can_save)
         base = copy.deepcopy(self.state)
@@ -2726,6 +2903,33 @@ class Visit:
         return (tr("Done. A reminder comes when you sign in, if there is a "
                    "plan to ask about.") if on else
                 tr("Done. The sign-in reminder is off."))
+
+    def setting(self, key, value):
+        """Save one setting; None removes it. Returns False when it could not
+        be saved."""
+        quietly(refresh, self.state, self.can_save)
+        base = copy.deepcopy(self.state)
+        if value is None:
+            self.state.pop(key, None)
+        else:
+            self.state[key] = value
+        saved, _ = quietly(commit, self.state, base, self.can_save)
+        if not saved:
+            undo(self.state, base)
+        return saved
+
+    def reminder_at(self, at):
+        """The reminder at a set time each day instead of at sign-in.
+        Returns the message."""
+        if not reminder_task(at):
+            return tr("Could not set up the reminder.")
+        # The links its buttons open are the sign-in reminder's.
+        quietly(remind, False, True)
+        quietly(reminder_keys, True)
+        self.setting("remind_at", at)
+        self.setting("offered", True)
+        return tr("Done. A reminder comes at {at} each day, if there is a "
+                  "plan to ask about.").format(at=at.lstrip("0"))
 
     def toggle(self, key):
         """Flip "tips" (shown unless False), "streak" or "text" (the text
@@ -2739,6 +2943,9 @@ class Visit:
                 self.state.pop("tips", None)
         elif key == "streak":
             self.state["streak"] = not self.state["streak"]
+        elif key in ("nudge", "open_after", "no_weekends", "name"):
+            if self.state.pop(key, None) is None:
+                self.state[key] = True
         elif self.state.pop("text", None) is None:
             self.state["text"] = True
         saved, _ = quietly(commit, self.state, base, self.can_save)
@@ -2786,7 +2993,7 @@ class Window:
             add(static, cid, text, text_style, m, h)
             y += h + gap
 
-        add(static, self.TITLE, tr(GREETING), text_style, m, 20)
+        add(static, self.TITLE, greeting(v.state), text_style, m, 20)
         y += 24
         header = long_date(v.d)
         para(self.DATE, header[0].upper() + header[1:], 8)
@@ -3158,15 +3365,42 @@ class Window:
         """Text to read, in a standard message box with OK."""
         self.user.MessageBoxW(self.hwnd, text, "hello-world", 0x40)  # MB_ICONINFORMATION
 
+    def reminder_settings(self):
+        v, checked = self.visit, 0x8
+        at = v.state.get("remind_at")
+        on = reminder_on()
+        entries = [(checked if on and not at else 0, 1, tr("At sign-in"))]
+        entries += [(checked if on and at == t else 0, 2 + n,
+                     tr("At {at}").format(at=t.lstrip("0")))
+                    for n, t in enumerate(REMINDER_TIMES)]
+        entries.append((0x800, 0, None))
+        for cid, key, label in ((20, "nudge", tr("Also on days with no plan")),
+                                (21, "open_after", tr("Open hello-world after I answer")),
+                                (22, "no_weekends", tr("Not on weekends"))):
+            entries.append((checked if v.state.get(key) else 0, cid, label))
+        choice = self.popup(entries)
+        if choice == 1:
+            self.set_text(self.STATUS, v.set_reminder(True))
+        elif 2 <= choice < 2 + len(REMINDER_TIMES):
+            self.set_text(self.STATUS, v.reminder_at(REMINDER_TIMES[choice - 2]))
+        elif choice in (20, 21, 22):
+            saved = v.toggle({20: "nudge", 21: "open_after", 22: "no_weekends"}[choice])
+            self.set_text(self.STATUS, tr("Saved.") if saved else
+                          tr("Could not save that choice on this computer."))
+
     def options(self):
         user, v = self.user, self.visit
         checked, grayed = 0x8, 0x1
         entries = []
         if launcher_place()[0] and not plans_off():
-            on = launcher_on()
+            on = reminder_on()
             entries.append(((checked if on else 0) | (
                 grayed if policy("DisableSignInLauncher") and not on else 0),
                 1, tr("Remind me when I sign in")))
+            if not policy("DisableSignInLauncher"):
+                entries.append((0, 9, tr("Reminder settings...")))
+        entries.append((checked if v.state.get("name") else 0, 10,
+                        tr("Greet me by name")))
         if not policy("HideThoughtAndTip"):
             entries.append((checked if v.state.get("tips", True) else 0, 2,
                             tr("Show the thought and tip")))
@@ -3183,7 +3417,15 @@ class Window:
         entries.append((0, 4, tr("More options")))
         choice = self.popup(entries)
         if choice == 1:
-            self.set_text(self.STATUS, v.set_reminder(not launcher_on()))
+            self.set_text(self.STATUS, v.set_reminder(not reminder_on()))
+        elif choice == 9:
+            self.reminder_settings()
+        elif choice == 10:
+            saved = v.toggle("name")
+            self.set_text(self.STATUS, tr("Saved.") if saved else
+                          tr("Could not save that choice on this computer."))
+            if saved:
+                self.set_text(self.TITLE, greeting(v.state))
         elif choice == 2:
             saved = v.toggle("tips")
             shown = v.state.get("tips", True)
@@ -3904,6 +4146,28 @@ sitio.""",
             'Listo. El nuevo idioma se verá la próxima vez que abras hello-world.',
         'Language...':
             'Idioma...',
+        'Hello, {name}!':
+            '¡Hola, {name}!',
+        'One thing to get done today? Open hello-world to plan it.':
+            '¿Una cosa que terminar hoy? Abre hello-world para planearla.',
+        '&Open':
+            '&Abrir',
+        'Reminder settings...':
+            'Ajustes del aviso...',
+        'Greet me by name':
+            'Saludarme por mi nombre',
+        'At sign-in':
+            'Al iniciar sesión',
+        'At {at}':
+            'A las {at}',
+        'Also on days with no plan':
+            'También los días sin plan',
+        'Open hello-world after I answer':
+            'Abrir hello-world después de responder',
+        'Not on weekends':
+            'No los fines de semana',
+        'Done. A reminder comes at {at} each day, if there is a plan to ask about.':
+            'Listo. Cada día a las {at} llega un aviso si hay un plan sobre el que preguntar.',
     },
 }
 
@@ -4573,6 +4837,28 @@ Digite m para ver as opções de novo. Nada é enviado para lugar nenhum.""",
             'Pronto. O novo idioma aparece quando você abrir o hello-world de novo.',
         'Language...':
             'Idioma...',
+        'Hello, {name}!':
+            'Olá, {name}!',
+        'One thing to get done today? Open hello-world to plan it.':
+            'Uma coisa para concluir hoje? Abra o hello-world para planejar.',
+        '&Open':
+            '&Abrir',
+        'Reminder settings...':
+            'Configurações do lembrete...',
+        'Greet me by name':
+            'Cumprimentar pelo meu nome',
+        'At sign-in':
+            'Ao entrar',
+        'At {at}':
+            'Às {at}',
+        'Also on days with no plan':
+            'Também nos dias sem plano',
+        'Open hello-world after I answer':
+            'Abrir o hello-world depois de responder',
+        'Not on weekends':
+            'Não nos fins de semana',
+        'Done. A reminder comes at {at} each day, if there is a plan to ask about.':
+            'Pronto. Todo dia às {at} aparece um lembrete se houver um plano para acompanhar.',
     },
 }
 
@@ -5243,6 +5529,28 @@ Tapez m pour revoir les options. Rien n'est envoyé nulle part.""",
             "C'est fait. La nouvelle langue s'affichera à la prochaine ouverture.",
         'Language...':
             'Langue...',
+        'Hello, {name}!':
+            'Bonjour, {name} !',
+        'One thing to get done today? Open hello-world to plan it.':
+            "Une chose à faire aujourd'hui ? Ouvrez hello-world pour la planifier.",
+        '&Open':
+            '&Ouvrir',
+        'Reminder settings...':
+            'Réglages du rappel...',
+        'Greet me by name':
+            "M'accueillir par mon prénom",
+        'At sign-in':
+            'À la connexion',
+        'At {at}':
+            'À {at}',
+        'Also on days with no plan':
+            'Aussi les jours sans plan',
+        'Open hello-world after I answer':
+            'Ouvrir hello-world après ma réponse',
+        'Not on weekends':
+            'Pas le week-end',
+        'Done. A reminder comes at {at} each day, if there is a plan to ask about.':
+            "C'est fait. Un rappel s'affiche chaque jour à {at} s'il y a un plan à suivre.",
     },
 }
 
@@ -5912,6 +6220,28 @@ irgendwohin gesendet.""",
             'Fertig. Die neue Sprache erscheint beim nächsten Öffnen von hello-world.',
         'Language...':
             'Sprache...',
+        'Hello, {name}!':
+            'Hallo, {name}!',
+        'One thing to get done today? Open hello-world to plan it.':
+            'Eine Sache für heute? Öffnen Sie hello-world, um sie zu planen.',
+        '&Open':
+            'Ö&ffnen',
+        'Reminder settings...':
+            'Erinnerung einstellen...',
+        'Greet me by name':
+            'Mich mit Namen begrüßen',
+        'At sign-in':
+            'Bei der Anmeldung',
+        'At {at}':
+            'Um {at}',
+        'Also on days with no plan':
+            'Auch an Tagen ohne Plan',
+        'Open hello-world after I answer':
+            'hello-world nach meiner Antwort öffnen',
+        'Not on weekends':
+            'Nicht am Wochenende',
+        'Done. A reminder comes at {at} each day, if there is a plan to ask about.':
+            'Fertig. Jeden Tag um {at} kommt eine Erinnerung, wenn es einen Plan zum Nachfragen gibt.',
     },
 }
 
