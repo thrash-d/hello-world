@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-10-02: the pilot's round. Finished plans stay finished, a yes is answered at once, and q closes from anywhere
+
+Version 1.20.0. A simulated 30-day pilot (`docs/PILOT.md`) ran five simulated employees, one of them an NVDA user, through the real 1.19.0 from 5 October to 3 November. This round answers what they found. The owner also ran the spare-PC gate for 1.19.0, and it passed; `PLAN.md` records it.
+
+Found while building the pilot's tool: on the first visit, after the sign-in question, the last prompt dropped `done`. The offer re-reads the file, which replaced the plan the prompt was checking for. The tests ran with no Startup folder, so the offer never came up there. `daily()` now picks up the plan again after the offer, and a test with a Startup folder covers it.
+
+From the pilot, by how many of the five hit it:
+
+- "Earlier plan" offered back a plan they had just finished (all five). `finish_plan()` no longer keeps the words for `same`, and drops them if `same` held the same plan. `same` now only brings back a plan that wasn't finished.
+- Two "not yet" answers put a plan away when they were waiting on someone else (four, while Sam wanted it sooner). The `waits` count is gone. A kept plan now carries `since`, the day it was first set, and the two-week cleanup counts from that date. A plan can wait as long as it needs, and one carried for two weeks still goes.
+- A yes to "Did you do it?" got no answer until after the next question (four). A yes is now saved at once and answered with the praise and the last three finished plans, the same as `done`.
+- A finished plan was dated the day it was confirmed (three). It's now dated the day the plan was for.
+- A Friday off broke the "in a row" line, though the README said days off don't (three). `in_a_row()` now allows a four-day gap.
+- The thought and the tip were both about shoulders on one day (three). `todays_pair()` moves the thought on when it shares a body topic with the tip, and a test checks every pair across a full cycle.
+- The menu was read again after every choice, and Help repeated it (Ruth, Jun). The menu is listed once, `m` lists it again, and Help explains `done`, `plan`, `same`, "not yet" and `q`.
+- A full file path was read out (Ruth, Sam). The menu summary says "Saved in your own user folder", and turning on the sign-in opening says "choose option 2 in the menu" without a path. `--stats` keeps the path for IT.
+- The sign-in question came back three days running (Jun). It's asked once.
+- `q` didn't work at the yes or no questions (Sam). `q` now closes from any question in the morning flow, the menu included, and the visit still counts.
+- Wording (Dana, Ruth): "Cleared. Type same at a plan prompt if you want it back.", "it asks next time you open this", "Earlier plan (for same)", and two thoughts that assumed afternoon or a quiet desk.
+
+Declined (see `BACKLOG.md`): ending prompts in something other than `>`, until a real NVDA user confirms it's read as "greater", and reaching people on a site laptop, which is an install question.
+
+Tested here: all 144 tests pass on Windows 11, Python 3.13, under both pytest and the plain runner, and ruff is clean. I read a real day-2 screen: the yes is answered before the thought, dated the day before, and the finished plan isn't offered back. Not tested: a real NVDA pass on the new prompts.
+
 ## 2026-10-02: review rounds keep running
 
 No code change, so the version stays 1.19.0. The owner overruled the panel's "Stop the review rounds" item and the kill metric's "freeze the program": the project exists for steady improvement through review, and the rounds cost nothing. `PLAN.md` now says the rounds keep running on their schedule, and a weak pilot steers what the next rounds work on instead of freezing the program. `TODO.md` drops "turn off the schedule", and `BACKLOG.md` records the decision.

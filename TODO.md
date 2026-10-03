@@ -19,8 +19,10 @@ Items 3 to 8 from the panel's list, plus the installer code for item 2:
 
 ## Still to do, by hand
 
-1. On a spare PC: install 1.18.0, then upgrade to 1.19.0, and check the Apps entry shows the commit and install date. Force a step 6 failure, for example by making the Start menu folder read-only, and check the old install comes back. Then do a smoke run as a standard user.
-2. Run the pilot as `PLAN.md` describes.
+1. A simulated 30-day pilot ran instead of waiting a month. `docs/PILOT.md` has what it found, and 1.20.0 answers it. A real pilot can still follow.
+2. Check with a real NVDA user whether `>` at the end of each prompt is spoken as "greater". The simulated NVDA user said it is.
+
+The spare-PC session passed for 1.19.0: upgrade from 1.18.0, a forced step 6 rollback, and a standard-user smoke run. `PLAN.md` records it.
 
 ## Later, when the problem shows up
 
