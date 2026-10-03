@@ -1725,8 +1725,8 @@ def _drop_registry_test_key(key):
 
 
 def test_the_launcher_is_a_run_value_that_checks_the_install_still_exists():
-    import winreg
     key = _registry_test_key()
+    import winreg
     mod = _load_hello()
     mod.STARTUP_DIR, mod.RUN_KEY = None, key
     mod.say = lambda text="": None

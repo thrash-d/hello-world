@@ -75,7 +75,9 @@ jobs:
           Check ((Install $hash) -eq 0) 'a clean install exits 0'
           $entry = Get-ItemProperty $key
           Check ($entry.DisplayVersion -eq $version -and $entry.PackageHash -eq $hash) 'the Apps entry records the version and package hash'
-          Check ("$(& cmd.exe /d /c "`"$dir\hello.cmd`" --plain")" -eq 'Hello, world!') 'the installed program runs'
+          $ran = & "$dir\python\python.exe" -I "$dir\hello.py" --plain 2>&1
+          Write-Host "hello.py --plain said: $ran (exit $LASTEXITCODE)"
+          Check ("$ran" -eq 'Hello, world!') 'the installed program runs'
           Check (-not (Get-ChildItem "$dir\python" -Filter 'libssl-*.dll')) 'OpenSSL is stripped from the bundled Python'
           Check (Test-Path "$env:WINDIR\Logs\hello-world\install.log") 'the log is in Windows\Logs'
           Check ([bool](Get-EventLog -LogName Application -Source 'hello-world' -InstanceId 1000 -Newest 1)) 'the install is in the event log'
