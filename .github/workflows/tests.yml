@@ -78,6 +78,8 @@ jobs:
           $ran = & "$dir\python\python.exe" -I "$dir\hello.py" --plain 2>&1
           Write-Host "hello.py --plain said: $ran (exit $LASTEXITCODE)"
           Check ("$ran" -eq 'Hello, world!') 'the installed program runs'
+          $langs = & "$dir\python\python.exe" -I -c "import sys; sys.path.insert(0, sys.argv[1]); import hello; print(len(hello.LANGUAGES))" $dir
+          Check ("$langs" -eq "$(@(Get-ChildItem 'hello.*.json').Count)") 'the installed program loads every translation'
 
           # A standard user runs it, and can't change the install.
           $pw = 'Hw-' + [guid]::NewGuid().ToString('N').Substring(0, 20) + 'aA1!'

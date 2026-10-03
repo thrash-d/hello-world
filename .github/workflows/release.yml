@@ -1,11 +1,14 @@
 # Builds the offline install package for each new version on main and
 # publishes it as a GitHub release. The release notes carry the package hash,
-# which IT passes to install.ps1 -PackageHash. Runs on push to main, not on the
-# tag, because a tag pushed by another workflow's token starts no workflows.
+# which IT passes to install.ps1 -PackageHash. Runs once the tests have
+# passed on a push to main, so no release comes from a commit that failed
+# them, and not on the tag, which another workflow's token pushes.
 name: release
 
 on:
-  push:
+  workflow_run:
+    workflows: [tests]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
@@ -14,18 +17,20 @@ permissions:
 
 jobs:
   package:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           persist-credentials: false
       - name: Build and publish the package if this version has no release yet
         shell: powershell
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-          SHA: ${{ github.sha }}
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
           $ErrorActionPreference = 'Stop'
           $version = (Get-Content VERSION).Trim()

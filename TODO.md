@@ -8,20 +8,7 @@ opt-in setting or policy with the safe default kept.
 
 ## Building next
 
-Employees:
-- Built-in tips for shift and floor work, as a second list people can choose.
-- Organization content per language: `content.es.json` and the rest.
-- Translations in their own files next to `hello.py`.
-
-For IT:
-
-- Finding a pre-1.23 launcher in a redirected Startup folder through the Known
-  Folder API.
-
-Repository:
-- A `LICENSE` and `CODEOWNERS`.
-- Pinning the shared kit's workflows where the kit is kept, and tagging only
-  after the tests pass.
+The queue is empty. The next review round, pilot or idea fills it.
 
 ## Needs the deploying organization
 

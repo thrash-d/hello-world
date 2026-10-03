@@ -2043,7 +2043,8 @@ def test_every_language_has_the_lists_and_dates():
         assert len(data["thoughts"]) == len(hello.THOUGHTS), code
         assert len(data["tips"]) == len(hello.TIPS), code
         assert len(data["done"]) == len(hello.DONE_LINES), code
-        for line in data["thoughts"] + data["tips"] + data["done"]:
+        assert len(data["tips_floor"]) == len(hello.TIPS_FLOOR), code
+        for line in data["thoughts"] + data["tips"] + data["done"] + data["tips_floor"]:
             assert line == hello.tidy(line) and len(line) <= 140, (code, line)
         assert len(data["days"]) == 7 and len(data["months"]) == 12, code
         hello.LANGUAGE = code
@@ -2829,3 +2830,55 @@ def test_regional_variants_follow_the_whole_windows_language():
     hello.LANGUAGE = "fr-CA"
     assert hello.tr("Not on weekends") == "Pas la fin de semaine"
     assert hello.tr("Saved.") == hello.LANGUAGES["fr"]["text"]["Saved."]
+
+
+def test_translations_load_from_their_own_files_and_a_broken_one_is_skipped():
+    import shutil
+    hello = _load_hello()
+    folder = mkdtemp()
+    for code in ("es", "fr", "fr-CA"):
+        shutil.copy(os.path.join(os.path.dirname(HELLO), f"hello.{code}.json"), folder)
+    with open(os.path.join(folder, "hello.de.json"), "w") as f:
+        f.write("{ broken")
+    with open(os.path.join(folder, "hello.xx.json"), "w") as f:
+        f.write('{"text": {}}')
+    hello.load_languages(folder)
+    assert sorted(hello.LANGUAGES) == ["es", "fr", "fr-CA"]
+    assert hello.LANGUAGES["fr-CA"]["text"]["Not on weekends"] == "Pas la fin de semaine"
+    assert hello.LANGUAGES["fr-CA"]["text"]["Saved."] == hello.LANGUAGES["fr"]["text"]["Saved."]
+    assert len(hello.LANGUAGES["fr-CA"]["tips_floor"]) == len(hello.TIPS_FLOOR)
+
+
+def test_content_can_come_per_language():
+    import shutil
+    hello = _load_hello()
+    folder = mkdtemp()
+    shutil.copy(HELLO, folder)
+    base = {"thoughts": ["A calm line of ten chars"] * 7}
+    for name, tip in (("content.json", "An English tip, ten chars"),
+                      ("content.es.json", "Un consejo en español")):
+        with open(os.path.join(folder, name), "w", encoding="utf-8") as f:
+            json.dump(dict(base, tips=[tip] * 7), f)
+    hello.__file__ = os.path.join(folder, "hello.py")
+    hello.LANGUAGE = "es"
+    assert hello.org_content()["tips"][0] == "Un consejo en español"
+    hello.LANGUAGE = "fr"
+    assert hello.org_content()["tips"][0] == "An English tip, ten chars"
+
+
+def test_floor_tips_replace_the_tips_when_chosen():
+    first = run(["--set", "floor_tips", "on"])
+    p = run(text="\n\n", home=first.home)
+    hello = _load_hello()
+    assert any(tip in p.stdout.replace("\n  ", " ") for tip in hello.TIPS_FLOOR)
+    p = run(text="\n\n", home=first.home, lang="es", day="2026-10-02")
+    spanish = hello.LANGUAGES["es"]["tips_floor"]
+    assert any(tip in p.stdout.replace("\n  ", " ") for tip in spanish)
+
+
+@unittest.skipUnless(os.name == "nt", "known folders are Windows only")
+def test_the_startup_folder_comes_from_the_known_folder_api():
+    hello = _load_hello()
+    hello.STARTUP_DIR = None
+    path = hello.legacy_launcher()
+    assert path and path.endswith(os.path.join("Startup", "hello-world-daily.cmd"))

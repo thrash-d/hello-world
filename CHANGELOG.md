@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-10-03: translations in their own files, and the queue emptied
+
+Version 1.36.0. Builds the last items in `TODO.md`.
+
+- The translations moved out of `hello.py` into one file per language, `hello.<language>.json`, which `hello.py` reads at start. A file that can't be read or doesn't fit is skipped and that language shows English. A regional file names its base language and holds only what differs. `hello.py` went from 11,492 lines to under 4,000, and a script compared every string, list and date before and after the move: identical. The installer, the per-user install and the package builder carry and check the files like `hello.py`, and CI checks the installed program loads every one.
+- An organization can ship content per language, `content.<language>.json`, which that language shows in place of `content.json`; a regional language falls back to its base language's file first. `-ContentFile` takes several files, and the installer checks each one.
+- **Tips for floor and shift work**: a second list of 40 tips for warehouses, factories and shifts, chosen under Options or with `--set floor_tips on`, for Dana from the 1.29.0 pilot. Three agents translated it into the ten other languages, using the words people on a floor use, such as douchette, ヒヤリハット and חפיפה.
+- The pre-1.23 Startup launcher is found through the Known Folder API as well as `APPDATA`, so a redirected profile is cleaned up too.
+- A `LICENSE` (MIT, Thrash'd) and a `CODEOWNERS` file.
+- Every action in every workflow is pinned to a commit. hello-world keeps its own `auto-tag` and `dependabot-automerge`, opting out of the shared kit's copies with `.devkit/no-auto-workflows`; `devkit-quality` is pinned here and needs pinning again after a kit update.
+- Tags and releases wait for the tests: `auto-tag` and `release` start when the tests workflow finishes successfully on a push to main, from that commit, instead of on the push.
+
+`TODO.md` now has only what waits on the deploying organization: its signing certificate and a real pilot.
+
+Tests: translations loading from files with a broken and an unknown one skipped and a regional one merged, content per language with its fallback, the floor tips in English and Spanish, every language's floor tips, and the Startup folder from the Known Folder API. 246 run here on Windows: 244 pass and 2 are POSIX-only.
+
 ## 2026-10-03: installer hardening, and an install for one person
 
 Version 1.35.0. Builds the installer items in `TODO.md`, which earlier rounds left for a test on a spare PC as administrator. CI is that PC: every change here runs there as administrator, and the new standard-user and per-user checks run there too.
