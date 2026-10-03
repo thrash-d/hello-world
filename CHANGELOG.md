@@ -6,7 +6,7 @@ Version 1.23.0. The owner asked for the program to be ready for enterprises of 5
 
 Deployment, from the architect's blockers:
 - "The install can't be packaged": `install.ps1 -PackageHash` installs from an offline release package with no Git and no internet. The package hash is the SHA-256 of `SHA256SUMS`, which lists every file. All are checked before anything changes, and Python is also checked against the pin in the verified `install.ps1`. `tools/build-package.ps1` builds the package and a CycloneDX bill of materials, the same way every time, so anyone can rebuild a release from its commit and compare hashes. A new `release.yml` publishes the package for each new version on main.
-- "Upgrades fail whenever the program is open": a blocked swap now exits 1618, which Intune and MECM retry later, and the uninstaller does the same with nothing changed.
+- "Upgrades fail whenever the program is open": the CI install test showed this isn't so. Windows renames a folder that a running program came from, so the upgrade goes ahead, the open window keeps its old copy, and the next install removes it. What does block the rename is a file held open without delete sharing, as antivirus or a backup agent can do. Any rename that still fails after retries now exits 1618, which Intune and MECM retry later, and the uninstaller does the same with nothing changed.
 - Detection: a first install that fails at step 6 removes its Apps entry and shortcut, so detection doesn't count it as installed.
 - Logs go to `%WINDIR%\Logs\hello-world`, admin-only and created that way before anything is written. Install and uninstall results go to the Application event log (events 1000 to 1003). This replaces the copy of the log in the install folder.
 - Both scripts start themselves again in 64-bit PowerShell when Intune runs them in 32-bit. Windows 11 on ARM64 is allowed. An older version is refused unless `-AllowDowngrade` is passed, and `-Publisher` names the publisher. The Apps entry records the package hash or commit and the bundled Python version.
@@ -22,7 +22,7 @@ Security, from the threat review:
 - "The launcher works as a persistence vector": fixed by the Run value above. `docs/ENTERPRISE.md` gives EDR teams the exact value to allow.
 - The review's point on `release.yml` publishing a hash that vouches for itself: the package is reproducible, and the guide says to rebuild from the reviewed commit and record that hash in the change ticket.
 
-CI: a new step builds the package and really installs it on the Windows runner. It checks the Apps entry, the stripped libraries, the log and the event. Then it reinstalls, refuses a wrong hash and a downgrade, returns 1618 while a hello-world process runs, and uninstalls.
+CI: a new step builds the package and really installs it on the Windows runner. It checks the Apps entry, the stripped libraries, the log and the event. Then it reinstalls, refuses a wrong hash and a downgrade, upgrades while a hello-world process runs and clears the old copy on the next install, returns 1618 from both scripts while a file is held open, and uninstalls.
 
 Declined (see `BACKLOG.md`): deleting notes from the uninstaller, and signing in this repository. Still open in `TODO.md`: signing with the organization's certificate, a pilot ring through Intune or MECM, an NVDA check, and pinning the shared kit's workflows.
 

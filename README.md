@@ -95,8 +95,8 @@ in place, so if you don't want them kept, delete them with option 4 first.
 ## For IT: install
 
 There are two ways to install. Both check every file before anything changes,
-install for all users under Program Files, and exit 0 on success, 1618 when an
-open hello-world window blocks an upgrade, and 1 on any other failure.
+install for all users under Program Files, and exit 0 on success, 1618 when a
+file in use blocks the upgrade, and 1 on any other failure.
 
 - **From the release package**, for deployment tools and for PCs without Git
   or internet access. `docs/ENTERPRISE.md` covers Intune, MECM and Group
@@ -183,8 +183,11 @@ full record. A failed run leaves any working install as it was:
   previous install back.
 - A first install that fails there leaves no Apps entry or shortcut, so a
   deployment tool's detection sees it as not installed and tries again.
-- If an open hello-world window holds a file, it exits 1618 and says how many
-  windows are open. Close them, or let the deployment tool retry later.
+- An open hello-world window doesn't stop an upgrade: its copy is renamed
+  aside and removed by the next install.
+- If a file in the install folder is in use, for example by antivirus, it
+  exits 1618 with nothing changed. Run it again later, or let the deployment
+  tool retry.
 
 Each PC's Apps entry records the installed version, the package hash or
 commit, the bundled Python version and the install date, and has a

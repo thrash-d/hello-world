@@ -125,12 +125,12 @@ try {
         if (Test-Path -LiteralPath $removing) { Remove-Tree $removing }
         try { Rename-Item -LiteralPath $dir -NewName (Split-Path $removing -Leaf) }
         catch {
+            # A file held open without delete sharing blocks the rename. That
+            # passes, so the exit code asks the deployment tool to retry later.
+            $exitCode = 1618
             $open = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path -like "$dir\*" })
-            if ($open) {
-                $exitCode = 1618
-                throw "$($open.Count) hello-world window(s) are open. Close them, then uninstall again. Nothing was changed."
-            }
-            throw
+            $hint = if ($open) { " $($open.Count) hello-world window(s) are open; closing them may help." } else { '' }
+            throw "A file in $dir is in use.$hint Nothing was changed. Try again later."
         }
     }
 

@@ -253,13 +253,14 @@ function Rename-Retry([string]$Path, [string]$NewName) {
         try { Rename-Item -LiteralPath $Path -NewName $NewName; return }
         catch {
             if ($try -lt 5) { Start-Sleep -Seconds 1; continue }
-            # An open hello-world window runs the install's own python.exe.
+            # A running hello-world window doesn't block a rename, but a file
+            # held open without delete sharing does: antivirus, a backup
+            # agent, or another program. That passes, so the exit code asks
+            # the deployment tool to retry later.
+            $script:busy = $true
             $open = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path -like "$dir\*" })
-            if ($open) {
-                $script:busy = $true
-                throw "Couldn't rename $Path because $($open.Count) hello-world window(s) are open. Close them and run the installer again."
-            }
-            throw
+            $hint = if ($open) { " $($open.Count) hello-world window(s) are open; closing them may help." } else { '' }
+            throw "Couldn't rename $Path because a file in it is in use.$hint Try again later."
         }
     }
 }

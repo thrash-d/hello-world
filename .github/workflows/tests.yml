@@ -90,12 +90,24 @@ jobs:
           Check ((Install $hash) -eq 1) 'a downgrade is refused'
           Set-ItemProperty $key -Name DisplayVersion -Value $version
 
+          # A running window doesn't block an upgrade: its copy is renamed
+          # aside and keeps running, and the next install clears it.
           $busy = Start-Process "$dir\python\python.exe" -ArgumentList '-I -c "import time; time.sleep(120)"' -PassThru -WindowStyle Hidden
           Start-Sleep -Seconds 2
           Check (-not $busy.HasExited) 'the stand-in window is running'
-          try { Check ((Install $hash) -eq 1618) 'an open window gives 1618' }
+          try { Check ((Install $hash) -eq 0) 'an upgrade works while a window is open' }
           finally { Stop-Process -Id $busy.Id -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2 }
-          Check (Test-Path "$dir\hello.cmd") 'the install is still there after 1618'
+          Check ((Install $hash) -eq 0 -and -not (Test-Path "$dir.old")) 'the next install clears the old copy'
+
+          # A file held open without delete sharing does block it.
+          $held = [IO.File]::Open("$dir\hello.py", 'Open', 'Read', 'Read')
+          try {
+            Check ((Install $hash) -eq 1618) 'a file in use gives 1618'
+            Check (Test-Path "$dir\hello.cmd") 'the install is still there after 1618'
+            powershell -NoProfile -ExecutionPolicy Bypass -File "$dir\uninstall.ps1" -Quiet | Write-Host
+            Check ($LASTEXITCODE -eq 1618 -and (Test-Path "$dir\hello.cmd")) 'uninstall gives 1618 and changes nothing'
+          }
+          finally { $held.Close() }
 
           powershell -NoProfile -ExecutionPolicy Bypass -File "$dir\uninstall.ps1" -Quiet | Write-Host
           Check ($LASTEXITCODE -eq 0) 'uninstall exits 0'

@@ -64,9 +64,14 @@ Notes:
   again in 64-bit PowerShell, so no `sysnative` path is needed.
 - The installer refuses a package folder that non-administrators can change.
   Intune's `IMECache` and MECM's `ccmcache` pass that check.
-- `1618` means an open hello-world window held a file. Nothing changed, and
-  both tools retry that code later by default. On multi-session hosts, upgrade
-  during a drain window.
+- An open hello-world window doesn't block an upgrade. Its copy is renamed
+  aside to `hello-world.old`, keeps running until it's closed, and the next
+  install removes it. Upgrades on multi-session hosts don't need a drain
+  window.
+- `1618` means a file in the install folder was held open without delete
+  sharing, usually by antivirus or a backup agent. Nothing changed, and both
+  tools retry that code later by default. The uninstaller works the same
+  way.
 - A first install that fails leaves no Apps entry, so detection stays false
   and the tool retries.
 - The installer refuses to install an older version over a newer one. Add
@@ -158,8 +163,9 @@ organization's certificate.
 - The Run value is in `HKCU`, so it roams with the profile. On a PC without
   the program it does nothing.
 - On multi-session hosts every user has their own notes, saves are atomic,
-  and a lock file guards each read-then-write. Upgrades return `1618` while
-  any session has the program open, so schedule them in a drain window.
+  and a lock file guards each read-then-write. An upgrade works while
+  sessions have the program open; their old copy is cleared by the next
+  install.
 
 ## Data handling
 
@@ -219,7 +225,8 @@ match `PythonVersion` in the Apps entry.
 | Where is the program? | `%ProgramFiles%\hello-world`. `hello.cmd --version` prints the version. |
 | Where are someone's notes? | `%LOCALAPPDATA%\hello-world\notes.json`. `hello.cmd --stats` shows them. |
 | It said the file was damaged | The old file is kept as `notes.json.bak` in the same folder and a fresh one started. |
-| An upgrade or uninstall failed with 1618 | A hello-world window was open. Close it and retry. |
+| An upgrade or uninstall failed with 1618 | A file in `%ProgramFiles%\hello-world` was in use, often by antivirus. Retry later; nothing changed. |
+| A `hello-world.old` folder is left | A window was open during an upgrade. The next install removes it. |
 | Stop it opening at sign-in | Menu option 2, or the Group Policy setting. |
 | Remove someone's data | They choose menu option 4, or delete `%LOCALAPPDATA%\hello-world`. |
 | Install logs | `%WINDIR%\Logs\hello-world`, and the Application event log, source `hello-world`. |
