@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-02: review rounds keep running
+
+No code change, so the version stays 1.19.0. The owner overruled the panel's "Stop the review rounds" item and the kill metric's "freeze the program": the project exists for steady improvement through review, and the rounds cost nothing. `PLAN.md` now says the rounds keep running on their schedule, and a weak pilot steers what the next rounds work on instead of freezing the program. `TODO.md` drops "turn off the schedule", and `BACKLOG.md` records the decision.
+
 ## 2026-10-02: the panel's round, an upgrade that fails at step 6 puts the old install back
 
 Version 1.19.0. This round answers `TODO.md`, the result of a six-voice panel (engineer, employee, salesperson, profit maximizer, IT admin, accessibility user) on the backlog.

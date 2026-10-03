@@ -15,13 +15,12 @@ Items 3 to 8 from the panel's list, plus the installer code for item 2:
 - An automated test runs two real windows at once, a test freezes the saved keys, and visits dated after today are dropped instead of carried.
 - The employee part of the README is shorter, and the README now holds the one list of what is saved.
 - The installer keeps the old install until step 6 has worked and puts it back if step 6 fails during an upgrade. A rename that fails says how many hello-world windows are open. The Apps entry records the commit and install date and has a `QuietUninstallString`, and a copy of `install.log` stays in the install folder.
-- `PLAN.md` now has the stop rule for review rounds, the pilot with an assistive-tech user, and the 30-day kill metric.
+- `PLAN.md` now has the pilot, with an assistive-tech user and a day-30 check whose result steers the next review rounds.
 
 ## Still to do, by hand
 
-1. Turn off the schedule that runs the review rounds. It isn't a routine on this account, so it lives somewhere else.
-2. On a spare PC: install 1.18.0, then upgrade to 1.19.0, and check the Apps entry shows the commit and install date. Force a step 6 failure, for example by making the Start menu folder read-only, and check the old install comes back. Then do a smoke run as a standard user.
-3. Run the pilot as `PLAN.md` describes, and decide by day 30.
+1. On a spare PC: install 1.18.0, then upgrade to 1.19.0, and check the Apps entry shows the commit and install date. Force a step 6 failure, for example by making the Start menu folder read-only, and check the old install comes back. Then do a smoke run as a standard user.
+2. Run the pilot as `PLAN.md` describes.
 
 ## Later, when the problem shows up
 

@@ -85,9 +85,9 @@ Magnifier or voice control.
 - On day 14 and day 30, ask each person in person, never through the program,
   how often they opened it and what annoyed them. Ask the assistive-tech user
   whether anything was read twice, out of order, or too long.
-- Kill metric: if fewer than three of the five open it most days by day 30,
-  freeze the program as it is. No new features, only fixes for real reports.
-- After the pilot, build only what the five ask for.
+- If fewer than three of the five open it most days by day 30, the next
+  review rounds work on why before anything new is added.
+- What the five ask for goes to the front of the next rounds.
 
 ## Later
 
@@ -95,5 +95,5 @@ Magnifier or voice control.
   desktop icon. Each is a small change to `hello.py` or the installer.
 - If a second tool is added, split the payload from the installer then, with
   both tools in hand and a Windows test run.
-- Review rounds stop. The next one runs only after a code change or a report
-  from a real user, never on a schedule.
+- Review rounds keep running on their schedule. The point of the project is
+  steady improvement through review, and the rounds cost nothing.
