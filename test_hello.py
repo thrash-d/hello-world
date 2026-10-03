@@ -44,7 +44,8 @@ def launch(args=(), prelude="", **values):
             json.dumps(values), *args]
 
 
-def run(args=(), text=None, day="2026-10-01", home=None, startup=None):
+def run(args=(), text=None, day="2026-10-01", home=None, startup=None,
+        policy=None, env=None):
     """Run hello.py with its own data folder. text is typed at the prompts.
 
     Without text, stdin is the null device, so the result doesn't depend on
@@ -55,10 +56,12 @@ def run(args=(), text=None, day="2026-10-01", home=None, startup=None):
     # one. The sign-in offer then appears only where a test asks for it.
     values = {"TODAY": day, "HOME": home,
               "STARTUP_DIR": "" if startup is None else startup,
-              "FORCE_INTERACTIVE": text is not None}
+              "FORCE_INTERACTIVE": text is not None,
+              # Policies come from here, never from the real registry.
+              "POLICY": policy or {}}
     stdin = {"input": text} if text is not None else {"stdin": subprocess.DEVNULL}
     p = subprocess.run(launch(args, **values), capture_output=True,
-                       encoding="utf-8", **stdin)
+                       encoding="utf-8", env=env, **stdin)
     p.home = home
     return p
 
@@ -462,6 +465,7 @@ def _load_hello(day="2026-10-01"):
     spec.loader.exec_module(mod)
     mod.TODAY = day
     mod.STARTUP_DIR = ""  # never the real Startup folder
+    mod.POLICY = {}  # never the real policy registry
     return mod
 
 
@@ -1703,6 +1707,104 @@ def test_option_1_says_whether_sign_in_opening_is_on():
     home, startup = mkdtemp(), mkdtemp()
     p = run(text="\nm\n1\n\n\n\n", home=home, startup=startup)
     assert "Opens by itself at sign-in: off." in p.stdout
+
+
+def _registry_test_key():
+    if os.name != "nt":
+        raise unittest.SkipTest("the Run value is Windows only")
+    return rf"Software\hello-world-test-{os.getpid()}\Run"
+
+
+def _drop_registry_test_key(key):
+    import winreg
+    for sub in (key, key.rsplit("\\", 1)[0]):
+        try:
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, sub)
+        except OSError:
+            pass
+
+
+def test_the_launcher_is_a_run_value_that_checks_the_install_still_exists():
+    key = _registry_test_key()
+    import winreg
+    mod = _load_hello()
+    mod.STARTUP_DIR, mod.RUN_KEY = None, key
+    mod.say = lambda text="": None
+    appdata = os.environ.get("APPDATA")
+    os.environ["APPDATA"] = mkdtemp()  # keep the real Startup folder out of it
+    try:
+        assert mod.remind(True) and mod.launcher_on()
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key) as k:
+            value, _ = winreg.QueryValueEx(k, mod.RUN_VALUE)
+        folder = os.path.dirname(HELLO)
+        assert value.lower().endswith(
+            f'cmd.exe" /d /c if exist "{folder}\\hello.cmd" start "hello-world" '
+            f'/d "{folder}" hello.cmd --startup'.lower())
+        assert mod.remind(False) and not mod.launcher_on()
+    finally:
+        os.environ["APPDATA"] = appdata
+        _drop_registry_test_key(key)
+
+
+def test_an_old_startup_launcher_becomes_the_run_value():
+    key = _registry_test_key()
+    appdata = mkdtemp()
+    startup = os.path.join(appdata, "Microsoft", "Windows", "Start Menu",
+                           "Programs", "Startup")
+    os.makedirs(startup)
+    old = os.path.join(startup, "hello-world-daily.cmd")
+    with open(old, "w") as f:
+        f.write("@echo off\r\nstart hello.cmd --startup\r\n")
+    env = dict(os.environ, APPDATA=appdata)
+    values = {"TODAY": "2026-10-01", "HOME": mkdtemp(), "STARTUP_DIR": None,
+              "FORCE_INTERACTIVE": True, "POLICY": {}, "RUN_KEY": key}
+    try:
+        p = subprocess.run(launch((), **values), input="\n\n", capture_output=True,
+                           encoding="utf-8", env=env)
+        assert p.returncode == 0, p.stdout + p.stderr
+        assert not os.path.exists(old)
+        mod = _load_hello()
+        mod.STARTUP_DIR, mod.RUN_KEY = None, key
+        assert mod.launcher_on()
+    finally:
+        _drop_registry_test_key(key)
+
+
+def test_policy_hides_the_thought_tip_and_days_in_a_row():
+    home = mkdtemp()
+    for day in ("2026-10-01", "2026-10-02"):
+        run(text="\n\n", home=home, day=day)
+    p = run(text="\n\n", home=home, day="2026-10-03",
+            policy={"HideThoughtAndTip": 1, "HideDaysInARow": 1})
+    assert "Thought for today" not in p.stdout and "in a row" not in p.stdout
+    p = run(text="m\n\n\n\n", home=home, day="2026-10-03",
+            policy={"HideThoughtAndTip": 1, "HideDaysInARow": 1})
+    assert "hidden by your organization" in p.stdout
+
+
+def test_policy_turns_off_the_sign_in_launcher():
+    home, startup = mkdtemp(), mkdtemp()
+    run(["--remind", "on"], startup=startup)
+    assert os.listdir(startup) == ["hello-world-daily.cmd"]
+    pol = {"DisableSignInLauncher": 1}
+    p = run(text="Write it\n\n\n\n", home=home, startup=startup, policy=pol)
+    assert os.listdir(startup) == []  # an existing launcher is removed
+    assert "so it can ask" not in p.stdout
+    p = run(["--remind", "on"], startup=startup, policy=pol)
+    assert p.returncode == 1 and "turned off opening at sign-in" in p.stdout
+    p = run(text="m\n2\n\n\n\n", home=home, startup=startup, policy=pol)
+    assert "turned off by your organization" in p.stdout
+    assert os.listdir(startup) == []
+
+
+def test_the_policy_template_matches_the_policies_the_program_reads():
+    import re
+    with open(HELLO, encoding="utf-8") as f:
+        read = set(re.findall(r'policy\("([A-Za-z]+)"\)', f.read()))
+    admx = os.path.join(os.path.dirname(HELLO), "policy", "hello-world.admx")
+    with open(admx, encoding="utf-8") as f:
+        offered = set(re.findall(r'valueName="([A-Za-z]+)"', f.read()))
+    assert read == offered and read
 
 
 if __name__ == "__main__":

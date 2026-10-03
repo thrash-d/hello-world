@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="1.0" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName>hello-world</displayName>
+  <description>Settings for the hello-world daily program.</description>
+  <resources>
+    <stringTable>
+      <string id="HelloWorld">hello-world</string>
+      <string id="SUPPORTED_1_23">hello-world 1.23.0 or later</string>
+      <string id="DisableSignInLauncher">Turn off opening hello-world at sign-in</string>
+      <string id="DisableSignInLauncher_Help">When enabled, people can't set hello-world to open by itself when they sign in, it never offers to, and a launcher they turned on earlier is removed the next time they open the program.
+
+When disabled or not configured, each person can turn the sign-in opening on or off with menu option 2.
+
+The launcher is a value named hello-world under HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run.</string>
+      <string id="HideThoughtAndTip">Hide the daily thought and tip</string>
+      <string id="HideThoughtAndTip_Help">When enabled, hello-world doesn't show the thought for today or the tip to try. The plan question and the menu still work.
+
+When disabled or not configured, each person can hide or show them with menu option 8.</string>
+      <string id="HideDaysInARow">Hide the days-in-a-row message</string>
+      <string id="HideDaysInARow_Help">When enabled, hello-world never shows the message that counts how many days in a row someone opened it.
+
+When disabled or not configured, the message shows only on the 3rd, 7th and 14th day in a row and every 30th after that, and each person can hide it with menu option 3.</string>
+    </stringTable>
+  </resources>
+</policyDefinitionResources>

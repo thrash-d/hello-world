@@ -19,14 +19,36 @@ file changed since checkout.
 
 .PARAMETER Commit
 The full commit hash that was reviewed. The clone must be at this commit.
+Use this to install from a git clone.
+
+.PARAMETER PackageHash
+The package hash from the release notes: the SHA-256 of the package's
+SHA256SUMS file. Use this to install from the offline release package, which
+needs no Git and no internet access, for example from Intune or MECM. Every
+file in the package is checked against SHA256SUMS before anything changes.
+Anyone can rebuild the package from the reviewed commit with
+tools\build-package.ps1 and get the same hash.
+
+.PARAMETER AllowDowngrade
+Installs a version older than the one installed. Without it, that's refused.
+
+.PARAMETER Publisher
+The name shown as the publisher in Settings > Apps. The default is
+"IT Department".
 
 .PARAMETER Quiet
 Prints only warnings, the final result line, and on failure a FAILED line
-with where the log is. Everything is still written to install.log. The exit code is 0 on success and 1 on failure, so a
-management tool can run the installer unattended. It never asks questions.
+with where the log is. It never asks questions, so a management tool can run
+it unattended.
+
+Exit codes: 0 when installed, 1618 when an open hello-world window blocked
+the upgrade (Intune and MECM retry that code later), and 1 for any other
+failure. Everything is written to %WINDIR%\Logs\hello-world\install.log, which
+only administrators can read, and success and failure go to the Application
+event log under the source hello-world.
 
 .EXAMPLE
-$tag = 'v1.22.0'
+$tag = 'v1.23.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
@@ -66,11 +88,19 @@ Employees open hello-world from the Start menu or by typing "hello-world" in Win
 To uninstall, use Settings > Apps > Installed apps > hello-world > Uninstall.
 That also removes folders named .new and .old left by an interrupted run.
 
-The setup folder can be deleted after a successful install. A copy of
-install.log is kept in the install folder.
+The setup folder can be deleted after a successful install. The log is in
+%WINDIR%\Logs\hello-world.
 #>
 #Requires -RunAsAdministrator
-param([Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$Commit, [switch]$Quiet)
+[CmdletBinding(DefaultParameterSetName = 'Clone')]
+param(
+    [Parameter(Mandatory, ParameterSetName = 'Clone')][ValidatePattern('^[0-9a-f]{40}$')][string]$Commit,
+    [Parameter(Mandatory, ParameterSetName = 'Package')][ValidatePattern('^[0-9a-fA-F]{64}$')][string]$PackageHash,
+    [switch]$Quiet,
+    [switch]$AllowDowngrade,
+    [ValidateLength(1, 100)][string]$Publisher = 'IT Department'
+)
+$packageMode = $PSCmdlet.ParameterSetName -eq 'Package'
 $ErrorActionPreference = 'Stop'
 # The admin runs this in their own window and keeps using it afterward, for a
 # reinstall's git clone among other things. Save what this script changes in
@@ -95,9 +125,25 @@ trap { Write-Host "FAILED: $($_.Exception.Message)" -ForegroundColor Red; Restor
 function Write-Step([string]$Text) { if (-not $Quiet) { Write-Host $Text -ForegroundColor Cyan } }
 function Write-Info([string]$Text) { if (-not $Quiet) { Write-Host $Text } }
 # A 32-bit PowerShell sees Program Files (x86) and the 32-bit registry.
-if (-not [Environment]::Is64BitProcess) { throw 'Run this from 64-bit PowerShell.' }
-# The pinned Python is the amd64 build, which ARM64 Windows 10 can't run.
-if ($env:PROCESSOR_ARCHITECTURE -ne 'AMD64') { throw "Need an x64 PC, found $env:PROCESSOR_ARCHITECTURE." }
+# Intune runs install commands in one, so start again in the 64-bit one.
+if (-not [Environment]::Is64BitProcess) {
+    $native = Join-Path ([Environment]::GetFolderPath('Windows')) 'sysnative\WindowsPowerShell\v1.0\powershell.exe'
+    if (-not (Test-Path -LiteralPath $native)) { throw 'Run this from 64-bit PowerShell.' }
+    $argList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $PSCommandPath)
+    foreach ($name in $PSBoundParameters.Keys) {
+        $value = $PSBoundParameters[$name]
+        if ($value -is [switch]) { if ($value) { $argList += "-$name" } }
+        else { $argList += "-$name"; $argList += "$value" }
+    }
+    & $native @argList
+    exit $LASTEXITCODE
+}
+# The pinned Python is the amd64 build. Windows 11 on ARM64 runs it through
+# x64 emulation; Windows 10 on ARM64 can't.
+if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') {
+    if ([Environment]::OSVersion.Version.Build -lt 22000) { throw 'This needs Windows 11 on an ARM64 PC, to run the x64 Python it ships.' }
+}
+elseif ($env:PROCESSOR_ARCHITECTURE -ne 'AMD64') { throw "Need an x64 or ARM64 PC, found $env:PROCESSOR_ARCHITECTURE." }
 # Ask Windows for the folders; the admin's own session can carry other values.
 $pf = [Environment]::GetFolderPath('ProgramFiles')
 $winDir = [Environment]::GetFolderPath('Windows')
@@ -207,12 +253,26 @@ function Rename-Retry([string]$Path, [string]$NewName) {
         try { Rename-Item -LiteralPath $Path -NewName $NewName; return }
         catch {
             if ($try -lt 5) { Start-Sleep -Seconds 1; continue }
-            # An open hello-world window runs the install's own python.exe.
+            # A running hello-world window doesn't block a rename, but a file
+            # held open without delete sharing does: antivirus, a backup
+            # agent, or another program. That passes, so the exit code asks
+            # the deployment tool to retry later.
+            $script:busy = $true
             $open = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path -like "$dir\*" })
-            if ($open) { throw "Couldn't rename $Path because $($open.Count) hello-world window(s) are open. Close them and run the installer again." }
-            throw
+            $hint = if ($open) { " $($open.Count) hello-world window(s) are open; closing them may help." } else { '' }
+            throw "Couldn't rename $Path because a file in it is in use.$hint Try again later."
         }
     }
+}
+
+# Install results go to the Application event log, so a SIEM or a fleet
+# report sees them without collecting log files.
+function Write-AppEvent([int]$Id, [string]$Type, [string]$Message) {
+    try {
+        if (-not [Diagnostics.EventLog]::SourceExists('hello-world')) { New-EventLog -LogName Application -Source 'hello-world' }
+        Write-EventLog -LogName Application -Source 'hello-world' -EventId $Id -EntryType $Type -Message $Message
+    }
+    catch { Write-Warning "Couldn't write to the event log: $($_.Exception.Message)" }
 }
 
 # === RECOVERY: Handle interrupted installations ===
@@ -230,10 +290,12 @@ if (-not (Test-Path -LiteralPath $dir) -and (Test-Path -LiteralPath $old)) {
 }
 
 # === VERIFICATION: Validate the setup environment ===
-Write-Step '[1/6] Checking Git for Windows and its folders'
 # PATH can list folders employees can write, and a git or icacls found there
 # would run as admin. Call both by full path.
 $icacls = Join-Path $sys32 'icacls.exe'
+if ($packageMode) { Write-Step '[1/6] Installing from the release package, so Git is not needed' }
+else {
+Write-Step '[1/6] Checking Git for Windows and its folders'
 $gitDir = (Get-ItemProperty HKLM:\SOFTWARE\GitForWindows -ErrorAction SilentlyContinue).InstallPath
 $git = "$gitDir\cmd\git.exe"
 if (-not $git.StartsWith("$pf\", [StringComparison]::OrdinalIgnoreCase) -or -not (Test-Path -LiteralPath $git)) {
@@ -247,16 +309,26 @@ if (Test-Path -LiteralPath $gitData) {
     try { Assert-AdminOnlyTree $gitData }
     catch { throw "Non-admin write access in $gitData (shared Git for Windows config). Ensure only administrators can modify this folder, for example: icacls `"$gitData`" /inheritance:r /grant:r *S-1-5-32-544:(OI)(CI)F *S-1-5-18:(OI)(CI)F *S-1-5-32-545:(OI)(CI)RX" }
 }
+}
 # Covers .git too, so nobody can plant git objects that fool the commit check.
 Write-Step '[2/6] Checking the setup folder'
 Assert-AdminOnlyTree $PSScriptRoot
 
 # A record of the steps from here on; the checks above print to the console
-# only. Opened only now that the setup folder is known to be admin-only, and
-# stopped in the last finally below.
-try { Start-Transcript -LiteralPath (Join-Path $PSScriptRoot 'install.log') -Append | Out-Null }
+# only. It goes to a fixed folder only administrators can read, so deleting
+# the setup folder or a deployment tool's cache doesn't lose it. Stopped in
+# the last finally below.
+$logDir = Join-Path $winDir 'Logs\hello-world'
+if (-not (Test-Path -LiteralPath $logDir)) { New-Item -ItemType Directory $logDir | Out-Null }
+Assert-NotLink $logDir
+& $icacls $logDir /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F' | Out-Null
+if ($LASTEXITCODE) { throw "icacls failed on $logDir" }
+$log = Join-Path $logDir 'install.log'
+# One earlier log is kept, so the file can't grow without limit.
+if ((Test-Path -LiteralPath $log) -and (Get-Item -LiteralPath $log).Length -gt 1MB) { Move-Item -LiteralPath $log -Destination "$log.old" -Force }
+try { Start-Transcript -LiteralPath $log -Append | Out-Null }
 catch { throw "Couldn't start the install log (is a transcript already running in this window?): $_" }
-Write-Info "Logging to $(Join-Path $PSScriptRoot 'install.log')"
+Write-Info "Logging to $log"
 try {
 
 # The admin's own session can carry GIT_DIR and friends that point git elsewhere, and
@@ -269,7 +341,32 @@ Remove-Item -LiteralPath 'Env:HOME' -ErrorAction SilentlyContinue
 Remove-Item -LiteralPath 'Env:XDG_CONFIG_HOME' -ErrorAction SilentlyContinue
 # Set GIT_CONFIG_NOSYSTEM to prevent git from reading /etc/gitconfig (equivalent on Windows)
 $env:GIT_CONFIG_NOSYSTEM = '1'
+# The admin's home can be a redirected share. A global config or attributes
+# file there could make hash-object run a filter program as admin.
+$env:GIT_CONFIG_GLOBAL = 'NUL'
+$env:GIT_ATTR_NOSYSTEM = '1'
 
+$required = 'install.ps1', 'uninstall.ps1', 'hello.py', 'VERSION'
+if ($packageMode) {
+Write-Step '[3/6] Verifying the package against its hash'
+# The package hash vouches for SHA256SUMS, and SHA256SUMS for every file.
+$sumsFile = Join-Path $PSScriptRoot 'SHA256SUMS'
+if (-not (Test-Path -LiteralPath $sumsFile -PathType Leaf)) { throw "$PSScriptRoot has no SHA256SUMS. Unzip the whole release package into this folder." }
+if ((Get-FileHash -LiteralPath $sumsFile).Hash -ne $PackageHash) { throw "SHA256SUMS doesn't match -PackageHash. Use the package hash from the release you reviewed, and an unchanged package." }
+$listed = @{}
+foreach ($line in Get-Content -LiteralPath $sumsFile) {
+    if ($line -match '^([0-9a-f]{64})  ([A-Za-z0-9._-]+)$') { $listed[$Matches[2]] = $Matches[1] }
+    elseif ($line) { throw "SHA256SUMS has a line it can't read: $line" }
+}
+foreach ($f in $required + 'python-embed.zip') {
+    if (-not $listed.ContainsKey($f)) { throw "SHA256SUMS doesn't list $f." }
+    $path = Join-Path $PSScriptRoot $f
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf) -or (Get-FileHash -LiteralPath $path).Hash -ne $listed[$f]) {
+        throw "$f is missing or doesn't match SHA256SUMS. Use an unchanged copy of the release package."
+    }
+}
+}
+else {
 # === COMMIT VERIFICATION: Ensure the clone is at the reviewed commit ===
 Write-Step '[3/6] Verifying the reviewed commit'
 # The ACL checks show nobody else can change the clone. This shows the clone is
@@ -279,7 +376,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot '.git') -PathType Cont
 $head = & $git -C $PSScriptRoot rev-parse HEAD
 if ($LASTEXITCODE) { throw "git rev-parse failed with exit $LASTEXITCODE in $PSScriptRoot. If the message above mentions 'dubious ownership', a different account made this clone." }
 if ($head -ne $Commit) { throw "Source is at '$head', not the reviewed commit $Commit." }
-foreach ($f in 'install.ps1', 'uninstall.ps1', 'hello.py', 'VERSION') {
+foreach ($f in $required) {
     $actual = & $git -C $PSScriptRoot hash-object $f
     $actualOk = $LASTEXITCODE -eq 0
     $expected = & $git -C $PSScriptRoot rev-parse "HEAD:$f"
@@ -288,23 +385,36 @@ foreach ($f in 'install.ps1', 'uninstall.ps1', 'hello.py', 'VERSION') {
         throw "$f differs from commit $Commit. Do not modify files in the clone. Re-clone from the reviewed release tag to reinstall."
     }
 }
+}
+
+# An older version is refused unless asked for, so a stale package or an old
+# deployment assignment can't quietly roll PCs back.
+$version = (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'VERSION')).Trim()
+$installedVersion = (Get-ItemProperty -LiteralPath $key -ErrorAction SilentlyContinue).DisplayVersion
+if ($installedVersion -and -not $AllowDowngrade) {
+    try { $older = [version]$version -lt [version]$installedVersion } catch { $older = $false }
+    if ($older) { throw "$installedVersion is installed, which is newer than $version. Add -AllowDowngrade to install the older version." }
+}
 
 # === DOWNLOAD AND BUILD: Fetch Python, build, and test in isolation ===
-Write-Step '[4/6] Downloading Python and verifying its hash'
-# Download into the clone, which only administrators can change, and check the
-# hash before the old install is touched. The zip is deleted afterward.
-Write-Info "Downloading $pyUrl"
 $zip = Join-Path $PSScriptRoot 'python-embed.zip'
-# Windows PowerShell 5.1 can default to TLS versions python.org refuses, and its
-# progress bar slows downloads to a crawl.
-[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 $ProgressPreference = 'SilentlyContinue'
 try {
-    for ($try = 1; ; $try++) {
-        try { Invoke-WebRequest $pyUrl -OutFile $zip -UseBasicParsing -TimeoutSec 300; break }
-        catch { if ($try -ge 3) { throw }; Write-Warning "Download failed ($_). Trying again."; Start-Sleep -Seconds 5 }
+    if ($packageMode) { Write-Step '[4/6] Checking the bundled Python against the pinned hash' }
+    else {
+        Write-Step '[4/6] Downloading Python and verifying its hash'
+        # Download into the clone, which only administrators can change, and
+        # check the hash before the old install is touched. Deleted afterward.
+        Write-Info "Downloading $pyUrl"
+        # Windows PowerShell 5.1 can default to TLS versions python.org refuses,
+        # and its progress bar slows downloads to a crawl.
+        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+        for ($try = 1; ; $try++) {
+            try { Invoke-WebRequest $pyUrl -OutFile $zip -UseBasicParsing -TimeoutSec 300; break }
+            catch { if ($try -ge 3) { throw }; Write-Warning "Download failed ($_). Trying again."; Start-Sleep -Seconds 5 }
+        }
     }
-    if ((Get-FileHash -LiteralPath $zip).Hash -ne $pySha256) { throw "The Python download doesn't match the pinned SHA-256." }
+    if ((Get-FileHash -LiteralPath $zip).Hash -ne $pySha256) { throw "The Python zip doesn't match the pinned SHA-256." }
 
     # Build and test the new install beside the old one, so a failure leaves
     # the working install alone. Both sit in Program Files, which only
@@ -317,7 +427,15 @@ try {
     & $icacls $new /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-545:(OI)(CI)RX' | Out-Null
     if ($LASTEXITCODE) { throw "icacls failed on $new" }
 
+    # By full path: an autoloaded module could come from a folder the admin's
+    # own profile puts first.
+    Import-Module (Join-Path $PSHOME 'Modules\Microsoft.PowerShell.Archive\Microsoft.PowerShell.Archive.psd1')
     Expand-Archive -LiteralPath $zip -DestinationPath (Join-Path $new 'python')
+    # hello.py uses none of these, and vulnerability scanners flag every PC
+    # that carries an OpenSSL or SQLite build.
+    foreach ($pattern in '_ssl.pyd', '_hashlib.pyd', 'libssl-*.dll', 'libcrypto-*.dll', '_sqlite3.pyd', 'sqlite3.dll') {
+        Get-ChildItem -LiteralPath (Join-Path $new 'python') -Filter $pattern -Force | Remove-Item -Force
+    }
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'hello.py'), (Join-Path $PSScriptRoot 'uninstall.ps1') -Destination $new
     # -I ignores PYTHON* variables and the user's site-packages, so nothing the
     # employee controls loads into the run.
@@ -336,7 +454,8 @@ try {
         if (-not $usersRX) { throw "Users can't read and run $f" }
     }
     # --plain prints only the greeting and saves nothing, so the test leaves no notes in the admin's profile.
-    $out = & (Join-Path $new 'hello.cmd') --plain
+    # /d skips cmd AutoRun commands from the registry.
+    $out = & (Join-Path $sys32 'cmd.exe') /d /c "`"$(Join-Path $new 'hello.cmd')`" --plain"
     if ($LASTEXITCODE -or "$out" -ne 'Hello, world!') { throw "Test run failed with exit $LASTEXITCODE`: $out" }
 
     # Swap in the new folder, and put the old one back if that fails.
@@ -356,14 +475,14 @@ try {
     # there can put it back.
 }
 finally {
-    Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
+    # A package's zip is part of the package, so only a download is deleted.
+    if (-not $packageMode) { Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue }
     if (Test-Path -LiteralPath $new) { try { Remove-Tree $new } catch { Write-Warning "Couldn't remove $new. The next run clears it." } }
 }
 
 # === FINALIZATION: Register the installation in Windows settings and Start menu ===
 Write-Step '[6/6] Adding the Start menu shortcut and the Settings > Apps entry'
 # Added only after the checks pass. The entry in Settings > Apps, whose Uninstall button runs uninstall.ps1.
-$version = (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'VERSION')).Trim()
 $pyExe = Join-Path $dir 'python\python.exe'
 $lnk = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'hello-world.lnk'
 # Saving the shortcut overwrites the old install's one, so keep a copy for a
@@ -379,14 +498,15 @@ $uninstall = "`"$(Join-Path $sys32 'WindowsPowerShell\v1.0\powershell.exe')`" -N
 $entry = @{
     DisplayName          = 'hello-world'
     DisplayVersion       = $version
-    Publisher            = 'IT Department'
+    Publisher            = $Publisher
     DisplayIcon          = "$pyExe,0"
     InstallLocation      = $dir
     InstallDate          = (Get-Date -Format 'yyyyMMdd')
-    Commit               = $Commit
+    PythonVersion        = [regex]::Match($pyUrl, 'python-([0-9.]+)-embed').Groups[1].Value
     UninstallString      = $uninstall
     QuietUninstallString = "$uninstall -Quiet"
 }
+if ($packageMode) { $entry.PackageHash = $PackageHash.ToLower() } else { $entry.Commit = $Commit }
 foreach ($name in $entry.Keys) { New-ItemProperty $key -Name $name -Value $entry[$name] -Force | Out-Null }
 # Settings > Apps shows the size in KB.
 $sizeKB = [int]((Get-ChildItem -LiteralPath $dir -Recurse -File -Force | Measure-Object Length -Sum).Sum / 1KB)
@@ -448,6 +568,13 @@ catch {
         }
         catch { Write-Warning "Couldn't put the previous install back: $($_.Exception.Message)" }
     }
+    elseif (-not $hadOld) {
+        # A first install that fails here leaves no Apps entry or shortcut, so
+        # a deployment tool's detection rule doesn't count it as installed and
+        # tries again.
+        Remove-Item -LiteralPath $key -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $lnk -Force -ErrorAction SilentlyContinue
+    }
     Remove-Item -LiteralPath $lnkBackup -Force -ErrorAction SilentlyContinue
     throw $stepError
 }
@@ -457,24 +584,22 @@ if ($hadOld) {
     try { Remove-Tree $old }
     catch { Write-Warning "Installed, but couldn't remove $old. The next run clears it." }
 }
-$installed = $true
 
 $how = if ($prevVersion -and $prevVersion -ne $version) { "upgraded from $prevVersion" } elseif ($prevVersion) { 'reinstalled' } else { 'new install' }
 Write-Host "Installed hello-world $version to $dir ($how)." -ForegroundColor Green
+Write-AppEvent 1000 Information "Installed hello-world $version to $dir ($how)." 
 Write-Info "hello.py SHA-256: $hash"
-Write-Info 'Next: open hello-world from the Start menu to check it. The setup folder can be deleted. A copy of install.log stays in the install folder.'
+Write-Info "Next: open hello-world from the Start menu to check it. The setup folder can be deleted. The log is $log." 
 }
 # The host prints a script's error only after the finally below, so write it to the log first.
-catch { Write-Host "FAILED: $($_.Exception.Message)" -ForegroundColor Red; Write-Host 'The steps above and this message are in install.log in the setup folder.'; exit 1 }
+catch {
+    Write-Host "FAILED: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "The steps above and this message are in $log."
+    Write-AppEvent 1001 Error "hello-world install failed: $($_.Exception.Message)"
+    if ($script:busy) { exit 1618 }
+    exit 1
+}
 finally {
     Stop-Transcript -ErrorAction SilentlyContinue | Out-Null
-    # The README says the setup folder can be deleted, so keep a copy of the
-    # log in the install folder, which only administrators can change.
-    # It names the admin account and the PC, so only administrators may read it.
-    if ($installed) {
-        $logCopy = Join-Path $dir 'install.log'
-        Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'install.log') -Destination $logCopy -Force -ErrorAction SilentlyContinue
-        if (Test-Path -LiteralPath $logCopy) { & $icacls $logCopy /inheritance:r /grant:r '*S-1-5-32-544:F' '*S-1-5-18:F' | Out-Null }
-    }
     Restore-Window
 }

@@ -299,7 +299,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return HELP + "\n\nhello.cmd is in this folder:\n  " + here
 
-VERSION = "1.22.0"
+VERSION = "1.23.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -315,6 +315,11 @@ TODAY = None
 HOME = None
 STARTUP_DIR = None
 FORCE_INTERACTIVE = False
+# A dict of policy values, so tests never read the real registry.
+POLICY = None
+RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+RUN_VALUE = "hello-world"
+POLICY_KEY = r"SOFTWARE\Policies\hello-world"
 
 
 class Quit(Exception):
@@ -350,13 +355,63 @@ def data_file():
     return os.path.join(data_dir(), "notes.json")
 
 
-def startup_file():
-    # The tests set "" for no Startup folder, so they never touch the real one.
-    folder = STARTUP_DIR
-    if folder is None and os.name == "nt" and os.environ.get("APPDATA"):
-        folder = os.path.join(os.environ["APPDATA"], "Microsoft", "Windows",
-                              "Start Menu", "Programs", "Startup")
-    return os.path.join(folder, "hello-world-daily.cmd") if folder else None
+def policy(name):
+    """True when Group Policy sets this value to 1 for the PC or the user.
+
+    Read from HKLM, then HKCU, under SOFTWARE\\Policies\\hello-world, where
+    only administrators and Group Policy can write.
+    """
+    if POLICY is not None:
+        return bool(POLICY.get(name))
+    if os.name != "nt":
+        return False
+    import winreg
+    for hive in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+        try:
+            with winreg.OpenKey(hive, POLICY_KEY) as key:
+                value, kind = winreg.QueryValueEx(key, name)
+            if kind == winreg.REG_DWORD and value == 1:
+                return True
+        except OSError:
+            pass
+    return False
+
+
+def launcher_place():
+    """Where the sign-in launcher lives: ("file", path) for a test folder,
+    ("run", key) for the HKCU Run value on Windows, or (None, None)."""
+    # The tests set "" for no launcher, so they never touch the real one.
+    if STARTUP_DIR is not None:
+        if not STARTUP_DIR:
+            return None, None
+        return "file", os.path.join(STARTUP_DIR, "hello-world-daily.cmd")
+    if os.name == "nt":
+        return "run", RUN_KEY
+    return None, None
+
+
+def legacy_launcher():
+    """The Startup .cmd that versions before 1.23 wrote, on Windows only."""
+    if STARTUP_DIR is not None or os.name != "nt" or not os.environ.get("APPDATA"):
+        return None
+    return os.path.join(os.environ["APPDATA"], "Microsoft", "Windows",
+                        "Start Menu", "Programs", "Startup",
+                        "hello-world-daily.cmd")
+
+
+def launcher_on():
+    kind, where = launcher_place()
+    if kind == "file":
+        return os.path.exists(where)
+    if kind == "run":
+        import winreg
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, where) as key:
+                winreg.QueryValueEx(key, RUN_VALUE)
+            return True
+        except OSError:
+            return False
+    return False
 
 
 def new_state():
@@ -738,6 +793,34 @@ def in_a_row(visits, d):
     return n
 
 
+def launcher_command():
+    """The command the launcher runs, or None for a folder cmd would misread.
+
+    It checks hello.cmd still exists, so a launcher left behind after an
+    uninstall, or roamed to a PC without the program, does nothing.
+    """
+    target = os.path.dirname(os.path.abspath(__file__))
+    if any(c in target for c in '"%&^<>|!'):
+        return None
+    # start runs a .cmd through cmd /k, which strips the quotes from a path
+    # with ( or @ in it. /d keeps the folder out of that command line.
+    return (f'if exist "{target}\\hello.cmd" start "hello-world" /d "{target}" '
+            "hello.cmd --startup")
+
+
+def remove_legacy_launcher():
+    """Delete an old Startup .cmd launcher; True when there was one."""
+    path = legacy_launcher()
+    if not path or not os.path.isfile(path) or os.path.islink(path):
+        return False
+    clear_launcher_temps(path)
+    try:
+        os.remove(path)
+        return True
+    except OSError:
+        return False
+
+
 def clear_launcher_temps(path):
     """Remove temp copies a killed launcher write left in the Startup folder."""
     folder, name = os.path.split(path)
@@ -753,51 +836,76 @@ def clear_launcher_temps(path):
                 pass
 
 
-def remind(on):
-    path = startup_file()
-    if not path:
+def remind(on, quiet=False):
+    """Turn the sign-in launcher on or off. True when it worked."""
+    kind, where = launcher_place()
+    if not kind:
         say("The sign-in reminder works on Windows only.")
         return False
+    if on and policy("DisableSignInLauncher"):
+        say("Your organization has turned off opening at sign-in.")
+        return False
     if on:
-        target = os.path.dirname(os.path.abspath(__file__))
-        if any(c in target for c in '"%&^<>|!'):
+        command = launcher_command()
+        if not command:
             say("The reminder cannot be set up from this folder.")
             return False
-        # Written whole and then moved into place, so a sign-in never runs a
-        # half-written launcher.
-        clear_launcher_temps(path)
-        tmp = f"{path}.{os.getpid()}.tmp"
         try:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(tmp, "w", encoding="ascii", newline="") as f:
-                # start runs a .cmd through cmd /k, which strips the quotes
-                # from a path with ( or @ in it. /d keeps the folder out of
-                # that command line.
-                f.write(f'@echo off\r\nstart "hello-world" /d "{target}" '
-                        "hello.cmd --startup\r\n")
-            os.replace(tmp, path)
+            if kind == "file":
+                write_launcher_file(where, command)
+            else:
+                import winreg
+                cmd = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"),
+                                   "System32", "cmd.exe")
+                with winreg.CreateKey(winreg.HKEY_CURRENT_USER, where) as key:
+                    winreg.SetValueEx(key, RUN_VALUE, 0, winreg.REG_SZ,
+                                      f'"{cmd}" /d /c {command}')
+                remove_legacy_launcher()
         except (OSError, UnicodeEncodeError):
-            try:
-                os.remove(tmp)
-            except OSError:
-                pass
             say("Could not set up the reminder.")
             return False
         say("Done. hello-world will open once a day when you sign in.")
         say("To stop it, choose option 2 in the menu.")
         return True
-    else:
-        clear_launcher_temps(path)
-        try:
-            os.remove(path)
-        except FileNotFoundError:
-            pass
-        except OSError:
-            say("Could not remove the reminder. Delete this file:")
-            say("  " + path)
-            return False
+    try:
+        if kind == "file":
+            clear_launcher_temps(where)
+            try:
+                os.remove(where)
+            except FileNotFoundError:
+                pass
+        else:
+            import winreg
+            remove_legacy_launcher()
+            try:
+                with winreg.OpenKey(winreg.HKEY_CURRENT_USER, where, 0,
+                                    winreg.KEY_SET_VALUE) as key:
+                    winreg.DeleteValue(key, RUN_VALUE)
+            except FileNotFoundError:
+                pass
+    except OSError:
+        say("Could not turn off the sign-in reminder.")
+        return False
+    if not quiet:
         say("Done. The sign-in reminder is off.")
     return True
+
+
+def write_launcher_file(path, command):
+    """Write the test stand-in for the Run value, whole, then move it in."""
+    clear_launcher_temps(path)
+    tmp = f"{path}.{os.getpid()}.tmp"
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(tmp, "w", encoding="ascii", newline="") as f:
+            f.write("@echo off\r\n" + command + "\r\n")
+        os.replace(tmp, path)
+    except (OSError, UnicodeEncodeError):
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def show_saved(state, full=True):
@@ -819,10 +927,11 @@ def show_saved(state, full=True):
         say(wrapped("Earlier plan (for same): ", state["previous"]))
     show_finished(state)
     say("Days-in-a-row message: " + ("shown." if state["streak"] else "hidden."))
-    path = startup_file()
-    if path:
+    if launcher_place()[0]:
         say("Opens by itself at sign-in: "
-            + ("on." if os.path.exists(path) else "off."))
+            + ("turned off by your organization."
+               if policy("DisableSignInLauncher") else
+               "on." if launcher_on() else "off."))
     say("It never leaves this computer. Others who can read this computer's")
     say("files, such as IT staff, could read it.")
     if full:
@@ -1185,21 +1294,28 @@ def menu(state, can_save=True, iso=None):
     listed = False
     while True:
         say()
-        reminding = startup_file() and os.path.exists(startup_file())
+        reminding = launcher_on()
         if not listed:
             say("Options")
             say("  1  Show what is saved on this computer")
-            say("  2  " + ("Turn off: open once a day at sign-in (now on)"
+            say("  2  " + ("Open once a day at sign-in (turned off by your "
+                           "organization)"
+                           if policy("DisableSignInLauncher") and not reminding else
+                           "Turn off: open once a day at sign-in (now on)"
                            if reminding else
                            "Turn on: open once a day at sign-in (now off)"))
-            say("  3  " + ("Hide the days-in-a-row message (now shown)"
+            say("  3  " + ("Days-in-a-row message (hidden by your organization)"
+                           if policy("HideDaysInARow") else
+                           "Hide the days-in-a-row message (now shown)"
                            if state["streak"] else
                            "Show the days-in-a-row message (now hidden)"))
             say("  4  Delete everything saved")
             say("  5  Help")
             say("  6  Set or change today's plan")
             say("  7  Forget one finished plan")
-            say("  8  " + ("Hide the thought and tip (now shown)"
+            say("  8  " + ("Thought and tip (hidden by your organization)"
+                           if policy("HideThoughtAndTip") else
+                           "Hide the thought and tip (now shown)"
                            if state.get("tips", True) else
                            "Show the thought and tip (now hidden)"))
             say("  Enter  Back to the last prompt")
@@ -1235,6 +1351,8 @@ def menu(state, can_save=True, iso=None):
                 if not commit(state, base, can_save):
                     undo(state, base)
                     say("Could not save that choice on this computer.")
+        elif choice == "3" and policy("HideDaysInARow"):
+            say("Your organization has hidden the days-in-a-row message.")
         elif choice == "3":
             refresh(state, can_save)
             base = copy.deepcopy(state)
@@ -1253,6 +1371,8 @@ def menu(state, can_save=True, iso=None):
             set_plan(state, can_save, iso)
         elif choice == "7":
             forget_finished(state, can_save)
+        elif choice == "8" and policy("HideThoughtAndTip"):
+            say("Your organization has hidden the thought and tip.")
         elif choice == "8":
             refresh(state, can_save)
             base = copy.deepcopy(state)
@@ -1276,8 +1396,8 @@ def offer_reminder(state, can_save, planned=False):
     It is asked once. Enter is final too, and an unclear answer asks again on
     a later visit.
     """
-    path = startup_file()
-    if (not path or state.get("offered") or os.path.exists(path)
+    if (not launcher_place()[0] or policy("DisableSignInLauncher")
+            or state.get("offered") or launcher_on()
             or not (planned or len(state["visits"]) >= 2)):
         return
     answer = ask_choice(
@@ -1394,6 +1514,12 @@ def daily(startup):
     answered = False
     if startup and seen_today:
         return
+    if policy("DisableSignInLauncher"):
+        if launcher_on() or legacy_launcher() and os.path.isfile(legacy_launcher()):
+            remind(False, quiet=True)
+    elif remove_legacy_launcher():
+        # An old Startup .cmd becomes the Run value, keeping the person's choice.
+        remind(True)
     first = not state["visits"]
     intent = state["intent"]
     if intent and intent["date"] > iso:
@@ -1431,7 +1557,8 @@ def daily(startup):
             say("Welcome back. Glad you are here.")
             show_finished(state, SHOWN_AFTER_DONE)
             say()
-        elif state["streak"] and (row in (3, 7, 14) or row % 30 == 0):
+        elif (state["streak"] and not policy("HideDaysInARow")
+              and (row in (3, 7, 14) or row % 30 == 0)):
             say(f"You have opened this {row} times in a row. Nice to see you.")
             say()
 
@@ -1483,7 +1610,7 @@ def daily(startup):
                 say("Your plan is still open.")
             say()
 
-        if state.get("tips", True):
+        if state.get("tips", True) and not policy("HideThoughtAndTip"):
             thought, tip = todays_pair(d)
             say("Thought for today:")
             say(indent(thought))

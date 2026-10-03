@@ -1,5 +1,33 @@
 # Changelog
 
+## 2026-10-03: ready for enterprise deployment: an offline package, Group Policy, and a launcher that can't be hijacked
+
+Version 1.23.0. The owner asked for the program to be ready for enterprises of 5,000 users and more. Two reviews ran first: an enterprise endpoint architect's gap review and a security threat review for that setting.
+
+Deployment, from the architect's blockers:
+- "The install can't be packaged": `install.ps1 -PackageHash` installs from an offline release package with no Git and no internet. The package hash is the SHA-256 of `SHA256SUMS`, which lists every file. All are checked before anything changes, and Python is also checked against the pin in the verified `install.ps1`. `tools/build-package.ps1` builds the package and a CycloneDX bill of materials, the same way every time, so anyone can rebuild a release from its commit and compare hashes. A new `release.yml` publishes the package for each new version on main.
+- "Upgrades fail whenever the program is open": the CI install test showed this isn't so. Windows renames a folder that a running program came from, so the upgrade goes ahead, the open window keeps its old copy, and the next install removes it. What does block the rename is a file held open without delete sharing, as antivirus or a backup agent can do. Any rename that still fails after retries now exits 1618, which Intune and MECM retry later, and the uninstaller does the same with nothing changed.
+- Detection: a first install that fails at step 6 removes its Apps entry and shortcut, so detection doesn't count it as installed.
+- Logs go to `%WINDIR%\Logs\hello-world`, admin-only and created that way before anything is written. Install and uninstall results go to the Application event log (events 1000 to 1003). This replaces the copy of the log in the install folder.
+- Both scripts start themselves again in 64-bit PowerShell when Intune runs them in 32-bit. Windows 11 on ARM64 is allowed. An older version is refused unless `-AllowDowngrade` is passed, and `-Publisher` names the publisher. The Apps entry records the package hash or commit and the bundled Python version.
+- OpenSSL and SQLite are removed from the bundled Python after it's unpacked, since the program uses neither and scanners would flag every PC.
+- Group Policy: `hello.py` reads `DisableSignInLauncher`, `HideThoughtAndTip` and `HideDaysInARow` from `SOFTWARE\Policies\hello-world` in HKLM or HKCU. ADMX and ADML templates are in `policy/`, and a test keeps them in step with the program.
+- `docs/ENTERPRISE.md` covers Intune and MECM settings, detection, return codes, signing and application control, what EDR will see, VDI and roaming profiles, data handling, the security model, keeping Python patched, and help desk answers.
+
+Security, from the threat review:
+- Medium, "any standard user can break uninstall for everyone" and "per-profile operations check only the last path component": the sign-in launcher is now a value named hello-world under the user's HKCU Run key. It runs `cmd /d /c if exist "...\hello.cmd" start ...`, so it starts the admin-only install and does nothing once that's gone. The uninstaller no longer has to clean launchers out of every profile. An old Startup `.cmd` becomes the Run value the next time its owner opens the program. For anyone who never does, the uninstaller's sweep deletes only a plain file with the exact name, after checking every folder on the path for a link. It handles one profile at a time and runs before anything else is removed.
+- The uninstaller's `-RemoveNotes`, added in 1.22.0, is withdrawn: deleting inside user profiles as an administrator can't be made safe against a link a user controls. `BACKLOG.md` says why.
+- "Git config the admin process doesn't control can run code": a clone install sets `GIT_CONFIG_GLOBAL=NUL` and `GIT_ATTR_NOSYSTEM=1`, which Git 2.51 honors. The test run goes through `cmd /d`, and the Archive module loads from `$PSHOME` by full path.
+- "Any user can block an upgrade or half-break an uninstall": the uninstaller renames the install folder aside first, so an open file stops it before anything changes.
+- "The launcher works as a persistence vector": fixed by the Run value above. `docs/ENTERPRISE.md` gives EDR teams the exact value to allow.
+- The review's point on `release.yml` publishing a hash that vouches for itself: the package is reproducible, and the guide says to rebuild from the reviewed commit and record that hash in the change ticket.
+
+CI: a new step builds the package and really installs it on the Windows runner. It checks the Apps entry, the stripped libraries, the log and the event. Then it reinstalls, refuses a wrong hash and a downgrade, upgrades while a hello-world process runs and clears the old copy on the next install, returns 1618 from both scripts while a file is held open, and uninstalls.
+
+Declined (see `BACKLOG.md`): deleting notes from the uninstaller, and signing in this repository. Still open in `TODO.md`: signing with the organization's certificate, a pilot ring through Intune or MECM, an NVDA check, and pinning the shared kit's workflows.
+
+Tested here: all 167 tests pass on Windows 11, Python 3.13, including the HKCU Run value and the move from an old launcher against a throwaway registry key. ruff is clean. All three PowerShell scripts parse in Windows PowerShell 5.1, and the package builds with a stable hash. The CI install job is the first real run of the installer and uninstaller changes.
+
 ## 2026-10-03: no attendance log, a lock against lost deletes, prompts that fit a magnified window
 
 Version 1.22.0. Three sources: a security and robustness review of `hello.py`, a review of the installer, CI and tests, and a third simulated pilot round with three new people (`docs/PILOT.md`).
