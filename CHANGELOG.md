@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-10-03: plain answers, and the menu where people look for it
+
+Version 1.27.0. A review of 1.26.0 drove the screens with typed answers in all five languages, then gave a two-day transcript to a simulated new user: 64, accounts payable, 25 years of Outlook and Excel, never opened a command prompt. They rated the chance of still opening it in two weeks at 2 out of 10. The biggest reasons were the console window itself and the command words. The fixes here are the ones the text screens can make. The window is planned in `TODO.md`.
+
+Bugs from the review:
+- A menu number typed at the plan question was saved as the plan. Typing `m` there said "The menu comes at the last prompt", asked again, and a following `1` replaced "Write the report" with "1". A plan with no letters, only digits and punctuation, is now refused with "A plan needs a word or two, so nothing was saved." A plan like "Call 3 clients" is still fine.
+- In English, `s`, `o` and `j` finished a plan, because the shared word table held the one-letter yes of Spanish and Portuguese, French and German. Someone typing `s` for "skip" at "Did you do it?" got "Nice. It is good to finish something.", and a finished plan is never offered back. One-letter yes words now work only in their own language, in `LETTER_YES`. Whole words such as `sí`, `oui` and `ja` still work everywhere.
+
+From the simulated user:
+- `ok`, `okay`, `yup`, `sure`, `did it`, `i did`, `done it` and `finished` now count as yes at "Did you do it?". `ok`, `okay`, `yup` and `sure` also count at the other yes-or-no questions, along with `vale`, `claro`, `d'accord` and `klar`. `nah`, `not really` and `not done` count as not yet. "ok" was refused before, which "made me feel like I was taking a test".
+- `menu` at the plan question opens the menu, rather than saying where the menu lives and asking again. The sign-in offer waits for another visit then, so it doesn't come between the two.
+- "That was not one of the choices: "ok"." is now "Sorry, "ok" is not one of the choices."
+- The last prompt no longer names `q`: "Type done, plan or menu, or Enter to close". Nobody could tell what `q` meant. `q`, `x`, `quit` and the rest still close.
+- The welcome said "IT staff could read them, so skip private details", which made a wellbeing tool read like monitoring. It now says "Your notes stay on this computer and are never sent anywhere. Like any work file they are not secret, so keep them to everyday tasks." The full statement of who can read the file stays in the README, option 1 and `docs/ROLLOUT.md`.
+- "Type menu at the last prompt" is now "Type menu at the end". The simulated user didn't know what a prompt was.
+
+Every changed string is translated into Spanish, French, Portuguese and German, and the 72-column and no-English tests cover them.
+
+Tests: one-letter yes per language, the natural yes and no words, a number refused as a plan, `menu` at the plan question opening the menu and leaving the plan alone, and `q` working though it isn't named. 192 pass here on Linux with Python 3.11, and ruff is clean.
+
 ## 2026-10-03: French, Portuguese and German
 
 Version 1.26.0. The owner asked to keep going with languages after Spanish shipped. French, Brazilian Portuguese and German are the most common Windows display languages after English and Spanish in large multinational companies, so all three were added.

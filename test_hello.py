@@ -97,7 +97,7 @@ def test_first_run_welcomes_and_saves_the_plan():
     lines = p.stdout.splitlines()
     assert lines[0] == "Hello, world!"
     assert lines[1] == "Thursday, 1 October 2026"
-    assert "Welcome." in p.stdout and "sends nothing anywhere" in p.stdout
+    assert "Welcome." in p.stdout and "never sent anywhere" in p.stdout
     assert "Thought for today:" in p.stdout and "Try this today:" in p.stdout
     saved = notes(p.home)
     assert saved["visits"] == ["2026-10-01"]
@@ -352,7 +352,7 @@ def test_menu_does_not_save_over_a_file_it_could_not_read():
 
 
 def test_friendly_yes_words_count():
-    for word in ("yep", "Yes!", "done", "ya"):
+    for word in ("yep", "Yes!", "done", "ya", "ok", "Okay.", "did it", "yup"):
         first = run(text="Book travel\n\n")
         p = run(text=word + "\n\n\n", day="2026-10-02", home=first.home)
         assert "Last time you planned: Book travel" in p.stdout
@@ -606,7 +606,7 @@ def test_first_run_explains_tomorrow_and_confirms_the_plan():
     p = run(text="write the report\n\n")
     assert "asks next time" in p.stdout
     assert "Saved. Type done when you finish it, or it asks next time you open this." in p.stdout
-    assert "Type done, plan, menu or q" in p.stdout
+    assert "Type done, plan or menu" in p.stdout
 
 
 def test_sign_in_offer_is_made_once_on_the_second_visit():
@@ -629,8 +629,8 @@ def test_sign_in_offer_yes_turns_it_on():
 
 def test_unknown_input_is_named_and_outcomes_are_echoed():
     p = run(text="\nbanana\n\n")
-    assert 'That was not one of the choices: "banana".' in p.stdout
-    assert "Type plan, menu or q, or press Enter to close." in p.stdout
+    assert 'Sorry, "banana" is not one of the choices.' in p.stdout
+    assert "Type plan or menu, or press Enter to close." in p.stdout
     p = run(["--nope"])
     assert "Unknown option: --nope" in p.stdout and p.returncode == 2
     p = run(["--remind"])
@@ -683,7 +683,7 @@ def test_result_of_plan_command_stays_until_enter():
     # The same prompt comes back, so the result stays on screen and the
     # person can go on, instead of any typed word closing the window.
     after = p.stdout.split("Saved. Type done when you finish it")[1]
-    assert "Type done, plan, menu or q, or Enter to close >" in after
+    assert "Type done, plan or menu, or Enter to close >" in after
 
 
 def test_wrong_answers_never_close_the_window_and_the_choices_are_listed():
@@ -791,7 +791,7 @@ def test_help_lines_fit_72_columns():
 
 def test_done_at_the_last_prompt_counts_the_plan_the_same_day():
     first = run(text="Send the invoice\ndone\n\n")
-    assert "Type done, plan, menu or q" in first.stdout
+    assert "Type done, plan or menu" in first.stdout
     assert "Type the next plan" in first.stdout
     saved = notes(first.home)
     assert saved["intent"] is None and saved["done"] == 1
@@ -813,7 +813,7 @@ def test_after_done_one_enter_really_closes():
     p = run(text="Send the invoice\ndone\n\n")
     assert "Closing." in p.stdout and "tomorrow" not in p.stdout.split("Closing")[1]
     # The last prompt is shown once before done and never again.
-    assert p.stdout.count("menu or q, or Enter to close > ") == 1
+    assert p.stdout.count("or menu, or Enter to close > ") == 1
     assert notes(p.home)["intent"] is None and notes(p.home)["done"] == 1
 
 
@@ -827,9 +827,9 @@ def test_command_words_are_not_saved_as_the_plan():
     p = run(text="done\n\n")
     assert "looks like a command" in p.stdout and "at the last prompt" in p.stdout
     assert notes(p.home)["intent"] is None
-    # menu there says where the menu is and asks the plan question again.
-    p = run(text="menu\nWrite it\n\n")
-    assert "The menu comes at the last prompt" in p.stdout
+    # menu there opens the menu instead of saying where it lives.
+    p = run(text="menu\n6\nWrite it\n\n\n")
+    assert "Options" in p.stdout and "looks like a command" not in p.stdout
     assert notes(p.home)["intent"]["text"] == "Write it"
     p = run(text="\nplan\nmenu\n\n")
     assert "Type your plan, or press Enter to go back." in " ".join(p.stdout.split())
@@ -936,7 +936,7 @@ def test_turning_the_reminder_on_from_the_menu_ends_the_offer():
 def test_done_is_named_not_taken_at_keep_it_for_today():
     first = run(text="Send the invoice\n\n")
     p = run(text="n\ndone\n\n\n", home=first.home, day="2026-10-02")
-    assert 'not one of the choices: "done"' in p.stdout
+    assert '"done" is not one of the choices' in p.stdout
     assert notes(first.home)["intent"]["text"] == "Send the invoice"
 
 
@@ -1011,7 +1011,7 @@ def test_done_with_no_plan_says_so_and_done_is_not_offered():
 
 def test_menu_accepts_q_and_help_and_names_a_wrong_word():
     p = run(text="\nm\nbanana\nhelp\nq\n")
-    assert 'That was not one of the choices: "banana". Type 1 to 8' in p.stdout
+    assert 'Sorry, "banana" is not one of the choices. Type 1 to 8' in p.stdout
     assert "Words you can type at the last prompt" in p.stdout
     assert p.returncode == 0
 
@@ -1019,7 +1019,7 @@ def test_menu_accepts_q_and_help_and_names_a_wrong_word():
 def test_a_mistyped_yes_or_no_is_named_and_asked_again():
     first = run(text="Send the invoice\n\n")
     p = run(text="yse\ny\n\n", home=first.home, day="2026-10-02")
-    assert 'not one of the choices: "yse"' in p.stdout
+    assert '"yse" is not one of the choices' in p.stdout
     assert notes(first.home)["done"] == 1
     # Three misunderstood answers leave the plan as it was.
     second = run(text="Write it\n\n")
@@ -1033,7 +1033,7 @@ def test_a_mistyped_sign_in_answer_is_named_and_not_counted_as_a_skip():
     home, startup = mkdtemp(), mkdtemp()
     run(text="\n\n", home=home, startup=startup, day="2026-10-01")
     p = run(text="\nyse\nn\n\n", home=home, startup=startup, day="2026-10-02")
-    assert 'not one of the choices: "yse"' in p.stdout
+    assert '"yse" is not one of the choices' in p.stdout
     saved = notes(home)
     assert saved.get("offered") is True and "offer_skips" not in saved
     assert os.listdir(startup) == []
@@ -1129,7 +1129,7 @@ def test_a_failed_yes_at_the_sign_in_offer_leaves_it_open():
 def test_no_after_done_goes_back_to_the_last_prompt():
     p = run(text="A\ndone\nno\n\n")
     assert "Closing." not in p.stdout
-    assert p.stdout.count("menu or q, or Enter to close > ") == 2
+    assert p.stdout.count("or menu, or Enter to close > ") == 2
     assert notes(p.home)["intent"] is None
 
 
@@ -1456,7 +1456,7 @@ def test_no_prompt_uses_an_equals_sign_for_enter():
 def test_done_is_still_offered_after_the_sign_in_question():
     home, startup = mkdtemp(), mkdtemp()
     p = run(text="Send the invoices\nn\ndone\n\n", home=home, startup=startup)
-    assert "Type done, plan, menu or q, or Enter to close >" in p.stdout
+    assert "Type done, plan or menu, or Enter to close >" in p.stdout
     assert notes(home)["done"] == 1
 
 
@@ -1811,7 +1811,7 @@ def test_policy_turns_plans_off_and_drops_saved_plan_text():
     pol = {"DisablePlans": 1}
     p = run(text="m\n6\n\n\n", home=home, policy=pol)
     assert "Did you do it?" not in p.stdout and "What is one thing" not in p.stdout
-    assert "Type menu or q, or Enter to close >" in p.stdout
+    assert "Type menu, or Enter to close >" in p.stdout
     assert "Plans are turned off by your organization." in p.stdout
     saved = json.dumps(notes(home))
     assert "secret" not in saved and '"done"' not in saved
@@ -1824,7 +1824,7 @@ def test_the_first_run_welcome_matches_the_policies():
     welcome = " ".join(p.stdout.split("Welcome.")[1].split())
     assert "thought" not in welcome.split("Type menu")[0]
     assert "plan" not in welcome.split("Type menu")[0]
-    assert "Type menu at the last prompt" in welcome
+    assert "Type menu at the end" in welcome
 
 
 def test_hiding_days_in_a_row_keeps_only_the_latest_visit():
@@ -2007,7 +2007,8 @@ def test_every_language_has_the_lists_and_dates():
 
 def test_command_words_mean_one_thing_in_every_language():
     hello = _load_hello()
-    groups = {"yes": hello.STRICT_YES, "no": hello.NO, "quit": hello.QUIT_WORDS,
+    groups = {"yes": hello.STRICT_YES + hello.DID_WORDS + tuple(
+                  {w for ws in hello.LETTER_YES.values() for w in ws}), "no": hello.NO, "quit": hello.QUIT_WORDS,
               "plan": hello.PLAN_WORDS, "menu": hello.MENU_WORDS,
               "help": hello.HELP_WORDS, "same": hello.SAME_WORDS,
               "done": hello.DONE_WORDS}
@@ -2117,3 +2118,49 @@ if __name__ == "__main__":
         print(f"FAILED {len(failed)}: {', '.join(failed)}")
         sys.exit(1)
     print("ok")
+
+
+def test_one_letter_yes_words_count_only_in_their_own_language():
+    # In English, s is a slip or "skip", and must not finish the plan.
+    for word in ("s", "o", "j"):
+        first = run(text="Book travel\n\n")
+        p = run(text=word + "\n\n\n\n\n", day="2026-10-02", home=first.home)
+        assert f'"{word}" is not one of the choices' in p.stdout, word
+        assert notes(first.home)["intent"]["text"] == "Book travel", word
+    for code, word in (("es", "s"), ("pt", "s"), ("fr", "o"), ("de", "j")):
+        first = run(text="Plan A\n\n", lang=code)
+        run(text=word + "\n\n\n", day="2026-10-02", home=first.home, lang=code)
+        assert notes(first.home)["intent"] is None, code
+
+
+def test_natural_no_words_keep_the_plan_open():
+    for word in ("nah", "not really"):
+        first = run(text="Book travel\n\n")
+        p = run(text=word + "\n\n\n\n", day="2026-10-02", home=first.home)
+        assert "Keep it for today?" in p.stdout, word
+        assert notes(first.home)["intent"]["text"] == "Book travel", word
+
+
+def test_a_menu_number_is_not_saved_as_the_plan():
+    for typed in ("1", "2.", "#4", "  7 "):
+        first = run(text="Write the report\n\n")
+        p = run(text=f"\n{typed}\n\n\n", day="2026-10-02", home=first.home)
+        assert "A plan needs a word or two" in p.stdout, typed
+        assert notes(first.home)["intent"]["text"] == "Write the report", typed
+    p = run(text="Call 3 clients\n\n")
+    assert notes(p.home)["intent"]["text"] == "Call 3 clients"
+
+
+def test_menu_at_the_plan_question_opens_the_menu_and_keeps_the_plan():
+    first = run(text="Write the report\n\n")
+    p = run(text="\nm\n1\n\n\n\n", day="2026-10-02", home=first.home)
+    assert "Options" in p.stdout
+    assert "Show what is saved" in p.stdout
+    assert notes(first.home)["intent"]["text"] == "Write the report"
+    assert p.stdout.count("What is one thing you want to get done today?") == 1
+
+
+def test_the_last_prompt_does_not_name_q_but_q_still_closes():
+    p = run(text="Plan A\nq\n")
+    assert " or q" not in p.stdout
+    assert p.returncode == 0 and p.stdout.count("Enter to close >") == 1
