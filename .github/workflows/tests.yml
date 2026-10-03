@@ -131,3 +131,56 @@ jobs:
           if ($LASTEXITCODE -or "$out" -ne 'Hello, world!') { throw "hello.py --plain on the pinned Python gave exit $LASTEXITCODE`: $out" }
           $version = & (Join-Path $py 'python.exe') -I hello.py --version
           if ($version -ne "hello-world $((Get-Content VERSION).Trim())") { throw "--version gave '$version'." }
+
+  # Where AllSigned or WDAC script rules apply, only a signed package runs.
+  # A throwaway certificate stands in for the organization's: the package is
+  # signed with it, the machine is set to AllSigned, and the scripts run with
+  # no -ExecutionPolicy Bypass. An unsigned package must be refused there.
+  signed:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: A signed package installs and uninstalls under AllSigned
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          function Check([bool]$Ok, [string]$What) { if (-not $Ok) { throw "Failed: $What" }; Write-Host "ok: $What" }
+          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject 'CN=hello-world CI signing' -CertStoreLocation Cert:\CurrentUser\My -NotAfter (Get-Date).AddDays(1)
+          $cer = Join-Path $env:RUNNER_TEMP 'ci-signing.cer'
+          Export-Certificate -Cert $cert -FilePath $cer | Out-Null
+          Import-Certificate -FilePath $cer -CertStoreLocation Cert:\LocalMachine\Root | Out-Null
+          Import-Certificate -FilePath $cer -CertStoreLocation Cert:\LocalMachine\TrustedPublisher | Out-Null
+
+          $pf = [Environment]::GetFolderPath('ProgramFiles')
+          $dir = Join-Path $pf 'hello-world'
+          function Build([string]$Name, [string[]]$Extra) {
+            $out = Join-Path $env:RUNNER_TEMP $Name
+            $hash = (powershell -NoProfile -ExecutionPolicy Bypass -File tools\build-package.ps1 -OutDir $out @Extra | Select-Object -Last 1).Trim()
+            $setup = Join-Path $pf $Name
+            New-Item -ItemType Directory $setup | Out-Null
+            icacls $setup /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F' | Out-Null
+            Copy-Item "$out\*" $setup
+            return @{ Setup = $setup; Hash = $hash }
+          }
+          $signed = Build 'hello-setup-signed' @('-CertificateThumbprint', $cert.Thumbprint)
+          $unsigned = Build 'hello-setup-unsigned' @()
+          Check ((Get-AuthenticodeSignature "$($signed.Setup)\install.ps1").Status -eq 'Valid') 'the signed package carries a valid signature'
+          Check ($signed.Hash -ne $unsigned.Hash) 'signing gives the package its own hash'
+
+          Set-ExecutionPolicy Undefined -Scope CurrentUser -Force
+          Set-ExecutionPolicy AllSigned -Scope LocalMachine -Force
+          Check ((powershell -NoProfile -Command 'Get-ExecutionPolicy') -eq 'AllSigned') 'the machine is set to AllSigned'
+
+          powershell -NoProfile -File "$($unsigned.Setup)\install.ps1" -PackageHash $unsigned.Hash -Quiet 2>&1 | Write-Host
+          Check ($LASTEXITCODE -ne 0 -and -not (Test-Path $dir)) 'an unsigned package is refused under AllSigned'
+
+          powershell -NoProfile -File "$($signed.Setup)\install.ps1" -PackageHash $signed.Hash -Quiet | Write-Host
+          Check ($LASTEXITCODE -eq 0) 'the signed package installs under AllSigned'
+          Check ((Get-AuthenticodeSignature "$dir\uninstall.ps1").Status -eq 'Valid') 'the installed uninstaller is signed'
+          Check ("$(& "$dir\python\python.exe" -I "$dir\hello.py" --plain)" -eq 'Hello, world!') 'the installed program runs'
+
+          powershell -NoProfile -File "$dir\uninstall.ps1" -Quiet | Write-Host
+          Check ($LASTEXITCODE -eq 0 -and -not (Test-Path $dir)) 'the signed uninstaller runs under AllSigned'

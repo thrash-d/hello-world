@@ -13,8 +13,23 @@ tested is the package that ships.
 
 .PARAMETER OutDir
 An empty or missing folder to build the package in.
+
+.PARAMETER CertificateThumbprint
+Signs install.ps1 and uninstall.ps1 with this code-signing certificate before
+hashing, for PCs where an AllSigned execution policy or WDAC script rules
+apply. The certificate must be in Cert:\CurrentUser\My or Cert:\LocalMachine\My
+with its private key. A signed package has its own package hash, and it is
+no longer reproducible from the commit alone, so record the printed hash.
+
+.PARAMETER TimestampServer
+An RFC 3161 timestamp server for the signatures, so they stay valid after
+the certificate expires. Leave it out only for testing.
 #>
-param([Parameter(Mandatory)][string]$OutDir)
+param(
+    [Parameter(Mandatory)][string]$OutDir,
+    [ValidatePattern('^[0-9A-Fa-f]{40}$')][string]$CertificateThumbprint,
+    [string]$TimestampServer
+)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 $src = Get-Content -Raw -LiteralPath (Join-Path $root 'install.ps1')
@@ -31,6 +46,17 @@ foreach ($f in 'install.ps1', 'uninstall.ps1', 'hello.py', 'VERSION') {
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 $ProgressPreference = 'SilentlyContinue'
+if ($CertificateThumbprint) {
+    $cert = @(Get-ChildItem -Path "Cert:\CurrentUser\My\$CertificateThumbprint", "Cert:\LocalMachine\My\$CertificateThumbprint" -CodeSigningCert -ErrorAction SilentlyContinue)[0]
+    if (-not $cert) { throw "No code-signing certificate with thumbprint $CertificateThumbprint and a private key in CurrentUser\My or LocalMachine\My." }
+    foreach ($f in 'install.ps1', 'uninstall.ps1') {
+        $sign = @{ FilePath = (Join-Path $OutDir $f); Certificate = $cert; HashAlgorithm = 'SHA256' }
+        if ($TimestampServer) { $sign.TimestampServer = $TimestampServer }
+        $result = Set-AuthenticodeSignature @sign
+        if ($result.Status -ne 'Valid') { throw "Signing $f gave status $($result.Status): $($result.StatusMessage)" }
+    }
+}
+
 $zip = Join-Path $OutDir 'python-embed.zip'
 Invoke-WebRequest $url -OutFile $zip -UseBasicParsing -TimeoutSec 300
 if ((Get-FileHash -LiteralPath $zip).Hash -ne $sha) { throw "The download from $url doesn't match the pinned SHA-256." }
