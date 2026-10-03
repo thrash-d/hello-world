@@ -32,7 +32,7 @@ At the last prompt:
   replaces it. At any plan prompt, `same` brings back a plan from an earlier
   day that you didn't finish. A finished plan is never offered back.
 - Type `menu` (or `m`) for the options: see what is saved, open once a day at
-  sign-in, hide the "in a row" line, delete everything, help, set today's plan,
+  sign-in, hide the days-in-a-row message, delete everything, help, set today's plan,
   forget one finished plan, and hide the thought and tip. The options are read
   once; type `m` to hear them again. Enter at the menu goes back.
 
@@ -40,8 +40,8 @@ At the last prompt:
 still counts. So do `x` and `close`.
 
 If you don't type `done`, the next visit asks "Did you do it?". A yes is
-counted on the spot. If the plan is more than a day old, it asks which day you
-finished it. "Not yet" lets you keep the plan for today, as many days as you
+counted on the spot. If the plan is more than a day old, it lists the days
+since and you pick one by number. "Not yet" lets you keep the plan for today, as many days as you
 need. Press Enter to skip the question; after two skips it stops asking and
 shows the plan as still open, and `done` still works. A plan first set more
 than two weeks ago is put away, and `same` brings it back.
@@ -49,8 +49,8 @@ than two weeks ago is put away, and `same` brings it back.
 If a plan sounds like several things joined together, it says once that
 finishing the first part still counts.
 
-The "in a row" line shows only on your 3rd, 7th and 14th visit in a row, then
-every 30th. A visit within four days of the last one counts, so weekends and
+The days-in-a-row message shows only on your 3rd, 7th and 14th visit in a
+row, then every 30th. A visit within four days of the last one counts, so weekends and
 a day off don't break it. You can turn it off in the menu.
 
 The first time you open it, it asks once whether to open by itself when you
@@ -61,9 +61,11 @@ so a screen reader reads it in order. Each prompt ends by saying what Enter
 does. It was checked with Narrator in a real console for version 1.16.0. If
 two windows are open, each one keeps the other's changes.
 
-To remove the program, use Settings > Apps > Installed apps > hello-world >
-Uninstall. Windows asks for an administrator password. If you don't have it,
-ask IT.
+To stop using it, you don't need IT: turn off the sign-in opening with menu
+option 2, delete your notes with option 4, and don't open it again. To remove
+the program itself, use Settings > Apps > Installed apps > hello-world >
+Uninstall. That needs an administrator password, so ask IT if you don't have
+one.
 
 ### What is saved, and who can see it
 
@@ -72,20 +74,24 @@ here.
 
 hello-world saves one small file, `notes.json`, in the `hello-world` folder
 under `AppData\Local` in your own user folder. It holds the dates you opened
-the program (the last 400), your current plan, the plan before it, how many
-times you marked a plan done, and your last seven finished plans (words and
-date). It also holds your in-a-row setting and your answer to the sign-in
-question. Nothing else: no name, no computer name, no times.
+the program in the last 60 days, your current plan, an unfinished earlier
+plan, how many times you marked a plan done, and your last seven finished
+plans (words and date). It also holds your settings for the days-in-a-row
+message and the thought and tip, and your answer to the sign-in question.
+Nothing else: no name, no computer name, no times. Older dates are dropped, so
+the file is never a long record of when you worked. An empty `notes.lock` file
+sits next to it and holds nothing.
 
 It makes no network connections and reports nothing to IT or managers. Other
 people who can read your computer's files, such as IT staff, could read the
 file, so don't type passwords or private details.
 
-Menu option 1 shows all of it, option 7 forgets one finished plan, and option 4
-deletes everything. After a delete the file holds only a random marker, so
+Menu option 1 shows all of it, and whether it opens by itself at sign-in.
+Option 7 forgets one finished plan, and option 4 deletes everything. After a delete the file holds only a random marker, so
 another open window can't write the notes back. A damaged file is kept as
-`notes.json.bak` until you delete everything. Uninstalling leaves the file in
-place, so delete the folder if you don't want it.
+`notes.json.bak` until you delete everything. Uninstalling asks the
+administrator whether to delete everyone's notes too; if not, delete the
+folder yourself if you don't want it.
 
 ## For IT: install
 
@@ -94,7 +100,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.21.0'
+$tag = 'v1.22.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

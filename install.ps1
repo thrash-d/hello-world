@@ -21,12 +21,12 @@ file changed since checkout.
 The full commit hash that was reviewed. The clone must be at this commit.
 
 .PARAMETER Quiet
-Prints only warnings, errors, and the final result line. Everything is still
-written to install.log. The exit code is 0 on success and 1 on failure, so a
+Prints only warnings, the final result line, and on failure a FAILED line
+with where the log is. Everything is still written to install.log. The exit code is 0 on success and 1 on failure, so a
 management tool can run the installer unattended. It never asks questions.
 
 .EXAMPLE
-$tag = 'v1.21.0'
+$tag = 'v1.22.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
@@ -247,16 +247,6 @@ if (Test-Path -LiteralPath $gitData) {
     try { Assert-AdminOnlyTree $gitData }
     catch { throw "Non-admin write access in $gitData (shared Git for Windows config). Ensure only administrators can modify this folder, for example: icacls `"$gitData`" /inheritance:r /grant:r *S-1-5-32-544:(OI)(CI)F *S-1-5-18:(OI)(CI)F *S-1-5-32-545:(OI)(CI)RX" }
 }
-# The admin's own session can carry GIT_DIR and friends that point git elsewhere, and
-# HOME/XDG_CONFIG_HOME can point to employee-writable locations. Clear them. Git then
-# falls back to the admin's profile for ~/.gitconfig, which is admin-only unless the
-# profile is redirected.
-Get-ChildItem Env: | Where-Object Name -like 'GIT_*' | ForEach-Object { Remove-Item -LiteralPath "Env:$($_.Name)" }
-Remove-Item -LiteralPath 'Env:HOME' -ErrorAction SilentlyContinue
-Remove-Item -LiteralPath 'Env:XDG_CONFIG_HOME' -ErrorAction SilentlyContinue
-# Set GIT_CONFIG_NOSYSTEM to prevent git from reading /etc/gitconfig (equivalent on Windows)
-$env:GIT_CONFIG_NOSYSTEM = '1'
-
 # Covers .git too, so nobody can plant git objects that fool the commit check.
 Write-Step '[2/6] Checking the setup folder'
 Assert-AdminOnlyTree $PSScriptRoot
@@ -268,6 +258,17 @@ try { Start-Transcript -LiteralPath (Join-Path $PSScriptRoot 'install.log') -App
 catch { throw "Couldn't start the install log (is a transcript already running in this window?): $_" }
 Write-Info "Logging to $(Join-Path $PSScriptRoot 'install.log')"
 try {
+
+# The admin's own session can carry GIT_DIR and friends that point git elsewhere, and
+# HOME/XDG_CONFIG_HOME can point to employee-writable locations. Clear them. Git then
+# falls back to the admin's profile for ~/.gitconfig, which is admin-only unless the
+# profile is redirected. Done inside this try, so the finally puts them back even
+# after Ctrl+C, which the trap above doesn't catch.
+Get-ChildItem Env: | Where-Object Name -like 'GIT_*' | ForEach-Object { Remove-Item -LiteralPath "Env:$($_.Name)" }
+Remove-Item -LiteralPath 'Env:HOME' -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath 'Env:XDG_CONFIG_HOME' -ErrorAction SilentlyContinue
+# Set GIT_CONFIG_NOSYSTEM to prevent git from reading /etc/gitconfig (equivalent on Windows)
+$env:GIT_CONFIG_NOSYSTEM = '1'
 
 # === COMMIT VERIFICATION: Ensure the clone is at the reviewed commit ===
 Write-Step '[3/6] Verifying the reviewed commit'
@@ -365,6 +366,12 @@ Write-Step '[6/6] Adding the Start menu shortcut and the Settings > Apps entry'
 $version = (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'VERSION')).Trim()
 $pyExe = Join-Path $dir 'python\python.exe'
 $lnk = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'hello-world.lnk'
+# Saving the shortcut overwrites the old install's one, so keep a copy for a
+# rollback. Set before anything here can fail, and any copy left by an earlier
+# run is cleared first. The setup folder is admin-only, like the Start menu folder.
+$lnkBackup = Join-Path $PSScriptRoot 'hello-world.lnk.bak'
+Remove-Item -LiteralPath $lnkBackup -Force -ErrorAction SilentlyContinue
+if (Test-Path -LiteralPath $lnk) { Copy-Item -LiteralPath $lnk -Destination $lnkBackup -Force }
 try {
 New-Item $key -Force | Out-Null
 $uninstall = "`"$(Join-Path $sys32 'WindowsPowerShell\v1.0\powershell.exe')`" -NoProfile -ExecutionPolicy Bypass -File `"$dir\uninstall.ps1`""
@@ -390,10 +397,6 @@ foreach ($name in $dwords.Keys) { New-ItemProperty $key -Name $name -Value $dwor
 # Start menu, and after the Apps entry, so a half-finished install still has
 # an Uninstall button. hello.py waits for Enter before it closes its window; the
 # shortcut adds a pause only when hello.cmd fails, so an error message stays readable.
-# Saving overwrites the old install's shortcut, so keep a copy for a rollback.
-# The setup folder is admin-only, like the Start menu folder.
-$lnkBackup = Join-Path $PSScriptRoot 'hello-world.lnk.bak'
-if (Test-Path -LiteralPath $lnk) { Copy-Item -LiteralPath $lnk -Destination $lnkBackup -Force }
 $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk)
 $shortcut.TargetPath = Join-Path $sys32 'cmd.exe'
 $shortcut.Arguments = "/d /c `"title hello-world & `"$dir\hello.cmd`" & if errorlevel 1 pause`""
@@ -422,8 +425,17 @@ catch {
             $failed = "$dir.failed"
             if (Test-Path -LiteralPath $failed) { Remove-Tree $failed }
             Rename-Retry $dir (Split-Path $failed -Leaf)
-            Rename-Retry $old (Split-Path $dir -Leaf)
-            if (Test-Path -LiteralPath $lnkBackup) { Copy-Item -LiteralPath $lnkBackup -Destination $lnk -Force }
+            try { Rename-Retry $old (Split-Path $dir -Leaf) }
+            catch {
+                # Never leave nothing at $dir: put the new install back instead.
+                Rename-Retry $failed (Split-Path $dir -Leaf)
+                throw
+            }
+            if (Test-Path -LiteralPath $lnkBackup) {
+                Copy-Item -LiteralPath $lnkBackup -Destination $lnk -Force
+                try { Assert-AdminOnly $lnk $edit }
+                catch { Remove-Item -LiteralPath $lnk -Force -ErrorAction SilentlyContinue }
+            }
             Remove-Item -LiteralPath $key -Recurse -Force -ErrorAction SilentlyContinue
             if ($prevEntry) {
                 New-Item $key -Force | Out-Null
@@ -436,6 +448,7 @@ catch {
         }
         catch { Write-Warning "Couldn't put the previous install back: $($_.Exception.Message)" }
     }
+    Remove-Item -LiteralPath $lnkBackup -Force -ErrorAction SilentlyContinue
     throw $stepError
 }
 Remove-Item -LiteralPath $lnkBackup -Force -ErrorAction SilentlyContinue
@@ -448,7 +461,7 @@ $installed = $true
 
 $how = if ($prevVersion -and $prevVersion -ne $version) { "upgraded from $prevVersion" } elseif ($prevVersion) { 'reinstalled' } else { 'new install' }
 Write-Host "Installed hello-world $version to $dir ($how)." -ForegroundColor Green
-Write-Host "hello.py SHA-256: $hash"
+Write-Info "hello.py SHA-256: $hash"
 Write-Info 'Next: open hello-world from the Start menu to check it. The setup folder can be deleted. A copy of install.log stays in the install folder.'
 }
 # The host prints a script's error only after the finally below, so write it to the log first.
@@ -457,6 +470,11 @@ finally {
     Stop-Transcript -ErrorAction SilentlyContinue | Out-Null
     # The README says the setup folder can be deleted, so keep a copy of the
     # log in the install folder, which only administrators can change.
-    if ($installed) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'install.log') -Destination $dir -Force -ErrorAction SilentlyContinue }
+    # It names the admin account and the PC, so only administrators may read it.
+    if ($installed) {
+        $logCopy = Join-Path $dir 'install.log'
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'install.log') -Destination $logCopy -Force -ErrorAction SilentlyContinue
+        if (Test-Path -LiteralPath $logCopy) { & $icacls $logCopy /inheritance:r /grant:r '*S-1-5-32-544:F' '*S-1-5-18:F' | Out-Null }
+    }
     Restore-Window
 }

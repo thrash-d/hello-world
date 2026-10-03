@@ -1,5 +1,35 @@
 # Changelog
 
+## 2026-10-03: no attendance log, a lock against lost deletes, prompts that fit a magnified window
+
+Version 1.22.0. Three sources: a security and robustness review of `hello.py`, a review of the installer, CI and tests, and a third simulated pilot round with three new people (`docs/PILOT.md`).
+
+Security and robustness review:
+- Medium, "a reset in another window can be undone by a save already in progress": a small `notes.lock` is now held while any change reads and writes the file, and while Delete everything runs. A second process can't take it meanwhile, and a test checks that with a real second process. The lock gives up after about five seconds, so a stuck window can't freeze another one. The backlog's "no lock file" entry is updated.
+- "epoch is the one string from the file that is never cleaned": only hex is kept.
+- "A missing file looks like 'deleted in another window'": a file that is gone, deleted by hand or set aside as damaged, no longer blocks the next save. Only a changed marker means Delete everything ran.
+- "Emoji newer than the pinned Python's Unicode data are silently removed": `tidy()` now drops only controls, format marks, private-use and surrogate characters, and keeps unassigned ones. "Combining-mark floods" are capped at four per letter.
+- "The launcher's temp file is written inside the Startup folder": it has the process ID in its name, and stale ones are cleared on turning the reminder on or off, and on uninstall.
+
+Installer, CI and tests review:
+- Medium, "the step 6 rollback stops halfway when step 6 fails before the shortcut code runs": a bug from round 46. The shortcut backup is now set before anything in step 6 can fail. A stale backup is cleared first and removed after a rollback too.
+- "If the second rollback rename fails, nothing is left at $dir": the new install is put back instead.
+- The restored shortcut is checked for admin-only access, like a new one.
+- "Ctrl+C in step 2 leaves the admin's window changed": the Git environment changes now happen inside the try whose finally restores them.
+- "-Quiet prints more than the help text says": the SHA-256 line is quiet now, and the help says a failure adds where the log is.
+- "Every user on the PC can read the copied log": the copy is admin-only.
+- Medium, "CI never runs the installer's logic": a new step reads the pinned Python URL and hash from `install.ps1`, downloads the zip, checks the hash, and runs `hello.py --plain` and `--version` on it. pytest and PSScriptAnalyzer are pinned, checkouts drop their token, and jobs time out after 15 minutes.
+- Tests: the pair test now checks real pairs, the two-process test shows window A's errors, Ctrl+C skipping one prompt has a test, and every temp folder the tests make is removed at exit (71 calls).
+
+Simulated pilot, third round:
+- The file now keeps visit dates for 60 days, not 400, so it can't read as an attendance record (Priya). The "That is N done so far" tally after each finish is gone; the count stays in option 1. Option 1 says whether the sign-in opening is on. `uninstall.ps1` asks whether to delete every user's notes, and `-RemoveNotes` does it without asking.
+- Prompts longer than the window are wrapped, with only the last line left for the answer, so the choices are never off a magnified screen (Glenn). "When did you finish it?" lists the days since the plan by number, because `y` there clashed with the `y` just typed (Glenn, Amara). "Still open since ..." puts the plan on its own line.
+- Plain words for the praise lines, "Left as it was" (now "Your plan is still open."), and nine thoughts and tips Amara quoted. The in-a-row line is called the days-in-a-row message.
+
+Declined (see `BACKLOG.md`): the days-in-a-row message off by default, and removing the program without an administrator. The README now says how to stop using it without IT.
+
+Tested here: all 162 tests pass on Windows 11, Python 3.13, under both pytest and the plain runner, and ruff is clean. Both PowerShell scripts parse in Windows PowerShell 5.1 and are ASCII. The new CI step ran on this PC: the pinned zip's hash matched, and 1.22.0 printed its greeting and version on that Python. Not tested: the installer and uninstaller themselves, including the reworked rollback and `-RemoveNotes`.
+
 ## 2026-10-03: a deleted plan stays deleted, q closes from every question, a late yes asks which day
 
 Version 1.21.0. Two sources this round: a fresh correctness review of the code, and the simulated pilot's second round on 1.20.0 (`docs/PILOT.md`).
