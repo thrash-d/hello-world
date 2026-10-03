@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-10-03: signed packages, a records policy, and a rollout kit
+
+Version 1.24.0. The owner reported that all pending manual tests passed on 1.23.0, including the NVDA check of the prompts and a pilot-ring deployment, and asked for the organization's side to be taken as far as possible. A product review of 1.23.0 ranked what to build next.
+
+Signing: `tools\build-package.ps1 -CertificateThumbprint` signs `install.ps1` and `uninstall.ps1` with SHA-256, with an optional timestamp server, checks both signatures, then hashes. A new CI job creates a throwaway code-signing certificate, trusts it, builds a signed package and an unsigned one, and sets the runner to AllSigned. With no `-ExecutionPolicy Bypass` it checks that the unsigned package is refused, the signed one installs and runs, the installed uninstaller keeps its signature, and the uninstall works.
+
+Product review, item 1, "Records and works-council controls": a new `DisablePlans` policy. With it, the program never asks for or follows up a plan, the last prompt and menu say plans are turned off, and plan text, finished plans and the done count are dropped from the file at each person's next visit. With `HideDaysInARow`, only the latest visit date is kept. The ADMX and ADML have the new setting.
+
+Product review, bugs:
+- "When the HideThoughtAndTip policy is on, the first-run welcome still says 'Each day you get one thought and one small thing to try'". The welcome is now built from what this PC shows.
+- "The welcome ends with 'Type menu for the options', and the very next prompt rejects menu". Typing menu at the first plan question now says where the menu is and asks the plan question again, and the welcome says "Type menu at the last prompt".
+
+Product review, items 2 and 3: `docs/ACCESSIBILITY.md` records how the program meets accessibility expectations and how each check was done, including the owner's NVDA pass. `docs/ROLLOUT.md` has an announcement email, an employee FAQ, and a page for privacy and records reviewers. The NVDA pass settles the `>` question in `BACKLOG.md`: the prompts stay as they are.
+
+`TODO.md` now lists only open work. The panel and money reviews moved to `docs/PANEL-2026-10.md` as a record.
+
+Tested here: all 170 tests pass on Windows 11, Python 3.13, and ruff is clean. On CI, the new signed job and the unsigned install job both pass.
+
 ## 2026-10-03: ready for enterprise deployment: an offline package, Group Policy, and a launcher that can't be hijacked
 
 Version 1.23.0. The owner asked for the program to be ready for enterprises of 5,000 users and more. Two reviews ran first: an enterprise endpoint architect's gap review and a security threat review for that setting.
