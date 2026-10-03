@@ -74,6 +74,14 @@ An organization that installs from a git clone with `-Commit` commits
 `content.json` at the top of its own fork instead. A `content.json` that
 isn't in the commit is ignored.
 
+Two more keys are optional:
+- `"holidays"`: up to 100 dates such as `"2026-12-25"`. The reminder doesn't
+  come on those days.
+- `"title"`: 1 to 40 characters that replace "Hello, world!" at the top of
+  the window and the text screen, such as your team's name. `--plain` still
+  prints "Hello, world!", since scripts read it. A person who chose "Greet me
+  by name" sees their own first name instead.
+
 A package with content has its own package hash, so record that one.
 
 ## Install, uninstall and detection
@@ -148,6 +156,7 @@ settings are under Computer or User Configuration > Administrative Templates
 | Hide the days-in-a-row message | `HideDaysInARow` | Never shows the count, and keeps only the latest visit date |
 | Turn off plans | `DisablePlans` | Never asks for a plan, and keeps no plan text, finished plans or done count; text already saved is dropped at each person's next visit |
 | Always show hello-world in English | `ForceEnglish` | Shows English even where the Windows display language is Spanish, French, Portuguese or German |
+| Turn on the sign-in reminder for everyone | `TurnOnReminder` | Turns the reminder on at each person's next open unless they already answered the question; each person can still turn it off |
 | Open hello-world as a text screen | `UseTextScreen` | The Start menu opens the text screen in a console, as before 1.28.0, and the sign-in launcher opens it instead of showing a notification |
 
 `DisablePlans` and `HideDaysInARow` together leave only the latest visit date
@@ -207,6 +216,11 @@ organization's certificate.
 
   Allow that exact value in persistence detections. It starts the
   admin-only install, and Windows skips it once the program is removed.
+- When an employee picks a reminder time instead of sign-in, a scheduled task
+  named `hello-world reminder` in their own task folder, running the same
+  `pythonw.exe -I hello.py --startup` daily at 8:00, 9:00, 10:00 or 13:00,
+  or at the next sign-in when the PC was off then. It needs no
+  administrator, and picking sign-in or turning the reminder off removes it.
   Versions 1.23.0 to 1.27.0 wrote a `cmd.exe /d /c if exist ... hello.cmd
   --startup` value instead, which keeps working; turning the reminder off and
   on again writes the new one.

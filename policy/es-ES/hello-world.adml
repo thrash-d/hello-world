@@ -41,6 +41,13 @@ Un archivo de contenido de la organización sustituye las ideas y sugerencias en
 Si se deshabilita o no se configura, hello-world se abre en una ventana con botones, y cada persona puede cambiar a la pantalla de texto en Opciones o con la opción 9 del menú de la pantalla de texto. Con el inicio al iniciar sesión activado, la versión en ventana muestra una notificación de Windows al iniciar sesión cuando hay un plan sobre el que preguntar, en lugar de abrirse.
 
 Use esta directiva cuando los usuarios de lectores de pantalla solo hayan probado la pantalla de texto, o cuando no se quieran notificaciones de Windows.</string>
+      <string id="SUPPORTED_1_31">hello-world 1.31.0 o posterior</string>
+      <string id="TurnOnReminder">Activar el aviso al iniciar sesión para todos</string>
+      <string id="TurnOnReminder_Help">Si se habilita, hello-world activa su aviso para cada persona la próxima vez que lo abra, salvo que ya haya respondido a la pregunta del aviso. Con la ventana, el aviso es una notificación de Windows al iniciar sesión cuando hay un plan sobre el que preguntar; con la pantalla de texto, hello-world se abre una vez al día al iniciar sesión. Cada persona puede desactivarlo en Opciones o con la opción 2 del menú, y se queda desactivado.
+
+Si se deshabilita o no se configura, hello-world pregunta una vez a cada persona.
+
+"Desactivar la apertura de hello-world al iniciar sesión" prevalece sobre esta directiva.</string>
     </stringTable>
   </resources>
 </policyDefinitionResources>

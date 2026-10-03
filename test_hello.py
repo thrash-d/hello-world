@@ -2544,3 +2544,96 @@ def test_a_person_can_choose_their_language():
     visit = hello.Visit()
     assert hello.set_language(visit.state, visit.can_save, None)
     assert "lang" not in notes(p.home)
+
+
+def test_the_reminder_can_come_on_days_with_no_plan_and_skips_days_off():
+    import datetime
+    hello = _window_hello(day="2026-10-05")
+    state = hello.new_state()
+    d = datetime.date(2026, 10, 5)
+    assert hello.reminder_due(state, d) is None
+    state["nudge"] = True
+    assert hello.reminder_due(state, d) == ""
+    state["no_weekends"] = True
+    assert hello.reminder_due(state, datetime.date(2026, 10, 10)) is None
+    content = os.path.join(mkdtemp(), "content.json")
+    with open(content, "w") as f:
+        json.dump({"thoughts": ["A calm line of ten chars"] * 7,
+                   "tips": ["Another line, ten chars"] * 7,
+                   "holidays": ["2026-10-05"], "title": "Good day, team"}, f)
+    hello.CONTENT = content
+    assert hello.reminder_due(state, d) is None
+    assert hello.greeting(state) == "Good day, team"
+    hello.SHOWN = []
+    hello.TODAY = "2026-10-06"
+    with open(os.path.join(hello.HOME, "notes.json"), "w") as f:
+        json.dump({"visits": ["2026-10-05"], "nudge": True}, f)
+    hello.sign_in()
+    assert len(hello.SHOWN) == 1 and "hello-world:open" in hello.SHOWN[0]
+    assert "One thing to get done today?" in hello.SHOWN[0]
+
+
+def test_content_holidays_and_title_are_checked():
+    hello = _load_hello()
+    base = {"thoughts": ["A calm line of ten chars"] * 7,
+            "tips": ["Another line, ten chars"] * 7}
+    assert hello.content_problems(base) == []
+    assert hello.content_problems(dict(base, holidays=["2026-12-25"], title="Hi all")) == []
+    assert hello.content_problems(dict(base, holidays=["Christmas"]))
+    assert hello.content_problems(dict(base, title="See www.example.com"))
+    assert hello.content_problems(dict(base, title=""))
+    assert hello.content_problems(dict(base, extra=1))
+
+
+def test_a_reminder_at_a_set_time_replaces_the_sign_in_one():
+    hello = _window_hello()
+    hello.STARTUP_DIR = mkdtemp()
+    hello.TASKS = []
+    visit = hello.Visit()
+    assert "9:00" in visit.reminder_at("09:00")
+    assert hello.TASKS == ["09:00"] and hello.task_on() and hello.reminder_on()
+    assert not hello.launcher_on()
+    saved = notes(hello.HOME)
+    assert saved["remind_at"] == "09:00" and saved["offered"] is True
+    visit.set_reminder(True)
+    assert hello.TASKS[-1] is None and hello.launcher_on()
+    assert "remind_at" not in notes(hello.HOME)
+
+
+def test_open_after_answering_and_greeting_by_name():
+    first = run(text="Write the report\n\n")
+    hello = _window_hello(home=first.home)
+    visit = hello.Visit()
+    assert visit.toggle("open_after") and visit.toggle("name")
+    opened = []
+    hello.show_window = lambda: opened.append(1) or 0
+    hello.SHOWN = []
+    hello.TODAY = "2026-10-03"
+    hello.answer_reminder("hello-world:done")
+    assert opened == [1] and hello.SHOWN == []
+    hello.first_name = lambda: "Ana"
+    assert hello.greeting(notes(first.home)) == "Hello, Ana!"
+
+
+def test_the_turn_on_reminder_policy_turns_it_on_once():
+    first = run(text="\n\n")
+    startup = mkdtemp()
+    run(text="\n\n", home=first.home, startup=startup, day="2026-10-02",
+        policy={"TurnOnReminder": 1})
+    assert os.listdir(startup) == ["hello-world-daily.cmd"]
+    assert notes(first.home)["offered"] is True
+    run(["--remind", "off"], startup=startup, home=first.home)
+    run(text="\n\n", home=first.home, startup=startup, day="2026-10-03",
+        policy={"TurnOnReminder": 1})
+    assert os.listdir(startup) == []
+
+
+@unittest.skipUnless(os.name == "nt", "scheduled tasks are Windows only")
+def test_the_reminder_task_is_created_and_removed_for_this_user():
+    hello = _load_hello()
+    hello.TASK_NAME = "hello-world test " + os.urandom(4).hex()
+    try:
+        assert hello.reminder_task("09:00") and hello.task_on()
+    finally:
+        assert hello.reminder_task(None)
+    assert not hello.task_on()

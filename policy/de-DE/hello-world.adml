@@ -41,6 +41,13 @@ Eine Inhaltsdatei der Organisation ersetzt die Gedanken und Tipps in allen Sprac
 Wenn diese Einstellung deaktiviert oder nicht konfiguriert ist, öffnet sich hello-world in einem Fenster mit Schaltflächen, und jede Person kann unter Optionen oder mit Option 9 im Menü des Textbildschirms zum Textbildschirm wechseln. Ist der Starter eingeschaltet, zeigt die Fensterversion bei der Anmeldung eine Windows-Benachrichtigung, wenn es einen Plan zum Nachfragen gibt, statt sich zu öffnen.
 
 Verwenden Sie diese Einstellung, wenn Screenreader-Nutzer nur den Textbildschirm getestet haben oder keine Windows-Benachrichtigungen gewünscht sind.</string>
+      <string id="SUPPORTED_1_31">hello-world 1.31.0 oder höher</string>
+      <string id="TurnOnReminder">Erinnerung bei der Anmeldung für alle einschalten</string>
+      <string id="TurnOnReminder_Help">Wenn diese Einstellung aktiviert ist, schaltet hello-world die Erinnerung für jede Person beim nächsten Öffnen ein, außer sie hat die Frage nach der Erinnerung schon beantwortet. Mit dem Fenster ist die Erinnerung eine Windows-Benachrichtigung bei der Anmeldung, wenn es einen Plan zum Nachfragen gibt; mit dem Textbildschirm öffnet sich hello-world einmal täglich bei der Anmeldung. Jede Person kann sie unter Optionen oder mit Menüoption 2 ausschalten, und sie bleibt aus.
+
+Wenn diese Einstellung deaktiviert oder nicht konfiguriert ist, fragt hello-world jede Person einmal.
+
+„Öffnen von hello-world bei der Anmeldung deaktivieren“ hat Vorrang vor dieser Einstellung.</string>
     </stringTable>
   </resources>
 </policyDefinitionResources>
