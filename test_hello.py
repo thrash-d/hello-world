@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import re
 import unittest
 
 HELLO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hello.py")
@@ -45,7 +46,7 @@ def launch(args=(), prelude="", **values):
 
 
 def run(args=(), text=None, day="2026-10-01", home=None, startup=None,
-        policy=None, env=None):
+        policy=None, env=None, lang="en"):
     """Run hello.py with its own data folder. text is typed at the prompts.
 
     Without text, stdin is the null device, so the result doesn't depend on
@@ -58,7 +59,8 @@ def run(args=(), text=None, day="2026-10-01", home=None, startup=None,
               "STARTUP_DIR": "" if startup is None else startup,
               "FORCE_INTERACTIVE": text is not None,
               # Policies come from here, never from the real registry.
-              "POLICY": policy or {}}
+              "POLICY": policy or {},
+              "LANGUAGE": lang}
     stdin = {"input": text} if text is not None else {"stdin": subprocess.DEVNULL}
     p = subprocess.run(launch(args, **values), capture_output=True,
                        encoding="utf-8", env=env, **stdin)
@@ -466,6 +468,7 @@ def _load_hello(day="2026-10-01"):
     mod.TODAY = day
     mod.STARTUP_DIR = ""  # never the real Startup folder
     mod.POLICY = {}  # never the real policy registry
+    mod.LANGUAGE = "en"
     return mod
 
 
@@ -829,7 +832,7 @@ def test_command_words_are_not_saved_as_the_plan():
     assert "The menu comes at the last prompt" in p.stdout
     assert notes(p.home)["intent"]["text"] == "Write it"
     p = run(text="\nplan\nmenu\n\n")
-    assert "Type your plan, or press Enter to go back." in p.stdout
+    assert "Type your plan, or press Enter to go back." in " ".join(p.stdout.split())
     assert notes(p.home)["intent"] is None
 
 
@@ -1839,6 +1842,202 @@ def test_the_policy_template_matches_the_policies_the_program_reads():
     with open(admx, encoding="utf-8") as f:
         offered = set(re.findall(r'valueName="([A-Za-z]+)"', f.read()))
     assert read == offered and read
+
+
+SAMPLE = os.path.join(os.path.dirname(HELLO), "examples", "content.json")
+
+
+def _content(**changes):
+    with open(SAMPLE, encoding="utf-8") as f:
+        data = json.load(f)
+    data.update(changes)
+    return data
+
+
+def test_the_sample_content_file_passes_the_check():
+    p = run(["--check-content", SAMPLE])
+    assert p.returncode == 0
+    assert p.stdout.startswith("OK: 20 thoughts and 20 tips.")
+
+
+def test_organization_content_replaces_the_built_in_lists():
+    hello = _load_hello()
+    hello.CONTENT = SAMPLE
+    data = _content()
+    for day in range(7):
+        thought, tip = hello.todays_pair(hello.datetime.date(2026, 10, 1 + day))
+        assert thought in data["thoughts"] and tip in data["tips"]
+
+
+def test_content_that_breaks_a_rule_is_ignored_whole():
+    hello = _load_hello()
+    path = os.path.join(mkdtemp(), "content.json")
+    data = _content()
+    data["tips"][3] = "Read the news at https://intranet.example today."
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+    hello.CONTENT = path
+    assert hello.content_lists() == (hello.THOUGHTS, hello.TIPS)
+    hello.CONTENT = os.path.join(mkdtemp(), "missing.json")
+    assert hello.content_lists() == (hello.THOUGHTS, hello.TIPS)
+
+
+def test_content_rules_catch_links_dates_length_and_shape():
+    hello = _load_hello()
+    ok = _content()
+    assert hello.content_problems(ok) == []
+    cases = {
+        "Email the team at help@example.com.": "link or an address",
+        "The office closes on 12/24 this year.": "has a date",
+        "Remember the party on Friday, December the fifth.": "has a date",
+        "Short.": "characters long",
+        "x" * 121: "characters long",
+        "Two  spaces inside this line.": "extra spaces",
+    }
+    for text, expected in cases.items():
+        data = _content()
+        data["thoughts"][0] = text
+        problems = hello.content_problems(data)
+        assert len(problems) == 1 and expected in problems[0], (text, problems)
+    # "May" is a word as well as a month.
+    data = _content()
+    data["thoughts"][0] = "You may find the quiet hour helps you focus."
+    assert hello.content_problems(data) == []
+    assert hello.content_problems({"thoughts": ok["thoughts"]})
+    assert hello.content_problems(_content(tips=ok["tips"][:6]))
+    assert hello.content_problems(_content(tips=[1] * 7))
+
+
+def test_check_content_fails_on_bad_json_and_missing_files():
+    path = os.path.join(mkdtemp(), "content.json")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("{not json")
+    p = run(["--check-content", path])
+    assert p.returncode == 1 and "isn't valid JSON" in p.stdout
+    p = run(["--check-content", path + ".missing"])
+    assert p.returncode == 1 and "Can't read" in p.stdout
+
+
+def test_todays_pair_ends_when_every_thought_shares_the_tips_topic():
+    hello = _load_hello()
+    path = os.path.join(mkdtemp(), "content.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({"thoughts": [f"Drink some water, take {n}." for n in "abcdefg"],
+                   "tips": [f"Fill a glass of water, round {n}." for n in "abcdefg"]},
+                  f)
+    hello.CONTENT = path
+    thought, tip = hello.todays_pair(hello.datetime.date(2026, 10, 1))
+    assert "water" in thought and "water" in tip
+
+
+def test_every_translated_string_has_spanish():
+    import ast
+    hello = _load_hello()
+    with open(HELLO, encoding="utf-8") as f:
+        tree = ast.parse(f.read())
+    keys = [n.args[0].value for n in ast.walk(tree)
+            if isinstance(n, ast.Call) and getattr(n.func, "id", "") == "tr"
+            and isinstance(n.args[0], ast.Constant)]
+    keys += [hello.HELP, hello.MENU_HELP, hello.SAVED_PLAN, hello.GREETING]
+    assert len(keys) > 100
+    assert [k for k in keys if k not in hello.ES] == []
+    # A key no call uses is a translation nobody sees.
+    assert [k for k in hello.ES if k not in keys] == []
+    for en, es in hello.ES.items():
+        assert re.findall(r"\{\w+\}", en) == re.findall(r"\{\w+\}", es), en
+        assert en.endswith("> ") == es.endswith("> "), en
+    # say() doesn't wrap, so what it prints as is must fit 72 columns, less
+    # the "  2  " in front of a menu line.
+    raw = {n.args[0].value: isinstance(call.args[0], ast.BinOp)
+           for call in ast.walk(tree)
+           if isinstance(call, ast.Call) and getattr(call.func, "id", "") == "say"
+           and call.args
+           for n in ast.walk(call.args[0])
+           if isinstance(n, ast.Call) and getattr(n.func, "id", "") == "tr"
+           and isinstance(n.args[0], ast.Constant)}
+    assert len(raw) > 50
+    for en, prefixed in raw.items():
+        for text in (en, hello.ES[en]):
+            limit = 66 if prefixed else 72
+            assert all(len(line) <= limit for line in text.splitlines()), text
+
+
+def test_nothing_on_screen_skips_the_translation():
+    import ast
+    with open(HELLO, encoding="utf-8") as f:
+        tree = ast.parse(f.read())
+    english_only = {"check_content", "main"}
+    for fn in ast.walk(tree):
+        if not isinstance(fn, ast.FunctionDef) or fn.name in english_only:
+            continue
+        for n in ast.walk(fn):
+            if not (isinstance(n, ast.Call) and n.args
+                    and getattr(n.func, "id", "") in ("say", "para", "ask")):
+                continue
+            arg = n.args[0]
+            # A literal with letters in it; "  " + path and the like are fine.
+            plain = (isinstance(arg, ast.JoinedStr)
+                     or isinstance(arg, ast.Constant) and arg.value.strip())
+            assert not plain, f"{fn.name} line {n.lineno} is not translated"
+
+
+def test_spanish_lists_match_the_english_ones():
+    hello = _load_hello()
+    assert len(hello.THOUGHTS_ES) == len(hello.THOUGHTS)
+    assert len(hello.TIPS_ES) == len(hello.TIPS)
+    assert len(hello.DONE_LINES_ES) == len(hello.DONE_LINES)
+    for line in hello.THOUGHTS_ES + hello.TIPS_ES + hello.DONE_LINES_ES:
+        assert line == hello.tidy(line) and len(line) <= 120, line
+
+
+def test_a_spanish_day_reads_in_spanish():
+    p = run(text="Llamar al cliente\n\n", day="2026-10-05", lang="es")
+    out = p.stdout
+    assert out.startswith("¡Hola, mundo!\nLunes, 5 de octubre de 2026\n")
+    assert "Te damos la bienvenida." in out and "Idea para hoy:" in out
+    assert "¿Qué cosa quieres terminar hoy?" in out
+    assert "Guardado. Escribe hecho" in out
+    for english in ("Welcome", "Thought for today", "Type ", "Saved."):
+        assert english not in out, english
+    later = run(text="hecho\n\n\n", day="2026-10-06", lang="es", home=p.home)
+    assert "¿Lo hiciste?" in later.stdout
+    assert notes(p.home)["done"] == 1
+
+
+def test_spanish_words_work_in_english_too():
+    p = run(text="Send the invoice\nhecho\nsalir\n")
+    assert notes(p.home)["done"] == 1
+    assert p.stdout.rstrip().endswith("Closing.")
+    q = run(text="Old plan\n\n", day="2026-09-20")
+    r = run(text="n\nn\nrepetir\n\n", home=q.home)
+    assert notes(r.home)["intent"]["text"] == "Old plan"
+
+
+def test_force_english_policy_wins_over_spanish():
+    p = run(lang="es", policy={"ForceEnglish": 1})
+    assert p.stdout.startswith("Hello, world!\n")
+    assert run(["--help"], lang="es").stdout.startswith("hello-world muestra")
+    assert run(["--plain"], lang="es").stdout == "Hello, world!\n"
+
+
+def test_spanish_help_fits_72_columns():
+    for args in (["--help"], ["--bogus"]):
+        out = run(args, lang="es").stdout
+        assert all(len(line) <= 72 for line in out.splitlines()), args
+    menu = run(text="\nplan\nmenú\nmenú\n5\n\n\n", lang="es").stdout
+    assert "Palabras que puedes escribir" in menu
+    assert "Eso parece un comando" in menu
+    # Prompts run into the next line here, since piped input has no echo.
+    assert all(len(line) <= 72 for line in menu.splitlines() if "> " not in line)
+
+
+def test_spanish_policy_template_has_every_english_string():
+    root = os.path.join(os.path.dirname(HELLO), "policy")
+    ids = []
+    for lang in ("en-US", "es-ES"):
+        with open(os.path.join(root, lang, "hello-world.adml"), encoding="utf-8") as f:
+            ids.append(re.findall(r'<string id="(\w+)"', f.read()))
+    assert ids[0] == ids[1] and ids[0]
 
 
 if __name__ == "__main__":

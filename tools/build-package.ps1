@@ -24,11 +24,18 @@ no longer reproducible from the commit alone, so record the printed hash.
 .PARAMETER TimestampServer
 An RFC 3161 timestamp server for the signatures, so they stay valid after
 the certificate expires. Leave it out only for testing.
+
+.PARAMETER ContentFile
+The organization's own thoughts and tips, added to the package as
+content.json and covered by SHA256SUMS. The build stops if the file breaks
+the rules that hello.py --check-content lists. examples/content.json shows
+the format.
 #>
 param(
     [Parameter(Mandatory)][string]$OutDir,
     [ValidatePattern('^[0-9A-Fa-f]{40}$')][string]$CertificateThumbprint,
-    [string]$TimestampServer
+    [string]$TimestampServer,
+    [string]$ContentFile
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
@@ -43,6 +50,7 @@ New-Item -ItemType Directory -Force $OutDir | Out-Null
 foreach ($f in 'install.ps1', 'uninstall.ps1', 'hello.py', 'VERSION') {
     Copy-Item -LiteralPath (Join-Path $root $f) -Destination $OutDir
 }
+if ($ContentFile) { Copy-Item -LiteralPath $ContentFile -Destination (Join-Path $OutDir 'content.json') }
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 $ProgressPreference = 'SilentlyContinue'
@@ -61,9 +69,20 @@ $zip = Join-Path $OutDir 'python-embed.zip'
 Invoke-WebRequest $url -OutFile $zip -UseBasicParsing -TimeoutSec 300
 if ((Get-FileHash -LiteralPath $zip).Hash -ne $sha) { throw "The download from $url doesn't match the pinned SHA-256." }
 
+if ($ContentFile) {
+    # Checked with the Python the package ships, so the build PC needs none.
+    $check = Join-Path ([IO.Path]::GetTempPath()) ([IO.Path]::GetRandomFileName())
+    try {
+        Expand-Archive -LiteralPath $zip -DestinationPath $check
+        $out = & (Join-Path $check 'python.exe') -I (Join-Path $OutDir 'hello.py') --check-content (Join-Path $OutDir 'content.json')
+        if ($LASTEXITCODE) { throw "The content file breaks these rules:`n$($out -join "`n")" }
+    }
+    finally { Remove-Item -LiteralPath $check -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
 # One line per file, "<sha256>  <name>", in a fixed order, so the same inputs
 # always give the same package hash.
-$files = 'hello.py', 'install.ps1', 'python-embed.zip', 'uninstall.ps1', 'VERSION'
+$files = @(if ($ContentFile) { 'content.json' }) + 'hello.py', 'install.ps1', 'python-embed.zip', 'uninstall.ps1', 'VERSION'
 $sums = foreach ($f in $files) { '{0}  {1}' -f (Get-FileHash -LiteralPath (Join-Path $OutDir $f)).Hash.ToLower(), $f }
 [IO.File]::WriteAllText((Join-Path $OutDir 'SHA256SUMS'), ($sums -join "`n") + "`n", [Text.Encoding]::ASCII)
 
@@ -89,6 +108,13 @@ $bom = [ordered]@{
             externalReferences = @([ordered]@{ type = 'distribution'; url = $url })
         }
     )
+}
+if ($ContentFile) {
+    $bom.components += [ordered]@{
+        type   = 'data'
+        name   = 'content.json'
+        hashes = @([ordered]@{ alg = 'SHA-256'; content = (Get-FileHash -LiteralPath (Join-Path $OutDir 'content.json')).Hash.ToLower() })
+    }
 }
 $bom | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $OutDir 'sbom.cdx.json') -Encoding ascii
 

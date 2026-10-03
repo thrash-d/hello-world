@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-10-03: organization content, Spanish, and JAWS
+
+Version 1.25.0. The owner reported that the JAWS check passed, asked for a sample content file for testing, and asked for a second language, leaving the choice open. These were the three "Next to build" items from the product review of 1.23.0.
+
+Product review, item 1, "A content file the organization supplies": `tools\build-package.ps1 -ContentFile` adds the organization's thoughts and tips to the package as `content.json`, listed in `SHA256SUMS`, so the package hash covers it. The build checks the file with the Python it ships and stops on any problem. `install.ps1` installs `content.json` only when `SHA256SUMS` lists it, or, from a clone, only when the reviewed commit has it, and checks it again after the test run. `hello.py --check-content FILE` lists what is wrong: the shape, 7 to 200 lines per list, 10 to 120 characters per line, no control characters, no links or addresses, and no dates or month names in English or Spanish, so the file can't become an announcement channel. The program falls back to its own lists when the file is missing or breaks a rule. `examples/content.json` is a sample with 20 thoughts and 20 tips about teamwork and work habits. A CI step builds a package with it, checks that an edited `content.json` is refused, and checks that the installed program shows the sample tips. `todays_pair()` now stops after one pass through the thoughts, so a list where every thought shares the tip's topic can't loop forever.
+
+Product review, item 2, "A second language": Spanish, the most widely spoken language after English among likely users. The program shows Spanish when the Windows display language is Spanish. A new `ForceEnglish` policy keeps it in English, with ADMX and ADML entries and a Spanish ADML in `policy/es-ES`. Every screen string goes through `tr()`, keyed by the English text. The Spanish table, the 101 thoughts, 100 tips and done lines, the help and the dates ("lunes, 5 de octubre de 2026") are in `hello.py`, so the install still copies one file. Spanish command words work in both languages: `hecho`, `s`, `sí`, `menú`, `ayuda`, `repetir`, `salir`, `todo`. Translations avoid gendered forms where the English is neutral. A simulated native-speaker review walked the screens and found 39 phrasing problems, among them "para ahora no", "Hecho." used both as a confirmation and as the command word, and a gender clash in the error message. All 39 were fixed. New tests check that every translated string has Spanish, that the placeholders match, that no screen string skips the translation, and that lines printed without wrapping fit the window.
+
+While translating, three English messages turned out to print as one line of over 72 characters instead of wrapping: "That looks like a command, not a plan...", the saved-plan notice, and "The menu comes at the last prompt...". They and the other single-sentence messages now wrap to the window, which matters at high magnification.
+
+Product review, item 3: `docs/ACCESSIBILITY.md` records the owner's JAWS pass on 1.24.0.
+
+`TODO.md` had a backspace byte in place of `\b` in `tools\build-package.ps1`, left by an earlier editing script. Fixed.
+
+Declined, with reasons in `BACKLOG.md`: Spanish for `--plain` and `--check-content`, `retomar` for `same`, content files per language, and a per-person language setting.
+
+Tested here: 184 tests pass on Windows 11, Python 3.13, and ruff is clean. A content package built locally, and a bad content file stopped the build with its problems listed. The real install of the content package runs in CI, since this shell isn't elevated.
+
 ## 2026-10-03: signed packages, a records policy, and a rollout kit
 
 Version 1.24.0. The owner reported that all pending manual tests passed on 1.23.0, including the NVDA check of the prompts and a pilot-ring deployment, and asked for the organization's side to be taken as far as possible. A product review of 1.23.0 ranked what to build next.

@@ -34,6 +34,9 @@ materials (`sbom.cdx.json`), and in its notes the package hash. The zip holds:
 | `SHA256SUMS` | The SHA-256 of each file above |
 | `sbom.cdx.json` | The bill of materials |
 
+A package you build with your own content also holds `content.json`, listed
+in `SHA256SUMS` like the rest. See "Your own thoughts and tips" below.
+
 The package hash is the SHA-256 of `SHA256SUMS`. `install.ps1 -PackageHash`
 checks it first, then checks every file against `SHA256SUMS`, then checks the
 Python zip against the pin inside the verified `install.ps1`. Nothing changes
@@ -43,6 +46,35 @@ The build is reproducible. To confirm a release, check out its commit on
 Windows and run `tools\build-package.ps1 -OutDir <empty folder>`. It prints
 the package hash, which must match the release notes. Record the hash in your
 change ticket once the commit is reviewed, and deploy only with that hash.
+
+## Your own thoughts and tips
+
+An organization can replace the built-in thoughts and tips with its own, for
+example lines about its values, safety habits or how teams work together.
+Write a JSON file in the format of `examples\content.json`: an object with a
+`"thoughts"` list and a `"tips"` list, each 7 to 200 lines of 10 to 120
+characters. Then build the package with it:
+
+    tools\build-package.ps1 -OutDir <empty folder> -ContentFile <your file>
+
+The lines are meant to be timeless, so the rules keep the file from becoming
+an announcement channel: no links or email addresses, no dates or month
+names, no control characters. The build stops on a file that breaks a rule
+and lists each problem. To check a file first, run
+`hello.cmd --check-content <file>`.
+
+The file becomes `content.json` in the package, covered by `SHA256SUMS` and
+the package hash, so the content is reviewed and signed off with the rest of
+the release. The installer checks the file again on the PC and stops if it
+breaks a rule. Your lines replace the built-in ones in every language, so
+write them in the language your people read. The program shows them by date,
+like the built-in lists, so everyone sees the same line on the same day.
+
+An organization that installs from a git clone with `-Commit` commits
+`content.json` at the top of its own fork instead. A `content.json` that
+isn't in the commit is ignored.
+
+A package with content has its own package hash, so record that one.
 
 ## Install, uninstall and detection
 
@@ -102,7 +134,8 @@ read.
 
 Copy `policy\hello-world.admx` to `PolicyDefinitions`, and
 `policy\en-US\hello-world.adml` to `PolicyDefinitions\en-US`, in the central
-store or locally. Intune can import the same ADMX as a custom template. The
+store or locally. `policy\es-ES\hello-world.adml` goes to
+`PolicyDefinitions\es-ES` for administrators who edit policy in Spanish. Intune can import the same ADMX as a custom template. The
 settings are under Computer or User Configuration > Administrative Templates
 > hello-world, and the computer setting wins.
 
@@ -112,6 +145,7 @@ settings are under Computer or User Configuration > Administrative Templates
 | Hide the daily thought and tip | `HideThoughtAndTip` | Shows only the plan question |
 | Hide the days-in-a-row message | `HideDaysInARow` | Never shows the count, and keeps only the latest visit date |
 | Turn off plans | `DisablePlans` | Never asks for a plan, and keeps no plan text, finished plans or done count; text already saved is dropped at each person's next visit |
+| Always show hello-world in English | `ForceEnglish` | Shows English even where the Windows display language is Spanish |
 
 `DisablePlans` and `HideDaysInARow` together leave only the latest visit date
 and the settings in each `notes.json`. Use them where typed plan text or a
@@ -253,4 +287,13 @@ match `PythonVersion` in the Apps entry.
 All output is plain text in one top-to-bottom flow, prompts say what Enter
 does, and long prompts wrap to the window. It was checked with Narrator and
 in simulated pilots with screen reader, Magnifier and second-language users.
-A pass with NVDA or JAWS is still to do. The program is English only.
+The owner also passed it with NVDA and JAWS; `docs/ACCESSIBILITY.md` has the
+details.
+
+The program speaks English and Spanish. It shows Spanish when the Windows
+display language is Spanish, and English otherwise. The `ForceEnglish` policy
+keeps everyone in English. The words people type, such as `hecho` (done),
+`menú` and `salir` (quit), work in either language, so a PC whose language
+changes needs no retraining. `--check-content`, which is for administrators,
+answers in English, and `--plain` always prints `Hello, world!` so scripts can
+rely on it.

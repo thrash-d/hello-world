@@ -7,7 +7,7 @@ their reasons are in `BACKLOG.md`.
 ## Needs the deploying organization
 
 1. Sign the package with the organization's code-signing certificate:
-   `toolsuild-package.ps1 -CertificateThumbprint <thumbprint> -TimestampServer <URL>`.
+   `tools\build-package.ps1 -CertificateThumbprint <thumbprint> -TimestampServer <URL>`.
    CI already proves a signed package installs under AllSigned.
 2. Pin the actions in the three workflows the shared kit installs
    (`auto-tag`, `devkit-quality`, `dependabot-automerge`), where the kit is
@@ -15,15 +15,12 @@ their reasons are in `BACKLOG.md`.
 
 ## Next to build
 
-From the product review of 1.23.0, in order:
+The three items from the product review of 1.23.0 shipped in 1.25.0.
 
-1. A content file the organization supplies: up to 100 tips and thoughts in
-   a file that ships inside the signed package and replaces the built-in
-   lists. A build-time check enforces length, plain text and no dates or
-   links, so it can't become an announcement channel.
-2. A second language as a complete file, reviewed by a native speaker, chosen
-   from the Windows display language, with a policy to force English.
-3. A JAWS pass, to add to `docs/ACCESSIBILITY.md`.
+1. A real native speaker's pass over the Spanish screens. The review in
+   1.25.0 was simulated.
+2. A third language, if the organization asks for one. Adding one is a word
+   table, three lists and an ADML file.
 
 ## Later, when the problem shows up
 

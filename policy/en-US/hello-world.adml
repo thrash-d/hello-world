@@ -7,6 +7,7 @@
       <string id="HelloWorld">hello-world</string>
       <string id="SUPPORTED_1_23">hello-world 1.23.0 or later</string>
       <string id="SUPPORTED_1_24">hello-world 1.24.0 or later</string>
+      <string id="SUPPORTED_1_25">hello-world 1.25.0 or later</string>
       <string id="DisableSignInLauncher">Turn off opening hello-world at sign-in</string>
       <string id="DisableSignInLauncher_Help">When enabled, people can't set hello-world to open by itself when they sign in, it never offers to, and a launcher they turned on earlier is removed the next time they open the program.
 
@@ -27,6 +28,12 @@ When disabled or not configured, the message shows only on the 3rd, 7th and 14th
 Use this where plan text typed into a local file would be a records or works-council concern.
 
 When disabled or not configured, people can type one optional plan a day.</string>
+      <string id="ForceEnglish">Always show hello-world in English</string>
+      <string id="ForceEnglish_Help">When enabled, hello-world shows its screens in English for everyone.
+
+When disabled or not configured, hello-world shows its screens in Spanish when the Windows display language is Spanish, and in English otherwise. Spanish words such as hecho and salir work in either language.
+
+An organization content file replaces the thoughts and tips in every language.</string>
     </stringTable>
   </resources>
 </policyDefinitionResources>
