@@ -192,6 +192,21 @@ hash of every file. Anyone can rebuild the package from the reviewed commit
 with `tools\build-package.ps1` and get the same hash, so the hash doesn't rest
 on the release alone.
 
+### For one person, without an administrator
+
+Where IT allows it, such as on a laptop for site days, one person can install
+hello-world for themselves from the release package, with no administrator:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File install-user.ps1 -PackageHash <package hash>
+```
+
+It checks the package the same way, installs into
+`%LOCALAPPDATA%\Programs\hello-world`, and adds hello-world to that person's
+Start menu and Settings > Apps, where Uninstall removes it. That folder is
+in their own profile, so they, and programs running as them, can change it;
+the all-users install is the one to use wherever IT can.
+
 ### From a git clone
 
 Run these in one PowerShell window opened as administrator, each line on its own. Change the
@@ -199,7 +214,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.34.0'
+$tag = 'v1.35.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

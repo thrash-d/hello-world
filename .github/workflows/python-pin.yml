@@ -1,0 +1,37 @@
+# Once a week: the pinned Python still downloads with its pinned hash, and
+# a newer patch release of the same minor version is reported, so the pin
+# gets bumped while it still gets security fixes.
+name: python-pin
+
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check the pin and look for a newer patch release
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $src = Get-Content -Raw install.ps1
+          $url = [regex]::Match($src, "(?m)^\`$pyUrl = '([^']+)'").Groups[1].Value
+          $sha = [regex]::Match($src, "(?m)^\`$pySha256 = '([0-9A-Fa-f]{64})'").Groups[1].Value
+          $zip = Join-Path $env:RUNNER_TEMP 'python-embed.zip'
+          Invoke-WebRequest $url -OutFile $zip -UseBasicParsing
+          if ((Get-FileHash -LiteralPath $zip).Hash -ne $sha) { throw "The download from $url no longer matches the pinned SHA-256." }
+          $m = [regex]::Match($url, 'python-(\d+)\.(\d+)\.(\d+)-embed')
+          $next = "$($m.Groups[1].Value).$($m.Groups[2].Value).$([int]$m.Groups[3].Value + 1)"
+          $nextUrl = "https://www.python.org/ftp/python/$next/python-$next-embed-amd64.zip"
+          try { Invoke-WebRequest $nextUrl -Method Head -UseBasicParsing | Out-Null; $found = $true } catch { $found = $false }
+          if ($found) { throw "Python $next is out. Update `$pyUrl and `$pySha256 in install.ps1 (the hash is in the .sigstore file next to the zip)." }
+          Write-Host "ok: the pin matches and no newer patch release was found."

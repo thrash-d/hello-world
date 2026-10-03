@@ -122,6 +122,37 @@ Notes:
 Use the `QuietUninstallString` from the Apps entry, never the plain
 `UninstallString`, for unattended removal.
 
+## Installer behaviour worth knowing
+
+- It runs on Windows 10 version 1809 or later and Windows 11, on x64, and on
+  ARM64 with Windows 11. The architecture comes from the operating system,
+  not from an environment variable the caller can set.
+- Domain Admins and Enterprise Admins count as administrators in its
+  permission checks, along with the local Administrators group and SYSTEM.
+- It walks each folder it checks without going into a junction or a linked
+  folder, and stops at the first link it finds.
+- The all-users Start menu folder must be changeable only by administrators,
+  since anyone who could change it could swap the shortcut.
+- Behind an authenticating proxy, the Python download uses the
+  administrator's own Windows credentials. The release package needs no
+  download at all.
+- `NO_COLOR` set to anything turns its colours off.
+- When a file in use blocks an upgrade, the message names the hello-world
+  programs that are open.
+- The bundled Python leaves out the modules hello.py never loads, as well as
+  OpenSSL and SQLite, so fewer files are on every PC for scanners to flag.
+- `install-user.ps1` installs for one person with no administrator, into
+  their own profile; the README has the trade-off. Settings > Apps lists it
+  for that person, and Uninstall removes it.
+- `tools\reinstall.ps1 -Tag <tag> -Commit <hash>` does the git clone steps in
+  one command.
+
+CI checks the pinned Python's sigstore signature from python.org on every
+change, and a weekly workflow checks that its hash still matches and fails
+when a newer patch release of the same Python is out. CI also runs the
+installed program as a standard user, and checks that user can't change the
+install.
+
 ## Logs and events
 
 `uninstall.ps1` turns off every user's reminder: the `hello-world` Run value

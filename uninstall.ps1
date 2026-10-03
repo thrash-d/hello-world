@@ -181,7 +181,8 @@ try {
             # passes, so the exit code asks the deployment tool to retry later.
             $exitCode = 1618
             $open = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path -like "$dir\*" })
-            $hint = if ($open) { " $($open.Count) hello-world window(s) are open; closing them may help." } else { '' }
+            $names = ($open | ForEach-Object { "$($_.ProcessName) (process $($_.Id))" }) -join ', '
+            $hint = if ($open) { " These hello-world programs are open: $names. Closing them may help." } else { '' }
             throw "A file in $dir is in use.$hint Nothing was changed. Try again later."
         }
     }
