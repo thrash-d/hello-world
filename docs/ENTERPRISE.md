@@ -240,9 +240,11 @@ organization's certificate.
 
 ## Data handling
 
-Each user's `notes.json` holds the days they opened the program in the last
-60 days, their current plan, one unfinished earlier plan, a count of plans
-marked done, their last seven finished plans with dates, and three settings.
+Each user's `notes.json` holds the date they last opened the program, their
+current plan, one unfinished earlier plan, a count of plans marked done, their
+last seven finished plans with dates, four settings, and the date of the last
+sign-in reminder. Only someone who turns on the days-in-a-row message keeps
+the dates of the last 60 days, which the message counts.
 The `DisablePlans` and `HideDaysInARow` policies cut that to the latest visit
 date and the settings.
 It holds no names, computer names or times. It's plain text, protected by the
@@ -311,13 +313,16 @@ match `PythonVersion` in the Apps entry.
 The Start menu opens a window built from standard Windows controls: labels,
 one text box and buttons, in the system font at 12 points, with the system's
 colours so high contrast themes apply. Every button has an Alt key, Enter
-saves, and Esc closes. The text screen is the version checked with screen
-readers. All its output is plain text in one top-to-bottom flow, prompts say
-what Enter does, and long prompts wrap to the window. It was checked with
-Narrator and in simulated pilots with screen reader, Magnifier and
-second-language users. The owner also passed it with NVDA and JAWS;
-`docs/ACCESSIBILITY.md` has the details. Each person can switch to it under
-Options, and the `UseTextScreen` policy sets it for everyone.
+saves, and Esc closes. The owner checked the window and the notification
+with Narrator, NVDA, JAWS, Magnifier at 200 percent and high contrast for
+1.28.0, and the translations had a native speaker review.
+
+The text screen is for anyone who prefers typing. All its output is plain
+text in one top-to-bottom flow, prompts say what Enter does, and long prompts
+wrap to the window. It was checked with Narrator, NVDA and JAWS, and in
+simulated pilots with screen reader, Magnifier and second-language users.
+Each person can switch to it under Options, and the `UseTextScreen` policy
+sets it for everyone. `docs/ACCESSIBILITY.md` has the details.
 
 The program speaks English, Spanish, French, Brazilian Portuguese and
 German. It follows the Windows display language, and shows English for any

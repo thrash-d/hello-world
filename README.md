@@ -24,22 +24,28 @@ you want to get done today. Type it and press Enter, or click **Not today**.
 That's all you need. Everyone sees the same thought and tip on the same day,
 so you can compare notes with a coworker.
 
+Saving says "Saved." and leaves the window open; Enter again closes it.
 The next day the window asks "Did you do it?" with three buttons: **Done**,
-**Not yet** (keeps the plan for today) and **Skip**. When today's plan is
-finished, click **I did it**.
+**Not yet** (keeps the plan for today) and **Skip** (asks again next time).
+When today's plan is finished, click **I did it**; if you changed the words in
+the box first, the new words are what's marked done. To drop a plan, empty
+the box and click **Save**. Typing a new plan instead of answering keeps the
+old one for `same`.
 
 After your first plan it asks once whether you want a reminder when you sign
 in. With it on, a Windows notification appears at your first sign-in of the
 day, only when there is a plan to ask about: "Last time you planned: ... Did
 you do it?". Click **Done** or **Not yet** on it and that's the answer; nothing
-else opens. Click the notification itself to open the window. With no plan, it
-stays quiet. **Options** in the window turns the reminder off, hides the
-thought and tip, or switches to the text screen.
+else opens, and Done brings a short thank-you. Click the notification itself
+to open the window. With no plan, it stays quiet. **Options** in the window
+turns the reminder off, hides the thought and tip, turns on the days-in-a-row
+message, shows what is saved, deletes everything, or switches to the text
+screen.
 
 ### The text screen
 
-hello-world also runs as text in a console window, which is the version
-checked with screen readers. Choose **Options > Use the text screen** in the
+hello-world also runs as text in a console window, for anyone who prefers
+typing to clicking. Choose **Options > Use the text screen** in the
 window, or ask IT, who can set it for everyone. In the text screen, menu
 option 9 switches back to the window. Press Enter at each question to skip it,
 and once more to close.
@@ -79,9 +85,10 @@ than two weeks ago is put away, and `same` brings it back.
 If a plan sounds like several things joined together, it says once that
 finishing the first part still counts.
 
-The days-in-a-row message shows only on your 3rd, 7th and 14th visit in a
-row, then every 30th. A visit within four days of the last one counts, so weekends and
-a day off don't break it. You can turn it off in the menu.
+The days-in-a-row message is off until you turn it on, under Options or with
+menu option 3. Then it shows only on your 3rd, 7th and 14th visit in a row,
+then every 30th. A visit within four days of the last one counts, so weekends
+and a day off don't break it.
 
 The text screen asks once whether to open by itself when you sign in.
 Whatever you answer, menu option 2 changes it later.
@@ -103,9 +110,10 @@ This is the one place that lists what is saved. `PLAN.md` and the why-doc link
 here.
 
 hello-world saves one small file, `notes.json`, in the `hello-world` folder
-under `AppData\Local` in your own user folder. It holds the dates you opened
-the program in the last 60 days, your current plan, an unfinished earlier
-plan, how many times you marked a plan done, and your last seven finished
+under `AppData\Local` in your own user folder. It holds the date you last
+opened the program (the dates of the last 60 days only if you turned on the
+days-in-a-row message, which needs them), your current plan, an unfinished
+earlier plan, how many times you marked a plan done, and your last seven finished
 plans (words and date). It also holds your settings for the days-in-a-row
 message, the thought and tip, and the window or text screen, your answer to
 the sign-in question, and the date of the last sign-in reminder, so it comes
@@ -162,7 +170,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.28.0'
+$tag = 'v1.29.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

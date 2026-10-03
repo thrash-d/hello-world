@@ -36,10 +36,10 @@ Subject: A 20-second start to the day, if you want one
 - I don't want the thought and tip. Options > Show the thought and tip.
 - Is it in my language? It follows the Windows display language: English,
   Spanish, French, Portuguese or German.
-- Does it work with a screen reader? The window uses standard Windows
-  buttons and labels. The text screen is the version checked with screen
-  readers: plain text, read top to bottom, and every prompt says what Enter
-  does. Options > Use the text screen switches to it.
+- Does it work with a screen reader? Yes. The window uses standard Windows
+  buttons and labels, and was checked with Narrator, NVDA, JAWS, Magnifier
+  and high contrast. The text screen, plain text read top to bottom, is there
+  too: Options > Use the text screen.
 
 ## For privacy and records reviewers
 
@@ -48,7 +48,8 @@ prints the whole saved file.
 
 - The program makes no network connections at any time.
 - Each user has one file, `%LOCALAPPDATA%\hello-world\notes.json`. It holds
-  the dates they opened the program in the last 60 days, one current plan,
+  the date they last opened the program (the last 60 days of dates only if
+  they turned on the days-in-a-row message), one current plan,
   one unfinished earlier plan, a count of plans marked done, the last seven
   finished plans with dates, four settings, and the date of the last
   sign-in reminder. No names, computer names or times.

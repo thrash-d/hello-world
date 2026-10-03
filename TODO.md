@@ -15,17 +15,10 @@ their reasons are in `BACKLOG.md`.
 
 ## Needs a person
 
-1. Check the window at a real desktop: Narrator, NVDA and JAWS reading the
-   labels, buttons and plan box; Magnifier at 200 percent; a high contrast
-   theme; and the sign-in notification answered from the screen and from
-   notification center. The tests open and close it in every language, and it
-   was drawn on Windows 11 at 100 percent in English and German, but nobody
-   has used it with assistive technology yet.
-2. Five non-technical employees using the window for a week. The simulated
-   user who rated 1.27.0 at 2 out of 10 rated the window at 7.
-3. A real native speaker's pass over the Spanish, French, Portuguese and
-   German screens. The reviews in 1.25.0 and 1.26.0, and the strings added in
-   1.27.0 and 1.28.0, were simulated or written without a native reviewer.
+- A real pilot with employees, when the deploying organization is ready.
+  `docs/PILOT.md` has the simulated ones: three on the text screen and two
+  rounds on the window. The owner's assistive technology checks and the
+  native speaker review of the translations passed for 1.28.0.
 
 ## When an organization asks
 

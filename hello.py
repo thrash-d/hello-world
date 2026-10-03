@@ -377,7 +377,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.28.0"
+VERSION = "1.29.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -539,7 +539,7 @@ def launcher_on():
 
 
 def new_state():
-    return {"visits": [], "intent": None, "streak": True}
+    return {"visits": [], "intent": None, "streak": False}
 
 
 MAX_PLAN = 120
@@ -675,8 +675,10 @@ def load(repair=True):
         say(tr("In the folder: ") + data_dir())
         say()
         return state, True
-    if raw.get("streak") is False:
-        state["streak"] = False
+    # Off unless turned on. Files from before 1.29.0 saved true for everyone,
+    # so those people keep it until they turn it off.
+    if raw.get("streak") is True:
+        state["streak"] = True
     if raw.get("tips") is False:
         state["tips"] = False
     if raw.get("offered") is True:
@@ -754,8 +756,9 @@ def load(repair=True):
         state["intent"] = None
         for key in ("previous", "done", "finished"):
             state.pop(key, None)
-    # Without the days-in-a-row count, only the latest visit is needed.
-    if policy("HideDaysInARow"):
+    # Without the days-in-a-row count, only the latest visit is needed, so
+    # nothing reads like a record of the days someone opened it.
+    if policy("HideDaysInARow") or not state["streak"]:
         state["visits"] = state["visits"][-1:]
     return state, True
 
@@ -764,6 +767,9 @@ def file_form(state):
     """What goes in the file: the state, holding at most MAX_VISITS dates."""
     out = {k: v for k, v in state.items() if not (k == "epoch" and not v)}
     out["visits"] = sorted(set(state["visits"]))[-MAX_VISITS:]
+    # The same rule as load(): with no days-in-a-row count, one date.
+    if policy("HideDaysInARow") or not state.get("streak"):
+        out["visits"] = out["visits"][-1:]
     return out
 
 
@@ -1013,7 +1019,7 @@ def clear_launcher_temps(path):
                 pass
 
 
-def remind(on, quiet=False):
+def remind(on, quiet=False, window=False):
     """Turn the sign-in launcher on or off. True when it worked."""
     kind, where = launcher_place()
     if not kind:
@@ -1039,8 +1045,12 @@ def remind(on, quiet=False):
         except (OSError, UnicodeEncodeError):
             say(tr("Could not set up the reminder."))
             return False
-        say(tr("Done. hello-world will open once a day when you sign in."))
-        say(tr("To stop it, choose option 2 in the menu."))
+        if window:
+            para(tr("Done. A reminder comes when you sign in, if there is a "
+                    "plan to ask about."))
+        else:
+            say(tr("Done. hello-world will open once a day when you sign in."))
+            say(tr("To stop it, choose option 2 in the menu."))
         return True
     try:
         if kind == "file":
@@ -1105,11 +1115,16 @@ def show_saved(state, full=True):
     show_finished(state)
     say(tr("Days-in-a-row message: shown.") if state["streak"] else
         tr("Days-in-a-row message: hidden."))
-    if launcher_place()[0]:
+    if launcher_place()[0] and text_screen(state):
         say(tr("Opens by itself at sign-in: turned off by your organization.")
             if policy("DisableSignInLauncher") else
             tr("Opens by itself at sign-in: on.") if launcher_on() else
             tr("Opens by itself at sign-in: off."))
+    elif launcher_place()[0]:
+        say(tr("Reminder when you sign in: turned off by your organization.")
+            if policy("DisableSignInLauncher") else
+            tr("Reminder when you sign in: on.") if launcher_on() else
+            tr("Reminder when you sign in: off."))
     para(tr("It never leaves this computer. Others who can read this "
             "computer's files, such as IT staff, could read it."))
     if full:
@@ -1488,7 +1503,7 @@ def forget_finished(state, can_save):
         say(tr("Could not save that on this computer. Nothing changed."))
 
 
-def menu(state, can_save=True, iso=None):
+def menu(state, can_save=True, iso=None, alone=False):
     # The options are read out once. After that only the prompt comes back,
     # and m lists them again.
     listed = False
@@ -1498,12 +1513,20 @@ def menu(state, can_save=True, iso=None):
         if not listed:
             say(tr("Options"))
             say("  1  " + tr("Show what is saved on this computer"))
-            say("  2  " + (tr("Open once a day at sign-in (turned off by your "
-                              "organization)")
-                           if policy("DisableSignInLauncher") and not reminding else
-                           tr("Turn off: open once a day at sign-in (now on)")
-                           if reminding else
-                           tr("Turn on: open once a day at sign-in (now off)")))
+            # With the window, sign-in brings a notification, not the program.
+            say("  2  " + ((
+                tr("Open once a day at sign-in (turned off by your "
+                   "organization)") if text_screen(state) else
+                tr("Reminder when you sign in (turned off by your "
+                   "organization)"))
+                if policy("DisableSignInLauncher") and not reminding else
+                (tr("Turn off: open once a day at sign-in (now on)")
+                 if text_screen(state) else
+                 tr("Turn off: reminder when you sign in (now on)"))
+                if reminding else
+                (tr("Turn on: open once a day at sign-in (now off)")
+                 if text_screen(state) else
+                 tr("Turn on: reminder when you sign in (now off)"))))
             say("  3  " + (tr("Days-in-a-row message (hidden by your "
                               "organization)")
                            if policy("HideDaysInARow") else
@@ -1530,7 +1553,8 @@ def menu(state, can_save=True, iso=None):
                            tr("Use a window with buttons (now this text screen)")
                            if state.get("text") else
                            tr("Use this text screen (now a window with buttons)")))
-            say("  " + tr("Enter") + "  " + tr("Back to the last prompt"))
+            say("  " + tr("Enter") + "  " + (tr("Close") if alone else
+                                             tr("Back to the last prompt")))
             listed = True
             choice = ask(tr("Choose 1 to 9, or Enter to go back > "))
         else:
@@ -1555,7 +1579,7 @@ def menu(state, can_save=True, iso=None):
                 refresh(state, can_save)
                 say(json.dumps(file_form(state), indent=2, ensure_ascii=False))
         elif choice == "2":
-            if remind(not reminding):
+            if remind(not reminding, window=not text_screen(state)):
                 # A choice made here is final; the offer must not come back.
                 refresh(state, can_save)
                 base = copy.deepcopy(state)
@@ -1779,8 +1803,8 @@ def answer_plan(state, can_save, d, choice, text):
     """Answer "Did you do it?" for the plan `text` from the window or the
     sign-in reminder: "yes", "no" (not yet, kept for today) or "skip".
 
-    Returns (saved, message). Finishing counts on the plan's own day, the
-    same as Enter at the text screen's "When did you finish it?".
+    Returns (saved, message). Finishing counts on day d, the day it was
+    answered, which is the date people expect to see in the finished list.
     """
     refresh(state, can_save)
     intent = state["intent"]
@@ -1789,7 +1813,7 @@ def answer_plan(state, can_save, d, choice, text):
                          "is kept.")
     base = copy.deepcopy(state)
     if choice == "yes":
-        finish_plan(state, text, datetime.date.fromisoformat(intent["date"]))
+        finish_plan(state, text, d)
         state["intent"] = None
     elif choice == "no":
         state["intent"] = {"text": text, "date": d.isoformat(),
@@ -1857,7 +1881,7 @@ def daily(startup):
             say()
         elif (state["streak"] and not policy("HideDaysInARow")
               and (row in (3, 7, 14) or row % 30 == 0)):
-            say(tr("You have opened this {row} times in a row. Nice to see "
+            say(tr("You have opened this {row} days in a row. Nice to see "
                    "you.").format(row=row))
             say()
 
@@ -2063,7 +2087,7 @@ def run(argv):
     if argv == ["--menu"]:
         state, can_save = load()
         try:
-            menu(state, can_save, today().isoformat())
+            menu(state, can_save, today().isoformat(), alone=True)
         except Quit:
             pass
         return 0
@@ -2320,15 +2344,16 @@ def sign_in():
     return 0
 
 
+def xml_text(text):
+    from xml.sax.saxutils import escape
+    return escape(text, {'"': "&quot;"})
+
+
 def show_reminder(text):
     """Show a Windows notification with the plan and two answers. False when
     Windows would not show it, such as where PowerShell is locked down."""
-    from xml.sax.saxutils import escape as plain
-
-    def escape(text):
-        return plain(text, {'"': "&quot;"})
-
-    xml = ('<toast activationType="protocol" launch="hello-world:open">'
+    escape = xml_text
+    return notify('<toast activationType="protocol" launch="hello-world:open">'
            '<visual><binding template="ToastGeneric">'
            f'<text>{escape(tr("Last time you planned: ") + text)}</text>'
            f'<text>{escape(tr("Did you do it?"))}</text></binding></visual>'
@@ -2338,6 +2363,10 @@ def show_reminder(text):
            f'<action content="{escape(tr("&Not yet").replace("&", ""))}" '
            'activationType="protocol" arguments="hello-world:notyet"/>'
            '</actions></toast>')
+
+
+def notify(xml):
+    """Show one Windows notification. False when Windows would not show it."""
     if SHOWN is not None:
         SHOWN.append(xml)
         return True
@@ -2382,8 +2411,13 @@ def answer_reminder(link):
     state, can_save = load()
     intent = state["intent"]
     if asks_followup(intent, d):
-        answer_plan(state, can_save, d, "yes" if word == "done" else "no",
-                    intent["text"])
+        saved, message = answer_plan(state, can_save, d,
+                                     "yes" if word == "done" else "no",
+                                     intent["text"])
+        if saved and word == "done":
+            # The window says this out loud; the reminder had no way to.
+            notify('<toast><visual><binding template="ToastGeneric">'
+                   f'<text>{xml_text(message)}</text></binding></visual></toast>')
     return 0
 
 
@@ -2422,7 +2456,7 @@ class Visit:
                 notes.append(tr("Welcome back. Glad you are here."))
             elif (state["streak"] and not policy("HideDaysInARow")
                   and (row in (3, 7, 14) or row % 30 == 0)):
-                notes.append(tr("You have opened this {row} times in a row. "
+                notes.append(tr("You have opened this {row} days in a row. "
                                 "Nice to see you.").format(row=row))
         state["intent"] = intent
         if not seen:
@@ -2453,20 +2487,24 @@ class Visit:
         return message
 
     def save(self, typed):
-        """The plan typed in the box. Returns (close, message): a refused
-        plan keeps the window open to say why."""
+        """The plan typed in the box. Returns (close, message, saved).
+
+        Nothing new to save closes the window. A saved plan keeps it open to
+        say so, and Enter again closes it. A refused plan keeps it open to
+        say why.
+        """
         if plans_off():
-            return True, ""
+            return True, "", False
         quietly(refresh, self.state, self.can_save)
         if not tidy(typed) or clean(typed) == self.plan():
-            return True, ""
+            return True, "", False
         if is_same(typed) and not self.state.get("previous"):
             return False, tr("There is no earlier plan to reuse yet. Nothing "
-                             "was saved.")
+                             "was saved."), False
         command, said = quietly(is_command, typed, tr("Type your plan in the box."))
         if command:
             # A word like "skip" or "none" is a choice to plan nothing.
-            return not said, said
+            return not said, said, False
         text = clean(reuse(self.state, typed))
         state = self.state
         base = copy.deepcopy(state)
@@ -2478,12 +2516,52 @@ class Visit:
         if not saved:
             undo(state, base)
             return False, said or tr("Could not save that on this computer. "
-                                     "Your plan is unchanged.")
+                                     "Your plan is unchanged."), False
         self.followup = None
-        return True, ""
+        _, several = quietly(nudge_if_several, text)
+        return False, " ".join([tr("Saved.")] + ([several] if several else [])), True
 
-    def did_it(self):
-        """Today's plan is finished. Returns the message."""
+    def saved_summary(self):
+        """What is saved, in words, and where the file is. The raw file stays
+        in the text menu, for anyone who wants it."""
+        quietly(refresh, self.state, self.can_save)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            show_saved(self.state, full=False)
+        return (out.getvalue().strip() + "\n\n" + tr("Saved on this computer in:")
+                + "\n" + data_file())
+
+    def clear(self):
+        """Drop today's plan; same can bring it back. Returns the message."""
+        quietly(refresh, self.state, self.can_save)
+        base = copy.deepcopy(self.state)
+        if self.state["intent"]:
+            self.state["previous"] = self.state["intent"]["text"]
+        self.state["intent"] = None
+        saved, said = quietly(commit, self.state, base, self.can_save)
+        if not saved:
+            undo(self.state, base)
+            return said or tr("Could not save that on this computer. Your plan "
+                              "is unchanged.")
+        self.followup = None
+        return tr("Cleared. Type same at a plan prompt if you want it back.")
+
+    def delete_all(self):
+        """Delete everything saved, as menu option 4 does. Returns the message."""
+        def delete():
+            with file_lock():
+                return delete_everything(self.state)
+        _, said = quietly(delete)
+        self.followup = None
+        return said
+
+    def did_it(self, typed=""):
+        """Today's plan, or what was typed over it, is finished. Returns the
+        message."""
+        if tidy(typed) and clean(typed) != self.plan():
+            close, message, saved = self.save(typed)
+            if not saved:
+                return message
         _, said = quietly(mark_done_now, self.state, self.can_save, self.d)
         # The finished list after it is for the text screen.
         return said.split(tr("Finished lately:"))[0].strip()
@@ -2508,8 +2586,8 @@ class Visit:
                 tr("Done. The sign-in reminder is off."))
 
     def toggle(self, key):
-        """Flip "tips" (shown unless False) or "text" (the text screen).
-        Returns False when it could not be saved."""
+        """Flip "tips" (shown unless False), "streak" or "text" (the text
+        screen). Returns False when it could not be saved."""
         quietly(refresh, self.state, self.can_save)
         base = copy.deepcopy(self.state)
         if key == "tips":
@@ -2517,6 +2595,8 @@ class Visit:
                 self.state["tips"] = False
             else:
                 self.state.pop("tips", None)
+        elif key == "streak":
+            self.state["streak"] = not self.state["streak"]
         elif self.state.pop("text", None) is None:
             self.state["text"] = True
         saved, _ = quietly(commit, self.state, base, self.can_save)
@@ -2540,6 +2620,8 @@ class Window:
         self.visit = visit
         self.error = None
         self.fonts = []
+        self.finished = False  # a plan was finished in this window
+        self.asking = bool(visit.followup)
 
     def lines(self, text):
         per_line = int(self.WIDTH / 4.2)
@@ -2588,20 +2670,22 @@ class Window:
         y += 2 * line + 6
         add(button, self.OPTIONS, tr("&Options"), tab, m, 16, 64)
         right = m + w
+        # Added left to right, which is the Tab order.
         if not plans_off():
-            add(button, self.CLOSE, self.close_label(), tab, right - 64, 16, 64)
-            add(button, self.SAVE, tr("&Save"), tab | 1, right - 134, 16, 64)
             add(button, self.DID_IT, tr("&I did it"), tab, right - 204, 16, 64)
+            add(button, self.SAVE, tr("&Save"), tab | 1, right - 134, 16, 64)
+            add(button, self.CLOSE, self.close_label(), tab, right - 64, 16, 64)
         else:
             add(button, self.CLOSE, tr("Close"), tab | 1, right - 64, 16, 64)
         return items, y + 26
 
     def plan_label(self):
         return (tr("Your plan for today: ").strip() if self.visit.plan() else
+                tr("Next plan, if you want one:") if self.finished else
                 tr("What is one thing you want to get done today?"))
 
     def close_label(self):
-        return tr("Close") if self.visit.plan() else tr("Not today")
+        return tr("Close") if self.visit.plan() or self.finished else tr("Not today")
 
     def template(self):
         import struct
@@ -2756,8 +2840,10 @@ class Window:
         if self.item(self.PLAN):
             user.SendMessageW(self.item(self.PLAN), 0xC5, MAX_PLAN, 0)  # EM_LIMITTEXT
         self.show(self.DID_IT, bool(self.visit.plan()))
-        self.focus(self.DONE if self.visit.followup else
-                   self.PLAN if self.item(self.PLAN) else self.CLOSE)
+        if self.visit.followup:
+            self.focus(self.DONE)
+        else:
+            self.focus_plan()
         if CLOSE_WINDOW_AFTER:
             user.SetTimer(self.hwnd, 1, CLOSE_WINDOW_AFTER, None)
 
@@ -2770,35 +2856,66 @@ class Window:
                 return
             for hidden in (self.ASK, self.DONE, self.NOT_YET, self.SKIP):
                 self.show(hidden, False)
-            self.close_gap()
+            # The question's line stays as space under the answer.
+            self.collapse(self.DONE, self.SKIP)
+            self.asking = False
             self.set_text(self.PLANNED, message)
             self.refresh_plan()
-            self.focus(self.PLAN if self.item(self.PLAN) else self.CLOSE)
+            self.focus_plan()
         elif cid == self.DID_IT:
-            self.set_text(self.STATUS, v.did_it())
+            self.set_text(self.STATUS, v.did_it(self.typed()))
+            self.finished = not v.plan()
             self.refresh_plan()
-            self.focus(self.PLAN)
+            self.focus_plan()
         elif cid == self.SAVE:
-            close, message = v.save(self.typed())
-            if not close:
-                self.set_text(self.STATUS, message)
-                self.focus(self.PLAN)
-                return
-            if v.plan() and v.offer_due():
-                # MB_YESNO | MB_ICONQUESTION; IDYES is 6.
-                answer = self.user.MessageBoxW(self.hwnd, tr(
-                    "Want a reminder when you sign in? It shows your plan from "
-                    "last time, and you answer with one click. You can turn it "
-                    "off under Options."), "hello-world", 0x24)
-                v.set_reminder(answer == 6)
-            self.user.EndDialog(self.hwnd, 1)
+            if not self.typed().strip() and v.plan():
+                # An emptied box is a plan to drop, which asks first.
+                if self.confirm(tr("Clear today's plan?")):
+                    self.set_text(self.STATUS, v.clear())
+                    self.refresh_plan()
+                self.focus_plan()
+            elif self.save_typed() is None:
+                self.user.EndDialog(self.hwnd, 1)
         elif cid == self.CLOSE:
+            if (self.item(self.PLAN) and self.typed().strip()
+                    and clean(self.typed()) != v.plan()
+                    and self.confirm(tr("Save your plan before closing?"))
+                    and self.save_typed() is False):
+                return
             self.user.EndDialog(self.hwnd, 2)
         elif cid == self.OPTIONS:
             self.options()
 
-    def close_gap(self):
-        """Move what was under the answered question up into its place."""
+    def save_typed(self):
+        """Save the box. True when saved, False when refused (the window
+        says why), None when there was nothing to save."""
+        v = self.visit
+        close, message, saved = v.save(self.typed())
+        if close:
+            return None
+        self.set_text(self.STATUS, message)
+        if saved:
+            if self.asking:
+                # A new plan replaces the one asked about, which same keeps.
+                for hidden in (self.PLANNED, self.ASK, self.DONE, self.NOT_YET,
+                               self.SKIP):
+                    self.show(hidden, False)
+                self.collapse(self.PLANNED, self.SKIP)
+                self.asking = False
+            elif self.item(self.PLANNED):
+                self.set_text(self.PLANNED, "")
+            self.refresh_plan()
+            if v.offer_due():
+                v.set_reminder(self.confirm(tr(
+                    "Want a reminder when you sign in? It shows your plan from "
+                    "last time, and you answer with one click. You can turn it "
+                    "off under Options.")))
+        self.focus_plan()
+        return saved
+
+    def collapse(self, first, last):
+        """Move everything after the hidden controls first..last up into
+        their place, and shorten the window to match."""
         import ctypes
         from ctypes import wintypes as wt
         user = self.user
@@ -2812,8 +2929,8 @@ class Window:
                 user.MapWindowPoints(None, self.hwnd, ctypes.byref(r), 2)
             return r
 
-        later = self.ids[self.ids.index(self.SKIP) + 1:]
-        shift = rect(self.item(later[0])).top - rect(self.item(self.ASK)).bottom
+        later = self.ids[self.ids.index(last) + 1:]
+        shift = rect(self.item(later[0])).top - rect(self.item(first)).top
         for cid in later:
             r = rect(self.item(cid))
             # SWP_NOSIZE | SWP_NOZORDER
@@ -2822,6 +2939,15 @@ class Window:
         # SWP_NOMOVE | SWP_NOZORDER
         user.SetWindowPos(self.hwnd, None, 0, 0, r.right - r.left,
                           r.bottom - r.top - shift, 0x6)
+
+    def focus_plan(self):
+        """Focus the plan box with the cursor at the end, so a stray key adds
+        to the plan instead of replacing it."""
+        if not self.item(self.PLAN):
+            self.focus(self.CLOSE)
+            return
+        self.focus(self.PLAN)
+        self.user.SendMessageW(self.item(self.PLAN), 0xB1, 0x7FFFFFFF, 0x7FFFFFFF)  # EM_SETSEL
 
     def typed(self):
         import ctypes
@@ -2839,39 +2965,84 @@ class Window:
         self.set_text(self.CLOSE, self.close_label())
         self.show(self.DID_IT, bool(self.visit.plan()))
 
-    def options(self):
+    def popup(self, entries):
+        """Show the Options menu of (flags, id, label) and return the id chosen,
+        or 0."""
         import ctypes
         from ctypes import wintypes as wt
-        user, v = self.user, self.visit
+        user = self.user
         menu = user.CreatePopupMenu()
-        checked, grayed = 0x8, 0x1
-        if launcher_place()[0] and not plans_off():
-            on = launcher_on()
-            user.AppendMenuW(menu, (checked if on else 0) | (
-                grayed if policy("DisableSignInLauncher") and not on else 0),
-                1, tr("Remind me when I sign in"))
-        if not policy("HideThoughtAndTip"):
-            user.AppendMenuW(menu, checked if v.state.get("tips", True) else 0,
-                             2, tr("Show the thought and tip"))
-        user.AppendMenuW(menu, 0x800, 0, None)  # MF_SEPARATOR
-        user.AppendMenuW(menu, grayed if policy("UseTextScreen") else 0, 3,
-                         tr("Use the text screen"))
-        user.AppendMenuW(menu, 0, 4, tr("More options"))
+        for flags, cid, label in entries:
+            user.AppendMenuW(menu, flags, cid, label)
         rect = wt.RECT()
         user.GetWindowRect(self.item(self.OPTIONS), ctypes.byref(rect))
         # TPM_RETURNCMD: the choice comes back here instead of as a message.
         choice = user.TrackPopupMenu(menu, 0x100, rect.left, rect.bottom, 0,
                                      self.hwnd, None)
         user.DestroyMenu(menu)
+        return choice
+
+    def confirm(self, text):
+        """A yes or no question in a standard message box."""
+        # MB_YESNO | MB_ICONQUESTION; IDYES is 6.
+        return self.user.MessageBoxW(self.hwnd, text, "hello-world", 0x24) == 6
+
+    def inform(self, text):
+        """Text to read, in a standard message box with OK."""
+        self.user.MessageBoxW(self.hwnd, text, "hello-world", 0x40)  # MB_ICONINFORMATION
+
+    def options(self):
+        user, v = self.user, self.visit
+        checked, grayed = 0x8, 0x1
+        entries = []
+        if launcher_place()[0] and not plans_off():
+            on = launcher_on()
+            entries.append(((checked if on else 0) | (
+                grayed if policy("DisableSignInLauncher") and not on else 0),
+                1, tr("Remind me when I sign in")))
+        if not policy("HideThoughtAndTip"):
+            entries.append((checked if v.state.get("tips", True) else 0, 2,
+                            tr("Show the thought and tip")))
+        if not policy("HideDaysInARow"):
+            entries.append((checked if v.state["streak"] else 0, 7,
+                            tr("Show the days-in-a-row message")))
+        entries.append((0, 5, tr("Show what is saved on this computer")))
+        entries.append((0, 6, tr("Delete everything saved")))
+        entries.append((0x800, 0, None))  # MF_SEPARATOR
+        entries.append((grayed if policy("UseTextScreen") else 0, 3,
+                        tr("Use the text screen")))
+        entries.append((0, 4, tr("More options")))
+        choice = self.popup(entries)
         if choice == 1:
             self.set_text(self.STATUS, v.set_reminder(not launcher_on()))
         elif choice == 2:
             saved = v.toggle("tips")
+            shown = v.state.get("tips", True)
+            if saved and not shown and self.item(self.THOUGHT_LABEL):
+                for cid in (self.THOUGHT_LABEL, self.THOUGHT, self.TIP_LABEL, self.TIP):
+                    self.show(cid, False)
+                self.collapse(self.THOUGHT_LABEL, self.TIP)
             self.set_text(self.STATUS, (
                 tr("Could not save that choice on this computer.") if not saved
-                else tr("Done. The thought and tip are on.")
-                if v.state.get("tips", True) else
+                else tr("Done. The thought and tip show next time you open "
+                        "hello-world.") if shown else
                 tr("Done. The thought and tip are off.")))
+        elif choice == 7:
+            saved = v.toggle("streak")
+            self.set_text(self.STATUS, (
+                tr("Could not save that choice on this computer.") if not saved
+                else tr("Done. The days-in-a-row message is on.")
+                if v.state["streak"] else
+                tr("Done. The days-in-a-row message is off.")))
+        elif choice == 5:
+            self.inform(v.saved_summary())
+        elif choice == 6:
+            if self.confirm(tr("Delete all saved notes, dates and plans on this "
+                               "computer?")):
+                self.set_text(self.STATUS, v.delete_all())
+                self.refresh_plan()
+            else:
+                self.set_text(self.STATUS, tr("Nothing was deleted."))
         elif choice == 3:
             if v.toggle("text"):
                 open_console()
@@ -3388,7 +3559,7 @@ sitio.""",
             'Escribe menú al final para ver las opciones.',
         'Welcome back. Glad you are here.':
             'Qué bien verte de nuevo.',
-        'You have opened this {row} times in a row. Nice to see you.':
+        'You have opened this {row} days in a row. Nice to see you.':
             'Lo has abierto {row} días seguidos. Qué bien verte.',
         'Last time you planned: ':
             'Tu último plan: ',
@@ -3494,6 +3665,32 @@ sitio.""",
             'Ventana o pantalla de texto (lo decide tu organización)',
         'Your organization has set hello-world to open as a text screen.':
             'Tu organización ha configurado hello-world como pantalla de texto.',
+        'Saved.':
+            'Guardado.',
+        'Save your plan before closing?':
+            '¿Guardar tu plan antes de cerrar?',
+        'Delete all saved notes, dates and plans on this computer?':
+            '¿Borrar todas las notas, fechas y planes guardados en este equipo?',
+        'Turn off: reminder when you sign in (now on)':
+            'Desactivar: aviso al iniciar sesión (ahora activado)',
+        'Turn on: reminder when you sign in (now off)':
+            'Activar: aviso al iniciar sesión (ahora desactivado)',
+        'Reminder when you sign in (turned off by your organization)':
+            'Aviso al iniciar sesión (desactivado por tu organización)',
+        'Reminder when you sign in: on.':
+            'Aviso al iniciar sesión: activado.',
+        'Reminder when you sign in: off.':
+            'Aviso al iniciar sesión: desactivado.',
+        'Reminder when you sign in: turned off by your organization.':
+            'Aviso al iniciar sesión: desactivado por tu organización.',
+        'Show the days-in-a-row message':
+            'Mostrar el mensaje de días seguidos',
+        'Done. The thought and tip show next time you open hello-world.':
+            'Listo. La idea y la sugerencia se verán la próxima vez que abras hello-world.',
+        "Clear today's plan?":
+            '¿Borrar el plan de hoy?',
+        'Next plan, if you want one:':
+            'Siguiente plan, si quieres:',
     },
 }
 
@@ -3999,7 +4196,7 @@ Digite m para ver as opções de novo. Nada é enviado para lugar nenhum.""",
             'Digite menu no final para ver as opções.',
         'Welcome back. Glad you are here.':
             'Olá de novo. Que bom ter você aqui.',
-        'You have opened this {row} times in a row. Nice to see you.':
+        'You have opened this {row} days in a row. Nice to see you.':
             'Você abriu o hello-world {row} dias seguidos. Que bom ver você.',
         'Last time you planned: ':
             'O seu último plano: ',
@@ -4105,6 +4302,32 @@ Digite m para ver as opções de novo. Nada é enviado para lugar nenhum.""",
             'Janela ou tela de texto (definido pela sua organização)',
         'Your organization has set hello-world to open as a text screen.':
             'Sua organização configurou o hello-world para abrir como tela de texto.',
+        'Saved.':
+            'Salvo.',
+        'Save your plan before closing?':
+            'Salvar seu plano antes de fechar?',
+        'Delete all saved notes, dates and plans on this computer?':
+            'Apagar todas as notas, datas e planos salvos neste computador?',
+        'Turn off: reminder when you sign in (now on)':
+            'Desativar: lembrete ao entrar (agora ativado)',
+        'Turn on: reminder when you sign in (now off)':
+            'Ativar: lembrete ao entrar (agora desativado)',
+        'Reminder when you sign in (turned off by your organization)':
+            'Lembrete ao entrar (desativado pela sua organização)',
+        'Reminder when you sign in: on.':
+            'Lembrete ao entrar: ativado.',
+        'Reminder when you sign in: off.':
+            'Lembrete ao entrar: desativado.',
+        'Reminder when you sign in: turned off by your organization.':
+            'Lembrete ao entrar: desativado pela sua organização.',
+        'Show the days-in-a-row message':
+            'Mostrar a mensagem de dias seguidos',
+        'Done. The thought and tip show next time you open hello-world.':
+            'Concluído. O pensamento e a dica aparecem na próxima vez que você abrir o hello-world.',
+        "Clear today's plan?":
+            'Apagar o plano de hoje?',
+        'Next plan, if you want one:':
+            'Próximo plano, se quiser:',
     },
 }
 
@@ -4611,8 +4834,8 @@ Tapez m pour revoir les options. Rien n'est envoyé nulle part.""",
             'Tapez menu à la fin pour voir les options.',
         'Welcome back. Glad you are here.':
             'Bon retour parmi nous. Ça fait plaisir de vous revoir.',
-        'You have opened this {row} times in a row. Nice to see you.':
-            "Vous avez ouvert hello-world {row} fois d'affilée. Merci d'être là.",
+        'You have opened this {row} days in a row. Nice to see you.':
+            "Vous avez ouvert hello-world {row} jours d'affilée. Merci d'être là.",
         'Last time you planned: ':
             'Votre dernier plan : ',
         'Did you do it? (y for yes, n for not yet, Enter to skip) > ':
@@ -4717,6 +4940,32 @@ Tapez m pour revoir les options. Rien n'est envoyé nulle part.""",
             'Fenêtre ou écran texte (défini par votre organisation)',
         'Your organization has set hello-world to open as a text screen.':
             'Votre organisation a configuré hello-world en écran texte.',
+        'Saved.':
+            'Enregistré.',
+        'Save your plan before closing?':
+            'Enregistrer votre plan avant de fermer ?',
+        'Delete all saved notes, dates and plans on this computer?':
+            'Supprimer toutes les notes, dates et plans enregistrés sur cet ordinateur ?',
+        'Turn off: reminder when you sign in (now on)':
+            'Désactiver le rappel à la connexion (activé)',
+        'Turn on: reminder when you sign in (now off)':
+            'Activer le rappel à la connexion (désactivé)',
+        'Reminder when you sign in (turned off by your organization)':
+            'Rappel à la connexion (désactivé par votre organisation)',
+        'Reminder when you sign in: on.':
+            'Rappel à la connexion : activé.',
+        'Reminder when you sign in: off.':
+            'Rappel à la connexion : désactivé.',
+        'Reminder when you sign in: turned off by your organization.':
+            'Rappel à la connexion : désactivé par votre organisation.',
+        'Show the days-in-a-row message':
+            "Afficher le message des jours d'affilée",
+        'Done. The thought and tip show next time you open hello-world.':
+            "C'est fait. La pensée et l'astuce s'afficheront à la prochaine ouverture de hello-world.",
+        "Clear today's plan?":
+            "Effacer le plan d'aujourd'hui ?",
+        'Next plan, if you want one:':
+            'Plan suivant, si vous voulez :',
     },
 }
 
@@ -5222,7 +5471,7 @@ irgendwohin gesendet.""",
             'Geben Sie am Ende „menü“ ein, um die Optionen zu sehen.',
         'Welcome back. Glad you are here.':
             'Willkommen zurück. Schön, dass Sie da sind.',
-        'You have opened this {row} times in a row. Nice to see you.':
+        'You have opened this {row} days in a row. Nice to see you.':
             'Sie haben hello-world {row} Tage in Folge geöffnet. Schön, Sie zu sehen.',
         'Last time you planned: ':
             'Ihr letzter Plan: ',
@@ -5328,6 +5577,32 @@ irgendwohin gesendet.""",
             'Fenster/Textbildschirm (von Ihrer Organisation festgelegt)',
         'Your organization has set hello-world to open as a text screen.':
             'Ihre Organisation hat hello-world auf den Textbildschirm festgelegt.',
+        'Saved.':
+            'Gespeichert.',
+        'Save your plan before closing?':
+            'Ihren Plan vor dem Schließen speichern?',
+        'Delete all saved notes, dates and plans on this computer?':
+            'Alle gespeicherten Notizen, Daten und Pläne auf diesem Computer löschen?',
+        'Turn off: reminder when you sign in (now on)':
+            'Ausschalten: Erinnerung bei der Anmeldung (jetzt an)',
+        'Turn on: reminder when you sign in (now off)':
+            'Einschalten: Erinnerung bei der Anmeldung (jetzt aus)',
+        'Reminder when you sign in (turned off by your organization)':
+            'Erinnerung bei der Anmeldung (von der Organisation aus)',
+        'Reminder when you sign in: on.':
+            'Erinnerung bei der Anmeldung: an.',
+        'Reminder when you sign in: off.':
+            'Erinnerung bei der Anmeldung: aus.',
+        'Reminder when you sign in: turned off by your organization.':
+            'Erinnerung bei der Anmeldung: von Ihrer Organisation ausgeschaltet.',
+        'Show the days-in-a-row message':
+            'Hinweis zu Tagen in Folge einblenden',
+        'Done. The thought and tip show next time you open hello-world.':
+            'Fertig. Gedanke und Tipp erscheinen beim nächsten Öffnen von hello-world.',
+        "Clear today's plan?":
+            'Den Plan für heute löschen?',
+        'Next plan, if you want one:':
+            'Nächster Plan, falls Sie möchten:',
     },
 }
 

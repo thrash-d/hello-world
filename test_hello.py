@@ -152,7 +152,8 @@ def test_next_day_follow_up_done():
     p = run(text="y\nCall back\n\n", day="2026-10-02", home=first.home)
     assert "Last time you planned: Send the invoice" in p.stdout
     assert notes(first.home)["intent"]["text"] == "Call back"
-    assert notes(first.home)["visits"] == ["2026-10-01", "2026-10-02"]
+    # With the days-in-a-row message off, only the latest date is kept.
+    assert notes(first.home)["visits"] == ["2026-10-02"]
 
 
 def test_next_day_not_done_can_be_kept():
@@ -166,16 +167,31 @@ def test_next_day_not_done_can_be_kept():
 
 def test_in_a_row_line_appears_at_milestones_only():
     home = mkdtemp()
+    run(["--streak", "on"], home=home)
     outs = [run(text="\n\n", day=f"2026-10-0{n}", home=home).stdout
             for n in range(1, 8)]
     shown = [n for n, out in enumerate(outs, 1) if "in a row" in out]
     assert shown == [3, 7]
-    assert "3 times in a row" in outs[2]
+    assert "3 days in a row" in outs[2]
     home = mkdtemp()
+    run(["--streak", "on"], home=home)
     for n in (1, 2):
         run(text="\n\n", day=f"2026-10-0{n}", home=home)
     run(["--streak", "off"], home=home)
     assert "in a row" not in run(text="\n\n", day="2026-10-03", home=home).stdout
+
+
+def test_the_days_in_a_row_message_is_off_until_turned_on_and_keeps_one_date():
+    home = mkdtemp()
+    outs = [run(text="\n\n", day=f"2026-10-0{n}", home=home).stdout
+            for n in range(1, 4)]
+    assert not any("in a row" in out for out in outs)
+    saved = notes(home)
+    assert saved["streak"] is False and saved["visits"] == ["2026-10-03"]
+    # A file from before 1.29.0 saved true, and keeps it.
+    with open(os.path.join(home, "notes.json"), "w") as f:
+        json.dump({"visits": ["2026-10-01", "2026-10-02"], "streak": True}, f)
+    assert "3 days in a row" in run(text="\n\n", day="2026-10-03", home=home).stdout
 
 
 def test_streak_option_exit_codes():
@@ -200,7 +216,7 @@ def test_p_at_the_last_prompt_sets_the_plan():
 def test_a_notes_file_with_a_byte_order_mark_is_read_not_moved_aside():
     home = mkdtemp()
     with open(os.path.join(home, "notes.json"), "w", encoding="utf-8-sig") as f:
-        json.dump({"visits": ["2026-09-30"], "intent": None}, f)
+        json.dump({"visits": ["2026-09-30"], "intent": None, "streak": True}, f)
     run(text="\n\n", home=home)
     assert not os.path.exists(os.path.join(home, "notes.json.bak"))
     assert notes(home)["visits"] == ["2026-09-30", "2026-10-01"]
@@ -271,7 +287,7 @@ def test_menu_shows_saved_data_and_toggles_the_in_a_row_line():
     first = run(text="Send the invoice\n\n")
     p = run(text="y\nBuy milk\nm\n1\n\n3\n\n", home=first.home, day="2026-10-02")
     assert "Options" in p.stdout and "Buy milk" in p.stdout
-    assert notes(first.home)["streak"] is False
+    assert notes(first.home)["streak"] is True
 
 
 def test_reminder_writes_and_removes_only_the_launcher():
@@ -476,7 +492,7 @@ def test_visits_dated_after_today_are_dropped_from_the_file():
     home = mkdtemp()
     path = os.path.join(home, "notes.json")
     with open(path, "w") as f:
-        json.dump({"visits": ["2026-09-30", "2030-01-01"]}, f)
+        json.dump({"visits": ["2026-09-30", "2030-01-01"], "streak": True}, f)
     p = run(text="\n", day="2026-10-01", home=home)
     assert "opened this" not in p.stdout
     with open(path) as f:
@@ -527,7 +543,7 @@ def test_visits_dated_after_today_are_dropped_on_load():
     hello.HOME = home
     os.makedirs(os.path.dirname(hello.data_file()), exist_ok=True)
     with open(hello.data_file(), "w", encoding="utf-8") as f:
-        json.dump({"visits": ["2026-09-30", "2030-01-01"]}, f)
+        json.dump({"visits": ["2026-09-30", "2030-01-01"], "streak": True}, f)
     state, _ = hello.load()
     assert state["visits"] == ["2026-09-30"]
 
@@ -768,7 +784,7 @@ def test_delete_needs_a_clear_yes():
 
 def test_menu_toggles_say_the_action_and_menu_help_is_for_employees():
     p = run(text="\nm\n5\n\n")
-    assert "Turn on: open once a day at sign-in (now off)" in p.stdout
+    assert "Turn on: reminder when you sign in (now off)" in p.stdout
     assert "Words you can type at the last prompt" in p.stdout
     assert "hello.cmd" not in p.stdout.split("Words you can type")[1]
 
@@ -1268,7 +1284,7 @@ def test_the_file_never_holds_more_than_the_visit_limit():
     import datetime
     mod = _load_hello()
     day = datetime.date(2026, 10, 1)
-    state = mod.new_state()
+    state = dict(mod.new_state(), streak=True)
     state["visits"] = [(day - datetime.timedelta(days=n)).isoformat()
                        for n in range(mod.MAX_VISITS + 50)]
     out = mod.file_form(state)["visits"]
@@ -1298,7 +1314,7 @@ def test_unknown_keys_and_wrong_types_in_the_file_are_dropped():
     assert p.returncode == 0 and "Traceback" not in p.stderr
     saved = notes(home)
     assert "unknown" not in saved and saved["visits"] == ["2026-10-01"]
-    assert saved["intent"] is None and saved["streak"] is True
+    assert saved["intent"] is None and saved["streak"] is False
     assert run(["--stats"], home=home).returncode == 0
 
 
@@ -1622,7 +1638,8 @@ def test_ctrl_c_at_a_prompt_skips_only_that_prompt():
 def test_visits_older_than_60_days_are_not_kept():
     home = mkdtemp()
     with open(os.path.join(home, "notes.json"), "w") as f:
-        json.dump({"visits": ["2025-01-05", "2026-07-01", "2026-09-30"]}, f)
+        json.dump({"visits": ["2025-01-05", "2026-07-01", "2026-09-30"],
+                   "streak": True}, f)
     run(text="\n\n", home=home)
     assert notes(home)["visits"] == ["2026-09-30", "2026-10-01"]
 
@@ -1711,7 +1728,7 @@ def test_a_long_prompt_wraps_and_keeps_its_choices_visible():
 def test_option_1_says_whether_sign_in_opening_is_on():
     home, startup = mkdtemp(), mkdtemp()
     p = run(text="\nm\n1\n\n\n\n", home=home, startup=startup)
-    assert "Opens by itself at sign-in: off." in p.stdout
+    assert "Reminder when you sign in: off." in p.stdout
 
 
 def _registry_test_key():
@@ -2206,7 +2223,7 @@ def test_the_window_asks_about_yesterdays_plan_and_answers_like_the_text_screen(
         assert visit.followup is None, choice
         if choice == "yes":
             assert saved["done"] == 1 and saved["intent"] is None
-            assert saved["finished"][0]["date"] == "2026-10-01"
+            assert saved["finished"][0]["date"] == "2026-10-02"
             assert message in hello.DONE_LINES
         elif choice == "no":
             assert saved["intent"] == {"text": "Write the report",
@@ -2219,15 +2236,16 @@ def test_the_window_asks_about_yesterdays_plan_and_answers_like_the_text_screen(
 def test_the_window_saves_a_plan_and_refuses_what_is_not_one():
     hello = _window_hello()
     visit = hello.Visit()
-    close, message = visit.save("menu")
-    assert not close and "command" in message and "last prompt" not in message
-    close, message = visit.save("12")
-    assert not close and "A plan needs a word or two" in message
-    assert visit.save("skip") == (True, "") and visit.plan() == ""
-    assert visit.save("  ") == (True, "")
-    assert visit.save("Call the bank") == (True, "")
+    close, message, saved = visit.save("menu")
+    assert not close and not saved
+    assert "command" in message and "last prompt" not in message
+    close, message, saved = visit.save("12")
+    assert not close and not saved and "A plan needs a word or two" in message
+    assert visit.save("skip") == (True, "", False) and visit.plan() == ""
+    assert visit.save("  ") == (True, "", False)
+    assert visit.save("Call the bank") == (False, "Saved.", True)
     assert notes(hello.HOME)["intent"]["text"] == "Call the bank"
-    assert visit.save("Call the bank") == (True, "")
+    assert visit.save("Call the bank") == (True, "", False)
     assert visit.did_it() in hello.DONE_LINES
     saved = notes(hello.HOME)
     assert saved["done"] == 1 and saved["intent"] is None
@@ -2237,7 +2255,7 @@ def test_the_window_replacing_an_unanswered_plan_keeps_it_for_same():
     first = run(text="Old plan\n\n")
     hello = _window_hello(home=first.home)
     visit = hello.Visit()
-    assert visit.save("New plan") == (True, "")
+    assert visit.save("New plan") == (False, "Saved.", True)
     saved = notes(first.home)
     assert saved["intent"]["text"] == "New plan" and saved["previous"] == "Old plan"
 
@@ -2343,3 +2361,81 @@ def test_the_window_opens_and_closes_in_every_language():
             window = hello.Window(hello.Visit())
             window.run()
             assert window.error is None, lang
+
+
+def test_the_window_tab_order_reads_top_to_bottom_and_left_to_right():
+    for home in (run(text="Write the report\n\n").home, None):
+        hello = _window_hello(home=home)
+        items, _ = hello.Window(hello.Visit()).layout()
+        places = [(y, x) for _, _, _, _, x, y, _, _ in items]
+        assert places == sorted(places)
+
+
+def test_i_did_it_finishes_what_is_in_the_box_when_it_was_edited():
+    first = run(text="Finish the backlog\n\n")
+    hello = _window_hello(home=first.home, day="2026-10-01")
+    visit = hello.Visit()
+    assert visit.did_it("Get the backlog under 20") in hello.DONE_LINES
+    saved = notes(first.home)
+    assert [f["text"] for f in saved["finished"]] == ["Get the backlog under 20"]
+    assert "previous" not in saved  # a same-day change is a correction
+    assert "A plan needs a word or two" in visit.did_it("42")
+
+
+def test_the_window_says_saved_and_nudges_a_plan_of_several_things():
+    hello = _window_hello()
+    close, message, saved = hello.Visit().save("Email Ana and call the bank")
+    assert saved and not close
+    assert message.startswith("Saved.") and "more than one thing" in message
+
+
+def test_the_window_shows_what_is_saved_and_deletes_it():
+    first = run(text="Write the report\n\n")
+    hello = _window_hello(home=first.home)
+    visit = hello.Visit()
+    summary = visit.saved_summary()
+    assert "Write the report" in summary and hello.data_file() in summary
+    assert "Everything saved was deleted" in visit.delete_all()
+    assert visit.plan() == "" and visit.followup is None
+    assert set(notes(first.home)) == {"visits", "intent", "streak", "epoch"}
+
+
+def test_the_text_menu_names_the_sign_in_choice_by_what_it_does():
+    p = run(text="\nm\n\n\n")
+    assert "Turn on: reminder when you sign in (now off)" in p.stdout
+    first = run(text="\nm\n9\n\n\n")
+    p = run(text="\nm\n\n\n", home=first.home, day="2026-10-02")
+    assert "Turn on: open once a day at sign-in (now off)" in p.stdout
+
+
+def test_the_text_menu_opened_from_the_window_closes_on_enter():
+    p = run(["--menu"], text="\n")
+    assert "Enter  Close" in p.stdout and "Back to the last prompt" not in p.stdout
+    assert p.returncode == 0
+
+
+def test_the_window_clears_a_plan_and_names_the_days_in_a_row_choice():
+    first = run(text="Write the report\n\n")
+    hello = _window_hello(home=first.home, day="2026-10-01")
+    visit = hello.Visit()
+    assert "Cleared" in visit.clear() and visit.plan() == ""
+    saved = notes(first.home)
+    assert saved["intent"] is None and saved["previous"] == "Write the report"
+    assert visit.toggle("streak") and notes(first.home)["streak"] is True
+    summary = visit.saved_summary()
+    assert "Days-in-a-row message: shown." in summary
+    assert '"visits"' not in summary and hello.data_file() in summary
+
+
+def test_done_on_the_reminder_says_thank_you():
+    first = run(text="Write the report\n\n")
+    hello = _window_hello(home=first.home)
+    hello.SHOWN = []
+    assert hello.answer_reminder("hello-world:done") == 0
+    assert len(hello.SHOWN) == 1 and "<actions>" not in hello.SHOWN[0]
+    assert any(line in hello.SHOWN[0] for line in hello.DONE_LINES)
+    first = run(text="Write the report\n\n")
+    hello = _window_hello(home=first.home)
+    hello.SHOWN = []
+    hello.answer_reminder("hello-world:notyet")
+    assert hello.SHOWN == []

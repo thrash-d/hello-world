@@ -11,7 +11,6 @@ Changes considered and declined, with the reason. On 2 October 2026 the list fro
 - A switch to hide the finished list, expiring `same` after 30 days, or an opt-in done count: option 7 forgets one plan, and option 4 deletes everything.
 - A timestamped `.bak`, or a cap on `.bak` copies: numbered backups keep every damaged file, and a cap would delete someone's data.
 - A schema version: `load()` checks every field by type, which is the schema. A lock file was added in 1.22.0 after a review showed a delete could land between another window's read and write.
-- Turning the days-in-a-row message off by default (simulated pilot, the manager): it shows only on milestones, the pilot users mostly liked it, and option 3 hides it. Revisit if real employees read it as being counted.
 - Removing the program without an administrator (simulated pilot, the manager): an all-users install needs one to remove. The README says how to stop using it without IT.
 - Deleting every user's notes from the uninstaller (`-RemoveNotes`, added in 1.22.0, withdrawn in 1.23.0): an administrator deleting inside user profiles can be pointed elsewhere by a link a user controls, and that can't be checked away. Users delete their own notes with option 4; `docs/ENTERPRISE.md` tells IT to use their own profile cleanup.
 - Signing the scripts in this repository: it needs the deploying organization's certificate. `docs/ENTERPRISE.md` says how to sign and rebuild the package.
@@ -41,7 +40,15 @@ Changes considered and declined, with the reason. On 2 October 2026 the list fro
 - Opening the window after Done or Not yet on the reminder (1.28.0, simulated user): "Don't open another window on me when I'm busy." Clicking the notification itself opens it.
 - A reminder that is on for everyone (1.28.0, simulated user): the window asks once, after the first plan, and Options turns it off.
 - Rewriting a 1.23.0 to 1.27.0 sign-in value to the new one (1.28.0): the old value still opens the text screen at sign-in, which is what the person turned on. Turning it off and on writes the new one.
-- Announcing window messages to screen readers as they change (1.28.0): it needs UI Automation live regions, which `ctypes` can't set on a standard control. The text screen stays the checked path.
+- Announcing window messages to screen readers as they change (1.28.0): it needs UI Automation live regions, which `ctypes` can't set on a standard control. The owner's screen reader checks passed without it, and the text screen is there for anyone who wants every line read in order.
+- A checklist of several plans a day (1.29.0 pilot, Rafael): one plan is the design, and the plan after **I did it** covers a second. Revisit if real employees keep typing lists into the box.
+- "Partly done" on a plan (1.29.0 pilot, Priya, Rafael): the box can be edited to the part that's left, or to the part done before **I did it**.
+- Skip or "drop it" on the notification (1.29.0 pilot, Priya): Windows shows two buttons comfortably, and the simulated user who designed the reminder wanted just Done and Not yet. Emptying the box and saving drops a plan.
+- Skipping public holidays (1.29.0 pilot, Mónica, Rafael): holidays differ by country and region, the program asks nothing on a day nobody opens it, and the reminder only comes at sign-in.
+- A title other than "Hello, world!" (1.29.0 pilot, Dana, Rafael): it is the program's name and what `--plain` prints.
+- Tips for shift and floor work (1.29.0 pilot, Dana): an organization can ship its own thoughts and tips in `content.json`.
+- A warning when a pasted plan is cut at 120 characters (1.29.0 pilot, Tom): the box itself stops at 120, the same as typing.
+- Keeping settings through Delete everything (1.29.0 pilot, Mónica): delete means everything, and the first visit after it asks again.
 - Removing each user's reminder keys in the uninstaller (1.28.0): an administrator writing inside user profiles is what `-RemoveNotes` was withdrawn for. The keys name a program that is gone, and do nothing.
 
 ## Claims that turned out wrong or already true
