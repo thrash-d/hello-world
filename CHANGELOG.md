@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-10-03: French, Portuguese and German
+
+Version 1.26.0. The owner asked to keep going with languages after Spanish shipped. French, Brazilian Portuguese and German are the most common Windows display languages after English and Spanish in large multinational companies, so all three were added.
+
+The translations are data now, not Spanish-shaped code. Each language is a `LANGUAGES` block at the end of `hello.py` with its text table, thoughts, tips, done lines, day and month names, and date format. `language()` maps the Windows display language to a block through `WINDOWS_LANGUAGES`, and `ForceEnglish` still wins. Adding a language is one block, its command words, its Windows language ID and an ADML file.
+
+Each language was translated from the English with the reviewed Spanish as a second reference, then reviewed by a simulated native speaker who walked the screens with the visit tool. The French uses vous, the German Sie, and the Portuguese você. All three stay gender-neutral where the English is. Reviews found and fixed about 27 problems in the Portuguese, 40 in the French and 40 in the German, most of them literal English phrasing. The real errors were a German accusative ("Gedanke" for "Gedanken"), a German line that read as if the program would switch the reminder on by itself, and French and Portuguese lines where "il" or "ele" pointed at nothing.
+
+The French review found three things that only a code change could fix:
+- The menu's last line printed the English key name "Enter". It is now translated: "Entrée", "Eingabetaste".
+- Dates in the finished list were followed by a hard-coded ": ". French needs " : ", so the label is translated too.
+- The first of the month reads "1er" in French and "1º" in Portuguese.
+
+Command words now live in one table and work in every language: done is also `hecho`, `fait`, `feito` and `erledigt`, quit is also `salir`, `quitter`, `sair` and `beenden`, and same is also `repetir`, `reprendre` and `wieder`. A test checks that no word means two things. The German screens put „…" around command words so "wieder" doesn't read as "again", so typed words now ignore quote marks around them.
+
+Group Policy templates come in `fr-FR`, `pt-BR` and `de-DE` too. The `ForceEnglish` description names all four languages. The topic list that keeps two lines about the same body part off one screen has stems in every language.
+
+Tests now loop over every language: every screen string translated, placeholders and prompt endings kept, raw lines within 72 columns (66 for menu lines), the lists the same length as the English, a whole day shown with no English left, the done word of each language finishing a plan, the help and menu fitting 72 columns, and an ADML per language with every string.
+
+Declined, with reasons in `BACKLOG.md`: regional variants, scripts a console can't draw reliably, and a file per language.
+
+Tested here: 187 tests pass on Windows 11, Python 3.13, and ruff is clean. The menus and a first day were checked by eye in each language with the visit tool.
+
 ## 2026-10-03: organization content, Spanish, and JAWS
 
 Version 1.25.0. The owner reported that the JAWS check passed, asked for a sample content file for testing, and asked for a second language, leaving the choice open. These were the three "Next to build" items from the product review of 1.23.0.

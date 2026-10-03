@@ -31,7 +31,7 @@ Si se deshabilita o no se configura, cada persona puede escribir un plan opciona
       <string id="ForceEnglish">Mostrar siempre hello-world en inglés</string>
       <string id="ForceEnglish_Help">Si se habilita, hello-world muestra sus pantallas en inglés para todo el mundo.
 
-Si se deshabilita o no se configura, hello-world muestra sus pantallas en español cuando el idioma de presentación de Windows es español, y en inglés en los demás casos. Las palabras en español, como hecho y salir, funcionan en ambos idiomas.
+Si se deshabilita o no se configura, hello-world muestra sus pantallas en español, francés, portugués o alemán cuando el idioma de presentación de Windows es uno de ellos, y en inglés en los demás casos. Las palabras de comando de cada idioma, como hecho y salir, funcionan en todos los idiomas.
 
 Un archivo de contenido de la organización sustituye las ideas y sugerencias en todos los idiomas.</string>
     </stringTable>

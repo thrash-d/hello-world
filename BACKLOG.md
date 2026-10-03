@@ -31,7 +31,10 @@ Changes considered and declined, with the reason. On 2 October 2026 the list fro
 - `--plain` and `--check-content` in Spanish (1.25.0): scripts read `--plain`, and `--check-content` is for administrators, whose tickets are in English.
 - `retomar` instead of `repetir` as the Spanish word for `same` (Spanish review, 1.25.0): the reviewer called it a closer fit but advised keeping `repetir`, which every prompt already names.
 - Organization content per language (1.25.0): one file replaces the lists in every language, so the organization writes in the language its people read. A second file per language waits for an organization that needs it.
-- A Spanish setting in the menu (1.25.0): the language follows Windows, and `ForceEnglish` covers the organization's choice. Nobody has asked to pick per person.
+- A language setting in the menu (1.25.0, 1.26.0): the language follows Windows, and `ForceEnglish` covers the organization's choice. Nobody has asked to pick per person.
+- Regional variants such as Canadian French or European Portuguese (1.26.0): the translations avoid words that only one region uses, and one text per language keeps reviews and tests manageable.
+- Chinese, Japanese, Korean, Arabic or Hebrew (1.26.0): older consoles draw these as `?` and right-to-left text runs backwards in a console. They wait for an organization that needs them and a test on its PCs.
+- A separate file per language next to `hello.py` (1.26.0): the installer copies and checks one program file, and the translations are data at the end of it.
 
 ## Claims that turned out wrong or already true
 

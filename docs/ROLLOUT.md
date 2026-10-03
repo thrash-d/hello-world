@@ -33,6 +33,8 @@ Subject: A 20-second start to the day, if you want one
   the menu (option 2). Option 2 turns it off again.
 - How do I delete what it saved? Menu option 4.
 - I don't want the thought and tip. Menu option 8 hides them.
+- Is it in my language? It follows the Windows display language: English,
+  Spanish, French, Portuguese or German.
 - Does it work with a screen reader? Yes. It's plain text, read top to bottom,
   and every prompt says what Enter does.
 
