@@ -1,5 +1,33 @@
 # Changelog
 
+## 2026-10-03: a window with buttons, and a sign-in reminder
+
+Version 1.28.0. The 1.27.0 review gave the console to a simulated new user, 64, accounts payable, 25 years of Outlook and Excel, who rated the chance of still opening it in two weeks at 2 out of 10: "a black window looks like an error", and typed words have to be remembered. `TODO.md` planned a window and a morning notification. Each open decision went back to the same simulated user, and their answers decided it.
+
+The window:
+- The Start menu shortcut now runs `pythonw.exe -I hello.py --window`, which opens a standard Windows dialog: "Hello, world!" in large type, the date, the thought and tip, one box for today's plan, and buttons. No console appears. Asked to choose between this and a custom Tk window, the simulated user picked "exactly like the other small Windows boxes", because if it looks different "I'll think something's wrong with my computer".
+- Yesterday's plan comes with **Done**, **Not yet** and **Skip**. Not yet keeps it for today, as Enter does at the text screen. Finishing counts on the plan's own day.
+- Enter saves the plan and closes ("like clicking OK. If the window stays open I'll wonder if I did it right"). **Not today** closes without one, which the simulated user asked for so a skipped day "doesn't feel like homework". A command word or a number in the box is refused with the same message as the text screen, and the window stays open.
+- With today's plan set, **I did it** finishes it and the box takes the next one.
+- **Options** turns the sign-in reminder on or off, hides the thought and tip, switches to the text screen, or opens the text menu for everything else.
+- It is drawn with `ctypes` from a dialog template built in memory, with the current Windows look, per-monitor DPI and the system colours, so high contrast applies. A PC where it can't be drawn gets the text screens in a console instead.
+
+The reminder:
+- After the first plan in the window, it asks once: "Want a reminder when you sign in?". The simulated user: "Ask me once, nicely."
+- With it on, the sign-in launcher runs `pythonw.exe` instead of `cmd.exe`. At the first sign-in of the day, and only when there is a plan to ask about, it shows a Windows notification: "Last time you planned: ... Did you do it?" with **Done** and **Not yet**. A click answers it and nothing else opens. With no plan it stays quiet ("too many pop-ups and I'll start ignoring all of them"). It comes once a day at most, and not after the window was opened that day.
+- The notification is shown through Windows PowerShell with the XML passed as base64, under the name `hello-world`, registered in `HKCU\Software\Classes\AppUserModelId`. Its buttons open `hello-world:done` and `hello-world:notyet` links, registered for the user, which run `hello.py --answer` and accept nothing else. Where PowerShell can't show it, such as in Constrained Language Mode, the window opens at sign-in instead.
+
+The text screen:
+- `hello.cmd` runs it as before. Menu option 9 and the window's Options switch the Start menu between the window and the text screen, saved as `"text": true` in `notes.json`. The new `UseTextScreen` policy sets the text screen for everyone, with ADML strings in all five languages.
+- With the text screen chosen, the window and the sign-in launcher open the text screens in a console, so screen reader users keep the checked path.
+- `notes.json` can also hold `"notified"`, the date of the last reminder.
+
+Every new string is translated into Spanish, French, Portuguese and German. `docs/ENTERPRISE.md` lists the new Run value and registry keys for persistence allow-lists. `docs/ACCESSIBILITY.md` has a section on the window and says it hasn't been checked with assistive technology yet.
+
+The simulated user's rating with the window and reminder: 7 out of 10. "I'll still forget about it some weeks, but I would open it." They also said not to add a language until someone asks, so that stays in `TODO.md` under "When an organization asks".
+
+Tests: the window's answers, saves, refusals and "I did it" through the `Visit` class it draws, the reminder once a day and only with a plan, valid notification XML with an escaped `&`, the `--answer` links and refused ones, menu option 9 and the policy, the saved `text` and `notified` fields, the Run value and the reminder keys in a test registry key, and on Windows the window opening and closing by itself in every language, with and without a plan to ask about. CI also checks that the installed shortcut targets `pythonw.exe --window` and that the bundled embeddable Python draws the window. The window was also drawn and captured here on Windows 11 at 100 percent in English and German, after Done and after Not yet, and a French notification was shown with a plan containing `<` and `&`.
+
 ## 2026-10-03: plain answers, and the menu where people look for it
 
 Version 1.27.0. A review of 1.26.0 drove the screens with typed answers in all five languages, then gave a two-day transcript to a simulated new user: 64, accounts payable, 25 years of Outlook and Excel, never opened a command prompt. They rated the chance of still opening it in two weeks at 2 out of 10. The biggest reasons were the console window itself and the command words. The fixes here are the ones the text screens can make. The window is planned in `TODO.md`.

@@ -34,6 +34,13 @@ When disabled or not configured, people can type one optional plan a day.</strin
 When disabled or not configured, hello-world shows its screens in Spanish, French, Portuguese or German when the Windows display language is one of those, and in English otherwise. The command words of every language, such as hecho and quitter, work in every language.
 
 An organization content file replaces the thoughts and tips in every language.</string>
+      <string id="SUPPORTED_1_28">hello-world 1.28.0 or later</string>
+      <string id="UseTextScreen">Open hello-world as a text screen</string>
+      <string id="UseTextScreen_Help">When enabled, the Start menu shortcut opens hello-world as a text screen in a console window, as versions before 1.28 did, and the sign-in launcher opens it there too. Nobody can switch to the window.
+
+When disabled or not configured, hello-world opens in a window with buttons, and each person can switch to the text screen under Options, or with option 9 in the text screen's menu. With the sign-in launcher on, the window version shows a Windows notification at sign-in when there is a plan to ask about, instead of opening.
+
+Use this setting where screen reader users have tested only the text screen, or where Windows notifications are not wanted.</string>
     </stringTable>
   </resources>
 </policyDefinitionResources>

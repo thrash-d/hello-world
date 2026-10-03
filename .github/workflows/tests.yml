@@ -78,6 +78,11 @@ jobs:
           $ran = & "$dir\python\python.exe" -I "$dir\hello.py" --plain 2>&1
           Write-Host "hello.py --plain said: $ran (exit $LASTEXITCODE)"
           Check ("$ran" -eq 'Hello, world!') 'the installed program runs'
+          $lnk = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'hello-world.lnk'))
+          Check ($lnk.TargetPath -eq "$dir\python\pythonw.exe" -and $lnk.Arguments -eq "-I `"$dir\hello.py`" --window") 'the shortcut opens the window through pythonw.exe'
+          # The embeddable Python draws the window, which closes itself after a moment.
+          $drawn = & "$dir\python\python.exe" -I -c "import sys, tempfile; sys.path.insert(0, sys.argv[1]); import hello; hello.HOME = tempfile.mkdtemp(); hello.CLOSE_WINDOW_AFTER = 500; hello.WINDOW = True; w = hello.Window(hello.Visit()); w.run(); print('drawn' if w.error is None else w.error)" $dir 2>&1
+          Check ("$drawn" -eq 'drawn') "the installed Python draws the window ($drawn)"
           Check (-not (Get-ChildItem "$dir\python" -Filter 'libssl-*.dll')) 'OpenSSL is stripped from the bundled Python'
           Check (Test-Path "$env:WINDIR\Logs\hello-world\install.log") 'the log is in Windows\Logs'
           Check ([bool](Get-EventLog -LogName Application -Source 'hello-world' -InstanceId 1000 -Newest 1)) 'the install is in the event log'

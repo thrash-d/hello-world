@@ -19,9 +19,30 @@ unless you ask for one.
 ## For employees
 
 Open **hello-world** from the Start menu, or type "hello-world" in Windows
-Search. Press Enter at each question to skip it, and once more to close.
+Search. A window opens with the day's thought and tip, and a box for one thing
+you want to get done today. Type it and press Enter, or click **Not today**.
 That's all you need. Everyone sees the same thought and tip on the same day,
 so you can compare notes with a coworker.
+
+The next day the window asks "Did you do it?" with three buttons: **Done**,
+**Not yet** (keeps the plan for today) and **Skip**. When today's plan is
+finished, click **I did it**.
+
+After your first plan it asks once whether you want a reminder when you sign
+in. With it on, a Windows notification appears at your first sign-in of the
+day, only when there is a plan to ask about: "Last time you planned: ... Did
+you do it?". Click **Done** or **Not yet** on it and that's the answer; nothing
+else opens. Click the notification itself to open the window. With no plan, it
+stays quiet. **Options** in the window turns the reminder off, hides the
+thought and tip, or switches to the text screen.
+
+### The text screen
+
+hello-world also runs as text in a console window, which is the version
+checked with screen readers. Choose **Options > Use the text screen** in the
+window, or ask IT, who can set it for everyone. In the text screen, menu
+option 9 switches back to the window. Press Enter at each question to skip it,
+and once more to close.
 
 If Windows is set to Spanish, French, Portuguese or German, hello-world
 speaks that language. The words you type work in every language, so `done`,
@@ -62,8 +83,8 @@ The days-in-a-row message shows only on your 3rd, 7th and 14th visit in a
 row, then every 30th. A visit within four days of the last one counts, so weekends and
 a day off don't break it. You can turn it off in the menu.
 
-The first time you open it, it asks once whether to open by itself when you
-sign in. Whatever you answer, menu option 2 changes it later.
+The text screen asks once whether to open by itself when you sign in.
+Whatever you answer, menu option 2 changes it later.
 
 Everything works from the keyboard with plain text, in one top-to-bottom flow,
 so a screen reader reads it in order. Each prompt ends by saying what Enter
@@ -86,10 +107,16 @@ under `AppData\Local` in your own user folder. It holds the dates you opened
 the program in the last 60 days, your current plan, an unfinished earlier
 plan, how many times you marked a plan done, and your last seven finished
 plans (words and date). It also holds your settings for the days-in-a-row
-message and the thought and tip, and your answer to the sign-in question.
+message, the thought and tip, and the window or text screen, your answer to
+the sign-in question, and the date of the last sign-in reminder, so it comes
+once a day at most.
 Nothing else: no name, no computer name, no times. Older dates are dropped, so
 the file is never a long record of when you worked. An empty `notes.lock` file
 sits next to it and holds nothing.
+
+Turning the reminder on adds three entries to your own part of the Windows
+registry: the sign-in value under `Run`, the name the notification shows, and
+the `hello-world:` links its buttons open. Turning it off removes them.
 
 It makes no network connections and reports nothing to IT or managers. Other
 people who can read your computer's files, such as IT staff, could read the
@@ -135,7 +162,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.27.0'
+$tag = 'v1.28.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

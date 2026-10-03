@@ -281,7 +281,7 @@ def test_reminder_writes_and_removes_only_the_launcher():
     with open(path) as f:
         text = f.read()
     assert text.startswith("@echo off") and text.rstrip().endswith("--startup")
-    assert "hello.cmd" in text
+    assert "hello.py" in text and "hello.cmd" not in text
     run(["--remind", "off"], startup=startup)
     assert not os.path.exists(path)
 
@@ -1011,7 +1011,7 @@ def test_done_with_no_plan_says_so_and_done_is_not_offered():
 
 def test_menu_accepts_q_and_help_and_names_a_wrong_word():
     p = run(text="\nm\nbanana\nhelp\nq\n")
-    assert 'Sorry, "banana" is not one of the choices. Type 1 to 8' in p.stdout
+    assert 'Sorry, "banana" is not one of the choices. Type 1 to 9' in p.stdout
     assert "Words you can type at the last prompt" in p.stdout
     assert p.returncode == 0
 
@@ -1149,11 +1149,11 @@ def test_finished_dates_far_off_are_dropped():
     assert [i["text"] for i in notes(home)["finished"]] == ["ok"]
 
 
-def test_the_launcher_is_not_written_from_a_folder_cmd_would_misread():
+def test_the_launcher_is_not_written_from_a_folder_it_cannot_quote():
     mod = _load_hello()
     mod.STARTUP_DIR = mkdtemp()
     mod.say = lambda text="": None
-    for folder in ("a&b", "a!b"):
+    for folder in ("a%b",):
         mod.__file__ = os.path.join(mkdtemp(), folder, "hello.py")
         assert not mod.remind(True)
         assert os.listdir(mod.STARTUP_DIR) == []
@@ -1275,16 +1275,16 @@ def test_the_file_never_holds_more_than_the_visit_limit():
     assert len(out) == mod.MAX_VISITS and out[-1] == day.isoformat()
 
 
-def test_the_launcher_keeps_a_folder_with_brackets_out_of_cmd():
+def test_the_launcher_quotes_a_folder_with_brackets_and_ampersands():
     mod = _load_hello()
     mod.STARTUP_DIR = mkdtemp()
     mod.say = lambda text="": None
-    folder = os.path.join(mkdtemp(), "Tools (x86), a=b @~")
+    folder = os.path.join(mkdtemp(), "Tools (x86), a=b @~ & !")
     mod.__file__ = os.path.join(folder, "hello.py")
     assert mod.remind(True)
     with open(os.path.join(mod.STARTUP_DIR, "hello-world-daily.cmd")) as f:
         text = f.read()
-    assert f'start "hello-world" /d "{folder}" hello.cmd --startup' in text
+    assert f'-I "{mod.__file__}" --startup' in text
 
 
 def test_unknown_keys_and_wrong_types_in_the_file_are_dropped():
@@ -1722,18 +1722,30 @@ def _registry_test_key():
 
 def _drop_registry_test_key(key):
     import winreg
-    for sub in (key, key.rsplit("\\", 1)[0]):
+
+    def drop(sub):
         try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, sub) as k:
+                children = [winreg.EnumKey(k, i)
+                            for i in range(winreg.QueryInfoKey(k)[0])]
+            for child in children:
+                drop(sub + "\\" + child)
             winreg.DeleteKey(winreg.HKEY_CURRENT_USER, sub)
         except OSError:
             pass
+    drop(key)
+    try:
+        winreg.DeleteKey(winreg.HKEY_CURRENT_USER, key.rsplit("\\", 1)[0])
+    except OSError:
+        pass
 
 
-def test_the_launcher_is_a_run_value_that_checks_the_install_still_exists():
+def test_the_launcher_is_a_run_value_with_the_reminder_and_its_answers():
     key = _registry_test_key()
     import winreg
     mod = _load_hello()
     mod.STARTUP_DIR, mod.RUN_KEY = None, key
+    mod.CLASSES_KEY = key + "\\Classes"
     mod.say = lambda text="": None
     appdata = os.environ.get("APPDATA")
     os.environ["APPDATA"] = mkdtemp()  # keep the real Startup folder out of it
@@ -1741,11 +1753,20 @@ def test_the_launcher_is_a_run_value_that_checks_the_install_still_exists():
         assert mod.remind(True) and mod.launcher_on()
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key) as k:
             value, _ = winreg.QueryValueEx(k, mod.RUN_VALUE)
-        folder = os.path.dirname(HELLO)
-        assert value.lower().endswith(
-            f'cmd.exe" /d /c if exist "{folder}\\hello.cmd" start "hello-world" '
-            f'/d "{folder}" hello.cmd --startup'.lower())
+        assert value.lower().endswith(f'pythonw.exe" -i "{HELLO}" --startup'.lower())
+        command = key + "\\Classes\\hello-world\\shell\\open\\command"
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, command) as k:
+            assert winreg.QueryValueEx(k, "")[0].endswith('--answer "%1"')
+        name = key + "\\Classes\\AppUserModelId\\hello-world"
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, name) as k:
+            assert winreg.QueryValueEx(k, "DisplayName")[0] == "hello-world"
         assert mod.remind(False) and not mod.launcher_on()
+        for gone in (command, name):
+            try:
+                winreg.OpenKey(winreg.HKEY_CURRENT_USER, gone).Close()
+                raise AssertionError(gone + " is still there")
+            except FileNotFoundError:
+                pass
     finally:
         os.environ["APPDATA"] = appdata
         _drop_registry_test_key(key)
@@ -2164,3 +2185,161 @@ def test_the_last_prompt_does_not_name_q_but_q_still_closes():
     p = run(text="Plan A\nq\n")
     assert " or q" not in p.stdout
     assert p.returncode == 0 and p.stdout.count("Enter to close >") == 1
+
+
+def _window_hello(day="2026-10-02", home=None):
+    mod = _load_hello(day)
+    mod.HOME = home or mkdtemp()
+    mod.WINDOW = True
+    return mod
+
+
+def test_the_window_asks_about_yesterdays_plan_and_answers_like_the_text_screen():
+    for choice in ("yes", "no", "skip"):
+        first = run(text="Write the report\n\n")
+        hello = _window_hello(home=first.home)
+        visit = hello.Visit()
+        assert visit.followup == "Write the report", choice
+        message = visit.answer(choice)
+        saved = notes(first.home)
+        assert "2026-10-02" in saved["visits"], choice
+        assert visit.followup is None, choice
+        if choice == "yes":
+            assert saved["done"] == 1 and saved["intent"] is None
+            assert saved["finished"][0]["date"] == "2026-10-01"
+            assert message in hello.DONE_LINES
+        elif choice == "no":
+            assert saved["intent"] == {"text": "Write the report",
+                                       "date": "2026-10-02", "since": "2026-10-01"}
+            assert visit.plan() == "Write the report" and message == "Kept for today."
+        else:
+            assert saved["intent"]["skips"] == 1 and visit.plan() == ""
+
+
+def test_the_window_saves_a_plan_and_refuses_what_is_not_one():
+    hello = _window_hello()
+    visit = hello.Visit()
+    close, message = visit.save("menu")
+    assert not close and "command" in message and "last prompt" not in message
+    close, message = visit.save("12")
+    assert not close and "A plan needs a word or two" in message
+    assert visit.save("skip") == (True, "") and visit.plan() == ""
+    assert visit.save("  ") == (True, "")
+    assert visit.save("Call the bank") == (True, "")
+    assert notes(hello.HOME)["intent"]["text"] == "Call the bank"
+    assert visit.save("Call the bank") == (True, "")
+    assert visit.did_it() in hello.DONE_LINES
+    saved = notes(hello.HOME)
+    assert saved["done"] == 1 and saved["intent"] is None
+
+
+def test_the_window_replacing_an_unanswered_plan_keeps_it_for_same():
+    first = run(text="Old plan\n\n")
+    hello = _window_hello(home=first.home)
+    visit = hello.Visit()
+    assert visit.save("New plan") == (True, "")
+    saved = notes(first.home)
+    assert saved["intent"]["text"] == "New plan" and saved["previous"] == "Old plan"
+
+
+def test_the_window_offers_the_reminder_once():
+    hello = _window_hello()
+    hello.STARTUP_DIR = mkdtemp()
+    visit = hello.Visit()
+    assert visit.offer_due()
+    assert "reminder comes when you sign in" in visit.set_reminder(True)
+    assert os.listdir(hello.STARTUP_DIR) == ["hello-world-daily.cmd"]
+    assert notes(hello.HOME)["offered"] is True and not visit.offer_due()
+    assert "off" in visit.set_reminder(False)
+    assert os.listdir(hello.STARTUP_DIR) == [] and not visit.offer_due()
+
+
+def test_the_window_switches_to_the_text_screen_and_back():
+    hello = _window_hello()
+    visit = hello.Visit()
+    assert not hello.text_screen(visit.state)
+    assert visit.toggle("text") and notes(hello.HOME)["text"] is True
+    assert hello.text_screen(hello.load()[0])
+    assert visit.toggle("text") and "text" not in notes(hello.HOME)
+    hello.POLICY = {"UseTextScreen": 1}
+    assert hello.text_screen(hello.load()[0])
+
+
+def test_menu_option_9_switches_the_start_menu_and_policy_can_set_it():
+    p = run(text="\nm\n9\n\n\n")
+    assert "Use this text screen (now a window with buttons)" in p.stdout
+    assert "Done. The Start menu opens this text screen." in p.stdout
+    assert notes(p.home)["text"] is True
+    p = run(text="\nm\n9\n\n\n", home=p.home, day="2026-10-02")
+    assert "Done. The Start menu opens a window with buttons." in p.stdout
+    assert "text" not in notes(p.home)
+    p = run(text="\nm\n9\n\n\n", policy={"UseTextScreen": 1})
+    assert "Window or text screen (set by your organization)" in p.stdout
+    assert "set hello-world to open as a text screen" in p.stdout
+
+
+def test_the_sign_in_reminder_asks_about_a_plan_once_a_day():
+    import xml.etree.ElementTree as ET
+    first = run(text="Report & slides\n\n")
+    hello = _window_hello(home=first.home)
+    hello.SHOWN = []
+    assert hello.sign_in() == 0 and len(hello.SHOWN) == 1
+    toast = ET.fromstring(hello.SHOWN[0])
+    texts = [t.text for t in toast.iter("text")]
+    assert texts == ["Last time you planned: Report & slides", "Did you do it?"]
+    assert [a.get("arguments") for a in toast.iter("action")] == [
+        "hello-world:done", "hello-world:notyet"]
+    assert [a.get("content") for a in toast.iter("action")] == ["Done", "Not yet"]
+    assert notes(first.home)["notified"] == "2026-10-02"
+    hello.sign_in()
+    assert len(hello.SHOWN) == 1
+    # Quiet with no plan, and after hello-world was opened that day.
+    hello.TODAY = "2026-10-03"
+    hello.Visit()
+    hello.sign_in()
+    assert len(hello.SHOWN) == 1
+    quiet = _window_hello(home=run(text="\n\n").home)
+    quiet.SHOWN = []
+    quiet.sign_in()
+    assert quiet.SHOWN == []
+
+
+def test_the_reminder_answers_with_no_window_and_refuses_other_links():
+    for link, check in (("hello-world:done", lambda s: s["done"] == 1),
+                        ("HELLO-WORLD:notyet/", lambda s: s["intent"]["date"] == "2026-10-02")):
+        first = run(text="Write the report\n\n")
+        p = run(["--answer", link], day="2026-10-02", home=first.home)
+        saved = notes(first.home)
+        assert p.returncode == 0 and check(saved), link
+        assert saved["visits"] == ["2026-10-01"], link
+    first = run(text="Write the report\n\n")
+    for link in ("hello-world:delete", "other:done", "hello-world"):
+        p = run(["--answer", link], day="2026-10-02", home=first.home)
+        assert p.returncode == 2, link
+    assert notes(first.home)["intent"]["date"] == "2026-10-01"
+
+
+def test_the_saved_file_keeps_only_a_valid_text_choice_and_reminder_date():
+    hello = _window_hello()
+    with open(os.path.join(hello.HOME, "notes.json"), "w") as f:
+        json.dump({"text": True, "notified": "2026-10-01"}, f)
+    state, _ = hello.load()
+    assert state["text"] is True and state["notified"] == "2026-10-01"
+    for bad in ({"text": "yes", "notified": "2030-01-01"}, {"notified": 5}):
+        with open(os.path.join(hello.HOME, "notes.json"), "w") as f:
+            json.dump(bad, f)
+        state, _ = hello.load()
+        assert "text" not in state and "notified" not in state
+
+
+@unittest.skipUnless(os.name == "nt", "the window is Windows only")
+def test_the_window_opens_and_closes_in_every_language():
+    for lang in ["en"] + sorted(_load_hello().LANGUAGES):
+        for plan_first in (True, False):
+            home = run(text="Write the report & more\n\n").home if plan_first else None
+            hello = _window_hello(home=home)
+            hello.LANGUAGE = lang
+            hello.CLOSE_WINDOW_AFTER = 200
+            window = hello.Window(hello.Visit())
+            window.run()
+            assert window.error is None, lang

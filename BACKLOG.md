@@ -35,6 +35,14 @@ Changes considered and declined, with the reason. On 2 October 2026 the list fro
 - Regional variants such as Canadian French or European Portuguese (1.26.0): the translations avoid words that only one region uses, and one text per language keeps reviews and tests manageable.
 - Chinese, Japanese, Korean, Arabic or Hebrew (1.26.0): older consoles draw these as `?` and right-to-left text runs backwards in a console. They wait for an organization that needs them and a test on its PCs.
 - A separate file per language next to `hello.py` (1.26.0): the installer copies and checks one program file, and the translations are data at the end of it.
+- Shipping Tcl/Tk for a tkinter window (1.28.0): the embeddable Python has no tkinter, Tk windows look unlike other Windows dialogs, and Tk gives screen readers little to read. The window uses standard Windows controls through `ctypes`, with no new files. The simulated user chose "exactly like the other small Windows boxes".
+- A reminder at a set time such as 9:00 (1.28.0, simulated user): "I don't know what time I'll get in." The reminder comes at the first sign-in of the day.
+- A reminder on days with no plan (1.28.0, simulated user): "Too many pop-ups and I'll start ignoring all of them."
+- Opening the window after Done or Not yet on the reminder (1.28.0, simulated user): "Don't open another window on me when I'm busy." Clicking the notification itself opens it.
+- A reminder that is on for everyone (1.28.0, simulated user): the window asks once, after the first plan, and Options turns it off.
+- Rewriting a 1.23.0 to 1.27.0 sign-in value to the new one (1.28.0): the old value still opens the text screen at sign-in, which is what the person turned on. Turning it off and on writes the new one.
+- Announcing window messages to screen readers as they change (1.28.0): it needs UI Automation live regions, which `ctypes` can't set on a standard control. The text screen stays the checked path.
+- Removing each user's reminder keys in the uninstaller (1.28.0): an administrator writing inside user profiles is what `-RemoveNotes` was withdrawn for. The keys name a program that is gone, and do nothing.
 
 ## Claims that turned out wrong or already true
 

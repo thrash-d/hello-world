@@ -13,38 +13,25 @@ their reasons are in `BACKLOG.md`.
    (`auto-tag`, `devkit-quality`, `dependabot-automerge`), where the kit is
    kept.
 
-## Next to build
+## Needs a person
 
-1. A window with buttons, and a morning notification. The 1.27.0 review
-   found the console itself is the main reason a non-technical employee
-   would stop opening hello-world: a black window looks like an error, and
-   typed command words have to be remembered. What the simulated user asked
-   for: a normal window with large text, buttons for Done / Not yet / Skip /
-   Close, a box to type the plan, and a once-a-morning Windows notification,
-   "Yesterday you planned: X. Done?", that answers in one click.
-   - The installed Python is the python.org embeddable zip, which has no
-     tkinter. Choose between shipping Tcl/Tk with a pinned hash (simplest
-     code; check which official python.org artifact carries `_tkinter` and
-     the Tcl/Tk DLLs for the pinned version) and Win32 dialogs through
-     `ctypes` (no new files; `TaskDialogIndirect` needs a common controls
-     v6 activation context).
-   - The notification needs an AppUserModelID on the Start menu shortcut,
-     which `install.ps1` creates, and opens only once the employee turns it
-     on, as the sign-in launcher does now.
-   - Keep the console screens as they are, behind `--console` and a policy,
-     for screen reader and keyboard users. They are the tested,
-     Narrator-checked path.
-   - The plan, saved file, lock, policies and installer don't change; only
-     the screen does. Split `daily()` into what to ask and how to ask it
-     first, so both front ends share one flow and one test suite.
-   - Needs a person at a real Windows desktop: Narrator, Magnifier at 200%,
-     high contrast, and five non-technical employees for a week.
-2. A real native speaker's pass over the Spanish, French, Portuguese and
-   German screens. The reviews in 1.25.0 and 1.26.0, and the strings changed
-   in 1.27.0, were simulated.
-3. Another language, if the organization asks for one. Adding one is a
-   `LANGUAGES` block at the end of `hello.py`, its command words, its Windows
-   language ID, and an ADML file.
+1. Check the window at a real desktop: Narrator, NVDA and JAWS reading the
+   labels, buttons and plan box; Magnifier at 200 percent; a high contrast
+   theme; and the sign-in notification answered from the screen and from
+   notification center. The tests open and close it in every language, and it
+   was drawn on Windows 11 at 100 percent in English and German, but nobody
+   has used it with assistive technology yet.
+2. Five non-technical employees using the window for a week. The simulated
+   user who rated 1.27.0 at 2 out of 10 rated the window at 7.
+3. A real native speaker's pass over the Spanish, French, Portuguese and
+   German screens. The reviews in 1.25.0 and 1.26.0, and the strings added in
+   1.27.0 and 1.28.0, were simulated or written without a native reviewer.
+
+## When an organization asks
+
+- Another language. Adding one is a `LANGUAGES` block at the end of
+  `hello.py`, its command words, its Windows language ID, and an ADML file.
+  The simulated user said not to add one until someone asks.
 
 ## Later, when the problem shows up
 

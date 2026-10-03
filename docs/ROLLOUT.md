@@ -12,11 +12,11 @@ Subject: A 20-second start to the day, if you want one
 > like, one plan for the day. The next time you open it, it asks whether you
 > did it. That's all.
 >
-> It's optional. Press Enter at each question to skip it. Nothing is sent
-> anywhere and nothing is reported to managers or IT. Your notes stay in a
-> small file in your own user folder, which IT staff could read, so don't type
-> passwords or private details. Type `menu` at the last prompt to see
-> everything saved, or to delete it.
+> It's optional. Click Not today to skip it. Nothing is sent anywhere and
+> nothing is reported to managers or IT. Your notes stay in a small file in
+> your own user folder, which IT staff could read, so don't type passwords or
+> private details. Options > More options shows everything saved, and can
+> delete it.
 >
 > Questions: <help desk contact>.
 
@@ -26,17 +26,20 @@ Subject: A 20-second start to the day, if you want one
   optional plan for the day.
 - Do I have to use it? No. Nobody can see whether you do.
 - How do I open it? Start menu, or type "hello-world" in Windows Search.
-- How long does it take? About 20 seconds. Press Enter to skip any question.
+- How long does it take? About 20 seconds. Click Not today to skip it.
 - Who sees my plans? Nobody is sent anything. The file sits in your own user
   folder, where IT staff could read it, like any file on a work PC.
-- Can it open by itself? Only if you say yes when it asks, or turn it on in
-  the menu (option 2). Option 2 turns it off again.
-- How do I delete what it saved? Menu option 4.
-- I don't want the thought and tip. Menu option 8 hides them.
+- Can it remind me? Only if you say yes when it asks. Then a notification
+  comes at your first sign-in of the day, only when there is a plan to ask
+  about, and you answer with one click. Options in the window turns it off.
+- How do I delete what it saved? Options > More options, then option 4.
+- I don't want the thought and tip. Options > Show the thought and tip.
 - Is it in my language? It follows the Windows display language: English,
   Spanish, French, Portuguese or German.
-- Does it work with a screen reader? Yes. It's plain text, read top to bottom,
-  and every prompt says what Enter does.
+- Does it work with a screen reader? The window uses standard Windows
+  buttons and labels. The text screen is the version checked with screen
+  readers: plain text, read top to bottom, and every prompt says what Enter
+  does. Options > Use the text screen switches to it.
 
 ## For privacy and records reviewers
 
@@ -47,11 +50,11 @@ prints the whole saved file.
 - Each user has one file, `%LOCALAPPDATA%\hello-world\notes.json`. It holds
   the dates they opened the program in the last 60 days, one current plan,
   one unfinished earlier plan, a count of plans marked done, the last seven
-  finished plans with dates, and three settings. No names, computer names or
-  times.
+  finished plans with dates, four settings, and the date of the last
+  sign-in reminder. No names, computer names or times.
 - The `DisablePlans` policy removes all plan text and counts, and
   `HideDaysInARow` keeps only the latest visit date. With both, the file holds
-  one date and three settings.
+  one date and four settings.
 - People delete everything themselves with menu option 4. Uninstalling leaves
   the files, since an administrator deleting inside user profiles could be
   redirected; use your own profile cleanup if required.

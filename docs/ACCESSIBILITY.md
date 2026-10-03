@@ -2,8 +2,10 @@
 
 A summary of how hello-world meets common accessibility expectations, and how
 that was checked. It isn't a formal conformance report, but it gives
-procurement what one would be built from. hello-world is a console program,
-so web criteria apply only where they carry over to text in a console.
+procurement what one would be built from. Since 1.28.0 the Start menu opens a
+window, and the console program described here is the text screen, which
+each person can switch to under Options and Group Policy can set for
+everyone. Web criteria apply only where they carry over.
 
 ## How it was checked
 
@@ -15,6 +17,7 @@ so web criteria apply only where they carry over to text in a console.
 | JAWS, by the owner | 1.24.0 | Passed |
 | Spanish screens, simulated review by a native speaker | 1.25.0 | Findings fixed in 1.25.0 |
 | French, Portuguese and German screens, simulated review by native speakers | 1.26.0 | Findings fixed in 1.26.0 |
+| The window, drawn on Windows 11 at 100 percent scaling in English and German, and opened and closed in every language by the tests | 1.28.0 | Passed; not yet checked with a screen reader, Magnifier or high contrast by a person |
 
 ## What it does
 
@@ -38,6 +41,21 @@ so web criteria apply only where they carry over to text in a console.
   accidental key press doesn't end the visit.
 - Group Policy and menu settings remove content people don't want read every
   day: the thought and tip, and the days-in-a-row message.
+
+## The window
+
+- Standard Windows controls only: static labels, one edit box, push buttons,
+  a popup menu and a standard message box, so screen readers get their names
+  and roles from Windows.
+- Each label sits just before the control it names, so the plan box is read
+  as "What is one thing you want to get done today?".
+- Every button has an Alt key, Enter saves the plan and closes, and Esc
+  closes without saving. Tab moves through the buttons in reading order.
+- It uses the system font at 12 points and scales with the display, and its
+  colours are the system's window colours, so high contrast themes apply.
+- A message after a button, such as "Kept for today.", changes a label's text.
+  Screen readers don't announce that by themselves, which is one reason the
+  text screen stays the checked path.
 
 ## Known limits
 

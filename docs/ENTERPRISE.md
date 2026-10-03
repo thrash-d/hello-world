@@ -148,6 +148,7 @@ settings are under Computer or User Configuration > Administrative Templates
 | Hide the days-in-a-row message | `HideDaysInARow` | Never shows the count, and keeps only the latest visit date |
 | Turn off plans | `DisablePlans` | Never asks for a plan, and keeps no plan text, finished plans or done count; text already saved is dropped at each person's next visit |
 | Always show hello-world in English | `ForceEnglish` | Shows English even where the Windows display language is Spanish, French, Portuguese or German |
+| Open hello-world as a text screen | `UseTextScreen` | The Start menu opens the text screen in a console, as before 1.28.0, and the sign-in launcher opens it instead of showing a notification |
 
 `DisablePlans` and `HideDaysInARow` together leave only the latest visit date
 and the settings in each `notes.json`. Use them where typed plan text or a
@@ -179,28 +180,47 @@ organization's certificate.
 - WDAC and AppLocker script enforcement: unsigned scripts run in
   Constrained Language Mode, where the installer fails. Sign the scripts, or
   allow them by hash.
-- Running the program: `hello.cmd` and `python.exe` sit under Program
+- Running the program: `hello.cmd`, `python.exe` and `pythonw.exe` sit under Program
   Files, which the default AppLocker rules allow. For WDAC, allow
   `%ProgramFiles%\hello-world\*` by file path or the release's files by hash.
   Don't allow the Python Software Foundation publisher, because that would
   allow any Python a user brings.
 - Nothing runs from user-writable folders: The sign-in launcher is a
   registry value that points at the admin-only install.
+- The sign-in notification is shown by Windows PowerShell 5.1 with
+  `-NoProfile -NonInteractive -EncodedCommand`, started by `pythonw.exe`. In
+  Constrained Language Mode it can't load the Windows notification types, so
+  the window opens at sign-in instead. Use the `UseTextScreen` policy where
+  that should never happen either.
 
 ## What endpoint detection will see
 
 - During install: PowerShell running `icacls.exe` and `cmd.exe /d /c rmdir`,
   folder renames under Program Files, a new Apps key, an all-users shortcut,
   and an Application event log source.
-- When an employee turns on the sign-in opening, a value named `hello-world`
+- When an employee turns on the sign-in reminder, a value named `hello-world`
   under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`:
 
   ```
-  "C:\Windows\System32\cmd.exe" /d /c if exist "C:\Program Files\hello-world\hello.cmd" start "hello-world" /d "C:\Program Files\hello-world" hello.cmd --startup
+  "C:\Program Files\hello-world\python\pythonw.exe" -I "C:\Program Files\hello-world\hello.py" --startup
   ```
 
   Allow that exact value in persistence detections. It starts the
-  admin-only install and does nothing once the program is removed.
+  admin-only install, and Windows skips it once the program is removed.
+  Versions 1.23.0 to 1.27.0 wrote a `cmd.exe /d /c if exist ... hello.cmd
+  --startup` value instead, which keeps working; turning the reminder off and
+  on again writes the new one.
+- With the reminder on, two more keys under `HKCU\Software\Classes`:
+  `AppUserModelId\hello-world`, the name the notification shows, and the
+  `hello-world` link handler, which runs the same `pythonw.exe` with
+  `--answer "%1"` when a notification button is clicked. It accepts only
+  `hello-world:done`, `hello-world:notyet` and `hello-world:open`, and the
+  most a link from a web page could do is mark that person's plan done after
+  the browser asks them. Turning the reminder off removes both keys; the
+  uninstaller leaves them, like the Run value, and they do nothing once the
+  program is gone.
+- At sign-in, when there is a plan to ask about, `pythonw.exe` starts
+  `powershell.exe` once to show the notification.
 - Versions before 1.23.0 used a `hello-world-daily.cmd` in the Startup folder.
   The program replaces it with the Run value the next time each person opens
   it, and the uninstaller removes any that are left.
@@ -280,17 +300,24 @@ match `PythonVersion` in the Apps entry.
 | It said the file was damaged | The old file is kept as `notes.json.bak` in the same folder and a fresh one started. |
 | An upgrade or uninstall failed with 1618 | A file in `%ProgramFiles%\hello-world` was in use, often by antivirus. Retry later; nothing changed. |
 | A `hello-world.old` folder is left | A window was open during an upgrade. The next install removes it. |
-| Stop it opening at sign-in | Menu option 2, or the Group Policy setting. |
+| Stop the sign-in reminder | Options in the window, menu option 2 in the text screen, or the Group Policy setting. |
+| Someone wants the old text screen | Options > Use the text screen in the window, or the `UseTextScreen` policy. Menu option 9 switches back. |
+| The window doesn't open | `hello.cmd` still runs the text screen. A PC where the window can't be drawn gets the text screen in a console instead. |
 | Remove someone's data | They choose menu option 4, or delete `%LOCALAPPDATA%\hello-world`. |
 | Install logs | `%WINDIR%\Logs\hello-world`, and the Application event log, source `hello-world`. |
 
 ## Accessibility and language
 
-All output is plain text in one top-to-bottom flow, prompts say what Enter
-does, and long prompts wrap to the window. It was checked with Narrator and
-in simulated pilots with screen reader, Magnifier and second-language users.
-The owner also passed it with NVDA and JAWS; `docs/ACCESSIBILITY.md` has the
-details.
+The Start menu opens a window built from standard Windows controls: labels,
+one text box and buttons, in the system font at 12 points, with the system's
+colours so high contrast themes apply. Every button has an Alt key, Enter
+saves, and Esc closes. The text screen is the version checked with screen
+readers. All its output is plain text in one top-to-bottom flow, prompts say
+what Enter does, and long prompts wrap to the window. It was checked with
+Narrator and in simulated pilots with screen reader, Magnifier and
+second-language users. The owner also passed it with NVDA and JAWS;
+`docs/ACCESSIBILITY.md` has the details. Each person can switch to it under
+Options, and the `UseTextScreen` policy sets it for everyone.
 
 The program speaks English, Spanish, French, Brazilian Portuguese and
 German. It follows the Windows display language, and shows English for any

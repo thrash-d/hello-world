@@ -7,9 +7,9 @@ Creates "Program Files\hello-world", where only Administrators and SYSTEM can
 write. Unpacks a pinned, hash-checked Python from python.org into it, copies
 hello.py and uninstall.ps1 there, with the organization's content.json when
 the package or commit has one, and writes hello.cmd next to them. hello.cmd
-starts hello.py with that Python in isolated mode and passes its options on. Adds a hello-world shortcut
-to every user's Start menu and an entry with an Uninstall button to Settings >
-Apps. The workstation needs Git for Windows and internet access, but no Python
+starts hello.py with that Python in isolated mode and passes its options on. Adds a hello-world shortcut,
+which opens the window through pythonw.exe, to every user's Start menu, and an
+entry with an Uninstall button to Settings > Apps. The workstation needs Git for Windows and internet access, but no Python
 of its own. Its guarantees hold only if the employees use standard accounts. A
 local administrator can change anything it protects.
 
@@ -49,7 +49,7 @@ only administrators can read, and success and failure go to the Application
 event log under the source hello-world.
 
 .EXAMPLE
-$tag = 'v1.27.0'
+$tag = 'v1.28.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
@@ -457,7 +457,7 @@ try {
 
     # Check the tree before running anything from it as admin.
     Assert-AdminOnlyTree $new
-    foreach ($f in $new, (Join-Path $new 'hello.py'), (Join-Path $new 'hello.cmd'), (Join-Path $new 'python\python.exe')) {
+    foreach ($f in $new, (Join-Path $new 'hello.py'), (Join-Path $new 'hello.cmd'), (Join-Path $new 'python\python.exe'), (Join-Path $new 'python\pythonw.exe')) {
         $usersRX = (Get-Acl -LiteralPath $f).GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | Where-Object {
             $_.IdentityReference.Value -eq 'S-1-5-32-545' -and $_.FileSystemRights.HasFlag([Security.AccessControl.FileSystemRights]::ReadAndExecute) }
         if (-not $usersRX) { throw "Users can't read and run $f" }
@@ -531,11 +531,11 @@ foreach ($name in $dwords.Keys) { New-ItemProperty $key -Name $name -Value $dwor
 
 # Added only after the checks pass, so a failed install never shows up in the
 # Start menu, and after the Apps entry, so a half-finished install still has
-# an Uninstall button. hello.py waits for Enter before it closes its window; the
-# shortcut adds a pause only when hello.cmd fails, so an error message stays readable.
+# an Uninstall button. pythonw.exe opens no console: hello.py shows its window,
+# or opens the text screens in a console when the person or a policy chose them.
 $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk)
-$shortcut.TargetPath = Join-Path $sys32 'cmd.exe'
-$shortcut.Arguments = "/d /c `"title hello-world & `"$dir\hello.cmd`" & if errorlevel 1 pause`""
+$shortcut.TargetPath = Join-Path $dir 'python\pythonw.exe'
+$shortcut.Arguments = "-I `"$dir\hello.py`" --window"
 $shortcut.Description = 'A daily thought and one small thing to try'
 $shortcut.IconLocation = "$pyExe,0"
 # Not $dir: a window left open there is a current directory, and Windows won't

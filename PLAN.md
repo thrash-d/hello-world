@@ -37,9 +37,12 @@ to type passwords or private details.
 
 ## Accessibility and inclusion
 
-- Linear plain text laid out for a screen reader to read top to bottom, with
-  no art, no progress bars and no redrawing. Checked with Narrator in a real
-  console for 1.16.0.
+- The Start menu opens a window of standard Windows controls: large text,
+  buttons, one box for the plan, and system colours for high contrast. The
+  text screen stays for anyone who prefers it.
+- The text screen is linear plain text laid out for a screen reader to read
+  top to bottom, with no art, no progress bars and no redrawing. Checked with
+  Narrator in a real console for 1.16.0.
 - No reliance on colour, short lines, short sentences, an unambiguous date
   ("Thursday, 1 October 2026").
 - Everything works with the keyboard and with Enter alone. Typed letters other
@@ -105,7 +108,7 @@ Magnifier or voice control.
 
 ## Later
 
-- If employees ask for it: a second language file, a different tone, or a
+- If employees ask for it: another language, a different tone, or a
   desktop icon. Each is a small change to `hello.py` or the installer.
 - If a second tool is added, split the payload from the installer then, with
   both tools in hand and a Windows test run.
