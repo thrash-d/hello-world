@@ -42,13 +42,13 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
-          foreach ($f in 'install.ps1', 'uninstall.ps1', 'tools\build-package.ps1') {
+          foreach ($f in 'install.ps1', 'uninstall.ps1', 'install-user.ps1', 'uninstall-user.ps1', 'tools\build-package.ps1', 'tools\reinstall.ps1') {
             $errors = $null
             [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f), [ref]$null, [ref]$errors)
             if ($errors) { $errors | Out-String | Write-Host; throw "$f does not parse." }
           }
           Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser -Force
-          $found = foreach ($f in 'install.ps1', 'uninstall.ps1', 'tools\build-package.ps1') { Invoke-ScriptAnalyzer -Path $f -Severity Error }
+          $found = foreach ($f in 'install.ps1', 'uninstall.ps1', 'install-user.ps1', 'uninstall-user.ps1', 'tools\build-package.ps1', 'tools\reinstall.ps1') { Invoke-ScriptAnalyzer -Path $f -Severity Error }
           if ($found) { $found | Format-Table -AutoSize | Out-String | Write-Host; throw 'PSScriptAnalyzer found errors.' }
       # The runner is an administrator, so the package really installs here:
       # the same package the release workflow publishes, built the same way.
@@ -78,6 +78,20 @@ jobs:
           $ran = & "$dir\python\python.exe" -I "$dir\hello.py" --plain 2>&1
           Write-Host "hello.py --plain said: $ran (exit $LASTEXITCODE)"
           Check ("$ran" -eq 'Hello, world!') 'the installed program runs'
+
+          # A standard user runs it, and can't change the install.
+          $pw = 'Hw-' + [guid]::NewGuid().ToString('N').Substring(0, 20) + 'aA1!'
+          $secure = ConvertTo-SecureString $pw -AsPlainText -Force
+          New-LocalUser 'hwsmoke' -Password $secure -AccountNeverExpires | Out-Null
+          try {
+            $cred = [pscredential]::new("$env:COMPUTERNAME\hwsmoke", $secure)
+            $outFile = 'C:\Users\Public\hw-plain.txt'
+            $p = Start-Process "$dir\python\python.exe" -ArgumentList "-I `"$dir\hello.py`" --plain" -Credential $cred -LoadUserProfile -RedirectStandardOutput $outFile -WorkingDirectory 'C:\Users\Public' -Wait -PassThru
+            Check ($p.ExitCode -eq 0 -and "$(Get-Content $outFile)" -eq 'Hello, world!') 'a standard user runs it'
+            $p = Start-Process powershell -ArgumentList "-NoProfile -Command `"try { Set-Content -LiteralPath '$dir\planted.txt' -Value x -ErrorAction Stop; exit 0 } catch { exit 7 }`"" -Credential $cred -LoadUserProfile -WorkingDirectory 'C:\Users\Public' -Wait -PassThru
+            Check ($p.ExitCode -eq 7 -and -not (Test-Path "$dir\planted.txt")) "a standard user can't change the install"
+          }
+          finally { Remove-LocalUser 'hwsmoke' -ErrorAction SilentlyContinue }
           $lnk = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'hello-world.lnk'))
           Check ($lnk.TargetPath -eq "$dir\python\pythonw.exe" -and $lnk.Arguments -eq "-I `"$dir\hello.py`" --window") 'the shortcut opens the window through pythonw.exe'
           # The embeddable Python draws the window, which closes itself after a moment.
@@ -149,6 +163,17 @@ jobs:
           Check (-not (Test-Path (Join-Path $notesDir 'notes.json')) -and (Test-Path (Join-Path $notesDir 'keep-me.txt'))) 'it deletes the notes and nothing else'
           Check ($null -eq (Get-ItemProperty $run -Name 'hello-world' -ErrorAction SilentlyContinue)) 'it removes the sign-in value'
           Check (-not (schtasks /Query /FO CSV /NH 2>$null | Select-String 'hello-world reminder')) 'it removes the reminder task'
+
+          # The per-user install needs no administrator and stays in the profile.
+          $userDir = Join-Path $env:LOCALAPPDATA 'Programs\hello-world'
+          powershell -NoProfile -ExecutionPolicy Bypass -File "$setup\install-user.ps1" -PackageHash $contentHash -Quiet | Write-Host
+          Check ($LASTEXITCODE -eq 0) 'install-user exits 0'
+          $ran = & "$userDir\python\python.exe" -I "$userDir\hello.py" --plain
+          Check ("$ran" -eq 'Hello, world!') 'the per-user install runs'
+          Check (Test-Path (Join-Path ([Environment]::GetFolderPath('Programs')) 'hello-world.lnk')) "it is in this user's Start menu"
+          Check (Test-Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\hello-world') "it is in this user's Apps list"
+          powershell -NoProfile -ExecutionPolicy Bypass -File "$userDir\uninstall-user.ps1" -Quiet | Write-Host
+          Check ($LASTEXITCODE -eq 0 -and -not (Test-Path $userDir) -and -not (Test-Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\hello-world')) 'uninstall-user removes it'
       # A dead URL or a wrong hash would pass every other check and fail every
       # real install at step 4, so run what the installer will run.
       - name: Check the pinned Python and run hello.py on it
@@ -168,6 +193,19 @@ jobs:
           if ($LASTEXITCODE -or "$out" -ne 'Hello, world!') { throw "hello.py --plain on the pinned Python gave exit $LASTEXITCODE`: $out" }
           $version = & (Join-Path $py 'python.exe') -I hello.py --version
           if ($version -ne "hello-world $((Get-Content VERSION).Trim())") { throw "--version gave '$version'." }
+          # The zip's sigstore signature, from python.org's release manager for
+          # the version, or the Windows release signer.
+          Invoke-WebRequest "$url.sigstore" -OutFile "$zip.sigstore" -UseBasicParsing
+          python -m pip install --quiet "sigstore>=3,<5"
+          $signed = $false
+          # sigstore reports on stderr, which 'Stop' would turn into a failure.
+          $ErrorActionPreference = 'Continue'
+          foreach ($who in @(@('hugo@python.org', 'https://github.com/login/oauth'), @('steve.dower@python.org', 'https://login.microsoftonline.com'))) {
+            python -m sigstore verify identity --bundle "$zip.sigstore" --cert-identity $who[0] --cert-oidc-issuer $who[1] $zip 2>&1 | Write-Host
+            if ($LASTEXITCODE -eq 0) { $signed = $true; Write-Host "ok: signed by $($who[0])"; break }
+          }
+          $ErrorActionPreference = 'Stop'
+          if (-not $signed) { throw "The Python zip's sigstore signature didn't verify." }
 
   # Where AllSigned or WDAC script rules apply, only a signed package runs.
   # A throwaway certificate stands in for the organization's: the package is

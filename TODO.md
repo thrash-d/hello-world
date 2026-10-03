@@ -14,27 +14,12 @@ Employees:
 - Translations in their own files next to `hello.py`.
 
 For IT:
-- Removing the program for one person without an administrator: hiding it
-  from their Start menu and turning everything off.
-- Reaching people on laptops: a per-user install for PCs where IT allows it.
 
-Installer, tested as administrator in CI:
-- Defer removing the old copy and roll back when step 6 fails, and name the
-  open windows in the rename error.
-- Installer colours and `NO_COLOR`, the Start menu folder access list, Domain
-  Admins in the access check.
-- ARM64 PowerShell, the architecture from `RuntimeInformation`, a Windows
-  version check.
-- More Git hardening (`GIT_CONFIG_GLOBAL=NUL`, `--no-filters`), proxy
-  credentials, and the "dubious ownership" message.
-- Walking the tree without descending into junctions.
-- Finding launchers in redirected profiles through the Known Folder API.
-- A standard-user smoke run, a sigstore check, a scheduled hash check, and a
-  trimmed bundled Python.
-- A one-step reinstall helper.
+- Finding a pre-1.23 launcher in a redirected Startup folder through the Known
+  Folder API.
 
 Repository:
-- A `LICENSE`, `CODEOWNERS`, and the reviewed commit hash in each release.
+- A `LICENSE` and `CODEOWNERS`.
 - Pinning the shared kit's workflows where the kit is kept, and tagging only
   after the tests pass.
 

@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-10-03: installer hardening, and an install for one person
+
+Version 1.35.0. Builds the installer items in `TODO.md`, which earlier rounds left for a test on a spare PC as administrator. CI is that PC: every change here runs there as administrator, and the new standard-user and per-user checks run there too.
+
+- `install-user.ps1` installs for one person with no administrator, from the same release package and package hash, into `%LOCALAPPDATA%\Programs\hello-world`, with that person's Start menu and Settings > Apps entries. `uninstall-user.ps1` removes it and its reminder. The simulated pilot's laptop user and the old "remove it without an administrator" item both asked for this. The install folder is in the person's own profile, which the README says plainly.
+- `tools\reinstall.ps1` does the git clone steps in one command.
+- The installer reads the architecture from the operating system rather than `PROCESSOR_ARCHITECTURE`, and stops on Windows before 10 version 1809, which the window needs.
+- Domain Admins and Enterprise Admins pass its permission checks.
+- Its folder walk never goes into a junction, and it checks that only administrators can change the all-users Start menu folder.
+- `git hash-object --no-filters`, so no filter configuration can change what the commit check sees.
+- Proxy credentials for the Python download, `NO_COLOR`, and the names of open hello-world programs when a file in use blocks an upgrade or uninstall.
+- The bundled Python leaves out more modules hello.py never loads: `_lzma`, `_bz2`, `_elementtree`, `pyexpat`, `winsound`, `_multiprocessing`, `_overlapped`, `_asyncio`, `_zoneinfo`, `_decimal` and the test modules. CI draws the window, builds a reminder task and checks content with the trimmed copy.
+- CI verifies the pinned Python zip's sigstore signature, runs the installed program as a standard user and checks that user can't write into the install, and installs and removes the per-user install. A weekly `python-pin` workflow checks the pinned hash and fails when a newer patch release is out.
+
+Already done and removed from `TODO.md`: rolling back when step 6 fails, the "dubious ownership" message and `GIT_CONFIG_GLOBAL=NUL` were already there, and each release's notes already name the commit it was built from.
+
 ## 2026-10-03: seven more languages
 
 Version 1.34.0. Builds the language items in `TODO.md`, which earlier rounds had held back: the window now speaks Simplified Chinese, Japanese, Korean, Arabic and Hebrew, and France and Brazil get company from Canadian French and European Portuguese.

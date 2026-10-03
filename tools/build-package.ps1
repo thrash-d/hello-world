@@ -3,7 +3,8 @@
 Builds the offline install package for a release.
 
 .DESCRIPTION
-Copies install.ps1, uninstall.ps1, hello.py and VERSION into -OutDir. Downloads
+Copies install.ps1, uninstall.ps1, install-user.ps1, uninstall-user.ps1,
+hello.py and VERSION into -OutDir. Downloads
 the Python zip that install.ps1 pins and checks it against the pinned SHA-256.
 Writes SHA256SUMS and a CycloneDX bill of materials. Prints the package hash:
 the SHA-256 of SHA256SUMS, which install.ps1 -PackageHash checks first.
@@ -47,7 +48,7 @@ $version = (Get-Content -LiteralPath (Join-Path $root 'VERSION')).Trim()
 
 if ((Test-Path -LiteralPath $OutDir) -and (Get-ChildItem -LiteralPath $OutDir -Force)) { throw "$OutDir is not empty." }
 New-Item -ItemType Directory -Force $OutDir | Out-Null
-foreach ($f in 'install.ps1', 'uninstall.ps1', 'hello.py', 'VERSION') {
+foreach ($f in 'install.ps1', 'uninstall.ps1', 'install-user.ps1', 'uninstall-user.ps1', 'hello.py', 'VERSION') {
     Copy-Item -LiteralPath (Join-Path $root $f) -Destination $OutDir
 }
 if ($ContentFile) { Copy-Item -LiteralPath $ContentFile -Destination (Join-Path $OutDir 'content.json') }
@@ -57,7 +58,7 @@ $ProgressPreference = 'SilentlyContinue'
 if ($CertificateThumbprint) {
     $cert = @(Get-ChildItem -Path "Cert:\CurrentUser\My\$CertificateThumbprint", "Cert:\LocalMachine\My\$CertificateThumbprint" -CodeSigningCert -ErrorAction SilentlyContinue)[0]
     if (-not $cert) { throw "No code-signing certificate with thumbprint $CertificateThumbprint and a private key in CurrentUser\My or LocalMachine\My." }
-    foreach ($f in 'install.ps1', 'uninstall.ps1') {
+    foreach ($f in 'install.ps1', 'uninstall.ps1', 'install-user.ps1', 'uninstall-user.ps1') {
         $sign = @{ FilePath = (Join-Path $OutDir $f); Certificate = $cert; HashAlgorithm = 'SHA256' }
         if ($TimestampServer) { $sign.TimestampServer = $TimestampServer }
         $result = Set-AuthenticodeSignature @sign
@@ -82,7 +83,7 @@ if ($ContentFile) {
 
 # One line per file, "<sha256>  <name>", in a fixed order, so the same inputs
 # always give the same package hash.
-$files = @(if ($ContentFile) { 'content.json' }) + 'hello.py', 'install.ps1', 'python-embed.zip', 'uninstall.ps1', 'VERSION'
+$files = @(if ($ContentFile) { 'content.json' }) + 'hello.py', 'install-user.ps1', 'install.ps1', 'python-embed.zip', 'uninstall-user.ps1', 'uninstall.ps1', 'VERSION'
 $sums = foreach ($f in $files) { '{0}  {1}' -f (Get-FileHash -LiteralPath (Join-Path $OutDir $f)).Hash.ToLower(), $f }
 [IO.File]::WriteAllText((Join-Path $OutDir 'SHA256SUMS'), ($sums -join "`n") + "`n", [Text.Encoding]::ASCII)
 

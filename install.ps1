@@ -49,7 +49,7 @@ only administrators can read, and success and failure go to the Application
 event log under the source hello-world.
 
 .EXAMPLE
-$tag = 'v1.34.0'
+$tag = 'v1.35.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
@@ -121,9 +121,13 @@ function Restore-Window {
 }
 # A failure before the log starts prints one plain line, not PowerShell's error
 # block with its line numbers. A failure after that is reported by the catch below.
-trap { Write-Host "FAILED: $($_.Exception.Message)" -ForegroundColor Red; Restore-Window; exit 1 }
+trap { if ($env:NO_COLOR) { Write-Host "FAILED: $($_.Exception.Message)" } else { Write-Host "FAILED: $($_.Exception.Message)" -ForegroundColor Red }; Restore-Window; exit 1 }
 # Progress lines for the person running this. -Quiet hides them; the log keeps them.
-function Write-Step([string]$Text) { if (-not $Quiet) { Write-Host $Text -ForegroundColor Cyan } }
+function Write-Color([string]$Text, [string]$Color) {
+    # https://no-color.org: any value of NO_COLOR turns colour off.
+    if ($env:NO_COLOR) { Write-Host $Text } else { Write-Host $Text -ForegroundColor $Color }
+}
+function Write-Step([string]$Text) { if (-not $Quiet) { Write-Color $Text Cyan } }
 function Write-Info([string]$Text) { if (-not $Quiet) { Write-Host $Text } }
 # A 32-bit PowerShell sees Program Files (x86) and the 32-bit registry.
 # Intune runs install commands in one, so start again in the 64-bit one.
@@ -141,10 +145,19 @@ if (-not [Environment]::Is64BitProcess) {
 }
 # The pinned Python is the amd64 build. Windows 11 on ARM64 runs it through
 # x64 emulation; Windows 10 on ARM64 can't.
-if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') {
-    if ([Environment]::OSVersion.Version.Build -lt 22000) { throw 'This needs Windows 11 on an ARM64 PC, to run the x64 Python it ships.' }
+# The operating system's own answer; PROCESSOR_ARCHITECTURE is an environment
+# variable the caller can set. .NET before 4.7.1 lacks it, so fall back.
+try { $arch = "$([Runtime.InteropServices.RuntimeInformation]::OSArchitecture)".ToUpper() } catch { $arch = '' }
+if (-not $arch) { $arch = $env:PROCESSOR_ARCHITECTURE }
+if ($arch -eq 'X64') { $arch = 'AMD64' }
+$build = [Environment]::OSVersion.Version.Build
+# The window needs Windows 10 1809 or later for per-monitor scaling and
+# notifications with buttons.
+if ($build -lt 17763) { throw "This needs Windows 10 version 1809 or later, or Windows 11. This PC is build $build." }
+if ($arch -eq 'ARM64') {
+    if ($build -lt 22000) { throw 'This needs Windows 11 on an ARM64 PC, to run the x64 Python it ships.' }
 }
-elseif ($env:PROCESSOR_ARCHITECTURE -ne 'AMD64') { throw "Need an x64 or ARM64 PC, found $env:PROCESSOR_ARCHITECTURE." }
+elseif ($arch -ne 'AMD64') { throw "Need an x64 or ARM64 PC, found $arch." }
 # Ask Windows for the folders; the admin's own session can carry other values.
 $pf = [Environment]::GetFolderPath('ProgramFiles')
 $winDir = [Environment]::GetFolderPath('Windows')
@@ -199,7 +212,9 @@ function Assert-AdminOnly([string]$Path, [int64]$Rights) {
             ([int64]$_.FileSystemRights -band $Rights) } |
         ForEach-Object { $_.IdentityReference.Value }
 
-    $others = @($owner) + @($aceRules) | Where-Object { $_ -notin $trusted } | Select-Object -Unique
+    # Domain Admins (-512) and Enterprise Admins (-519) of any domain are
+    # administrators too.
+    $others = @($owner) + @($aceRules) | Where-Object { $_ -notin $trusted -and $_ -notmatch '^S-1-5-21-[\d-]+-(512|519)$' } | Select-Object -Unique
     if ($others) {
         $names = @($others | ForEach-Object { SID-ToName $_ })
         throw "Non-administrators can change $Path ($($names -join ', ')). Restrict write access to administrators only."
@@ -212,7 +227,15 @@ function Assert-AdminOnly([string]$Path, [int64]$Rights) {
 function Assert-AdminOnlyTree([string]$Root) {
     Write-Info "Checking permissions under $Root (this can take several minutes on Git for Windows)"
     $checked = 0
-    foreach ($i in @(Get-Item -LiteralPath $Root -Force) + @(Get-ChildItem -LiteralPath $Root -Recurse -Force)) {
+    # A stack, not Get-ChildItem -Recurse, so a link is reported before
+    # anything behind it is listed.
+    $pending = [Collections.Generic.Stack[object]]::new()
+    $pending.Push((Get-Item -LiteralPath $Root -Force))
+    while ($pending.Count) {
+        $i = $pending.Pop()
+        if (($i.Attributes -band [IO.FileAttributes]::Directory) -and -not ($i.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+            foreach ($child in @(Get-ChildItem -LiteralPath $i.FullName -Force)) { $pending.Push($child) }
+        }
         $checked++
         if (-not $Quiet -and $checked % 200 -eq 0) { Write-Progress -Activity "Checking permissions under $Root" -Status "$checked items checked so far" }
         # A link's own ACL says nothing about its target. Reject both symlinks and junctions.
@@ -260,7 +283,8 @@ function Rename-Retry([string]$Path, [string]$NewName) {
             # the deployment tool to retry later.
             $script:busy = $true
             $open = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path -like "$dir\*" })
-            $hint = if ($open) { " $($open.Count) hello-world window(s) are open; closing them may help." } else { '' }
+            $names = ($open | ForEach-Object { "$($_.ProcessName) (process $($_.Id))" }) -join ', '
+            $hint = if ($open) { " These hello-world programs are open: $names. Closing them may help." } else { '' }
             throw "Couldn't rename $Path because a file in it is in use.$hint Try again later."
         }
     }
@@ -386,7 +410,7 @@ $tracked = & $git -C $PSScriptRoot ls-tree --name-only HEAD content.json
 if ($LASTEXITCODE) { throw "git ls-tree failed with exit $LASTEXITCODE in $PSScriptRoot." }
 if ("$tracked" -eq 'content.json') { $extra = @('content.json') }
 foreach ($f in $required + $extra) {
-    $actual = & $git -C $PSScriptRoot hash-object $f
+    $actual = & $git -C $PSScriptRoot hash-object --no-filters $f
     $actualOk = $LASTEXITCODE -eq 0
     $expected = & $git -C $PSScriptRoot rev-parse "HEAD:$f"
     # Both commands failing and printing nothing must not read as a match.
@@ -418,6 +442,8 @@ try {
         # Windows PowerShell 5.1 can default to TLS versions python.org refuses,
         # and its progress bar slows downloads to a crawl.
         [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+        # An authenticating proxy gets the admin's own Windows credentials.
+        if ([Net.WebRequest]::DefaultWebProxy) { [Net.WebRequest]::DefaultWebProxy.Credentials = [Net.CredentialCache]::DefaultNetworkCredentials }
         for ($try = 1; ; $try++) {
             try { Invoke-WebRequest $pyUrl -OutFile $zip -UseBasicParsing -TimeoutSec 300; break }
             catch { if ($try -ge 3) { throw }; Write-Warning "Download failed ($_). Trying again."; Start-Sleep -Seconds 5 }
@@ -442,7 +468,10 @@ try {
     Expand-Archive -LiteralPath $zip -DestinationPath (Join-Path $new 'python')
     # hello.py uses none of these, and vulnerability scanners flag every PC
     # that carries an OpenSSL or SQLite build.
-    foreach ($pattern in '_ssl.pyd', '_hashlib.pyd', 'libssl-*.dll', 'libcrypto-*.dll', '_sqlite3.pyd', 'sqlite3.dll') {
+    # The rest are modules hello.py never loads; CI runs the trimmed copy.
+    foreach ($pattern in '_ssl.pyd', '_hashlib.pyd', 'libssl-*.dll', 'libcrypto-*.dll', '_sqlite3.pyd', 'sqlite3.dll',
+            '_lzma.pyd', '_bz2.pyd', '_elementtree.pyd', 'pyexpat.pyd', 'winsound.pyd', '_multiprocessing.pyd',
+            '_overlapped.pyd', '_asyncio.pyd', '_zoneinfo.pyd', '_decimal.pyd', '_test*.pyd', 'xxlimited*.pyd') {
         Get-ChildItem -LiteralPath (Join-Path $new 'python') -Filter $pattern -Force | Remove-Item -Force
     }
     foreach ($f in @('hello.py', 'uninstall.ps1') + $extra) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $f) -Destination $new }
@@ -533,6 +562,8 @@ foreach ($name in $dwords.Keys) { New-ItemProperty $key -Name $name -Value $dwor
 # Start menu, and after the Apps entry, so a half-finished install still has
 # an Uninstall button. pythonw.exe opens no console: hello.py shows its window,
 # or opens the text screens in a console when the person or a policy chose them.
+# Someone who could change the folder could swap the shortcut for their own.
+Assert-AdminOnly (Split-Path $lnk) $swap
 $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk)
 $shortcut.TargetPath = Join-Path $dir 'python\pythonw.exe'
 $shortcut.Arguments = "-I `"$dir\hello.py`" --window"
@@ -602,14 +633,14 @@ if ($hadOld) {
 }
 
 $how = if ($prevVersion -and $prevVersion -ne $version) { "upgraded from $prevVersion" } elseif ($prevVersion) { 'reinstalled' } else { 'new install' }
-Write-Host "Installed hello-world $version to $dir ($how)." -ForegroundColor Green
+Write-Color "Installed hello-world $version to $dir ($how)." Green
 Write-AppEvent 1000 Information "Installed hello-world $version to $dir ($how)." 
 Write-Info "hello.py SHA-256: $hash"
 Write-Info "Next: open hello-world from the Start menu to check it. The setup folder can be deleted. The log is $log." 
 }
 # The host prints a script's error only after the finally below, so write it to the log first.
 catch {
-    Write-Host "FAILED: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Color "FAILED: $($_.Exception.Message)" Red
     Write-Host "The steps above and this message are in $log."
     Write-AppEvent 1001 Error "hello-world install failed: $($_.Exception.Message)"
     if ($script:busy) { exit 1618 }
