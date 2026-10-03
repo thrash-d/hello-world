@@ -77,8 +77,10 @@ window, or ask IT, who can set it for everyone. In the text screen, menu
 option 9 switches back to the window. Press Enter at each question to skip it,
 and once more to close.
 
-If Windows is set to Spanish, French, Portuguese or German, hello-world
-speaks that language. The words you type work in every language, so `done`,
+hello-world speaks the Windows display language when it has a translation:
+English, Spanish, French (France and Canada), Portuguese (Brazil and Portugal), German, Simplified Chinese, Japanese, Korean, Arabic and Hebrew. Chinese, Japanese, Korean, Arabic and Hebrew show in the
+window; the text screen shows English for them, since older consoles can't
+draw those scripts. Options > Language picks another one. The words you type work in every language, so `done`,
 `hecho`, `fait`, `feito` and `erledigt` all mark a plan done. One-letter
 answers are the exception: `s` means yes only in Spanish and Portuguese, `o`
 only in French and `j` only in German, so a stray key in English never
@@ -197,7 +199,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.33.0'
+$tag = 'v1.34.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

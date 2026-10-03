@@ -11,9 +11,6 @@ opt-in setting or policy with the safe default kept.
 Employees:
 - Built-in tips for shift and floor work, as a second list people can choose.
 - Organization content per language: `content.es.json` and the rest.
-- Regional variants: Canadian French, European Portuguese.
-- Chinese, Japanese, Korean, Arabic and Hebrew in the window, which draws
-  them, with the text screen staying in English for those.
 - Translations in their own files next to `hello.py`.
 
 For IT:

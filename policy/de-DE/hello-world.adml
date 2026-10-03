@@ -31,7 +31,7 @@ Wenn diese Einstellung deaktiviert oder nicht konfiguriert ist, kann jede Person
       <string id="ForceEnglish">hello-world immer auf Englisch anzeigen</string>
       <string id="ForceEnglish_Help">Wenn diese Einstellung aktiviert ist, zeigt hello-world seine Bildschirme für alle auf Englisch.
 
-Wenn diese Einstellung deaktiviert oder nicht konfiguriert ist, zeigt hello-world seine Bildschirme auf Spanisch, Französisch, Portugiesisch oder Deutsch, wenn die Windows-Anzeigesprache eine davon ist, und sonst auf Englisch. Die Befehlswörter jeder Sprache, etwa erledigt und beenden, funktionieren in allen Sprachen.
+Wenn diese Einstellung deaktiviert oder nicht konfiguriert ist, zeigt hello-world seine Bildschirme in der Windows-Anzeigesprache, wenn es dafür eine Übersetzung hat, und sonst auf Englisch. docs/ENTERPRISE.md nennt die Sprachen. Die Befehlswörter jeder Sprache, etwa erledigt und beenden, funktionieren in allen Sprachen.
 
 Eine Inhaltsdatei der Organisation ersetzt die Gedanken und Tipps in allen Sprachen.</string>
       <string id="SUPPORTED_1_28">hello-world 1.28.0 oder höher</string>

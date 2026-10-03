@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="1.0" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName>hello-world</displayName>
+  <description>Settings for the hello-world daily program.</description>
+  <resources>
+    <stringTable>
+      <string id="HelloWorld">hello-world</string>
+      <string id="SUPPORTED_1_23">hello-world 1.23.0 或更高版本</string>
+      <string id="SUPPORTED_1_24">hello-world 1.24.0 或更高版本</string>
+      <string id="SUPPORTED_1_25">hello-world 1.25.0 或更高版本</string>
+      <string id="DisableSignInLauncher">关闭登录时打开 hello-world</string>
+      <string id="DisableSignInLauncher_Help">启用后，用户无法将 hello-world 设为登录时自动打开，程序也不会再提出此建议；用户之前开启的启动项会在下次打开程序时被删除。
+
+禁用或未配置时，每个人都可以通过菜单选项 2 开启或关闭登录时打开。
+
+启动项是 HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run 下名为 hello-world 的值。</string>
+      <string id="HideThoughtAndTip">隐藏每日一句和小建议</string>
+      <string id="HideThoughtAndTip_Help">启用后，hello-world 不显示今日一句和小建议。计划问题和菜单仍可使用。
+
+禁用或未配置时，每个人都可以通过菜单选项 8 隐藏或显示它们。</string>
+      <string id="HideDaysInARow">隐藏连续天数提示</string>
+      <string id="HideDaysInARow_Help">启用后，hello-world 不会显示统计用户连续打开天数的提示。
+
+禁用或未配置时，该提示仅在连续第 3、7、14 天以及之后每满 30 天时显示，每个人都可以通过菜单选项 3 将其隐藏。</string>
+      <string id="DisablePlans">关闭计划功能</string>
+      <string id="DisablePlans_Help">启用后，hello-world 不会询问或跟进计划，也不保留计划内容、已完成的计划或完成次数。已保存的计划内容会在每个人下次打开程序时被删除。用户仍会看到问候语，以及每日一句和小建议（除非也已隐藏）。
+
+如果在本地文件中输入计划内容会引起记录管理或职工委员会方面的顾虑，请使用此设置。
+
+禁用或未配置时，用户每天可以输入一个计划（可选）。</string>
+      <string id="ForceEnglish">始终以英文显示 hello-world</string>
+      <string id="ForceEnglish_Help">启用后，hello-world 对所有人以英文显示界面。
+
+禁用或未配置时，如果 hello-world 有 Windows 显示语言的译文，就以该语言显示界面，否则以英文显示。支持的语言列在 docs/ENTERPRISE.md 中。各语言的命令词（例如 hecho 和 quitter）在任何语言下都可使用。
+
+组织内容文件会替换所有语言中的每日一句和小建议。</string>
+      <string id="SUPPORTED_1_28">hello-world 1.28.0 或更高版本</string>
+      <string id="UseTextScreen">以文本界面打开 hello-world</string>
+      <string id="UseTextScreen_Help">启用后，开始菜单快捷方式会在控制台窗口中以文本界面打开 hello-world（与 1.28 之前的版本相同），登录启动项也会以这种方式打开。任何人都无法切换到窗口版本。
+
+禁用或未配置时，hello-world 在带按钮的窗口中打开，每个人都可以在“选项”中或通过文本界面菜单的选项 9 切换到文本界面。开启登录启动项后，如果有计划需要询问，窗口版本会在登录时显示 Windows 通知，而不是直接打开。
+
+如果读屏软件用户只测试过文本界面，或不希望出现 Windows 通知，请使用此设置。</string>
+      <string id="SUPPORTED_1_31">hello-world 1.31.0 或更高版本</string>
+      <string id="TurnOnReminder">为所有人开启登录提醒</string>
+      <string id="TurnOnReminder_Help">启用后，hello-world 会在每个人下次打开时为其开启提醒，除非对方已经回答过提醒问题。使用窗口版本时，如果有计划需要询问，提醒是登录时的 Windows 通知；使用文本界面时，hello-world 每天登录时打开一次。每个人仍可在“选项”中或通过菜单选项 2 将其关闭，关闭后会保持关闭。
+
+禁用或未配置时，hello-world 会询问每个人一次。
+
+“关闭登录时打开 hello-world”优先于此设置。</string>
+      <string id="SUPPORTED_1_32">hello-world 1.32.0 或更高版本</string>
+      <string id="ReportUsage">将使用事件写入事件日志</string>
+      <string id="ReportUsage_Help">启用后，每当有人打开 hello-world、设定计划或完成计划时，hello-world 会向应用程序事件日志写入一个事件（来源 hello-world，事件 2000）：“hello-world: opened”、“hello-world: plan set”或“hello-world: plan finished”。这些事件不包含计划内容，也不会通过网络发送任何内容；事件的去向由您自己的事件收集方式决定。
+
+禁用或未配置时，hello-world 不写入使用事件。</string>
+      <string id="LogErrors">保留错误日志</string>
+      <string id="LogErrors_Help">启用后，出现问题时，hello-world 会在每个人的 hello-world 数据文件夹中的 errors.log 里添加一行，内容包括时间、版本、错误类型以及相关的 hello.py 代码行。日志不包含计划内容，大小保持在 100 KB 以内。
+
+禁用或未配置时，hello-world 不保留错误日志。</string>
+      <string id="TimestampBackups">按日期和时间命名损坏文件的备份</string>
+      <string id="TimestampBackups_Help">启用后，损坏的 notes.json 会另存为 notes.json.&lt;date-time&gt;.bak，而不是 notes.json.bak、notes.json.bak2 等。
+
+禁用或未配置时，备份按编号命名。</string>
+      <string id="LeaveDamagedFile">无人操作时不处理损坏的文件</string>
+      <string id="LeaveDamagedFile_Help">启用后，在无人操作键盘时运行（例如登录时在没有控制台的情况下运行），损坏的 notes.json 会留在原处，不会被另存为备份。下次有人操作时会将其另存并告知。
+
+禁用或未配置时，一旦发现损坏的文件，就会将其另存为备份。</string>
+      <string id="MaxBackups">损坏文件备份的最大保留数量</string>
+      <string id="MaxBackups_Help">启用后，hello-world 在创建新备份前，会删除超出此数量的最旧的损坏 notes.json 备份。
+
+禁用或未配置时，所有备份都会保留，直到用户删除所有内容。</string>
+      <string id="FeedbackAddress">反馈地址</string>
+      <string id="FeedbackAddress_Help">启用后，窗口的“选项”菜单中会出现“发送反馈...”，它会在用户自己的邮件程序中新建一封发往此地址的邮件。hello-world 本身不发送任何内容。
+
+禁用或未配置时，不显示反馈项。</string>
+    </stringTable>
+    <presentationTable>
+      <presentation id="FeedbackAddress">
+        <textBox refId="FeedbackAddress"><label>地址：</label></textBox>
+      </presentation>
+      <presentation id="MaxBackups">
+        <decimalTextBox refId="MaxBackups" defaultValue="5">保留的备份数：</decimalTextBox>
+      </presentation>
+    </presentationTable>
+  </resources>
+</policyDefinitionResources>

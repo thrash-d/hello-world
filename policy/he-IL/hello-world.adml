@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="1.0" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName>hello-world</displayName>
+  <description>Settings for the hello-world daily program.</description>
+  <resources>
+    <stringTable>
+      <string id="HelloWorld">hello-world</string>
+      <string id="SUPPORTED_1_23">hello-world 1.23.0 ואילך</string>
+      <string id="SUPPORTED_1_24">hello-world 1.24.0 ואילך</string>
+      <string id="SUPPORTED_1_25">hello-world 1.25.0 ואילך</string>
+      <string id="DisableSignInLauncher">כיבוי הפתיחה של hello-world בכניסה למערכת</string>
+      <string id="DisableSignInLauncher_Help">כשההגדרה מופעלת, אי אפשר להגדיר את hello-world להיפתח אוטומטית בכניסה למערכת, התוכנה אף פעם לא מציעה זאת, ומפעיל שהופעל קודם לכן מוסר בפעם הבאה שהתוכנה נפתחת.
+
+כשההגדרה מושבתת או לא מוגדרת, כל אחד יכול להפעיל או לכבות את הפתיחה בכניסה באפשרות 2 בתפריט.
+
+המפעיל הוא ערך בשם hello-world תחת HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run.</string>
+      <string id="HideThoughtAndTip">הסתרת המחשבה והטיפ היומיים</string>
+      <string id="HideThoughtAndTip_Help">כשההגדרה מופעלת, hello-world לא מציג את המחשבה להיום ואת הטיפ לנסות. שאלת התוכנית והתפריט עדיין עובדים.
+
+כשההגדרה מושבתת או לא מוגדרת, כל אחד יכול להסתיר או להציג אותם באפשרות 8 בתפריט.</string>
+      <string id="HideDaysInARow">הסתרת הודעת הימים ברצף</string>
+      <string id="HideDaysInARow_Help">כשההגדרה מופעלת, hello-world אף פעם לא מציג את ההודעה שסופרת כמה ימים ברצף מישהו פתח אותו.
+
+כשההגדרה מושבתת או לא מוגדרת, ההודעה מופיעה רק ביום השלישי, השביעי והארבעה עשר ברצף ואחר כך כל 30 ימים, וכל אחד יכול להסתיר אותה באפשרות 3 בתפריט.</string>
+      <string id="DisablePlans">כיבוי התוכניות</string>
+      <string id="DisablePlans_Help">כשההגדרה מופעלת, hello-world לא מבקש תוכנית ולא עוקב אחריה, ולא שומר טקסט של תוכניות, תוכניות שהושלמו או ספירה של תוכניות שבוצעו. טקסט תוכניות שכבר נשמר נמחק בפעם הבאה שכל אחד פותח את התוכנה. המשתמשים עדיין רואים את הברכה, ואם גם הם לא הוסתרו, את המחשבה והטיפ.
+
+כדאי להשתמש בהגדרה הזו במקומות שבהם טקסט תוכנית שנשמר בקובץ מקומי מעורר שאלות של ניהול רשומות או של ועד העובדים.
+
+כשההגדרה מושבתת או לא מוגדרת, אפשר להקליד תוכנית אחת רשות בכל יום.</string>
+      <string id="ForceEnglish">הצגת hello-world תמיד באנגלית</string>
+      <string id="ForceEnglish_Help">כשההגדרה מופעלת, hello-world מציג את המסכים שלו באנגלית לכולם.
+
+כשההגדרה מושבתת או לא מוגדרת, hello-world מציג את המסכים שלו בשפת התצוגה של Windows כשיש לו תרגום אליה, ובאנגלית בכל מקרה אחר. רשימת השפות נמצאת בקובץ docs/ENTERPRISE.md. מילות הפקודה של כל השפות, כמו hecho ו-quitter, עובדות בכל שפה.
+
+קובץ תוכן של הארגון מחליף את המחשבות והטיפים בכל השפות.</string>
+      <string id="SUPPORTED_1_28">hello-world 1.28.0 ואילך</string>
+      <string id="UseTextScreen">פתיחת hello-world כמסך טקסט</string>
+      <string id="UseTextScreen_Help">כשההגדרה מופעלת, קיצור הדרך בתפריט התחל פותח את hello-world כמסך טקסט בחלון מסוף, כמו בגרסאות שלפני 1.28, וגם המפעיל בכניסה למערכת פותח אותו כך. אף אחד לא יכול לעבור לחלון.
+
+כשההגדרה מושבתת או לא מוגדרת, hello-world נפתח בחלון עם לחצנים, וכל אחד יכול לעבור למסך הטקסט דרך 'אפשרויות', או באפשרות 9 בתפריט של מסך הטקסט. כשהמפעיל בכניסה למערכת פועל, גרסת החלון מציגה התראה של Windows בכניסה כשיש תוכנית לשאול עליה, במקום להיפתח.
+
+כדאי להשתמש בהגדרה הזו במקומות שבהם משתמשי קורא מסך בדקו רק את מסך הטקסט, או במקומות שבהם לא רוצים התראות של Windows.</string>
+      <string id="SUPPORTED_1_31">hello-world 1.31.0 ואילך</string>
+      <string id="TurnOnReminder">הפעלת התזכורת בכניסה למערכת לכולם</string>
+      <string id="TurnOnReminder_Help">כשההגדרה מופעלת, hello-world מפעיל את התזכורת שלו לכל משתמש בפעם הבאה שהוא נפתח, אלא אם המשתמש כבר ענה על שאלת התזכורת. בחלון, התזכורת היא התראה של Windows בכניסה למערכת כשיש תוכנית לשאול עליה; במסך הטקסט, hello-world נפתח פעם ביום בכניסה למערכת. כל אחד עדיין יכול לכבות אותה דרך 'אפשרויות' או באפשרות 2 בתפריט, והיא נשארת כבויה.
+
+כשההגדרה מושבתת או לא מוגדרת, hello-world שואל כל משתמש פעם אחת.
+
+ההגדרה "כיבוי הפתיחה של hello-world בכניסה למערכת" גוברת על ההגדרה הזו.</string>
+      <string id="SUPPORTED_1_32">hello-world 1.32.0 ואילך</string>
+      <string id="ReportUsage">כתיבת אירועי שימוש ביומן האירועים</string>
+      <string id="ReportUsage_Help">כשההגדרה מופעלת, hello-world כותב אירוע אחד ביומן האירועים Application, עם המקור hello-world ומספר האירוע 2000, בכל פעם שמישהו פותח אותו, קובע תוכנית או משלים תוכנית: "hello-world: opened", "hello-world: plan set" או "hello-world: plan finished". האירועים לא מכילים טקסט של תוכניות, ושום דבר לא נשלח ברשת; מערכת איסוף האירועים של הארגון קובעת לאן הם מגיעים.
+
+כשההגדרה מושבתת או לא מוגדרת, hello-world לא כותב אירועי שימוש.</string>
+      <string id="LogErrors">שמירת יומן שגיאות</string>
+      <string id="LogErrors_Help">כשההגדרה מופעלת, hello-world מוסיף שורה לקובץ errors.log בתיקיית הנתונים של hello-world של כל משתמש כשמשהו משתבש: השעה, הגרסה, סוג השגיאה והשורות הרלוונטיות ב-hello.py. הקובץ לא מכיל טקסט של תוכניות ונשאר מתחת ל-100 KB.
+
+כשההגדרה מושבתת או לא מוגדרת, hello-world לא שומר יומן שגיאות.</string>
+      <string id="TimestampBackups">מתן שם לפי תאריך ושעה לגיבויים של קובץ פגום</string>
+      <string id="TimestampBackups_Help">כשההגדרה מופעלת, קובץ notes.json פגום מועבר הצידה בשם notes.json.&lt;date-time&gt;.bak במקום notes.json.bak, notes.json.bak2 וכן הלאה.
+
+כשההגדרה מושבתת או לא מוגדרת, הגיבויים ממוספרים.</string>
+      <string id="LeaveDamagedFile">השארת קובץ פגום במקומו כשאין אף אחד מול המסך</string>
+      <string id="LeaveDamagedFile_Help">כשההגדרה מופעלת, הרצה שאין בה אף אחד ליד המקלדת, למשל הרצה בכניסה למערכת בלי מסוף, משאירה קובץ notes.json פגום במקומו במקום להעביר אותו הצידה. ההרצה הבאה שבה מישהו נמצא מעבירה אותו הצידה ומודיעה על כך.
+
+כשההגדרה מושבתת או לא מוגדרת, קובץ פגום מועבר הצידה כגיבוי בכל פעם שהוא נמצא.</string>
+      <string id="MaxBackups">מספר מרבי של גיבויים של קובץ פגום</string>
+      <string id="MaxBackups_Help">כשההגדרה מופעלת, hello-world מוחק את הגיבויים הישנים ביותר של notes.json פגום מעבר למספר הזה לפני שהוא יוצר גיבוי חדש.
+
+כשההגדרה מושבתת או לא מוגדרת, כל הגיבויים נשמרים עד שהמשתמש מוחק הכול.</string>
+      <string id="FeedbackAddress">כתובת למשוב</string>
+      <string id="FeedbackAddress_Help">כשההגדרה מופעלת, בתפריט 'אפשרויות' של החלון יש "שליחת משוב...", שפותח הודעת דואר חדשה לכתובת הזו בתוכנת הדואר של המשתמש. hello-world עצמו לא שולח כלום.
+
+כשההגדרה מושבתת או לא מוגדרת, הפריט הזה לא מופיע.</string>
+    </stringTable>
+    <presentationTable>
+      <presentation id="FeedbackAddress">
+        <textBox refId="FeedbackAddress"><label>כתובת:</label></textBox>
+      </presentation>
+      <presentation id="MaxBackups">
+        <decimalTextBox refId="MaxBackups" defaultValue="5">מספר גיבויים לשמירה:</decimalTextBox>
+      </presentation>
+    </presentationTable>
+  </resources>
+</policyDefinitionResources>

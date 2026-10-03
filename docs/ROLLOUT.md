@@ -34,8 +34,8 @@ Subject: A 20-second start to the day, if you want one
   about, and you answer with one click. Options in the window turns it off.
 - How do I delete what it saved? Options > More options, then option 4.
 - I don't want the thought and tip. Options > Show the thought and tip.
-- Is it in my language? It follows the Windows display language: English,
-  Spanish, French, Portuguese or German.
+- Is it in my language? It follows the Windows display language: English, Spanish, French (France and Canada), Portuguese (Brazil and Portugal), German, Simplified Chinese, Japanese, Korean, Arabic and Hebrew.
+  Options > Language picks another.
 - Does it work with a screen reader? Yes. The window uses standard Windows
   buttons and labels, and was checked with Narrator, NVDA, JAWS, Magnifier
   and high contrast. The text screen, plain text read top to bottom, is there

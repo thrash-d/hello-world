@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="1.0" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName>hello-world</displayName>
+  <description>Settings for the hello-world daily program.</description>
+  <resources>
+    <stringTable>
+      <string id="HelloWorld">hello-world</string>
+      <string id="SUPPORTED_1_23">hello-world 1.23.0 以降</string>
+      <string id="SUPPORTED_1_24">hello-world 1.24.0 以降</string>
+      <string id="SUPPORTED_1_25">hello-world 1.25.0 以降</string>
+      <string id="DisableSignInLauncher">サインイン時に hello-world を開く機能をオフにする</string>
+      <string id="DisableSignInLauncher_Help">有効にすると、ユーザーはサインイン時に hello-world が自動で開くように設定できなくなり、hello-world からも設定を提案しません。以前にオンにした起動設定は、次にプログラムを開いたときに削除されます。
+
+無効または未構成の場合、各ユーザーはメニューの2でサインイン時に開く機能をオンまたはオフにできます。
+
+起動設定は、HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run にある hello-world という名前の値です。</string>
+      <string id="HideThoughtAndTip">毎日のひとこととヒントを非表示にする</string>
+      <string id="HideThoughtAndTip_Help">有効にすると、hello-world は今日のひとことと試してみるヒントを表示しません。予定の質問とメニューは引き続き使えます。
+
+無効または未構成の場合、各ユーザーはメニューの8で表示と非表示を切り替えられます。</string>
+      <string id="HideDaysInARow">連続日数のメッセージを非表示にする</string>
+      <string id="HideDaysInARow_Help">有効にすると、hello-world は何日続けて開いたかを数えるメッセージを表示しません。
+
+無効または未構成の場合、メッセージは連続3日目、7日目、14日目と、その後30日ごとにだけ表示され、各ユーザーはメニューの3で非表示にできます。</string>
+      <string id="DisablePlans">予定をオフにする</string>
+      <string id="DisablePlans_Help">有効にすると、hello-world は予定をたずねず、予定のフォローアップもしません。予定のテキスト、終えた予定、完了した予定の数も保存しません。保存済みの予定のテキストは、各ユーザーが次にプログラムを開いたときに破棄されます。ユーザーにはあいさつと、非表示にしていなければひとこととヒントが引き続き表示されます。
+
+ローカル ファイルに入力された予定のテキストが、記録管理や従業員代表の観点で問題になる場合に使用します。
+
+無効または未構成の場合、ユーザーは任意の予定を1日に1つ入力できます。</string>
+      <string id="ForceEnglish">hello-world を常に英語で表示する</string>
+      <string id="ForceEnglish_Help">有効にすると、hello-world はすべてのユーザーに英語で画面を表示します。
+
+無効または未構成の場合、Windows の表示言語の翻訳があればその言語で、なければ英語で画面を表示します。対応言語は docs/ENTERPRISE.md に記載されています。hecho や quitter など、各言語のコマンド語はどの言語でも使えます。
+
+組織のコンテンツ ファイルは、すべての言語のひとこととヒントを置き換えます。</string>
+      <string id="SUPPORTED_1_28">hello-world 1.28.0 以降</string>
+      <string id="UseTextScreen">hello-world をテキスト画面で開く</string>
+      <string id="UseTextScreen_Help">有効にすると、スタート メニューのショートカットは、バージョン 1.28 より前と同じように、hello-world をコンソール ウィンドウのテキスト画面で開きます。サインイン時の起動設定でもテキスト画面で開きます。ユーザーはウィンドウに切り替えられません。
+
+無効または未構成の場合、hello-world はボタン付きのウィンドウで開き、各ユーザーはオプション、またはテキスト画面のメニューの9でテキスト画面に切り替えられます。サインイン時の起動設定がオンの場合、ウィンドウ版はたずねる予定があるときに、開く代わりにサインイン時に Windows の通知を表示します。
+
+スクリーン リーダーのユーザーがテキスト画面しかテストしていない場合や、Windows の通知を使いたくない場合に使用します。</string>
+      <string id="SUPPORTED_1_31">hello-world 1.31.0 以降</string>
+      <string id="TurnOnReminder">全員のサインイン時のリマインダーをオンにする</string>
+      <string id="TurnOnReminder_Help">有効にすると、hello-world は各ユーザーが次に開いたときにリマインダーをオンにします。ただし、そのユーザーがリマインダーの質問にすでに答えている場合は除きます。ウィンドウでは、たずねる予定があるときにサインイン時に Windows の通知が表示され、テキスト画面では、サインイン時に hello-world が1日1回開きます。各ユーザーはオプションまたはメニューの2でオフにでき、オフにした設定はそのまま維持されます。
+
+無効または未構成の場合、hello-world は各ユーザーに一度だけたずねます。
+
+この設定より「サインイン時に hello-world を開く機能をオフにする」が優先されます。</string>
+      <string id="SUPPORTED_1_32">hello-world 1.32.0 以降</string>
+      <string id="ReportUsage">使用状況のイベントをイベント ログに書き込む</string>
+      <string id="ReportUsage_Help">有効にすると、hello-world は、ユーザーが開いたとき、予定を設定したとき、予定を終えたときに、アプリケーション イベント ログにイベントを1件書き込みます（ソース hello-world、イベント 2000）。内容は "hello-world: opened"、"hello-world: plan set"、"hello-world: plan finished" のいずれかです。イベントに予定のテキストは含まれず、ネットワーク経由で何も送信しません。送信先は組織のイベント収集の設定によって決まります。
+
+無効または未構成の場合、hello-world は使用状況のイベントを書き込みません。</string>
+      <string id="LogErrors">エラー ログを残す</string>
+      <string id="LogErrors_Help">有効にすると、問題が発生したときに、hello-world は各ユーザーの hello-world データ フォルダーにある errors.log に1行追加します。内容は、時刻、バージョン、エラーの種類、関係する hello.py の行です。予定のテキストは含まれず、サイズは100 KB 未満に保たれます。
+
+無効または未構成の場合、hello-world はエラー ログを残しません。</string>
+      <string id="TimestampBackups">壊れたファイルのバックアップに日時の名前を付ける</string>
+      <string id="TimestampBackups_Help">有効にすると、壊れた notes.json は、notes.json.bak、notes.json.bak2 などではなく、notes.json.&lt;date-time&gt;.bak として別に保存されます。
+
+無効または未構成の場合、バックアップには番号が付きます。</string>
+      <string id="LeaveDamagedFile">画面の前に誰もいないときは、壊れたファイルをそのままにする</string>
+      <string id="LeaveDamagedFile_Help">有効にすると、コンソールのないサインイン時の実行など、キーボードの前に誰もいない実行では、壊れた notes.json を別に保存せず、そのままにします。次に誰かがいるときに開くと、ファイルを別に保存し、そのことを伝えます。
+
+無効または未構成の場合、壊れたファイルは見つかった時点でバックアップとして別に保存されます。</string>
+      <string id="MaxBackups">壊れたファイルのバックアップを保持する最大数</string>
+      <string id="MaxBackups_Help">有効にすると、hello-world は新しいバックアップを作る前に、この数を超える壊れた notes.json のバックアップを古いものから削除します。
+
+無効または未構成の場合、すべてのバックアップは、ユーザーがすべて削除するまで保持されます。</string>
+      <string id="FeedbackAddress">フィードバックの送信先アドレス</string>
+      <string id="FeedbackAddress_Help">有効にすると、ウィンドウの [オプション] メニューに「フィードバックを送る...」が表示され、ユーザー自身のメール プログラムでこのアドレス宛ての新しいメールを開きます。hello-world 自体は何も送信しません。
+
+無効または未構成の場合、フィードバックの項目は表示されません。</string>
+    </stringTable>
+    <presentationTable>
+      <presentation id="FeedbackAddress">
+        <textBox refId="FeedbackAddress"><label>アドレス:</label></textBox>
+      </presentation>
+      <presentation id="MaxBackups">
+        <decimalTextBox refId="MaxBackups" defaultValue="5">保持するバックアップの数:</decimalTextBox>
+      </presentation>
+    </presentationTable>
+  </resources>
+</policyDefinitionResources>
