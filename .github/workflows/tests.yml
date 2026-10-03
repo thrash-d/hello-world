@@ -174,8 +174,13 @@ jobs:
           Set-ExecutionPolicy AllSigned -Scope LocalMachine -Force
           Check ((powershell -NoProfile -Command 'Get-ExecutionPolicy') -eq 'AllSigned') 'the machine is set to AllSigned'
 
+          # The refusal arrives on stderr, which 'Stop' would turn into a
+          # failure of this step instead of a result to check.
+          $ErrorActionPreference = 'Continue'
           powershell -NoProfile -File "$($unsigned.Setup)\install.ps1" -PackageHash $unsigned.Hash -Quiet 2>&1 | Write-Host
-          Check ($LASTEXITCODE -ne 0 -and -not (Test-Path $dir)) 'an unsigned package is refused under AllSigned'
+          $refused = $LASTEXITCODE
+          $ErrorActionPreference = 'Stop'
+          Check ($refused -ne 0 -and -not (Test-Path $dir)) 'an unsigned package is refused under AllSigned'
 
           powershell -NoProfile -File "$($signed.Setup)\install.ps1" -PackageHash $signed.Hash -Quiet | Write-Host
           Check ($LASTEXITCODE -eq 0) 'the signed package installs under AllSigned'
