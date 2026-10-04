@@ -25,6 +25,9 @@ import textwrap
 import unicodedata
 import time
 
+# "dmy" or "mdy" for 30/10 against 10/30; None asks Windows.
+DATE_ORDER = None
+
 DAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
         "Sunday")
 MONTHS = ("January", "February", "March", "April", "May", "June", "July",
@@ -503,7 +506,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.42.0"
+VERSION = "1.43.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -1619,9 +1622,9 @@ def delete_everything(state):
     say(tr("Done. Everything saved was deleted."))
     if settings:
         say(tr("Your settings were kept."))
-    if os.path.exists(export_file()):
+    if left := exported_files():
         para(tr("The plans file you saved yourself is not deleted: {path}")
-             .format(path=export_file()) + " " + tr(
+             .format(path="; ".join(left)) + " " + tr(
             "To delete it, choose Delete the plans file I saved."))
     if save(state):
         say(tr("A hello-world window still open elsewhere won't save it again."))
@@ -1893,27 +1896,25 @@ def set_plan(state, can_save, iso=None, after_done=False, in_menu=False):
     if not text:
         say(tr("Nothing changed."))
         return False
-    kept = leftovers(state, text, iso)
+    raw, kept = keep_leftovers(state, text, iso)
     if kept:
-        keep = ask_choice(
-            tr("Keep the ones you haven't finished too? {text}").format(
-                text="; ".join(kept)) + " " + tr("(y or n) > "),
-            strict_yes(), NO_WORDS, tr("Type y or n.")) == "yes"
-        refresh(state, can_save)
-        if state["intent"] != old:
-            say(tr("The other open window changed the plan, so its plan is kept."))
-            return False
-        if keep:
-            text = typed_plan("; ".join(kept) + "; " + text)
+        text = clean(raw)
+        if cut := shortened(raw, text):
+            say(cut)
     base = copy.deepcopy(state)
     # Changing today's plan is a correction, so only a plan carried over from
     # an earlier day is kept for same.
     if old and old["text"] != text and old["date"] != iso:
         state["previous"] = old["text"]
-    state["intent"] = {"text": text, "date": iso}
+    state["intent"] = {"text": text, "date": iso, **plan_due(
+        old, text, datetime.date.fromisoformat(iso))}
     if commit(state, base, can_save):
         para(tr("Saved. Choose 11 when you finish it, or it asks next time "
                 "you open this.") if in_menu else tr(SAVED_PLAN))
+        if note := kept_note(kept, text):
+            para(note)
+        if note := due_note(state["intent"], datetime.date.fromisoformat(iso)):
+            say(note)
         nudge_if_several(text)
     else:
         undo(state, base)
@@ -1924,7 +1925,7 @@ def set_plan(state, can_save, iso=None, after_done=False, in_menu=False):
 def forget_finished(state, can_save):
     """Remove one finished plan from the file, and leave everything else."""
     refresh(state, can_save)
-    shown = list(reversed(state.get("finished") or []))
+    shown = newest_first(state.get("finished") or [])
     if not shown:
         say(tr("No finished plans are saved."))
         return
@@ -2226,19 +2227,19 @@ def more_settings(state, can_save):
         entries += [
             (tr("This week..."), week),
             (tr("My numbers..."), numbers),
-            (tr("Save my plans to a file"), export)]
-        if os.path.exists(export_file()) or os.path.exists(export_file(".csv")):
-            entries.append((tr("Delete the plans file I saved"),
-                            lambda: para(delete_export())))
-        entries.append(
+            (tr("Save my plans to a file"), export),
             (marked(tr("Keep a longer history"), state.get("long_history")), flip(
                 "long_history",
                 tr("Done. Finished plans are kept for 90 days instead of 14."),
-                tr("Done. Finished plans are kept for 14 days, as usual."))))
+                tr("Done. Finished plans are kept for 14 days, as usual.")))]
+        # Entries that come and go are last, so the others keep their numbers.
         if state.get("previous"):
             entries.append((tr("Forget the earlier plan"), forget_previous))
         if state["intent"]:
             entries.append((tr("Due date for my plan..."), due))
+        if exported_files():
+            entries.append((tr("Delete the plans file I saved"),
+                            lambda: para(delete_export())))
     pick(entries)
 
 
@@ -2407,7 +2408,7 @@ def picked(words, count):
     for word in words:
         low, dash, high = word.partition("-")
         high = high if dash else low
-        if not (low.isdigit() and high.isdigit()):
+        if not (low.isdecimal() and high.isdecimal()):
             return None
         low, high = int(low), int(high)
         if not 1 <= low <= high <= count:
@@ -2461,6 +2462,105 @@ def leftovers(state, text, iso):
     return []
 
 
+def newest_first(finished):
+    """Finished things newest first, by the day they were finished."""
+    return sorted(reversed(finished), key=lambda item: item["date"], reverse=True)
+
+
+def keep_leftovers(state, text, iso):
+    """A new plan with today's unfinished things after it, so typing over
+    them never drops them. Returns (plan before cleaning, things kept). The
+    new plan goes first, so a cut at MAX_PLAN takes the oldest things."""
+    kept = leftovers(state, text, iso)
+    return (text + "; " + "; ".join(kept) if kept else text), kept
+
+
+def kept_note(kept, text):
+    """What to say about the unfinished things a new plan kept, or ""."""
+    still = [part for part in kept if part in plan_parts(text)]
+    if not still:
+        return ""
+    note = tr("Still on your list from before: {text}").format(text="; ".join(still))
+    # The plan's own words end it, so the sentence may still need its stop.
+    return note if note[-1] in ".!?。" else note + "."
+
+
+def typed_due(text, d):
+    """The earliest date on or after d written in a plan, as ISO, or None:
+    2026-10-30, 30/10 (or 10/30 where Windows writes the month first), a
+    weekday's full name, or "by" and the like followed by a weekday, today or
+    tomorrow."""
+    # ponytail: a weekday's full name anywhere counts, so "Friday meeting
+    # notes" gets a due date; it shows, and No due date removes it.
+    low = text.lower()
+    found = []
+    for y, m, n in re.findall(r"(?<!\d)(\d{4})-(\d{1,2})-(\d{1,2})(?!\d)", low):
+        found.append((int(y), int(m), int(n)))
+    month_first = DATE_ORDER == "mdy" if DATE_ORDER else short_date_month_first()
+    # 30.10 alone could be a number, so a date with dots needs its year.
+    numeric = (re.findall(r"(?<![\d/.-])(\d{1,2})/(\d{1,2})(?:/(\d{2,4}))?(?![\d/.])", low)
+               + re.findall(r"(?<![\d/.-])(\d{1,2})\.(\d{1,2})\.(\d{2,4})(?![\d/.])", low))
+    for a, b, y in numeric:
+        m, n = (a, b) if month_first else (b, a)
+        if y:
+            found.append((int(y) + (2000 if len(y) == 2 else 0), int(m), int(n)))
+        else:
+            found.append((None, int(m), int(n)))
+    dates = []
+    for y, m, n in found:
+        try:
+            when = datetime.date(y or d.year, m, n)
+        except ValueError:
+            continue
+        if y is None and (d - when).days > 180:
+            when = when.replace(year=d.year + 1)
+        dates.append(when)
+    names = [DAYS] + ([translation()["days"]] if translation() else [])
+    cues = [w for w in tr("by|due|before").lower().split("|") if w]
+    after_cue = [re.split(r"(?<!\w)" + re.escape(cue) + r"(?!\w)", low, maxsplit=1)[1].split()[:1]
+                 for cue in cues
+                 if re.search(r"(?<!\w)" + re.escape(cue) + r"(?!\w)", low)]
+    after_cue = [words[0].strip(".,;:!") for words in after_cue if words]
+    for weekday in range(7):
+        for days in names:
+            full = days[weekday].lower()
+            short = {full, full.split("-")[0], full[:3] if days is DAYS else full}
+            if (re.search(r"(?<!\w)" + re.escape(full) + r"(?!\w)", low)
+                    or any(word in short for word in after_cue)):
+                dates.append(d + datetime.timedelta(days=(weekday - d.weekday()) % 7))
+    for word in after_cue:
+        if word in tr("today").lower().split("|"):
+            dates.append(d)
+        elif word in tr("tomorrow").lower().split("|"):
+            dates.append(d + datetime.timedelta(days=1))
+    dates = [when for when in dates if (d - when).days <= 180]
+    return min(dates).isoformat() if dates else None
+
+
+def short_date_month_first():
+    """True where Windows writes short dates month first, as in the US."""
+    try:
+        import ctypes
+        buffer = ctypes.create_unicode_buffer(80)
+        # LOCALE_SSHORTDATE of the user's default locale.
+        if ctypes.windll.kernel32.GetLocaleInfoEx(None, 0x1F, buffer, 80):
+            return buffer.value.lstrip("'").upper().startswith("M")
+    except (AttributeError, OSError):
+        pass
+    return False
+
+
+def plan_due(old, text, d):
+    """The due date for a plan saved over `old`, as dict items: one written
+    in the plan, else the old one while the plan keeps any of its things."""
+    if found := typed_due(text, d):
+        return {"due": found}
+    if old and ({p.casefold() for p in plan_parts(old["text"])}
+                & {p.casefold() for p in plan_parts(text)}):
+        return carried_due(old)
+    return {}
+
+
 def nudge_if_several(text):
     """A plan of several things joined together is hard to finish. A list
     with ; is several on purpose, and each part is finished on its own."""
@@ -2512,7 +2612,7 @@ def ask_which(parts):
     for n, part in enumerate(parts, 1):
         say(wrapped(f"  {n}  ", part))
     for _ in range(3):
-        typed = ask(tr("Which did you finish? Type the numbers, such as 1 3, "
+        typed = ask(tr("Which did you finish? Type numbers such as 1 3 or 1-3, "
                        "y for all, or Enter to go back > "))
         text = (typed or "").lower().strip(TRIM)
         if not text:
@@ -2524,8 +2624,8 @@ def ask_which(parts):
             return True, (None if len(done) == len(parts) else done)
         if text in strict_yes() + DONE_WORDS + DID_WORDS:
             return True, None
-        not_a_choice(typed, tr("Type the numbers, such as 1 3, y for all, or "
-                               "press Enter to go back."))
+        not_a_choice(typed, tr("Type numbers from 1 to {n}, such as 1 3 or 1-3, "
+                               "y for all, or press Enter to go back.").format(n=len(parts)))
     return False, None
 
 
@@ -2593,10 +2693,26 @@ def export_file(ext=".md"):
     folder = (EXPORT_DIR or known_folder("FDD39AD0-238F-46AF-ADB4-6C85480369C7")
               or os.path.join(os.path.expanduser("~"), "Documents"))
     # The name is translated, so it is checked for a character Windows refuses.
-    name = tr("hello-world plans")
+    return os.path.join(folder, file_name(tr("hello-world plans")) + ext)
+
+
+def file_name(name):
+    """A translated file name, or the English one where Windows would refuse
+    it."""
     if not name.strip(" .") or any(c in name for c in '<>:"/\\|?*'):
-        name = "hello-world plans"
-    return os.path.join(folder, name + ext)
+        return "hello-world plans"
+    return name
+
+
+def exported_files():
+    """The exported files there are, under the name of any language, since
+    the language may have changed since the export."""
+    folder = os.path.dirname(export_file())
+    names = {"hello-world plans"} | {
+        file_name(data["text"]["hello-world plans"]) for data in LANGUAGES.values()
+        if "hello-world plans" in data.get("text", {})}
+    return [path for name in sorted(names) for ext in (".md", ".csv")
+            if os.path.exists(path := os.path.join(folder, name + ext))]
 
 
 def list_separator():
@@ -2625,11 +2741,14 @@ def export_plans(state):
         lines += [f"- {part}" for part in plan_parts(state["intent"]["text"])] + [""]
     if state.get("finished"):
         lines += ["## " + tr("Finished lately:"), ""]
-        lines += [f"- {i['date']}: {i['text']}" for i in reversed(state["finished"])]
+        lines += [f"- {i['date']}: {i['text']}" for i in newest_first(state["finished"])]
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             f.write("\n".join(lines).rstrip() + "\n")
+    except OSError:
+        return None
+    try:
         # The byte order mark makes Excel read the file as UTF-8.
         with open(export_file(".csv"), "w", encoding="utf-8-sig", newline="") as f:
             rows = csv.writer(f, delimiter=list_separator())
@@ -2639,18 +2758,18 @@ def export_plans(state):
                                 state["intent"].get("due", ""), ""]
                                for part in plan_parts(state["intent"]["text"]))
             rows.writerows([i["date"], i["text"], "", tr("yes")]
-                           for i in reversed(state.get("finished", [])))
-        return path
+                           for i in newest_first(state.get("finished", [])))
     except OSError:
-        return None
+        # The .md was saved; a .csv open in Excel stays as it was.
+        pass
+    return path
 
 
 def delete_export():
     """Delete the files Save my plans to a file wrote. Returns the message."""
     try:
-        for path in (export_file(), export_file(".csv")):
-            if os.path.exists(path):
-                os.remove(path)
+        for path in exported_files():
+            os.remove(path)
     except OSError:
         return tr("Could not delete the plans file. Close it if it is open, "
                   "then try again.")
@@ -2659,7 +2778,7 @@ def delete_export():
 
 def exported(path):
     """What to say after Save my plans to a file."""
-    return (tr("Saved to {path}").format(path=path) + " " + tr(
+    return (tr("Saved to {path}").format(path=path) + "\n" + tr(
         "A copy for spreadsheets is next to it, ending in .csv.")) if path else tr(
         "Could not save that on this computer.")
 
@@ -2931,8 +3050,10 @@ def daily(startup):
                 if text:
                     if intent and intent["text"] != text:
                         state["previous"] = intent["text"]
-                    intent = {"text": text, "date": iso}
+                    intent = {"text": text, "date": iso, **plan_due(intent, text, d)}
                     typed_new = True
+                    if note := due_note(intent, d):
+                        say(note)
             say()
     except Quit:
         quitting = True
@@ -3730,13 +3851,15 @@ class Visit:
         if command:
             # A word like "skip" or "none" is a choice to plan nothing.
             return not said, said, False
-        text = clean(reuse(self.state, typed))
         state = self.state
+        raw, kept = keep_leftovers(state, clean(reuse(state, typed)), self.iso)
+        text = clean(raw)
         base = copy.deepcopy(state)
         old = state["intent"]
         if old and old["text"] != text and old["date"] != self.iso:
             state["previous"] = old["text"]
-        state["intent"] = {"text": text, "date": self.iso}
+        state["intent"] = {"text": text, "date": self.iso,
+                           **plan_due(old, text, self.d)}
         saved, said = quietly(commit, state, base, self.can_save)
         if not saved:
             undo(state, base)
@@ -3744,9 +3867,9 @@ class Visit:
                                      "Your plan is unchanged."), False
         self.followup = None
         _, several = quietly(nudge_if_several, text)
-        cut = shortened(typed, text)
-        return False, " ".join([tr("Saved.")] + ([cut] if cut else [])
-                               + ([several] if several else [])), True
+        notes = [shortened(raw if kept else typed, text), kept_note(kept, text),
+                 due_note(state["intent"], self.d), several]
+        return False, " ".join([tr("Saved.")] + [n for n in notes if n]), True
 
     def saved_summary(self):
         """What is saved, in words, and where the file is. The raw file stays
@@ -3787,15 +3910,20 @@ class Visit:
         message."""
         if tidy(typed) and clean(typed) != self.plan():
             quietly(refresh, self.state, self.can_save)
-            kept = leftovers(self.state, clean(typed), self.iso)
-            close, message, saved = self.save(
-                "; ".join(kept + [typed]) if kept else typed)
+            mine = plan_parts(clean(typed))
+            today = {p.casefold(): p for p in plan_parts(self.plan())} if self.plan() else {}
+            # The box edited down to some of today's things finishes those.
+            if today and all(p.casefold() in today for p in mine):
+                return self.finish_parts([today[p.casefold()] for p in mine])
+            close, message, saved = self.save(typed)
             if not saved:
                 return message
-            if kept:
-                now = plan_parts(self.plan())
-                return self.finish_parts(
-                    [p for p in plan_parts(clean(typed)) if p in now])
+            now = plan_parts(self.plan())
+            names = [p for p in mine if p in now]
+            if not names:
+                return message
+            if len(names) < len(now):
+                return self.finish_parts(names)
         _, said = quietly(mark_done_now, self.state, self.can_save, self.d, False)
         # The finished list after it is for the text screen.
         return said.split(tr("Finished lately:"))[0].strip()
@@ -4091,7 +4219,7 @@ class Window:
             if len(today_parts) > 1:
                 para(self.ASK, tr("Tick the ones you finish, then click Done."), 2)
                 ticks(today_parts)
-        due = due_note(v.state["intent"], v.d) if v.plan() and not v.followup else ""
+        due = due_note(v.state["intent"], v.d) if v.plan() or v.followup else ""
         add(static, self.STATUS, "" if plans_off() else due or tr(
             "A few things? Put ; between them."), text_style, m, 2 * line)
         y += 2 * line + 6
@@ -4314,8 +4442,13 @@ class Window:
             if (cid == self.DONE and self.item(self.TICK) and not ticks
                     and not self.confirm(tr("Mark all of them done?"))):
                 return
+            typed = self.typed()
             message = v.answer({self.DONE: "yes", self.NOT_YET: "no"}.get(cid, "skip"),
                                ticks if cid == self.DONE and ticks else None)
+            if tidy(typed) and not v.followup and clean(typed) != v.plan():
+                _, said, saved = v.save(typed)
+                if said:
+                    message += " " + said
             if v.followup:
                 self.set_text(self.STATUS, message)
                 return
@@ -4373,19 +4506,17 @@ class Window:
         v = self.visit
         typed = self.typed()
         command, _ = quietly(is_command, typed)
+        earlier = ""
         if (self.asking and v.followup and tidy(typed) and not command
-                and not is_same(typed) and clean(typed) != v.followup
-                and self.confirm(tr("Keep your plan from {date} for today too?").format(
-                    date=long_date(datetime.date.fromisoformat(v.state["intent"]["date"]))))):
-            typed = v.followup + "; " + typed
-        elif (tidy(typed) and not command and not is_same(typed)
-              and (kept := leftovers(v.state, clean(typed), v.iso))
-              and self.confirm(tr("Keep the ones you haven't finished too? {text}")
-                               .format(text="; ".join(kept)))):
-            typed = "; ".join(kept) + "; " + typed
+                and not is_same(typed) and clean(typed) != v.followup):
+            # Typing a new plan instead of answering keeps the earlier one.
+            earlier = v.followup
+            typed = typed + "; " + earlier
         close, message, saved = v.save(typed)
         if close:
             return None
+        if saved and earlier:
+            message += " " + kept_note(plan_parts(earlier), v.plan())
         self.set_text(self.STATUS, message)
         if saved:
             if self.asking:
@@ -4628,7 +4759,7 @@ class Window:
                    (0, 14, tr("Save my plans to a file"))]
         if v.plan():
             entries.insert(0, (0, 16, tr("Due date for my plan...")))
-        if os.path.exists(export_file()) or os.path.exists(export_file(".csv")):
+        if exported_files():
             entries.append((0, 11, tr("Delete the plans file I saved")))
         entries.append((checked if v.state.get("long_history") else 0, 15,
                         tr("Keep a longer history")))
@@ -4667,7 +4798,7 @@ class Window:
                 tr("Done. Finished plans are kept for 90 days instead of 14."),
                 tr("Done. Finished plans are kept for 14 days, as usual.")))
         elif choice == 18:
-            items = list(reversed(v.state["finished"]))[:20]
+            items = newest_first(v.state["finished"])[:20]
             picked = self.popup([(0, 200 + n, tr("{date}: ").format(date=long_date(
                 datetime.date.fromisoformat(i["date"]))) + i["text"])
                 for n, i in enumerate(items)])
@@ -4693,8 +4824,9 @@ class Window:
         elif choice == 6:
             if self.confirm(tr("Delete all saved notes, dates and plans on this "
                                "computer?")):
-                self.set_text(self.STATUS, v.delete_all())
-                self.refresh_plan()
+                self.fresh = True
+                self.reopen(v.delete_all())
+                return
             else:
                 self.set_text(self.STATUS, tr("Nothing was deleted."))
 
