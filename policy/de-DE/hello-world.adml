@@ -80,6 +80,11 @@ Wenn diese Einstellung deaktiviert oder nicht konfiguriert ist, gibt es keinen E
 Wenn Sie diese Einstellung deaktivieren oder nicht konfigurieren, wählt jede Person selbst unter Optionen &gt; Was das Fenster zeigt.
 
 Eine Inhaltsdatei der Organisation ersetzt beide Listen.</string>
+      <string id="SUPPORTED_1_44">hello-world 1.44.0 oder höher</string>
+      <string id="UnlockedNotes">Notizen nicht sperren</string>
+      <string id="UnlockedNotes_Help">Wenn Sie diese Einstellung aktivieren, speichert hello-world die Notizen jeder Person als Klartext, den jeder lesen kann, der die Datei lesen kann, wie vor Version 1.44.0. Verwenden Sie sie nur, wo Aufbewahrungsregeln es verlangen, und informieren Sie die Personen, denn der Bildschirm bittet sie dann, bei alltäglichen Aufgaben zu bleiben.
+
+Wenn Sie diese Einstellung deaktivieren oder nicht konfigurieren, werden die Notizen mit der Windows-Datenschutz-API an das Windows-Konto der Person gebunden. Andere Benutzer und Kopien der Datei können sie nicht lesen; ein Administrator mit voller Kontrolle über den PC könnte es weiterhin. Ein lokales Konto, dessen Kennwort ein Administrator zurücksetzt, verliert seine gesperrten Notizen.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">

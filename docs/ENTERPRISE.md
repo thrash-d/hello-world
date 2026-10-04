@@ -211,6 +211,7 @@ settings are under Computer or User Configuration > Administrative Templates
 | Leave a damaged file alone when nobody is at the screen | `LeaveDamagedFile` | A run with nobody at the keyboard leaves a damaged file in place for the next visit |
 | Address for feedback | `FeedbackAddress` (string) | Adds Options > Send feedback..., which opens a new mail to that address in the person's own mail program |
 | Show the tips for floor and shift work | `FloorTips` | The second tip list, for warehouses, factories and shifts, for everyone |
+| Keep notes unlocked | `UnlockedNotes` | Computer only. Saves notes as plain text as before 1.44.0, for records rules that need them readable. Otherwise notes are locked to each person's Windows account with DPAPI |
 | Turn on the sign-in reminder for everyone | `TurnOnReminder` | Turns the reminder on at each person's next open unless they already answered the question; each person can still turn it off |
 | Open hello-world as a text screen | `UseTextScreen` | The Start menu opens the text screen in a console, as before 1.28.0, and the sign-in launcher opens it instead of showing a notification |
 

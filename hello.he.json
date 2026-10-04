@@ -559,7 +559,10 @@
   "Which did you finish? Type numbers such as 1 3 or 1-3, y for all, or Enter to go back > ": "מה הושלם? להקליד את המספרים, למשל 1 3 או 1-3, y לכולם, או Enter לחזרה > ",
   "by|due|before": "עד|לפני|תאריך יעד|דדליין",
   "today": "היום",
-  "tomorrow": "מחר"
+  "tomorrow": "מחר",
+  "If you type a plan, it asks next time how it went. It can be anything you want to get done, at work or not. Your notes are locked to your Windows account and never sent anywhere. Only someone with full admin control of this PC could get to them.": "אם מקלידים תוכנית, בפעם הבאה תופיע שאלה איך זה הלך. זה יכול להיות כל דבר שרוצים לעשות, בעבודה או מחוצה לה. הרשומות נעולות לחשבון ה-Windows שלך ולא נשלחות לשום מקום. רק מי שיש לו שליטה מלאה כמנהל במחשב הזה יכול להגיע אליהן.",
+  "It never leaves this computer. It is locked to your Windows account, so other people who use this computer or copy its files can't read it. Someone with full admin control of this PC still could.": "המידע לא יוצא מהמחשב הזה. הוא נעול לחשבון ה-Windows שלך, כך שאנשים אחרים שמשתמשים במחשב או מעתיקים את הקבצים שלו לא יכולים לקרוא אותו. מי שיש לו שליטה מלאה כמנהל במחשב עדיין יכול.",
+  "Your saved notes are locked to a Windows account that can't open them here, so hello-world set them aside as a backup copy and started fresh. Menu option 4 deletes the backup.": "הרשומות השמורות נעולות לחשבון Windows שלא יכול לפתוח אותן כאן, ולכן hello-world שמר אותן בצד כעותק גיבוי והתחיל מחדש. אפשרות 4 בתפריט מוחקת את הגיבוי."
  },
  "tips_floor": [
   "לבדוק שהמעבר פנוי לפני המשימה הראשונה במשמרת.",

@@ -229,7 +229,10 @@
   "Done. The plans file you saved is deleted.": "Pronto. O ficheiro de planos que guardou foi eliminado.",
   "There is no plan to give a due date. Type a plan first.": "Não há plano ao qual dar prazo. Escreva um plano primeiro.",
   "Which did you finish? Type numbers such as 1 3 or 1-3, y for all, or Enter to go back > ": "Quais terminou? Escreva os números, por exemplo 1 3 ou 1-3, s para todas, ou Enter para voltar > ",
-  "Type numbers from 1 to {n}, such as 1 3 or 1-3, y for all, or press Enter to go back.": "Escreva números de 1 a {n}, como 1 3 ou 1-3, s para todas, ou prima Enter para voltar."
+  "Type numbers from 1 to {n}, such as 1 3 or 1-3, y for all, or press Enter to go back.": "Escreva números de 1 a {n}, como 1 3 ou 1-3, s para todas, ou prima Enter para voltar.",
+  "If you type a plan, it asks next time how it went. It can be anything you want to get done, at work or not. Your notes are locked to your Windows account and never sent anywhere. Only someone with full admin control of this PC could get to them.": "Se escrever um plano, da próxima vez é perguntado como correu. Pode ser qualquer coisa que queira fazer, do trabalho ou não. As notas ficam bloqueadas na sua conta do Windows e nunca são enviadas para lado nenhum. Só alguém com controlo total de administrador deste computador lhes poderia aceder.",
+  "It never leaves this computer. It is locked to your Windows account, so other people who use this computer or copy its files can't read it. Someone with full admin control of this PC still could.": "Nunca sai deste computador. Fica bloqueado na sua conta do Windows, por isso quem usar este computador ou copiar os ficheiros não o consegue ler. Alguém com controlo total de administrador deste computador ainda conseguiria.",
+  "Your saved notes are locked to a Windows account that can't open them here, so hello-world set them aside as a backup copy and started fresh. Menu option 4 deletes the backup.": "As notas guardadas estão bloqueadas numa conta do Windows que não as consegue abrir aqui, por isso o hello-world guardou-as como cópia de segurança e começou do zero. A opção 4 do menu apaga a cópia."
  },
  "thoughts": {
   "0": "Abrir aquele documento que tem andado a adiar e ler só o primeiro parágrafo.",

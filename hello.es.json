@@ -559,7 +559,10 @@
   "Which did you finish? Type numbers such as 1 3 or 1-3, y for all, or Enter to go back > ": "¿Cuáles terminaste? Escribe números como 1 3 o 1-3, s para todas, o Enter para volver > ",
   "by|due|before": "para|hasta|antes del|antes de|límite|vence|entrega",
   "today": "hoy|hoy mismo",
-  "tomorrow": "mañana"
+  "tomorrow": "mañana",
+  "If you type a plan, it asks next time how it went. It can be anything you want to get done, at work or not. Your notes are locked to your Windows account and never sent anywhere. Only someone with full admin control of this PC could get to them.": "Si escribes un plan, la próxima vez te pregunta cómo fue. Puede ser cualquier cosa que quieras hacer, del trabajo o no. Tus notas están bloqueadas con tu cuenta de Windows y nunca se envían a ningún sitio. Solo alguien con control total de administrador de este equipo podría llegar a ellas.",
+  "It never leaves this computer. It is locked to your Windows account, so other people who use this computer or copy its files can't read it. Someone with full admin control of this PC still could.": "Nunca sale de este equipo. Está bloqueado con tu cuenta de Windows, así que otras personas que usen este equipo o copien sus archivos no pueden leerlo. Alguien con control total de administrador de este equipo sí podría.",
+  "Your saved notes are locked to a Windows account that can't open them here, so hello-world set them aside as a backup copy and started fresh. Menu option 4 deletes the backup.": "Tus notas guardadas están bloqueadas con una cuenta de Windows que no puede abrirlas aquí, así que hello-world las apartó como copia de seguridad y empezó de cero. La opción 4 del menú borra la copia."
  },
  "tips_floor": [
   "Comprueba que tu zona de paso está despejada antes de la primera tarea del turno.",

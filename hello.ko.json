@@ -559,7 +559,10 @@
   "Which did you finish? Type numbers such as 1 3 or 1-3, y for all, or Enter to go back > ": "어떤 일을 끝냈나요? 1 3 또는 1-3처럼 번호를 입력하세요. y는 전부, Enter는 돌아가기 > ",
   "by|due|before": "까지|마감|기한|전",
   "today": "오늘",
-  "tomorrow": "내일"
+  "tomorrow": "내일",
+  "If you type a plan, it asks next time how it went. It can be anything you want to get done, at work or not. Your notes are locked to your Windows account and never sent anywhere. Only someone with full admin control of this PC could get to them.": "계획을 입력하면 다음번에 어떻게 됐는지 물어봐요. 업무든 아니든, 하고 싶은 일이면 무엇이든 괜찮아요. 메모는 내 Windows 계정으로 잠겨 있고 어디로도 보내지 않아요. 이 PC의 관리자 권한을 모두 가진 사람만 볼 수 있어요.",
+  "It never leaves this computer. It is locked to your Windows account, so other people who use this computer or copy its files can't read it. Someone with full admin control of this PC still could.": "이 컴퓨터 밖으로 나가지 않아요. 내 Windows 계정으로 잠겨 있어서 이 컴퓨터를 쓰는 다른 사람이나 파일을 복사한 사람은 읽을 수 없어요. 이 PC의 관리자 권한을 모두 가진 사람은 볼 수 있어요.",
+  "Your saved notes are locked to a Windows account that can't open them here, so hello-world set them aside as a backup copy and started fresh. Menu option 4 deletes the backup.": "저장된 메모가 여기서 열 수 없는 Windows 계정으로 잠겨 있어서, hello-world가 백업 사본으로 따로 두고 새로 시작했어요. 메뉴 4번으로 백업을 지울 수 있어요."
  },
  "tips_floor": [
   "첫 작업 전에 다니는 통로에 걸리는 게 없는지 확인하세요.",

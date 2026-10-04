@@ -80,6 +80,11 @@ Si ce paramètre est désactivé ou non configuré, il n'y a pas d'option de com
 Si vous désactivez ou ne configurez pas ce paramètre, chaque personne choisit dans Options &gt; Ce qu'affiche la fenêtre.
 
 Un fichier de contenu de l'organisation remplace les deux listes.</string>
+      <string id="SUPPORTED_1_44">hello-world 1.44.0 ou version ultérieure</string>
+      <string id="UnlockedNotes">Laisser les notes non verrouillées</string>
+      <string id="UnlockedNotes_Help">Si vous activez ce paramètre, hello-world enregistre les notes de chaque personne en texte clair, lisible par toute personne pouvant lire le fichier, comme avant la version 1.44.0. Ne l'utilisez que si des règles d'archivage l'exigent, et prévenez les personnes, car l'écran leur demandera alors de s'en tenir aux tâches courantes.
+
+Si vous désactivez ce paramètre ou ne le configurez pas, les notes sont verrouillées sur le compte Windows de la personne avec l'API de protection des données de Windows. Les autres utilisateurs et les copies du fichier ne peuvent pas les lire ; un administrateur ayant le contrôle complet du PC le pourrait encore. Un compte local dont un administrateur réinitialise le mot de passe perd ses notes verrouillées.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
