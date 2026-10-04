@@ -73,7 +73,8 @@ earlier plan after 30 days), `no_count` (no done count kept), `numbers`,
 turns the reminder off, hides the thought and tip, turns on the days-in-a-row
 message, picks a language other than the Windows one, shows what is saved,
 deletes everything (your settings stay), or switches to the text screen. In
-the text screen, menu option 10 picks the language, and pressing Ctrl+C twice
+the text screen, menu option 10 picks the language, option 12 has the
+reminder times and the window's other settings, and pressing Ctrl+C twice
 closes it.
 
 ### The text screen
@@ -221,7 +222,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.38.0'
+$tag = 'v1.39.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

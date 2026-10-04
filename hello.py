@@ -34,7 +34,7 @@ GREETING = "Hello, world!"
 # lists repeat every 100 days (the pairing much later).
 TIPS = (
     'Sip a glass of water slowly, away from your screen.',
-    'Roll your shoulders back five times, nice and slow.',
+    'Raise your screen so its top edge is at eye level, with a book under it if needed.',
     'Rest your eyes for twenty seconds: look far away, or close them.',
     'Stretch your arms overhead, seated or standing, and take a deep breath.',
     'Move to the farthest room or window you can reach, and back.',
@@ -44,19 +44,19 @@ TIPS = (
     'Pin the one document you open most so it is one click away.',
     'Take a short walk or roll outside, whatever suits you.',
     'Pour a warm or cool drink and enjoy it away from your screen.',
-    'Rest your attention on something calm, a view, a sound or a texture.',
+    'Turn your screen brightness down a step if it is brighter than the room.',
     'Write the next step on one task you left half done.',
     'Plant both feet flat and sit tall, or stand tall, for ten breaths.',
     'Mute one group chat you only ever skim.',
     'Unclench your jaw and relax your forehead for a moment.',
-    'Move around for two minutes in whatever way feels good today.',
+    'Take your next phone call standing up or away from your desk, if you can.',
     'Block fifteen minutes in your calendar for the task you keep putting off.',
     'Adjust your chair, screen or keyboard so one thing sits more comfortably.',
     'Take the long way to your next meeting or call, if you can.',
     'Save a template for one email you write again and again.',
     'Learn one keyboard shortcut for the program you use most.',
     'Drink a full glass of water before your next coffee or tea.',
-    'Shrug your shoulders up to your ears, then let them melt down.',
+    'Set a timer for fifty minutes, and when it rings, stand up or stretch before you start it again.',
     'Step outside or open a window for a minute of fresh air.',
     'Take five slow breaths, making each exhale a little longer.',
     'Pause for one quiet minute before you open your next message.',
@@ -65,7 +65,7 @@ TIPS = (
     'Name three things you notice right now, with any sense.',
     'Write down one thing you are looking forward to this week.',
     'Set a timer for two minutes and simply sit with no screen.',
-    'Enjoy something small nearby, like a plant or a favorite mug.',
+    'Put one thing you like, such as a photo or a plant, where you can see it from your chair.',
     'Think of one thing you did well this week and give yourself a nod.',
     'Listen to one favorite song, start to finish, with nothing else open.',
     'Breathe in for four counts and out for six, three times.',
@@ -77,11 +77,11 @@ TIPS = (
     'Write one sentence about something you are grateful for.',
     'Savor the next sip of your drink and notice the taste.',
     'Take a short break between two tasks before you start the next one.',
-    'Look for one thing today that turns out better than you expected.',
-    'Choose one word for how you want the afternoon to feel.',
+    'Before you leave, write down one thing that went better than you expected today.',
+    'Write the three things you will do this afternoon, in the order you will do them.',
     'Let your mind rest for sixty seconds, then go back to your next task.',
     'Notice your feet on the floor and feel steady for a moment.',
-    'Remember one kind thing someone did for you and enjoy the memory.',
+    'Write down one thing you learned this week, so you can find it again.',
     'Jot down one idea you want to revisit later and let it rest.',
     'Tidy one small corner of your desk, just one.',
     'Reply to one message that has been waiting a while.',
@@ -112,7 +112,7 @@ TIPS = (
     'Share a useful link with someone who might enjoy it.',
     'Say hello to someone you have not spoken with before.',
     'Send a quick thank-you note to someone who helped you lately.',
-    'Greet a coworker warmly at the start of your next call.',
+    'Join your next call a minute early and say hello to whoever is already there.',
     'Ask a teammate what they are looking forward to this week.',
     'Congratulate someone on a small win you noticed.',
     'Invite a colleague for a short chat over tea, coffee, or a call.',
@@ -122,15 +122,15 @@ TIPS = (
     'Ask someone to recommend a song, show, or book.',
     'Check in with a colleague who has been quiet lately.',
     'Offer to help with one small thing if someone seems busy.',
-    'Greet the next person you meet with a warm hello.',
-    'Pass along a kind word you heard about a colleague.',
+    'After a meeting that went well, post a one-line thank-you in its chat.',
+    'When someone praises a colleague to you, pass it on to that colleague.',
     'Ask a coworker what made their week easier.',
     'Send a friendly message to someone you used to work with.',
     'Thank someone who keeps shared spaces running smoothly.',
     'Introduce two colleagues who might enjoy meeting each other.',
     'Ask a teammate how you can make a handoff easier for them.',
-    'Share a small, harmless joke with someone nearby.',
-    'Add a little extra warmth to your next please and thank you.',
+    'Save a seat for someone at the next meeting or lunch.',
+    'In your next request, say why you need it and by when.',
     'Ask a colleague what they enjoy doing outside of work.',
     'Listen fully to the next person who speaks to you, without multitasking.',
 )
@@ -148,7 +148,7 @@ TIPS_FLOOR = (
     'Take your full break, away from the floor if you can.',
     'Point out one small hazard to the person who can fix it.',
     'Check that your gloves, boots or vest are still in good shape.',
-    'Roll your shoulders back between loads.',
+    'Between loads, set everything down and stand straight for one breath.',
     'Thank someone who helped you catch up today.',
     'Look at something far away for twenty seconds between close-up tasks.',
     'Put one tool back where the next person will look for it.',
@@ -167,7 +167,7 @@ TIPS_FLOOR = (
     'Shake out your hands and wrists between scans.',
     'Tell your lead about a near miss, so it stays a near miss.',
     'Pick one task to finish properly before the end of the shift.',
-    'Smile at the next person you pass in the aisle.',
+    'Hold the door or gate for the next person carrying something.',
     'Shift your footing or posture every so often when you stand a long time.',
     'Write down one number or detail you keep forgetting.',
     'Check the time once, then let the clock be for a while.',
@@ -326,7 +326,8 @@ At a plan prompt, same brings back your earlier unfinished plan.
 When it asks "Did you do it?", n means not yet, and you can keep the
 plan for today. q closes from any question.
 In this menu, 1 shows what is saved, 7 forgets one finished plan,
-and 8 hides the thought and tip.
+8 hides the thought and tip, and 12 has the reminder times and the
+other settings.
 Type m to see the options again. Nothing is sent anywhere."""
 
 
@@ -501,7 +502,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.38.0"
+VERSION = "1.39.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -1852,13 +1853,13 @@ def forget_finished(state, can_save):
     numbers = [str(n) for n in range(1, len(shown) + 1)]
     for _ in range(3):
         choice = ask(tr("Type the number to forget (1 to {n}), or Enter to "
-                        "keep them all > ").format(n=len(shown)))
+                        "go back > ").format(n=len(shown)))
         if (choice or "").lower().strip(TRIM) in QUIT_WORDS:
             raise Quit
         if not choice or choice in numbers:
             break
         para(tr('There is no number "{typed}" on the list. Type a number from '
-                "1 to {n}, or press Enter to keep them all.").format(
+                "1 to {n}, or press Enter to go back.").format(
                     typed=tidy(choice)[:30], n=len(shown)))
     if not choice or choice not in numbers:
         say(tr("Nothing changed."))
@@ -1946,12 +1947,13 @@ def menu(state, can_save=True, iso=None, alone=False):
                                or tr("following Windows"))))
             say(" 11  " + (tr("Mark today's plan done (plans are turned off)")
                            if plans_off() else tr("Mark today's plan done")))
+            say(" 12  " + tr("More settings..."))
             say("  " + tr("Enter") + "  " + (tr("Close") if alone else
                                              tr("Back to the last prompt")))
             listed = True
-            choice = ask(tr("Choose 1 to 11, or Enter to go back > "))
+            choice = ask(tr("Choose 1 to 12, or Enter to go back > "))
         else:
-            choice = ask(tr("Choose 1 to 11, m to list the options, or Enter to "
+            choice = ask(tr("Choose 1 to 12, m to list the options, or Enter to "
                             "go back > "))
         if not choice:
             return
@@ -2023,6 +2025,8 @@ def menu(state, can_save=True, iso=None, alone=False):
             say(tr("Plans are turned off by your organization."))
         elif choice == "11":
             mark_done_now(state, can_save, today())
+        elif choice == "12":
+            more_settings(state, can_save)
         elif choice == "10" and policy("ForceEnglish"):
             say(tr("Your organization shows hello-world in English."))
         elif choice == "10":
@@ -2043,7 +2047,98 @@ def menu(state, can_save=True, iso=None, alone=False):
                 undo(state, base)
                 say(tr("Could not save that choice on this computer."))
         else:
-            not_a_choice(choice, tr("Type 1 to 11, or press Enter to go back."))
+            not_a_choice(choice, tr("Type 1 to 12, or press Enter to go back."))
+
+
+def more_settings(state, can_save):
+    """Menu option 12: the settings the window's Options has that the menu
+    above doesn't, by number."""
+    v = Visit.using(state, can_save)
+    yes_no = " " + tr("(y or n, Enter to go back) > ")
+    hint = tr("Type y or n, or press Enter to go back.")
+
+    def marked(label, on):
+        return (tr("{setting} (now on)") if on else
+                tr("{setting} (now off)")).format(setting=label)
+
+    def pick(entries):
+        for n, (label, _) in enumerate(entries, 1):
+            say(wrapped(f" {n:>2}  ", label))
+        choice = (ask(tr("Type a number from 1 to {n}, or Enter to go back > ")
+                      .format(n=len(entries))) or "").strip(TRIM)
+        if choice.lower() in QUIT_WORDS:
+            raise Quit
+        if choice in [str(n) for n in range(1, len(entries) + 1)]:
+            entries[int(choice) - 1][1]()
+        elif choice:
+            not_a_choice(choice, tr("Type a number from 1 to {n}, or press Enter "
+                                    "to go back.").format(n=len(entries)))
+
+    def flip(key, on_text, off_text):
+        return lambda: para(v.switch(key, on_text, off_text))
+
+    def reminders():
+        at, on = state.get("remind_at"), reminder_on()
+        entries = [(marked(tr("At sign-in"), on and not at),
+                    lambda: para(v.set_reminder(True)))]
+        entries += [(marked(tr("At {at}").format(at=t.lstrip("0")), on and at == t),
+                     lambda t=t: para(v.reminder_at(t))) for t in REMINDER_TIMES]
+        entries += [(marked(label, state.get(key)), flip(key, on_text, off_text))
+                    for key, label, on_text, off_text in reminder_switches()]
+        pick(entries)
+
+    def numbers():
+        if not state.get("numbers") and ask_choice(
+                tr("Keep my numbers from now on? They count the days you open "
+                   "hello-world and the plans you finish, on this computer "
+                   "only.") + yes_no, strict_yes(), NO_THANKS, hint) == "yes":
+            v.toggle("numbers")
+        for line in numbers_text(state).split("\n"):
+            para(line)
+
+    def week():
+        for line in week_text(state, today()).split("\n"):
+            say(line)
+
+    def export():
+        path = export_plans(state)
+        para(tr("Saved to {path}").format(path=path) if path else
+             tr("Could not save that on this computer."))
+
+    def forget_previous():
+        if ask_choice(tr("Forget the earlier plan? {text}").format(
+                text=state["previous"]) + yes_no, strict_yes(), NO_WORDS,
+                hint) != "yes":
+            say(tr("Nothing changed."))
+        elif v.setting("previous", None):
+            say(tr("Done. The earlier plan is forgotten."))
+        else:
+            say(tr("Could not save that on this computer. Nothing changed."))
+
+    entries = []
+    if (launcher_place()[0] and not plans_off()
+            and not policy("DisableSignInLauncher")):
+        entries.append((tr("Reminder settings..."), reminders))
+    entries.append((marked(tr("Greet me by name"), state.get("name")), flip(
+        "name", tr("Done. The greeting uses your first name."),
+        tr("Done. The greeting is back to the usual one."))))
+    if not (policy("HideThoughtAndTip") or policy("FloorTips") or org_content()):
+        entries.append((marked(tr("Tips for floor and shift work"),
+                               state.get("floor_tips")), flip(
+            "floor_tips", tr("Floor and shift tips are on."),
+            tr("Floor and shift tips are off."))))
+    if not plans_off():
+        entries += [
+            (tr("This week..."), week),
+            (tr("My numbers..."), numbers),
+            (tr("Save my plans to a file"), export),
+            (marked(tr("Keep a longer history"), state.get("long_history")), flip(
+                "long_history",
+                tr("Done. Finished plans are kept for 90 days instead of 14."),
+                tr("Done. Finished plans are kept for 14 days, as usual.")))]
+        if state.get("previous"):
+            entries.append((tr("Forget the earlier plan"), forget_previous))
+    pick(entries)
 
 
 def set_language(state, can_save, code):
@@ -2066,7 +2161,7 @@ def choose_language(state, can_save):
     codes = list(LANGUAGE_NAMES) + [None]
     for n, code in enumerate(codes, 1):
         say(f"  {n}  " + (LANGUAGE_NAMES[code] if code else tr("Follow Windows")))
-    answer = ask(tr("Type a number from 1 to {n}, or Enter to keep it > ")
+    answer = ask(tr("Type a number from 1 to {n}, or Enter to go back > ")
                  .format(n=len(codes)))
     word = (answer or "").strip(TRIM)
     if word.lower() in QUIT_WORDS:
@@ -3004,6 +3099,23 @@ OLD_TASK_NAME = "hello-world reminder " + (os.environ.get("USERNAME") or "user")
 REMINDER_TIMES = ("08:00", "09:00", "10:00", "13:00")
 
 
+def reminder_switches():
+    """The reminder's on-or-off settings: key, label, and what to say when it
+    turns on and when it turns off."""
+    return (("nudge", tr("Also on days with no plan"),
+             tr("Done. The reminder also comes on days with no plan."),
+             tr("Done. The reminder comes only when there is a plan.")),
+            ("open_after", tr("Open hello-world after I answer"),
+             tr("Done. hello-world opens after you answer."),
+             tr("Done. Answering no longer opens hello-world.")),
+            ("no_weekends", tr("Not on weekends"),
+             tr("Done. No reminder on Saturday or Sunday."),
+             tr("Done. The reminder comes on weekends too.")),
+            ("private_reminder", tr("Leave my plan out of the reminder"),
+             tr("Done. The reminder leaves your plan out."),
+             tr("Done. The reminder shows your plan.")))
+
+
 def move_old_task():
     """Remove a reminder task under its pre-1.37.0 name, which nothing else
     finds, and set it up again under the current name at the same time unless
@@ -3283,6 +3395,15 @@ class Visit:
     """One opening of the window: what it shows, and what its buttons do.
     The window only draws this, so the tests drive it directly."""
 
+    @classmethod
+    def using(cls, state, can_save):
+        """A Visit over state already loaded, for the text menu's settings,
+        without counting another opening."""
+        visit = cls.__new__(cls)
+        visit.state, visit.can_save, visit.d = state, can_save, today()
+        visit.iso = visit.d.isoformat()
+        return visit
+
     def __init__(self, redraw=False):
         self.d = today()
         self.iso = self.d.isoformat()
@@ -3546,6 +3667,12 @@ class Visit:
         if not saved:
             undo(self.state, base)
         return saved
+
+    def switch(self, key, on_text, off_text):
+        """Flip an on-or-off setting. Returns what to say."""
+        if not self.toggle(key):
+            return tr("Could not save that choice on this computer.")
+        return on_text if self.state.get(key) else off_text
 
 
 def live_region(hwnd):
@@ -4091,32 +4218,17 @@ class Window:
                      tr("At {at}").format(at=t.lstrip("0")))
                     for n, t in enumerate(REMINDER_TIMES)]
         entries.append((0x800, 0, None))
-        for cid, key, label in ((20, "nudge", tr("Also on days with no plan")),
-                                (21, "open_after", tr("Open hello-world after I answer")),
-                                (22, "no_weekends", tr("Not on weekends")),
-                                (23, "private_reminder",
-                                 tr("Leave my plan out of the reminder"))):
-            entries.append((checked if v.state.get(key) else 0, cid, label))
+        switches = reminder_switches()
+        for n, (key, label, _, _) in enumerate(switches):
+            entries.append((checked if v.state.get(key) else 0, 20 + n, label))
         choice = self.popup(entries)
         if choice == 1:
             self.set_text(self.STATUS, v.set_reminder(True))
         elif 2 <= choice < 2 + len(REMINDER_TIMES):
             self.set_text(self.STATUS, v.reminder_at(REMINDER_TIMES[choice - 2]))
-        elif choice in (20, 21, 22, 23):
-            key = {20: "nudge", 21: "open_after", 22: "no_weekends",
-                   23: "private_reminder"}[choice]
-            said = {"nudge": (tr("Done. The reminder also comes on days with no plan."),
-                              tr("Done. The reminder comes only when there is a plan.")),
-                    "open_after": (tr("Done. hello-world opens after you answer."),
-                                   tr("Done. Answering no longer opens hello-world.")),
-                    "no_weekends": (tr("Done. No reminder on Saturday or Sunday."),
-                                    tr("Done. The reminder comes on weekends too.")),
-                    "private_reminder": (tr("Done. The reminder leaves your plan out."),
-                                         tr("Done. The reminder shows your plan."))}[key]
-            saved = v.toggle(key)
-            self.set_text(self.STATUS, said[0] if saved and v.state.get(key) else
-                          said[1] if saved else
-                          tr("Could not save that choice on this computer."))
+        elif 20 <= choice < 20 + len(switches):
+            key, _, on_text, off_text = switches[choice - 20]
+            self.set_text(self.STATUS, v.switch(key, on_text, off_text))
 
     def options(self):
         """A short menu, with the rest in four submenus."""
@@ -4239,11 +4351,9 @@ class Window:
             self.set_text(self.STATUS, tr("Saved to {path}").format(path=path)
                           if path else tr("Could not save that on this computer."))
         elif choice == 15:
-            saved = v.toggle("long_history")
-            self.set_text(self.STATUS, (
-                tr("Could not save that choice on this computer.") if not saved
-                else tr("Done. Finished plans are kept for 90 days instead of 14.")
-                if v.state.get("long_history") else
+            self.set_text(self.STATUS, v.switch(
+                "long_history",
+                tr("Done. Finished plans are kept for 90 days instead of 14."),
                 tr("Done. Finished plans are kept for 14 days, as usual.")))
         elif choice == 18:
             items = list(reversed(v.state["finished"]))[:20]

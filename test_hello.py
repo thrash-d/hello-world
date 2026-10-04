@@ -1033,7 +1033,7 @@ def test_done_with_no_plan_says_so_and_done_is_not_offered():
 
 def test_menu_accepts_q_and_help_and_names_a_wrong_word():
     p = run(text="\nm\nbanana\nhelp\nq\n")
-    assert 'Sorry, "banana" is not one of the choices. Type 1 to 11' in p.stdout
+    assert 'Sorry, "banana" is not one of the choices. Type 1 to 12' in p.stdout
     assert "Words you can type at the last prompt" in p.stdout
     assert p.returncode == 0
 
@@ -3099,3 +3099,38 @@ def test_a_task_under_the_old_name_moves_to_the_new_one():
     finally:
         sp.run, hello.os.name = real_run, real_name
     assert calls == ["/Query", "/Delete"] * 2 and made == ["09:00"]
+
+
+def test_menu_option_12_has_the_windows_other_settings():
+    p = run(text="\nm\n12\n1\n12\n6\n12\n4\ny\n12\nbanana\n\n\n")
+    assert "12  More settings..." in p.stdout
+    assert "Greet me by name (now off)" in p.stdout
+    assert "Done. The greeting uses your first name." in p.stdout
+    assert "Done. Finished plans are kept for 90 days instead of 14." in p.stdout
+    assert "Days you opened hello-world: 1" in p.stdout
+    assert 'Type a number from 1 to 6, or press Enter to go back.' in p.stdout
+    saved = notes(p.home)
+    assert saved["name"] is True and saved["long_history"] is True
+    assert saved["numbers"] is True
+
+
+def test_the_text_menu_sets_a_reminder_time_and_forgets_the_earlier_plan(capsys):
+    first = run(text="Call Ana\n\n", day="2026-09-30")
+    hello = _window_hello(home=first.home, day="2026-10-01")
+    hello.STARTUP_DIR, hello.TASKS = mkdtemp(), []
+    saved = notes(first.home)
+    saved["previous"] = "Call Ana"
+    with open(os.path.join(first.home, "notes.json"), "w") as f:
+        json.dump(saved, f)
+    state, can_save = hello.load()
+    answers = iter(["1", "3", "1", "8", "8", "y"])
+    hello.ask = lambda prompt: next(answers)
+    hello.more_settings(state, can_save)
+    out = capsys.readouterr().out
+    assert "At 9:00 (now off)" in out and "Not on weekends (now off)" in out
+    assert hello.TASKS == ["09:00"]
+    hello.more_settings(state, can_save)
+    assert notes(first.home)["no_weekends"] is True
+    hello.more_settings(state, can_save)
+    assert "previous" not in notes(first.home)
+    assert "Done. The earlier plan is forgotten." in capsys.readouterr().out
