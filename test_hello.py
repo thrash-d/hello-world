@@ -63,7 +63,9 @@ def run(args=(), text=None, day="2026-10-01", home=None, startup=None,
               "LANGUAGE": lang,
               # The done count is kept only with My numbers on; most tests
               # check it, so they keep it.
-              "COUNT_ALWAYS": count}
+              "COUNT_ALWAYS": count,
+              # Never the real Task Scheduler.
+              "TASKS": []}
     stdin = {"input": text} if text is not None else {"stdin": subprocess.DEVNULL}
     p = subprocess.run(launch(args, **values), capture_output=True,
                        encoding="utf-8", env=env, **stdin)
@@ -1428,12 +1430,12 @@ def test_the_saved_keys_are_frozen():
     # one must change this list on purpose.
     keys = {"visits", "intent", "streak", "offered", "offer_skips",
             "previous", "done", "finished", "epoch", "tips", "text",
-            "notified", "lang", "nudge", "open_after", "no_weekends", "name",
+            "notified", "lang", "nudge", "open_after", "weekends", "name",
             "remind_at", "no_startup_visits"}
     full = {"visits": ["2026-09-30"], "streak": False, "offered": True,
             "offer_skips": 1, "previous": "p", "done": 2, "epoch": "abc",
             "tips": False, "text": True, "notified": "2026-09-30", "lang": "fr",
-            "nudge": True, "open_after": True, "no_weekends": True,
+            "nudge": True, "open_after": True, "weekends": True,
             "name": True, "remind_at": "09:00", "no_startup_visits": True,
             "intent": {"text": "x", "date": "2026-09-30", "since": "2026-09-29",
                        "skips": 1},
@@ -2588,8 +2590,10 @@ def test_the_reminder_can_come_on_days_with_no_plan_and_skips_days_off():
     assert hello.reminder_due(state, d) is None
     state["nudge"] = True
     assert hello.reminder_due(state, d) == ""
-    state["no_weekends"] = True
     assert hello.reminder_due(state, datetime.date(2026, 10, 10)) is None
+    state["weekends"] = True
+    assert hello.reminder_due(state, datetime.date(2026, 10, 10)) == ""
+    state.pop("weekends")
     content = os.path.join(mkdtemp(), "content.json")
     with open(content, "w") as f:
         json.dump({"thoughts": ["A calm line of ten chars"] * 7,
@@ -2846,7 +2850,7 @@ def test_regional_variants_follow_the_whole_windows_language():
     assert hello.WINDOWS_VARIANTS[0x0C0C] == "fr-CA"
     assert hello.WINDOWS_VARIANTS[0x0816] == "pt-PT"
     hello.LANGUAGE = "fr-CA"
-    assert hello.tr("Not on weekends") == "Pas la fin de semaine"
+    assert hello.tr("Also on weekends") == "Aussi la fin de semaine"
     assert hello.tr("Saved.") == hello.LANGUAGES["fr"]["text"]["Saved."]
 
 
@@ -2862,7 +2866,7 @@ def test_translations_load_from_their_own_files_and_a_broken_one_is_skipped():
         f.write('{"text": {}}')
     hello.load_languages(folder)
     assert sorted(hello.LANGUAGES) == ["es", "fr", "fr-CA"]
-    assert hello.LANGUAGES["fr-CA"]["text"]["Not on weekends"] == "Pas la fin de semaine"
+    assert hello.LANGUAGES["fr-CA"]["text"]["Also on weekends"] == "Aussi la fin de semaine"
     assert hello.LANGUAGES["fr-CA"]["text"]["Saved."] == hello.LANGUAGES["fr"]["text"]["Saved."]
     assert len(hello.LANGUAGES["fr-CA"]["tips_floor"]) == len(hello.TIPS_FLOOR)
 
@@ -3006,7 +3010,7 @@ def test_the_week_shows_last_week_too():
 
 
 def test_forgetting_one_of_two_identical_rows_keeps_the_other():
-    first = run(text="Call Ana; Call Ana\ndone\n\n")
+    first = run(text="Call Ana; Call Ana\ndone\ny\n\n")
     hello = _window_hello(home=first.home, day="2026-10-01")
     visit = hello.Visit()
     item = notes(first.home)["finished"][0]
@@ -3102,13 +3106,13 @@ def test_a_task_under_the_old_name_moves_to_the_new_one():
 
 
 def test_menu_option_12_has_the_windows_other_settings():
-    p = run(text="\nm\n12\n1\n12\n6\n12\n4\ny\n12\nbanana\n\n\n")
+    p = run(text="\nm\n12\n1\n12\n7\n12\n5\ny\n12\nbanana\n\n\n")
     assert "12  More settings..." in p.stdout
     assert "Greet me by name (now off)" in p.stdout
     assert "Done. The greeting uses your first name." in p.stdout
     assert "Done. Finished plans are kept for 90 days instead of 14." in p.stdout
     assert "Days you opened hello-world: 1" in p.stdout
-    assert 'Type a number from 1 to 6, or press Enter to go back.' in p.stdout
+    assert 'Type a number from 1 to 7, or press Enter to go back.' in p.stdout
     saved = notes(p.home)
     assert saved["name"] is True and saved["long_history"] is True
     assert saved["numbers"] is True
@@ -3123,14 +3127,81 @@ def test_the_text_menu_sets_a_reminder_time_and_forgets_the_earlier_plan(capsys)
     with open(os.path.join(first.home, "notes.json"), "w") as f:
         json.dump(saved, f)
     state, can_save = hello.load()
-    answers = iter(["1", "3", "1", "8", "8", "y"])
+    answers = iter(["1", "3", "1", "8", "9", "y"])
     hello.ask = lambda prompt: next(answers)
     hello.more_settings(state, can_save)
     out = capsys.readouterr().out
-    assert "At 9:00 (now off)" in out and "Not on weekends (now off)" in out
+    assert "At 9:00 (now off)" in out and "Also on weekends (now off)" in out
     assert hello.TASKS == ["09:00"]
     hello.more_settings(state, can_save)
-    assert notes(first.home)["no_weekends"] is True
+    assert notes(first.home)["weekends"] is True
     hello.more_settings(state, can_save)
     assert "previous" not in notes(first.home)
     assert "Done. The earlier plan is forgotten." in capsys.readouterr().out
+
+
+def test_done_in_the_text_screen_asks_which_of_several():
+    p = run(text="Call Ana; send it; book travel\ndone\n1 3\n\n")
+    assert "Good. 2 things are off your list. The rest is kept for today." in p.stdout
+    saved = notes(p.home)
+    assert [i["text"] for i in saved["finished"]] == ["Call Ana", "book travel"]
+    assert saved["intent"]["text"] == "send it"
+    p = run(text="done\n\n", home=p.home)
+    assert "Which did you finish?" not in p.stdout
+    assert "send it" in [i["text"] for i in notes(p.home)["finished"]]
+
+
+def test_a_new_plan_asks_before_dropping_todays_unfinished_things():
+    first = run(text="Call Ana; send it\ndone\n1\nBook travel\ny\n\n")
+    assert "Keep the ones you haven't finished too? send it" in first.stdout
+    assert notes(first.home)["intent"]["text"] == "Book travel; send it"
+    hello = _window_hello(home=first.home, day="2026-10-01")
+    visit = hello.Visit()
+    assert hello.leftovers(visit.state, "Write report", visit.iso) == [
+        "Book travel", "send it"]
+    assert hello.leftovers(visit.state, "Book travel; x", visit.iso) == []
+
+
+def test_a_long_plan_is_cut_at_a_word_and_stray_semicolons_go():
+    hello = _load_hello()
+    cut = hello.clean("word " * 100)
+    assert len(cut) <= hello.MAX_PLAN and cut.endswith("word")
+    assert hello.clean("a; ;; b;") == "a; b"
+
+
+def test_the_text_menu_turns_off_a_reminder_at_a_set_time():
+    hello = _window_hello()
+    hello.STARTUP_DIR, hello.TASKS = mkdtemp(), []
+    visit = hello.Visit()
+    visit.reminder_at("09:00")
+    assert hello.reminder_on()
+    message = hello.Visit.using(*hello.load()).set_reminder(False)
+    assert message == "Done. The sign-in reminder is off."
+    assert not hello.reminder_on() and "remind_at" not in notes(hello.HOME)
+
+
+def test_weekend_reminders_are_off_unless_asked_for_and_the_thought_hides_alone():
+    hello = _load_hello()
+    state = hello.new_state()
+    state["nudge"] = True
+    saturday = hello.datetime.date(2026, 10, 10)
+    assert hello.reminder_due(state, saturday) is None
+    state["weekends"] = True
+    assert hello.reminder_due(state, saturday) == ""
+    p = run(text="\n")
+    assert "Thought for today:" in p.stdout
+    with open(os.path.join(p.home, "notes.json")) as f:
+        saved = json.load(f)
+    saved["hide_thought"] = True
+    with open(os.path.join(p.home, "notes.json"), "w") as f:
+        json.dump(saved, f)
+    p = run(text="\n", home=p.home)
+    assert "Thought for today:" not in p.stdout and "Try this today:" in p.stdout
+
+
+def test_the_notification_for_several_things_says_what_open_is_for():
+    hello = _load_hello()
+    hello.SHOWN = []
+    hello.show_reminder("Call Ana; send it", "2026-10-01")
+    assert "Open it to tick the ones you did." in hello.SHOWN[0]
+    assert "Did you do it?" not in hello.SHOWN[0]

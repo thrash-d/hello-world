@@ -32,7 +32,8 @@ try {
     if ($value -and $value -like "*$dir*") { Remove-ItemProperty -LiteralPath $run -Name 'hello-world' }
     # Through cmd: Windows PowerShell 5.1 stops on any stderr text from a
     # native command, and schtasks writes some when there is no task.
-    $task = 'hello-world reminder ' + (@($env:USERDOMAIN, $env:USERNAME) | Where-Object { $_ }) -join '-'
+    # -join binds looser than +, so the join needs its own parentheses.
+    $task = 'hello-world reminder ' + ((@($env:USERDOMAIN, $env:USERNAME) | Where-Object { $_ }) -join '-')
     # Before 1.37.0 the task carried only the user name.
     foreach ($name in $task, "hello-world reminder $env:USERNAME") {
         & (Join-Path $sys32 'cmd.exe') /d /c "`"$(Join-Path $sys32 'schtasks.exe')`" /Delete /F /TN `"$name`" >nul 2>&1"

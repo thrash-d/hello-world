@@ -194,6 +194,34 @@ sixteen items; 1.37.0 answers them. The fourth round found:
 
 1.38.0 fixes all of these.
 
+## Fifth round, on 1.39.0
+
+The same five ran a fresh week, 12 to 19 October. Ratings: Dana 5, Rafael 6,
+Mónica 7, Tom 6, Priya 7, each the same or higher than the round before.
+
+They found:
+- Typing a new plan over today's leftovers dropped them without a word, after
+  the window had just said "The rest is kept for today" (Priya, Rafael,
+  Mónica).
+- The reminder came on Saturday and Sunday unless turned off (Rafael).
+- `done` in the text screen finished every part of a plan, where the window
+  asks which (Tom).
+- A long plan was cut mid-word, and stray `;;` stayed in the box (Tom).
+- The notification about several things asked "Did you do it?" with no Done
+  button (Dana, Mónica).
+- Some thoughts still read like posters, and the thought could only be hidden
+  with the tip (Tom).
+- Delete everything didn't say that the exported plans file stays (Mónica).
+
+1.40.0 fixes all of these. Several more reports were the pilot tool, not the
+program, and the tool is fixed: its notification answered Done where the real
+one shows only Open, its yes-or-no boxes answered No when the person gave no
+answer, it didn't say that a reminder at a set time isn't simulated, and its
+export wrote to the real Documents folder.
+
+**I did it** and **Done** keep their two names. Both can be on screen at once,
+one for today's plan and one for the question about an earlier plan.
+
 ## Not changed, and why
 
 - NVDA saying "greater" at the end of every prompt (Ruth). It's unclear
