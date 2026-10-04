@@ -73,6 +73,13 @@ Si ce paramètre est désactivé ou non configuré, toutes les copies sont gard�
       <string id="FeedbackAddress_Help">Si ce paramètre est activé, le menu Options de la fenêtre comporte « Envoyer un commentaire... », qui ouvre un nouveau courriel adressé à cette adresse dans le logiciel de courriel de la personne. hello-world n'envoie rien lui-même.
 
 Si ce paramètre est désactivé ou n'est pas configuré, aucun élément de commentaire n'apparaît.</string>
+      <string id="SUPPORTED_1_37">hello-world 1.37.0 ou version ultérieure</string>
+      <string id="FloorTips">Afficher les conseils pour l'atelier et le travail posté</string>
+      <string id="FloorTips_Help">Si vous activez ce paramètre, hello-world affiche sa deuxième liste de conseils, rédigée pour les entrepôts, les usines et le travail posté, à la place des conseils de bureau, pour tout le monde. Personne ne peut revenir aux conseils de bureau.
+
+Si vous désactivez ou ne configurez pas ce paramètre, chaque personne choisit dans Options &gt; Ce qu'affiche la fenêtre.
+
+Un fichier de contenu de l'organisation remplace les deux listes.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">

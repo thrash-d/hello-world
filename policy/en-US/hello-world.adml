@@ -73,6 +73,13 @@ When disabled or not configured, every backup is kept until the person deletes e
       <string id="FeedbackAddress_Help">When enabled, the window's Options menu has "Send feedback...", which opens a new mail to this address in the person's own mail program. hello-world itself sends nothing.
 
 When disabled or not configured, there is no feedback item.</string>
+      <string id="SUPPORTED_1_37">hello-world 1.37.0 or later</string>
+      <string id="FloorTips">Show the tips for floor and shift work</string>
+      <string id="FloorTips_Help">When enabled, hello-world shows its second list of tips, written for warehouses, factories and shift work, in place of the desk tips, for everyone. Nobody can switch back.
+
+When disabled or not configured, each person chooses under Options &gt; What the window shows.
+
+An organization content file replaces both lists.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">

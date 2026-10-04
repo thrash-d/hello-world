@@ -50,8 +50,8 @@ prints the whole saved file.
 - Each user has one file, `%LOCALAPPDATA%\hello-world\notes.json`. It holds
   the date they last opened the program (the last 60 days of dates only if
   they turned on the days-in-a-row message), one current plan,
-  one unfinished earlier plan, a count of plans marked done, the last seven
-  finished plans with dates, four settings, and the date of the last
+  one unfinished earlier plan, a count of plans marked done, the plans
+  finished in the last 14 days with dates, four settings, and the date of the last
   sign-in reminder. No names, computer names or times.
 - The `DisablePlans` policy removes all plan text and counts, and
   `HideDaysInARow` keeps only the latest visit date. With both, the file holds

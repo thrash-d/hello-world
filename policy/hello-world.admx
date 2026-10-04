@@ -12,6 +12,7 @@
       <definition name="SUPPORTED_1_28" displayName="$(string.SUPPORTED_1_28)" />
       <definition name="SUPPORTED_1_31" displayName="$(string.SUPPORTED_1_31)" />
       <definition name="SUPPORTED_1_32" displayName="$(string.SUPPORTED_1_32)" />
+      <definition name="SUPPORTED_1_37" displayName="$(string.SUPPORTED_1_37)" />
     </definitions>
   </supportedOn>
   <categories>
@@ -93,6 +94,12 @@
       <parentCategory ref="HelloWorld" />
       <supportedOn ref="SUPPORTED_1_32" />
       <elements><text id="FeedbackAddress" valueName="FeedbackAddress" maxLength="254" /></elements>
+    </policy>
+    <policy name="FloorTips" class="Both" displayName="$(string.FloorTips)" explainText="$(string.FloorTips_Help)" key="SOFTWARE\Policies\hello-world" valueName="FloorTips">
+      <parentCategory ref="HelloWorld" />
+      <supportedOn ref="SUPPORTED_1_37" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
     </policy>
   </policies>
 </policyDefinitions>

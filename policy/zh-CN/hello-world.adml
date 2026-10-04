@@ -73,6 +73,13 @@
       <string id="FeedbackAddress_Help">启用后，窗口的“选项”菜单中会出现“发送反馈...”，它会在用户自己的邮件程序中新建一封发往此地址的邮件。hello-world 本身不发送任何内容。
 
 禁用或未配置时，不显示反馈项。</string>
+      <string id="SUPPORTED_1_37">hello-world 1.37.0 或更高版本</string>
+      <string id="FloorTips">显示面向现场和轮班工作的小贴士</string>
+      <string id="FloorTips_Help">如果启用此策略设置，hello-world 会为所有人显示第二组小贴士，这组小贴士专为仓库、工厂和轮班工作编写，用来取代办公桌小贴士。任何人都无法切换回去。
+
+如果禁用或未配置此策略设置，每个人可以在“选项”&gt;“窗口显示的内容”中自行选择。
+
+组织内容文件会替换这两组小贴士。</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">

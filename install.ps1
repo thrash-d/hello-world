@@ -50,7 +50,7 @@ only administrators can read, and success and failure go to the Application
 event log under the source hello-world.
 
 .EXAMPLE
-$tag = 'v1.36.0'
+$tag = 'v1.37.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
@@ -425,6 +425,9 @@ foreach ($f in $required + $extra) {
 # An older version is refused unless asked for, so a stale package or an old
 # deployment assignment can't quietly roll PCs back.
 $version = (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'VERSION')).Trim()
+$perUser = @(Get-ChildItem 'Registry::HKEY_USERS' -ErrorAction SilentlyContinue | ForEach-Object {
+    Get-ItemProperty -LiteralPath "Registry::$($_.Name)\Software\Microsoft\Windows\CurrentVersion\Uninstall\hello-world" -ErrorAction SilentlyContinue })
+if ($perUser) { Write-Warning "$($perUser.Count) signed-in user(s) also have a per-user install. Each can remove theirs in Settings > Apps." }
 $installedVersion = (Get-ItemProperty -LiteralPath $key -ErrorAction SilentlyContinue).DisplayVersion
 if ($installedVersion -and -not $AllowDowngrade) {
     try { $older = [version]$version -lt [version]$installedVersion } catch { $older = $false }
