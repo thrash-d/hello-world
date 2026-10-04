@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-10-03: the window's settings in the text menu, and concrete tips
+
+Version 1.39.0. This round built the queue the fourth pilot left.
+
+- The text menu has option 12, **More settings...**, with what only the
+  window had: the reminder times and the reminder's switches, Greet me by
+  name, floor and shift tips, This week, My numbers, Save my plans to a file,
+  Keep a longer history and Forget the earlier plan. The window and the text
+  menu share one list of reminder switches and one way to flip a setting.
+- Fifteen tips that read like office posters, such as "roll your shoulders"
+  and "share a small, harmless joke", are now things to do with an end, such
+  as "Raise your screen so its top edge is at eye level" and "In your next
+  request, say why you need it and by when." All ten translations follow.
+- In the text menu, Enter that leaves a question without a change now always
+  says "Enter to go back", where it said "keep them all" or "keep it" before.
+- Arabic and Hebrew were checked on a real screen: the window is laid out
+  right to left as it should be. The mirrored title in the pilot's screenshot
+  came from `PrintWindow`, which copies a right-to-left window mirrored, and
+  the pilot tool now flips such screenshots back.
+
+Still queued in `TODO.md`: whether the window a timed reminder opens outlives
+the scheduled task's time limit, which needs a throwaway scheduled task.
+
 ## 2026-10-03: one way to tick things off, and the review's fixes
 
 Version 1.38.0. A fourth simulated pilot ran on 1.37.0 alongside a code and
