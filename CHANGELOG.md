@@ -1,5 +1,50 @@
 # Changelog
 
+## 2026-10-04: dates written in a plan, and nothing dropped without asking
+
+Version 1.43.0. The seventh pilot and a review of rounds 66 and 67.
+Ratings: Dana 6, Rafael 5, Mónica 6, Tom 6, Priya 7.
+
+From the pilot:
+- A date written in a plan becomes its due date: `30/10`, `10/30` where
+  Windows writes the month first, `30.10.2026`, `2026-10-30`, a weekday's
+  name, or "by" and a weekday, today or tomorrow. The words are translated.
+  Three of five pilots wrote dates that way and none found the menu.
+- Unfinished things are kept when a new plan is typed over them, after the
+  new plan, and the window and text screen say "Still on your list from
+  before: ...". The question it asked before lost things for four of five.
+  The same holds for a plan typed instead of answering about an earlier one.
+- A plan typed while the window asks about an earlier plan is saved along
+  with the Done, Not yet or Skip answer instead of being thrown away (Tom).
+- The due date shows while the window asks about an earlier plan (Dana).
+- Delete everything redraws the window, so no old question stays on screen
+  (Mónica).
+- The export message puts the spreadsheet sentence on its own line.
+- The text menu's entries that come and go are last, so the others keep
+  their numbers (Tom), and "Which did you finish?" mentions ranges.
+- Spanish and Brazilian Portuguese wording the pilot flagged.
+
+From the review:
+- "A new plan is lost when it is joined to the old ones and the total is too
+  long." The new plan goes first, so a cut takes the oldest things, and the
+  screen says how many were left out.
+- "Clicking Done on one part of today's plan deletes the other parts." A box
+  edited down to some of today's things finishes those and keeps the rest.
+- "`Visit.did_it` with kept leftovers saves a broken plan and blames another
+  window." It returns what was saved instead.
+- "The due date is dropped when a plan is edited or joined." It stays while
+  the plan keeps any of its things.
+- "If the .csv can't be written, the whole export is reported as failed."
+  A .csv open in Excel no longer fails the .md.
+- "The export file name depends on the current language." The delete entry,
+  the delete and the notice in Delete everything find the files under every
+  language's name, and the notice lists each one.
+- "`picked()` crashes on some digit characters." Only decimal digits count.
+
+Queued in `TODO.md`: a due date per thing, a plan-free notification by
+default, the settings Delete everything keeps, the first-run welcome after 60
+days away, quieter screens and plainer confirmations.
+
 ## 2026-10-04: due dates, a spreadsheet copy, and welcome back
 
 Version 1.42.0. This round built the queue the sixth pilot left.

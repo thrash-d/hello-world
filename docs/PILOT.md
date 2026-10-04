@@ -252,6 +252,25 @@ the pilot tool: its yes-or-no boxes are drawn with English labels, and its
 text menu ran without the tool's stand-ins, so the timed reminder Tom set
 was real and the tool's sign-in said the reminder was off.
 
+## Seventh round, on 1.42.0
+
+The same five ran 26 October to 2 November. Ratings: Dana 6, Rafael 5,
+Mónica 6, Tom 6, Priya 7.
+
+Three of five wrote the due date in the plan itself ("até sexta", "by
+Friday", "prazo 30/10") and none found the menu for it on their own. Four of
+five lost unfinished things at "Keep the ones you haven't finished too?",
+answering No or answering nothing. 1.43.0 reads a date written in the plan
+and keeps unfinished things without asking.
+
+They also found that a plan typed while the window asked about an earlier one
+was thrown away by Done or Not yet (Tom), that the due date didn't show while
+the window asked about an earlier plan (Dana), that Delete everything left
+the old question on screen (Mónica), and that the export message ran two
+sentences together (Mónica, Rafael). All are fixed. The rest is queued in
+`TODO.md`. Yes and No in English on the pilot tool's boxes are the tool's
+drawing; Windows draws its own boxes in its own language.
+
 ## Not changed, and why
 
 - NVDA saying "greater" at the end of every prompt (Ruth). It's unclear

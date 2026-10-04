@@ -38,10 +38,16 @@ a few things has a tick box for each: tick what you finished, then click
 **Done**. If you changed the words in the box first, the new words are what's
 marked done, and today's unfinished things stay. While the window asks about
 an earlier plan, only that plan's **Done** shows. To drop a plan, empty the
-box and click **Save**. Typing a new plan instead of answering asks whether to
-keep the old one for today too. A plan can be up to 400 characters.
-**My plans > Due date for my plan...** gives a plan a due date from the next
-ten workdays. The plan, the next day's question and the notification then
+box and click **Save**. A new plan typed over unfinished things, or instead of
+answering about an earlier plan, keeps them after it and says so: "Still on
+your list from before: ...". A plan can be up to 400 characters. A plan
+typed while the window asks about an earlier one is saved along with the
+answer.
+A date written in a plan becomes its due date: `30/10` (or `10/30` where
+Windows writes the month first), `2026-10-30`, a weekday's name, or "by"
+and a weekday, today or tomorrow, as in "send the report by Fri".
+**My plans > Due date for my plan...** sets or removes one from the next ten
+workdays. The plan, the next day's question and the notification then
 say "Due today.", "Due tomorrow." or the date, and the date stays with the
 plan while it is carried over. After a missed workday the window says
 "Welcome back." and nothing else about the gap.
@@ -53,8 +59,7 @@ you do it?". Click **Done** or **Not yet** on it and that's the answer; nothing
 else opens, and Done brings a short thank-you. Skip is there too. For a plan
 of a few things the notification has **Open** instead of Done, so you tick
 the ones you did. In the text screen, `done` on a plan of a few things asks
-which ones, by number. Typing a new plan over today's unfinished things asks
-whether to keep them too. Click the notification itself
+which ones, by number. Click the notification itself
 to open the window. With no plan, it stays quiet, unless you choose
 **Options > Reminder settings > Also on days with no plan**. The same menu
 moves the reminder to 8:00, 9:00, 10:00 or 13:00 instead of sign-in, opens
@@ -235,7 +240,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.42.0'
+$tag = 'v1.43.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

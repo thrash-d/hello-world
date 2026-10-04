@@ -2983,6 +2983,7 @@ def test_ticks_from_a_plan_another_window_changed_finish_nothing():
     hello = _window_hello(home=first.home, day="2026-10-01")
     visit = hello.Visit()
     other = hello.Visit()
+    other.clear()
     other.save("p; q")
     assert "changed the plan" in visit.finish_parts(["x"])
     saved = notes(first.home)
@@ -3151,14 +3152,14 @@ def test_done_in_the_text_screen_asks_which_of_several():
     assert "send it" in [i["text"] for i in notes(p.home)["finished"]]
 
 
-def test_a_new_plan_asks_before_dropping_todays_unfinished_things():
-    first = run(text="Call Ana; send it\ndone\n1\nBook travel\ny\n\n")
-    assert "Keep the ones you haven't finished too? send it" in first.stdout
-    assert notes(first.home)["intent"]["text"] == "send it; Book travel"
+def test_a_new_plan_keeps_todays_unfinished_things_and_says_so():
+    first = run(text="Call Ana; send it\ndone\n1\nBook travel\n\n")
+    assert "Still on your list from before: send it." in first.stdout
+    assert notes(first.home)["intent"]["text"] == "Book travel; send it"
     hello = _window_hello(home=first.home, day="2026-10-01")
     visit = hello.Visit()
     assert hello.leftovers(visit.state, "Write report", visit.iso) == [
-        "send it", "Book travel"]
+        "Book travel", "send it"]
     assert hello.leftovers(visit.state, "Book travel; x", visit.iso) == []
 
 
@@ -3218,9 +3219,10 @@ def test_a_plan_carried_from_an_earlier_day_asks_before_it_is_dropped():
     assert hello.leftovers(state, "Ship orders", "2026-10-02") == []
 
 
-def test_kept_things_go_first_so_a_long_new_plan_cannot_push_them_out():
-    p = run(text="Call Ana; send it\ndone\n1\n" + "x" * 395 + "\ny\n\n")
-    assert notes(p.home)["intent"]["text"].startswith("send it; ")
+def test_a_long_new_plan_is_kept_whole_before_the_unfinished_ones():
+    p = run(text="Call Ana; send it\ndone\n1\n" + "x" * 395 + "\n\n")
+    assert notes(p.home)["intent"]["text"] == "x" * 395
+    assert "Things left out: 1." in p.stdout
 
 
 def test_a_cut_after_a_semicolon_saves_the_same_text_it_loads():
@@ -3305,3 +3307,51 @@ def test_the_export_has_a_spreadsheet_copy_and_can_be_deleted():
                                              "2026-10-01;Call Ana;;"]
     assert hello.delete_export() == "Done. The plans file you saved is deleted."
     assert not os.listdir(hello.EXPORT_DIR)
+
+
+def test_a_date_written_in_a_plan_becomes_its_due_date():
+    hello = _load_hello()
+    hello.DATE_ORDER = "dmy"
+    monday = hello.datetime.date(2026, 10, 26)
+    due = hello.typed_due
+    assert due("Send boleto 30/10", monday) == "2026-10-30"
+    assert due("call bob 2026-10-28", monday) == "2026-10-28"
+    assert due("write report by fri", monday) == "2026-10-30"
+    assert due("email x due tomorrow", monday) == "2026-10-27"
+    assert due("Staff schedule Friday", monday) == "2026-10-30"
+    assert due("baby shower gifts; 3.5 hours", monday) is None
+    hello.DATE_ORDER = "mdy"
+    assert due("Send it 10/30", monday) == "2026-10-30"
+    first = run(text="Inventory report by Friday\n\n", day="2026-10-26")
+    assert notes(first.home)["intent"]["due"] == "2026-10-30"
+
+
+def test_done_over_part_of_todays_plan_finishes_that_part_only():
+    first = run(text="Call Ana; Send report\n\n")
+    hello = _window_hello(day="2026-10-01", home=first.home)
+    visit = hello.Visit()
+    visit.did_it("send report")
+    saved = notes(first.home)
+    assert saved["intent"]["text"] == "Call Ana"
+    assert [i["text"] for i in saved["finished"]] == ["Send report"]
+
+
+def test_a_due_date_stays_when_todays_plan_is_corrected():
+    first = run(text="Call Ana\n\n")
+    hello = _window_hello(day="2026-10-01", home=first.home)
+    visit = hello.Visit()
+    visit.set_due("2026-10-05")
+    visit.save("Call Ana; send the contract")
+    assert notes(first.home)["intent"]["due"] == "2026-10-05"
+
+
+def test_exported_files_are_found_in_any_language_and_digits_never_crash():
+    hello = _window_hello(day="2026-10-01")
+    hello.EXPORT_DIR = mkdtemp()
+    hello.load_languages()
+    for name in ("hello-world Pläne.csv", "hello-world plans.md"):
+        open(os.path.join(hello.EXPORT_DIR, name), "w").close()
+    assert len(hello.exported_files()) == 2
+    hello.delete_export()
+    assert not os.listdir(hello.EXPORT_DIR)
+    assert hello.picked(["\u00b2"], 3) is None
