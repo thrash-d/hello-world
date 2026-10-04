@@ -94,6 +94,21 @@ Si se deshabilita o no se configura, se usa el servidor integrado en el paquete,
       <string id="TurnOffSharedCounts_Help">Si se habilita, hello-world nunca contacta con un servidor de recuentos compartidos ni pregunta por ello.
 
 Si se deshabilita o no se configura, usa la directiva Servidor de recuentos compartidos o el servidor integrado en el paquete.</string>
+      <string id="SUPPORTED_1_46">hello-world 1.46.0 o posterior</string>
+      <string id="ShiftHandoff">Relevo de turno en este equipo</string>
+      <string id="ShiftHandoff_Help">Si se habilita, la parte de arriba de hello-world en este equipo muestra las notas dejadas para el siguiente turno, con cuánto hace que se dejó cada una, y un cuadro para dejar una. Las lee todo el que inicie sesión en este equipo. Una nota puede conservarse hasta que alguien la borre, para problemas de seguridad; las demás se muestran durante las horas que fije la directiva Horas del relevo. La pantalla dice que las notas no son un registro de seguridad ni de averías y que no deben incluir datos de pacientes ni de clientes. Consulte antes los números de habitación y similares con su responsable de privacidad.
+
+Las notas se bloquean en este equipo con la API de protección de datos de Windows, salvo que se configure Carpeta del relevo. El plan de cada persona sigue siendo privado de su cuenta.
+
+Si se deshabilita o no se configura, no hay relevo.</string>
+      <string id="HandoffFolder">Carpeta del relevo</string>
+      <string id="HandoffFolder_Help">Si se habilita, las notas del relevo se guardan en esta carpeta, como un recurso compartido de una unidad del hospital, para que todos los equipos que apunten a ella muestren las mismas notas. Ahí las notas son texto sin cifrar: los permisos de la carpeta deciden quién las lee. Dé acceso de lectura y escritura a los usuarios de esos equipos y a nadie más.
+
+Si se deshabilita o no se configura, cada equipo guarda sus propias notas en ProgramData, bloqueadas en ese equipo.</string>
+      <string id="HandoffHours">Horas del relevo</string>
+      <string id="HandoffHours_Help">Si se habilita, las notas del relevo se muestran durante este número de horas, de 1 a 336, salvo las que se conservan hasta que se borren. 24 va bien con turnos de 12 horas; 168 cubre un fin de semana largo.
+
+Si se deshabilita o no se configura, las notas se muestran 72 horas.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -104,6 +119,12 @@ Si se deshabilita o no se configura, usa la directiva Servidor de recuentos comp
       </presentation>
       <presentation id="SharedCountsServer">
         <textBox refId="SharedCountsServer"><label>Dirección del servidor:</label></textBox>
+      </presentation>
+      <presentation id="HandoffFolder">
+        <textBox refId="HandoffFolder"><label>Carpeta:</label></textBox>
+      </presentation>
+      <presentation id="HandoffHours">
+        <decimalTextBox refId="HandoffHours" defaultValue="72">Horas:</decimalTextBox>
       </presentation>
     </presentationTable>
   </resources>

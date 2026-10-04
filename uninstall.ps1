@@ -212,6 +212,11 @@ try {
             catch { Write-Warning "Couldn't remove the notes in ${p}: $($_.Exception.Message)" }
         }
     }
+    $shared = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'hello-world'
+    if ($RemoveNotes -and (Test-Path -LiteralPath $shared)) {
+        try { Remove-Tree $shared }
+        catch { Write-Warning "Couldn't remove the shift handoff notes in ${shared}: $($_.Exception.Message)" }
+    }
     try { Remove-UserReminders }
     catch { Write-Warning "Couldn't remove every reminder: $($_.Exception.Message)" }
 

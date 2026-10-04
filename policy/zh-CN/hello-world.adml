@@ -94,6 +94,21 @@
       <string id="TurnOffSharedCounts_Help">启用此策略后，hello-world 绝不会联系共享计数服务器，也不会询问此事。
 
 禁用或未配置此策略时，使用“共享计数服务器”策略或软件包内置的服务器。</string>
+      <string id="SUPPORTED_1_46">hello-world 1.46.0 或更高版本</string>
+      <string id="ShiftHandoff">此电脑上的交接班</string>
+      <string id="ShiftHandoff_Help">启用此策略后，此电脑上 hello-world 的顶部会显示留给下一班的交接记录，并注明每条是多久以前留下的，还有一个留言框。登录此电脑的每个人都能看到。涉及安全的问题可以保留到有人清除为止；其他记录按“交接时长”策略设定的小时数显示。界面会说明这些记录不是安全或故障记录，也不能包含患者或客户信息。请事先与隐私负责人确认病房号等内容。
+
+除非设置了“交接文件夹”，记录会通过 Windows 数据保护 API 锁定在此电脑上。每个人自己的计划仍只属于本人帐户。
+
+禁用或未配置此策略时，没有交接班功能。</string>
+      <string id="HandoffFolder">交接文件夹</string>
+      <string id="HandoffFolder_Help">启用此策略后，交接记录保存在此文件夹中（例如某个病区的共享文件夹），指向它的所有电脑都会显示相同的记录。这里的记录是纯文本：由文件夹权限决定谁能读取。只给这些电脑的用户读写权限，不给其他人。
+
+禁用或未配置此策略时，每台电脑把自己的记录保存在 ProgramData 中，并锁定在该电脑上。</string>
+      <string id="HandoffHours">交接时长</string>
+      <string id="HandoffHours_Help">启用此策略后，交接记录显示这么多小时（1 到 336），保留到清除的记录除外。12 小时班次适合设为 24；168 可以覆盖长周末。
+
+禁用或未配置此策略时，记录显示 72 小时。</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -104,6 +119,12 @@
       </presentation>
       <presentation id="SharedCountsServer">
         <textBox refId="SharedCountsServer"><label>服务器地址：</label></textBox>
+      </presentation>
+      <presentation id="HandoffFolder">
+        <textBox refId="HandoffFolder"><label>文件夹：</label></textBox>
+      </presentation>
+      <presentation id="HandoffHours">
+        <decimalTextBox refId="HandoffHours" defaultValue="72">小时：</decimalTextBox>
       </presentation>
     </presentationTable>
   </resources>

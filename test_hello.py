@@ -46,7 +46,7 @@ def launch(args=(), prelude="", **values):
 
 
 def run(args=(), text=None, day="2026-10-01", home=None, startup=None,
-        policy=None, env=None, lang="en", count=True, lock="plain"):
+        policy=None, env=None, lang="en", count=True, lock="plain", extra=None):
     """Run hello.py with its own data folder. text is typed at the prompts.
 
     Without text, stdin is the null device, so the result doesn't depend on
@@ -67,7 +67,7 @@ def run(args=(), text=None, day="2026-10-01", home=None, startup=None,
               # Never the real Task Scheduler.
               "TASKS": [],
               # Plain notes, so tests can read the file; the lock has its own.
-              "LOCK": lock}
+              "LOCK": lock, **(extra or {})}
     stdin = {"input": text} if text is not None else {"stdin": subprocess.DEVNULL}
     p = subprocess.run(launch(args, **values), capture_output=True,
                        encoding="utf-8", env=env, **stdin)
@@ -3521,3 +3521,78 @@ def test_the_window_counts_the_tip():
         assert "shared" not in notes(first.home)
     finally:
         server.shutdown()
+
+
+def _handoff(text, when, folder, policy=None, home=None, lock="plain"):
+    policy = {"ShiftHandoff": 1, **(policy or {})}
+    return run(text=text, day=when[:10], home=home, policy=policy, lock=lock,
+               extra={"NOW": when, "HANDOFF_DIR": folder})
+
+
+def test_shift_handoff_is_off_unless_the_organization_turns_it_on():
+    p = run(text="\nhandoff\n\n")
+    assert "Shift handoff" not in p.stdout and "Left for the next shift" not in p.stdout
+    assert '"handoff" is not one of the choices' in p.stdout
+
+
+def test_a_handoff_note_is_shown_to_the_next_person_with_its_age():
+    folder = mkdtemp()
+    first = _handoff("\nhandoff\nForklift 2 pulling left; Dave out Thu\nn\n\n",
+                     "2026-10-06T22:40", folder)
+    out = " ".join(first.stdout.split())
+    assert "No handoff notes in the last 72 hours." in out
+    assert "Everyone who uses this PC sees handoff notes." in out
+    assert "Not a safety or defect record." in out
+    assert "Left for the next shift." in out
+    # Someone else, with their own notes, on the same PC the next morning.
+    later = _handoff("\n\n", "2026-10-07T06:55", folder)
+    assert "1. 8 h ago: Forklift 2 pulling left; Dave out Thu" in later.stdout
+    assert "Forklift" not in json.dumps(notes(later.home))
+
+
+def test_old_handoff_notes_go_but_kept_ones_stay_until_cleared():
+    folder = mkdtemp()
+    _handoff("\nhandoff\nBlocked fire door by dock 3\ny\n\n", "2026-10-01T08:00", folder)
+    _handoff("\nhandoff\nAisle 9 short on pallets\nn\n\n", "2026-10-01T09:00", folder)
+    p = _handoff("\n\n", "2026-10-05T09:00", folder)
+    assert "Kept until cleared. Blocked fire door" in p.stdout
+    assert "Aisle 9" not in p.stdout and "4 d ago" in p.stdout
+    shorter = _handoff("\n\n", "2026-10-02T10:00", folder, {"HandoffHours": 24})
+    assert "Aisle 9" not in shorter.stdout
+    cleared = _handoff("\nhandoff\nclear\n1\n\n", "2026-10-05T09:05", folder)
+    assert "Cleared." in cleared.stdout
+    assert "Blocked fire door" not in _handoff("\n\n", "2026-10-05T09:10", folder).stdout
+
+
+def test_handoff_keeps_the_last_five_and_is_locked_to_the_pc():
+    folder = mkdtemp()
+    for n in range(7):
+        _handoff(f"\nhandoff\nNote {n}\nn\n\n", f"2026-10-05T0{n}:00", folder, lock="test")
+    with open(os.path.join(folder, "handoff.json"), encoding="utf-8") as f:
+        raw = f.read()
+    assert "Note" not in raw and json.loads(raw)["locked"] == "test"
+    p = _handoff("\n\n", "2026-10-05T08:00", folder, lock="test")
+    assert "Note 6" in p.stdout and "Note 2" in p.stdout and "Note 1" not in p.stdout
+
+
+def test_a_unit_folder_shares_plain_notes_between_pcs():
+    unit = mkdtemp()
+    _handoff("\nhandoff\nBladder scanner in 22\nn\n\n", "2026-10-05T07:00", mkdtemp(),
+             {"HandoffFolder": unit}, lock="test")
+    with open(os.path.join(unit, "handoff.json"), encoding="utf-8") as f:
+        assert "Bladder scanner in 22" in f.read()
+    other_pc = _handoff("\n\n", "2026-10-05T07:30", mkdtemp(), {"HandoffFolder": unit})
+    assert "Bladder scanner in 22" in other_pc.stdout
+
+
+def test_the_window_shows_handoff_notes():
+    folder = mkdtemp()
+    _handoff("\nhandoff\nPump recall done\nn\n\n", "2026-10-02T06:00", folder)
+    hello = _window_hello(day="2026-10-02")
+    hello.POLICY, hello.NOW, hello.HANDOFF_DIR = {"ShiftHandoff": 1}, "2026-10-02T07:00", folder
+    items, _ = hello.Window(hello.Visit()).layout()
+    texts = {cid: text for _, cid, text, *_ in items}
+    assert "1 h ago: Pump recall done" in texts[hello.Window.HANDOFF]
+    assert hello.Window.HANDOFF_LEAVE in texts
+    assert hello.leave_handoff("Scanner in 22", keep=True) == "Left for the next shift."
+    assert hello.clear_handoff(9) == "Nothing changed."

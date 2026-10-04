@@ -94,6 +94,21 @@ When disabled or not configured, the server built into the package is used, if i
       <string id="TurnOffSharedCounts_Help">When enabled, hello-world never contacts a shared counts server and doesn't ask about it.
 
 When disabled or not configured, it uses the Shared counts server policy or the server built into the package.</string>
+      <string id="SUPPORTED_1_46">hello-world 1.46.0 or later</string>
+      <string id="ShiftHandoff">Shift handoff on this PC</string>
+      <string id="ShiftHandoff_Help">When enabled, the top of hello-world on this PC shows notes left for the next shift, with how long ago each was left, and a box to leave one. Everyone who signs in to this PC reads them. A note can be kept until someone clears it, for safety issues; the rest show for the hours the Handoff hours policy sets. The screen says notes are not a safety or defect record and must not hold patient or customer details. Check room numbers and similar with your privacy officer first.
+
+Notes are locked to this PC with the Windows Data Protection API unless Handoff folder is set. Each person's own plan stays private to their account.
+
+When disabled or not configured, there is no handoff.</string>
+      <string id="HandoffFolder">Handoff folder</string>
+      <string id="HandoffFolder_Help">When enabled, handoff notes are kept in this folder, such as a share for one hospital unit, so every PC that points to it shows the same notes. Notes there are plain text: the folder's permissions decide who reads them. Give the PCs' users read and write access, and nobody else.
+
+When disabled or not configured, each PC keeps its own notes in ProgramData, locked to that PC.</string>
+      <string id="HandoffHours">Handoff hours</string>
+      <string id="HandoffHours_Help">When enabled, handoff notes show for this many hours, from 1 to 336, unless kept until cleared. 24 suits 12-hour shifts; 168 covers a long weekend.
+
+When disabled or not configured, notes show for 72 hours.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -104,6 +119,12 @@ When disabled or not configured, it uses the Shared counts server policy or the 
       </presentation>
       <presentation id="SharedCountsServer">
         <textBox refId="SharedCountsServer"><label>Server address:</label></textBox>
+      </presentation>
+      <presentation id="HandoffFolder">
+        <textBox refId="HandoffFolder"><label>Folder:</label></textBox>
+      </presentation>
+      <presentation id="HandoffHours">
+        <decimalTextBox refId="HandoffHours" defaultValue="72">Hours:</decimalTextBox>
       </presentation>
     </presentationTable>
   </resources>

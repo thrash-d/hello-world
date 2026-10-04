@@ -90,6 +90,21 @@
       <string id="TurnOffSharedCounts_Help">כשההגדרה מופעלת, hello-world אף פעם לא פונה לשרת ספירות משותפות ולא שואל על כך.
 
 כשההגדרה מושבתת או לא מוגדרת, הוא משתמש במדיניות שרת ספירות משותפות או בשרת המובנה בחבילה.</string>
+      <string id="SUPPORTED_1_46">hello-world 1.46.0 ואילך</string>
+      <string id="ShiftHandoff">העברת משמרת במחשב הזה</string>
+      <string id="ShiftHandoff_Help">כשההגדרה מופעלת, בראש hello-world במחשב הזה מוצגות הערות שהושארו למשמרת הבאה, עם כמה זמן עבר מאז שכל אחת הושארה, ותיבה להשאיר הערה. כל מי שמתחבר למחשב הזה קורא אותן. אפשר להשאיר הערה עד שמישהו ינקה אותה, לבעיות בטיחות; השאר מוצגות במשך השעות שקובעת המדיניות שעות העברה. המסך מציין שההערות אינן רישום בטיחות או תקלות ושאסור לכלול בהן פרטי מטופלים או לקוחות. כדאי לבדוק מראש מספרי חדרים וכדומה עם ממונה הפרטיות.
+
+ההערות נעולות למחשב הזה באמצעות ממשק הגנת הנתונים של Windows, אלא אם הוגדרה תיקיית העברה. התוכנית של כל אדם נשארת פרטית לחשבון שלו.
+
+כשההגדרה מושבתת או לא מוגדרת, אין העברת משמרת.</string>
+      <string id="HandoffFolder">תיקיית העברה</string>
+      <string id="HandoffFolder_Help">כשההגדרה מופעלת, הערות ההעברה נשמרות בתיקייה הזו, למשל שיתוף של מחלקה בבית החולים, כך שכל המחשבים שמפנים אליה מציגים את אותן הערות. שם ההערות הן טקסט רגיל: ההרשאות של התיקייה קובעות מי קורא אותן. יש לתת הרשאת קריאה וכתיבה למשתמשי המחשבים האלה בלבד.
+
+כשההגדרה מושבתת או לא מוגדרת, כל מחשב שומר את ההערות שלו ב-ProgramData, נעולות למחשב.</string>
+      <string id="HandoffHours">שעות העברה</string>
+      <string id="HandoffHours_Help">כשההגדרה מופעלת, הערות ההעברה מוצגות במשך מספר השעות הזה, בין 1 ל-336, חוץ מהערות שנשמרות עד ניקוי. 24 מתאים למשמרות של 12 שעות; 168 מכסה סוף שבוע ארוך.
+
+כשההגדרה מושבתת או לא מוגדרת, ההערות מוצגות 72 שעות.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -100,6 +115,12 @@
       </presentation>
       <presentation id="SharedCountsServer">
         <textBox refId="SharedCountsServer"><label>כתובת השרת:</label></textBox>
+      </presentation>
+      <presentation id="HandoffFolder">
+        <textBox refId="HandoffFolder"><label>תיקייה:</label></textBox>
+      </presentation>
+      <presentation id="HandoffHours">
+        <decimalTextBox refId="HandoffHours" defaultValue="72">שעות:</decimalTextBox>
       </presentation>
     </presentationTable>
   </resources>

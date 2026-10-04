@@ -90,6 +90,21 @@
       <string id="TurnOffSharedCounts_Help">عند التمكين، لا يتصل hello-world أبدًا بخادم العدّ المشترك ولا يسأل عنه.
 
 عند التعطيل أو عدم التكوين، يستخدم سياسة خادم العدّ المشترك أو الخادم المدمج في الحزمة.</string>
+      <string id="SUPPORTED_1_46">hello-world 1.46.0 أو أحدث</string>
+      <string id="ShiftHandoff">تسليم المناوبة على هذا الكمبيوتر</string>
+      <string id="ShiftHandoff_Help">عند التمكين، يعرض أعلى hello-world على هذا الكمبيوتر الملاحظات المتروكة للمناوبة التالية، مع المدة منذ ترك كل منها، ومربعًا لترك ملاحظة. يقرؤها كل من يسجّل الدخول إلى هذا الكمبيوتر. يمكن إبقاء ملاحظة حتى يمسحها أحد، لمشكلات السلامة؛ وتظهر البقية لعدد الساعات الذي تحدده سياسة ساعات التسليم. تقول الشاشة إن الملاحظات ليست سجل سلامة أو أعطال ويجب ألا تحتوي على بيانات مرضى أو عملاء. تحقق مسبقًا من أرقام الغرف وما يشبهها مع مسؤول الخصوصية.
+
+تُقفل الملاحظات على هذا الكمبيوتر بواجهة حماية البيانات في Windows ما لم يُضبط مجلد التسليم. تبقى خطة كل شخص خاصة بحسابه.
+
+عند التعطيل أو عدم التكوين، لا يوجد تسليم.</string>
+      <string id="HandoffFolder">مجلد التسليم</string>
+      <string id="HandoffFolder_Help">عند التمكين، تُحفظ ملاحظات التسليم في هذا المجلد، مثل مجلد مشترك لوحدة في المستشفى، فتعرض كل أجهزة الكمبيوتر التي تشير إليه الملاحظات نفسها. الملاحظات هناك نص عادي: أذونات المجلد تحدد من يقرؤها. امنح مستخدمي هذه الأجهزة القراءة والكتابة ولا أحد غيرهم.
+
+عند التعطيل أو عدم التكوين، يحفظ كل كمبيوتر ملاحظاته في ProgramData مقفلة عليه.</string>
+      <string id="HandoffHours">ساعات التسليم</string>
+      <string id="HandoffHours_Help">عند التمكين، تظهر ملاحظات التسليم لهذا العدد من الساعات، من 1 إلى 336، باستثناء الملاحظات المُبقاة حتى المسح. يناسب 24 المناوبات ذات 12 ساعة؛ ويغطي 168 عطلة نهاية أسبوع طويلة.
+
+عند التعطيل أو عدم التكوين، تظهر الملاحظات 72 ساعة.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -100,6 +115,12 @@
       </presentation>
       <presentation id="SharedCountsServer">
         <textBox refId="SharedCountsServer"><label>عنوان الخادم:</label></textBox>
+      </presentation>
+      <presentation id="HandoffFolder">
+        <textBox refId="HandoffFolder"><label>المجلد:</label></textBox>
+      </presentation>
+      <presentation id="HandoffHours">
+        <decimalTextBox refId="HandoffHours" defaultValue="72">الساعات:</decimalTextBox>
       </presentation>
     </presentationTable>
   </resources>

@@ -192,6 +192,23 @@ the `hello-world:` links its buttons open. Turning it off removes them.
 It reports nothing to IT or managers. The only network connection it can
 make is the shared count below, and only after you say yes to it.
 
+### Shift handoff, on shared PCs
+
+Where your organization turns on shift handoff for a PC (a dock office PC, a
+nurses' station, a cart on a unit), the top of hello-world shows the notes
+the last shift left on it, with how long ago each was left: "1. 8 h ago:
+Forklift 2 pulling left; Dave out Thu". Type `handoff` at the last prompt,
+or use the box in the window, to leave one. Notes show for 72 hours unless
+your organization changes that. A note about safety can be kept until
+someone clears it, and anyone can clear a note that is wrong.
+
+Everyone who signs in to that PC reads the notes, and the screen says so.
+They aren't signed unless you sign them, and they aren't a safety or defect
+record, or a place for patient or customer details. They are locked to the PC
+in `ProgramData\hello-world`, or kept in a unit's shared folder that your
+organization names, so every cart on a unit shows the same notes. Your own
+plan stays private to your account.
+
 ### The shared count
 
 When a shared counts server is set up, either by your organization's policy
@@ -282,7 +299,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.45.0'
+$tag = 'v1.46.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

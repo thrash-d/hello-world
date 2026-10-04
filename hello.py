@@ -507,7 +507,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.45.0"
+VERSION = "1.46.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -536,6 +536,8 @@ SAME_WORDS = ("same", "repetir", "retomar", "reprendre", "wieder")
 PLAN_WORDS = ("p", "plan", "plano")
 MENU_WORDS = ("m", "menu", "menú", "menü")
 TIP_WORDS = ("tip", "consejo", "astuce", "dica", "tipp")
+HANDOFF_WORDS = ("handoff", "relevo", "relève", "passagem", "übergabe", "ubergabe")
+CLEAR_WORDS = ("clear", "borrar", "effacer", "limpar", "löschen", "loschen")
 HELP_WORDS = ("h", "help", "?", "ayuda", "aide", "ajuda", "hilfe")
 LIST_WORDS = ("list", "lista", "liste")
 FULL_WORDS = ("full", "todo", "tout", "tudo", "alles")
@@ -559,6 +561,9 @@ CLOSE_WINDOW_AFTER = None
 # How the notes file is locked: "plain" or "test" in tests; None locks it to
 # the person's Windows account on Windows.
 LOCK = None
+# In tests: the time as "2026-10-05T22:40", and the shift handoff's folder.
+NOW = None
+HANDOFF_DIR = None
 # True while the window runs, so nothing waits for typed input.
 WINDOW = False
 # When Ctrl+C last skipped a question, for "twice in a row closes".
@@ -1085,8 +1090,9 @@ def notes_locked():
 LOCK_ENTROPY = b"hello-world notes"
 
 
-def _dpapi(data, protect):
-    """Windows' Data Protection API, scoped to the signed-in account."""
+def _dpapi(data, protect, machine=False):
+    """Windows' Data Protection API, scoped to the signed-in account, or to
+    this PC so every account on it can read the data."""
     import ctypes
     from ctypes import wintypes
 
@@ -1103,9 +1109,10 @@ def _dpapi(data, protect):
     entropy, keep_entropy = blob(LOCK_ENTROPY)
     out = Blob()
     call = crypt.CryptProtectData if protect else crypt.CryptUnprotectData
-    # CRYPTPROTECT_UI_FORBIDDEN: never ask anything on screen.
+    # CRYPTPROTECT_UI_FORBIDDEN: never ask anything on screen, and
+    # CRYPTPROTECT_LOCAL_MACHINE for data every account on the PC shares.
     if not call(ctypes.byref(source), None, ctypes.byref(entropy), None, None,
-                0x1, ctypes.byref(out)):
+                0x1 | (0x4 if machine else 0), ctypes.byref(out)):
         raise OSError("the notes could not be " + ("locked" if protect else "unlocked"))
     try:
         return ctypes.string_at(out.pbData, out.cbData)
@@ -1113,13 +1120,16 @@ def _dpapi(data, protect):
         ctypes.windll.kernel32.LocalFree(out.pbData)
 
 
-def seal(text):
-    """The file's contents for the state's JSON text, locked if possible."""
+def seal(text, machine=False):
+    """The file's contents for the state's JSON text, locked if possible:
+    to the person, or with machine set to everyone on this PC."""
     kind = lock_kind()
     if kind == "plain":
         return text
+    if kind == "dpapi" and machine:
+        kind = "dpapi-pc"
     data = text.encode("utf-8")
-    sealed = _dpapi(data, True) if kind == "dpapi" else data[::-1]
+    sealed = _dpapi(data, True, kind == "dpapi-pc") if kind.startswith("dpapi") else data[::-1]
     return json.dumps({"locked": kind,
                        "data": base64.b64encode(sealed).decode("ascii")})
 
@@ -1131,8 +1141,8 @@ def unseal(raw):
         return raw
     try:
         data = base64.b64decode(raw["data"], validate=True)
-        if raw["locked"] == "dpapi":
-            data = _dpapi(data, False)
+        if raw["locked"] in ("dpapi", "dpapi-pc"):
+            data = _dpapi(data, False, raw["locked"] == "dpapi-pc")
         elif raw["locked"] == "test":
             data = data[::-1]
         else:
@@ -1801,16 +1811,19 @@ def delete_everything(state):
 
 
 @contextlib.contextmanager
-def file_lock():
-    """Hold notes.lock while a change reads and writes the file.
+def file_lock(folder=None, name="notes.lock"):
+    """Hold notes.lock while a change reads and writes the file, or another
+    lock file in another folder, such as the shift handoff's.
 
     Without it, a delete in one window could land between another window's
     read and write, and that write would bring the deleted notes back.
     """
     try:
-        os.makedirs(data_dir(), mode=0o700, exist_ok=True)
-        fd = os.open(os.path.join(data_dir(), "notes.lock"),
-                     os.O_RDWR | os.O_CREAT, 0o600)
+        if folder is None:
+            folder = data_dir()
+            os.makedirs(folder, mode=0o700, exist_ok=True)
+        fd = os.open(os.path.join(folder, name),
+                     os.O_RDWR | os.O_CREAT, 0o600 if folder == data_dir() else 0o666)
     except OSError:
         yield
         return
@@ -3078,6 +3091,12 @@ def daily(startup):
                 "at the plan prompt to bring it back."))
         say()
 
+    if handoff_on():
+        for line in handoff_lines():
+            say(wrapped("", line))
+        say(tr("Type handoff at the end to leave a note or clear one."))
+        say()
+
     if first:
         para(tr("Press Enter at each question to skip it, and once more to "
                 "close. That's it."))
@@ -3308,6 +3327,174 @@ def did_tip(state, can_save, d):
     return tr("Counted. People who did today's tip so far: {n}").format(n=n)
 
 
+# Shift handoff: notes left on a shared PC for whoever uses it next. They are
+# the PC's, not a person's, so everyone who signs in to it reads them.
+MAX_HANDOFF = 5
+MAX_KEPT = 5
+
+
+def now():
+    return (datetime.datetime.fromisoformat(NOW) if NOW
+            else datetime.datetime.now().replace(second=0, microsecond=0))
+
+
+def handoff_on():
+    return policy("ShiftHandoff")
+
+
+def handoff_shared_folder():
+    """The folder the HandoffFolder policy names, so every PC on a unit
+    shows the same notes, or ""."""
+    return (policy_value("HandoffFolder", "text") or "").strip()
+
+
+def handoff_dir():
+    if shared := handoff_shared_folder():
+        return shared
+    if HANDOFF_DIR:
+        return HANDOFF_DIR
+    if os.name == "nt":
+        return os.path.join(os.environ.get("ProgramData") or r"C:\ProgramData",
+                            "hello-world")
+    return os.path.join(os.path.expanduser("~"), ".local", "share", "hello-world-pc")
+
+
+def handoff_hours():
+    hours = policy_value("HandoffHours", "number")
+    return min(max(hours, 1), 336) if hours else 72
+
+
+def read_handoff():
+    """Every handoff note saved on this PC or unit, oldest first."""
+    try:
+        with open(os.path.join(handoff_dir(), "handoff.json"), encoding="utf-8") as f:
+            raw = json.loads(f.read(100_000))
+        raw = unseal(raw) if isinstance(raw, dict) else {}
+    except (OSError, ValueError, RecursionError):
+        return []
+    notes = []
+    for note in raw.get("notes", []) if isinstance(raw.get("notes"), list) else []:
+        try:
+            at = datetime.datetime.fromisoformat(note["at"])
+            text = clean(note["text"])
+        except (TypeError, KeyError, ValueError):
+            continue
+        if text:
+            notes.append({"text": text, "at": at.isoformat(timespec="minutes"),
+                          "keep": note.get("keep") is True})
+    return notes
+
+
+def write_handoff(notes):
+    """Save the notes: locked to this PC, or plain in a shared unit folder,
+    where the folder's own permissions decide who reads them."""
+    folder = handoff_dir()
+    text = json.dumps({"notes": notes}, ensure_ascii=False)
+    try:
+        os.makedirs(folder, exist_ok=True)
+        if not handoff_shared_folder():
+            text = seal(text, machine=True)
+        tmp = os.path.join(folder, f"handoff.json.{os.getpid()}.tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(text)
+        os.replace(tmp, os.path.join(folder, "handoff.json"))
+        return True
+    except OSError:
+        return False
+
+
+def shown_handoff():
+    """The notes to show, newest first: kept ones, and the rest within the
+    policy's hours."""
+    cutoff = now() - datetime.timedelta(hours=handoff_hours())
+    notes = [n for n in read_handoff()
+             if n["keep"] or datetime.datetime.fromisoformat(n["at"]) >= cutoff]
+    return notes
+
+
+def handoff_order(notes):
+    """Kept notes first, then the newest."""
+    newest = sorted(notes, key=lambda n: n["at"], reverse=True)
+    return [n for n in newest if n["keep"]] + [n for n in newest if not n["keep"]]
+
+
+def age(at):
+    """How long ago, in the largest whole unit, so nobody does date sums."""
+    minutes = max(0, int((now() - datetime.datetime.fromisoformat(at)).total_seconds() // 60))
+    if minutes < 60:
+        return tr("{n} min ago").format(n=minutes)
+    if minutes < 48 * 60:
+        return tr("{n} h ago").format(n=minutes // 60)
+    return tr("{n} d ago").format(n=minutes // (24 * 60))
+
+
+def handoff_lines():
+    """The handoff block for the screen, as lines."""
+    notes = handoff_order(shown_handoff())
+    lines = [tr("Shift handoff on this PC (turned on by your organization):")]
+    if not notes:
+        lines.append(tr("No handoff notes in the last {n} hours.").format(n=handoff_hours()))
+    for n, note in enumerate(notes, 1):
+        kept = tr("Kept until cleared. ") if note["keep"] else ""
+        lines.append(f"{n}. {age(note['at'])}: {kept}{note['text']}")
+    return lines
+
+
+def leave_handoff(text, keep=False):
+    """Add a note. Returns what to say."""
+    text = clean(text)
+    if not text:
+        return tr("Nothing changed.")
+    with file_lock(handoff_dir(), "handoff.lock") if os.path.isdir(handoff_dir()) else contextlib.nullcontext():
+        notes = read_handoff()
+        notes.append({"text": text, "at": now().isoformat(timespec="minutes"), "keep": keep})
+        kept = [n for n in notes if n["keep"]][-MAX_KEPT:]
+        rest = [n for n in notes if not n["keep"]][-MAX_HANDOFF:]
+        if not write_handoff(sorted(kept + rest, key=lambda n: n["at"])):
+            return tr("Could not save the handoff note on this PC.")
+    report_usage("handoff note left")
+    return tr("Left for the next shift.")
+
+
+def clear_handoff(number):
+    """Remove the note shown with this number. Returns what to say."""
+    with file_lock(handoff_dir(), "handoff.lock") if os.path.isdir(handoff_dir()) else contextlib.nullcontext():
+        shown = handoff_order(shown_handoff())
+        if not 1 <= number <= len(shown):
+            return tr("Nothing changed.")
+        gone = shown[number - 1]
+        notes = [n for n in read_handoff() if n != gone]
+        if not write_handoff(notes):
+            return tr("Could not save the handoff note on this PC.")
+    return tr("Cleared.")
+
+
+def handoff_prompt():
+    """The text screen's handoff: leave a note, or clear one."""
+    para(tr("Everyone who uses this PC sees handoff notes. No patient or "
+            "customer details. Not a safety or defect record."))
+    para(tr("Sign it if the next shift may need to ask you."))
+    typed = ask(tr("Type a note for the next shift, clear to remove one, or "
+                   "Enter to go back > "))
+    word = (typed or "").lower().strip(TRIM)
+    if word in QUIT_WORDS:
+        raise Quit
+    if not word:
+        return
+    if word in CLEAR_WORDS:
+        for line in handoff_lines()[1:]:
+            say(wrapped("  ", line))
+        choice = (ask(tr("Which note to clear? Type its number, or Enter to go "
+                         "back > ")) or "").strip(TRIM)
+        if choice.isdecimal():
+            para(clear_handoff(int(choice)))
+        return
+    keep = ask_choice(tr("Keep it until someone clears it? (y or n, Enter for "
+                         "no) > "), strict_yes(), NO_WORDS,
+                      tr("Type y or n, or press Enter for no.")) == "yes"
+    para(leave_handoff(typed, keep))
+
+
 def last_prompt(state, can_save, intent, person, d, iso, open_menu=False):
     """Loop at the last prompt until the person closes the window."""
     if open_menu:
@@ -3344,6 +3531,9 @@ def last_prompt(state, can_save, intent, person, d, iso, open_menu=False):
             continue
         elif answer in TIP_WORDS and shared_on(state):
             say(did_tip(state, can_save, d))
+            continue
+        elif answer in HANDOFF_WORDS and handoff_on():
+            handoff_prompt()
             continue
         elif answer in QUIT_WORDS:
             pass
@@ -4355,6 +4545,7 @@ class Window:
     THOUGHT_LABEL, THOUGHT, TIP_LABEL, TIP, TIP_COUNT, TIP_DONE = range(110, 116)
     PLAN_LABEL, PLAN, STATUS, OPTIONS, DID_IT = range(120, 125)
     TICK = 130  # to 139, one tick box for each thing in the plan
+    HANDOFF_LABEL, HANDOFF, HANDOFF_EDIT, HANDOFF_KEEP, HANDOFF_LEAVE, HANDOFF_RULES = range(140, 146)
     SAVE, CLOSE = 1, 2  # IDOK and IDCANCEL, so Enter and Esc work
 
     def __init__(self, visit, message=None, keep=None):
@@ -4398,6 +4589,20 @@ class Window:
         para(self.DATE, header[0].upper() + header[1:], 8)
         if v.note:
             para(self.NOTE, v.note, 8)
+        if handoff_on():
+            lines = handoff_lines()
+            para(self.HANDOFF_LABEL, lines[0], 2)
+            para(self.HANDOFF, "\n".join(lines[1:]), 4)
+            para(self.HANDOFF_RULES, tr("Everyone who uses this PC sees handoff "
+                                        "notes. No patient or customer details. "
+                                        "Not a safety or defect record.") + " "
+                 + tr("Sign it if the next shift may need to ask you."), 2)
+            add(edit, self.HANDOFF_EDIT, "", tab | 0x800000 | 0x80, m, 15)
+            y += 18
+            add(button, self.HANDOFF_KEEP, tr("&Keep until cleared"), tab | 0x3, m, 14, 120)
+            add(button, self.HANDOFF_LEAVE, tr("&Leave note"), tab, m + w - 64, 16, 64)
+            y += 24
+
         def ticks(parts):
             nonlocal y
             self.parts = parts
@@ -4634,6 +4839,8 @@ class Window:
                     user.SendMessageW(self.item(cid), 0x30, font, 1)  # WM_SETFONT
         if self.item(self.PLAN):
             user.SendMessageW(self.item(self.PLAN), 0xC5, MAX_PLAN, 0)  # EM_LIMITTEXT
+        if self.item(self.HANDOFF_EDIT):
+            user.SendMessageW(self.item(self.HANDOFF_EDIT), 0xC5, MAX_PLAN, 0)  # EM_LIMITTEXT
         for cid in (self.STATUS, self.PLANNED):
             if self.item(cid):
                 live_region(self.item(cid))
@@ -4694,6 +4901,14 @@ class Window:
             self.set_text(self.PLANNED, message)
             self.refresh_plan()
             self.focus_plan()
+        elif cid == self.HANDOFF_LEAVE:
+            import ctypes
+            buffer = ctypes.create_unicode_buffer(MAX_PLAN + 2)
+            self.user.GetWindowTextW(self.item(self.HANDOFF_EDIT), buffer, MAX_PLAN + 2)
+            keep = bool(self.user.SendMessageW(self.item(self.HANDOFF_KEEP), 0xF0, 0, 0))
+            message = leave_handoff(buffer.value, keep)
+            self.fresh = True
+            self.reopen(message)
         elif cid == self.TIP_DONE:
             self.set_text(self.STATUS, v.did_tip())
             if v.tip_people is not None:
@@ -4901,6 +5116,8 @@ class Window:
             entries.append((0, 8, tr("Language...")))
         if feedback_address():
             entries.append((0, 11, tr("Send feedback...")))
+        if handoff_on() and shown_handoff():
+            entries.append((0, 12, tr("Clear a handoff note...")))
         entries.append((0x800, 0, None))  # MF_SEPARATOR
         entries.append(((grayed if policy("UseTextScreen") else 0)
                         | (checked if text_screen(v.state) else 0), 3,
@@ -4921,6 +5138,12 @@ class Window:
             self.language_menu()
         elif choice == 11:
             send_feedback()
+        elif choice == 12:
+            notes = handoff_lines()[1:]
+            picked = self.popup([(0, n, line[:80]) for n, line in enumerate(notes, 1)])
+            if picked:
+                self.fresh = True
+                self.reopen(clear_handoff(picked))
         elif choice == 3:
             if reminder_on():
                 self.inform(tr("At sign-in, this text screen now opens instead "

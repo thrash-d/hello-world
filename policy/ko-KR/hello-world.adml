@@ -94,6 +94,21 @@
       <string id="TurnOffSharedCounts_Help">이 정책 설정을 사용하면 hello-world는 공유 집계 서버에 연결하지 않고 이에 대해 묻지도 않습니다.
 
 사용하지 않거나 구성하지 않으면 공유 집계 서버 정책이나 패키지에 기본 제공된 서버를 사용합니다.</string>
+      <string id="SUPPORTED_1_46">hello-world 1.46.0 이상</string>
+      <string id="ShiftHandoff">이 PC의 교대 인계</string>
+      <string id="ShiftHandoff_Help">이 정책 설정을 사용하면 이 PC의 hello-world 위쪽에 다음 교대조를 위해 남긴 메모가 각각 얼마 전에 남겼는지와 함께 표시되고, 메모를 남기는 칸도 표시됩니다. 이 PC에 로그인하는 사람은 누구나 읽을 수 있습니다. 안전 문제 메모는 누군가 지울 때까지 남겨 둘 수 있고, 나머지는 인계 시간 정책에서 정한 시간 동안 표시됩니다. 화면에는 메모가 안전 기록이나 결함 기록이 아니며 환자나 고객 정보를 적으면 안 된다고 표시됩니다. 병실 번호 등은 미리 개인정보 보호 담당자와 확인하세요.
+
+인계 폴더를 설정하지 않으면 메모는 Windows 데이터 보호 API로 이 PC에 잠깁니다. 각 사용자의 계획은 계속 그 사람의 계정에만 있습니다.
+
+사용하지 않거나 구성하지 않으면 인계 기능이 없습니다.</string>
+      <string id="HandoffFolder">인계 폴더</string>
+      <string id="HandoffFolder_Help">이 정책 설정을 사용하면 인계 메모가 이 폴더(예: 병동별 공유 폴더)에 저장되어, 이 폴더를 가리키는 모든 PC에 같은 메모가 표시됩니다. 여기서 메모는 일반 텍스트이며, 누가 읽을 수 있는지는 폴더 권한이 정합니다. 해당 PC 사용자에게만 읽기와 쓰기 권한을 주세요.
+
+사용하지 않거나 구성하지 않으면 각 PC가 자기 메모를 ProgramData에 저장하고 그 PC에 잠급니다.</string>
+      <string id="HandoffHours">인계 시간</string>
+      <string id="HandoffHours_Help">이 정책 설정을 사용하면 인계 메모가 1부터 336까지 이 시간 동안 표시됩니다(지울 때까지 남기는 메모는 제외). 12시간 근무에는 24, 긴 주말에는 168이 알맞습니다.
+
+사용하지 않거나 구성하지 않으면 메모는 72시간 동안 표시됩니다.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -104,6 +119,12 @@
       </presentation>
       <presentation id="SharedCountsServer">
         <textBox refId="SharedCountsServer"><label>서버 주소:</label></textBox>
+      </presentation>
+      <presentation id="HandoffFolder">
+        <textBox refId="HandoffFolder"><label>폴더:</label></textBox>
+      </presentation>
+      <presentation id="HandoffHours">
+        <decimalTextBox refId="HandoffHours" defaultValue="72">시간:</decimalTextBox>
       </presentation>
     </presentationTable>
   </resources>
