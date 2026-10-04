@@ -85,6 +85,15 @@
       <string id="UnlockedNotes_Help">이 정책 설정을 사용하면 hello-world는 1.44.0 이전 버전처럼 각 사용자의 메모를 파일을 읽을 수 있는 누구나 읽을 수 있는 일반 텍스트로 저장합니다. 기록 보존 규정상 필요한 경우에만 사용하고 사용자에게 알리세요. 화면에서는 일상 업무만 적어 달라고 안내합니다.
 
 사용하지 않거나 구성하지 않으면 메모는 Windows 데이터 보호 API로 사용자의 Windows 계정에 잠깁니다. 다른 사용자나 파일 사본으로는 읽을 수 없지만, PC에 대한 전체 관리자 권한이 있는 관리자는 읽을 수 있습니다. 관리자가 암호를 재설정한 로컬 계정은 잠긴 메모를 잃습니다.</string>
+      <string id="SUPPORTED_1_45">hello-world 1.45.0 이상</string>
+      <string id="SharedCountsServer">공유 집계 서버</string>
+      <string id="SharedCountsServer_Help">이 정책 설정을 사용하면 hello-world가 사용자마다 한 번, 오늘의 팁을 몇 명이 했는지 볼지 물어봅니다. 예라고 답한 사용자는 팁 아래에서 인원수를 보고, tip을 입력하거나 [이 팁 했어요]를 클릭하면 1이 늘어납니다. 집계할 때마다 이 서버로 날짜만 https로 보내며, 계획이나 이름, 컴퓨터 이름은 절대 보내지 않습니다. 다른 웹 요청과 마찬가지로 서버는 PC의 네트워크 주소를 볼 수 있습니다. 릴리스에 포함된 server/counts_server.py는 직접 실행할 수 있는 작은 서버입니다.
+
+사용하지 않거나 구성하지 않으면 패키지에 기본 제공된 서버가 있는 경우 그 서버를 사용합니다.</string>
+      <string id="TurnOffSharedCounts">공유 집계 끄기</string>
+      <string id="TurnOffSharedCounts_Help">이 정책 설정을 사용하면 hello-world는 공유 집계 서버에 연결하지 않고 이에 대해 묻지도 않습니다.
+
+사용하지 않거나 구성하지 않으면 공유 집계 서버 정책이나 패키지에 기본 제공된 서버를 사용합니다.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -92,6 +101,9 @@
       </presentation>
       <presentation id="MaxBackups">
         <decimalTextBox refId="MaxBackups" defaultValue="5">보관할 백업 수:</decimalTextBox>
+      </presentation>
+      <presentation id="SharedCountsServer">
+        <textBox refId="SharedCountsServer"><label>서버 주소:</label></textBox>
       </presentation>
     </presentationTable>
   </resources>

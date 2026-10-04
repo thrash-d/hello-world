@@ -9,13 +9,13 @@ opt-in setting or policy with the safe default kept.
 ## Building next
 
 The owner's plan from the October 2026 persona review and the Profit
-Maximizer memo, one round each. 1.44.0 built the first: notes locked to the
-person's Windows account, so a plan can be personal.
+Maximizer memo, one round each. 1.44.0 locked notes to the person's Windows
+account; 1.45.0 added the shared tip count and its reference server.
 
-1. Shared counts: an opt-in "212 people did today's tip" and emoji reactions
-   to the thought, sending only anonymous counts to a server the
-   organization runs and names by policy, with a small reference server in
-   the repo. Plan text never leaves the PC.
+1. Emoji reactions to the thought on the same server, the count shown in
+   the window without waiting for the server (a background thread), and a
+   public counts server for the individual package. Running that server is
+   the owner's step.
 2. Shift handoff notes for shared floor PCs (Denise, Rick; the strongest paid
    demand).
 3. "I don't remember" as an answer, the day a plan was written ("On Monday you

@@ -85,6 +85,15 @@ Um ficheiro de conteúdo da organização substitui as duas listas.</string>
       <string id="UnlockedNotes_Help">Quando ativada, o hello-world guarda as notas de cada pessoa como texto simples, que qualquer pessoa que consiga ler o ficheiro pode ler, como nas versões anteriores à 1.44.0. Use-a só onde as regras de registos o exijam e avise as pessoas, porque o ecrã vai pedir-lhes que se limitem a tarefas do dia a dia.
 
 Quando desativada ou não configurada, as notas ficam bloqueadas na conta do Windows da pessoa com a API de Proteção de Dados do Windows. Outros utilizadores e cópias do ficheiro não as conseguem ler; um administrador com controlo total do computador ainda conseguiria. Uma conta local cuja palavra-passe um administrador reponha perde as notas bloqueadas.</string>
+      <string id="SUPPORTED_1_45">hello-world 1.45.0 ou posterior</string>
+      <string id="SharedCountsServer">Servidor de contagens partilhadas</string>
+      <string id="SharedCountsServer_Help">Quando ativada, o hello-world pergunta uma vez a cada pessoa se quer ver quantas pessoas fizeram a dica do dia. Quem diz que sim vê a contagem por baixo da dica, e escrever dica ou clicar em Fiz esta dica soma um. Cada contagem envia a este servidor só a data, por https; nunca um plano, um nome ou o nome do computador. O servidor continua a ver o endereço de rede do computador, como em qualquer pedido web. server/counts_server.py, incluído na versão, é um servidor pequeno que pode executar.
+
+Quando desativada ou não configurada, é usado o servidor incluído no pacote, se houver.</string>
+      <string id="TurnOffSharedCounts">Desativar as contagens partilhadas</string>
+      <string id="TurnOffSharedCounts_Help">Quando ativada, o hello-world nunca contacta um servidor de contagens partilhadas e não pergunta sobre isso.
+
+Quando desativada ou não configurada, usa a política Servidor de contagens partilhadas ou o servidor incluído no pacote.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -92,6 +101,9 @@ Quando desativada ou não configurada, as notas ficam bloqueadas na conta do Win
       </presentation>
       <presentation id="MaxBackups">
         <decimalTextBox refId="MaxBackups" defaultValue="5">Cópias a manter:</decimalTextBox>
+      </presentation>
+      <presentation id="SharedCountsServer">
+        <textBox refId="SharedCountsServer"><label>Endereço do servidor:</label></textBox>
       </presentation>
     </presentationTable>
   </resources>

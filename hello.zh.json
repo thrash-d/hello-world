@@ -562,7 +562,18 @@
   "tomorrow": "明天|明日",
   "If you type a plan, it asks next time how it went. It can be anything you want to get done, at work or not. Your notes are locked to your Windows account and never sent anywhere. Only someone with full admin control of this PC could get to them.": "如果您输入计划，下次会问您进展如何。工作上的事或其他事都可以，只要是您想完成的。您的记录已锁定在您的 Windows 帐户中，不会发送到任何地方。只有拥有这台电脑完全管理员权限的人才能读取。",
   "It never leaves this computer. It is locked to your Windows account, so other people who use this computer or copy its files can't read it. Someone with full admin control of this PC still could.": "这些内容不会离开这台电脑。它们已锁定在您的 Windows 帐户中，所以使用这台电脑或复制其文件的其他人无法读取。拥有这台电脑完全管理员权限的人仍然可以读取。",
-  "Your saved notes are locked to a Windows account that can't open them here, so hello-world set them aside as a backup copy and started fresh. Menu option 4 deletes the backup.": "您保存的记录锁定在一个在这里无法打开它们的 Windows 帐户中，所以 hello-world 把它们另存为备份并重新开始。菜单选项 4 可以删除备份。"
+  "Your saved notes are locked to a Windows account that can't open them here, so hello-world set them aside as a backup copy and started fresh. Menu option 4 deletes the backup.": "您保存的记录锁定在一个在这里无法打开它们的 Windows 帐户中，所以 hello-world 把它们另存为备份并重新开始。菜单选项 4 可以删除备份。",
+  "People who did today's tip so far: {n}": "到目前为止完成今天提示的人数：{n}",
+  "Type tip at the end once you have done it.": "完成后，在最后输入 tip。",
+  "See how many people do each day's tip? It sends only that you did the tip, never your plans or your name. (y or n, Enter for no) > ": "要查看每天有多少人完成提示吗？只发送您完成了提示这件事，绝不发送您的计划或姓名。（y 或 n，按 Enter 表示否）> ",
+  "Type y or n, or press Enter for no.": "请输入 y 或 n，或按 Enter 表示否。",
+  "No problem. Menu option 12 can turn it on later.": "没问题。之后可以在菜单选项 12 中打开。",
+  "The shared count can't be reached just now.": "现在无法连接共享计数。",
+  "Counted. People who did today's tip so far: {n}": "已计入。到目前为止完成今天提示的人数：{n}",
+  "Show how many people did the tip": "显示完成提示的人数",
+  "Done. You'll see how many people did the tip.": "完成。您会看到完成提示的人数。",
+  "Done. Nothing is sent, and no count shows.": "完成。不会发送任何内容，也不显示人数。",
+  "I did this &tip": "我做了这条提示(&T)"
  },
  "tips_floor": [
   "开始第一单活之前，先确认您走的通道畅通。",

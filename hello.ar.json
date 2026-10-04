@@ -562,7 +562,18 @@
   "tomorrow": "غدا|غدًا|بكرة",
   "If you type a plan, it asks next time how it went. It can be anything you want to get done, at work or not. Your notes are locked to your Windows account and never sent anywhere. Only someone with full admin control of this PC could get to them.": "إذا كتبت خطة، فسيسألك في المرة القادمة كيف سارت. يمكن أن تكون أي شيء تريد إنجازه، في العمل أو خارجه. ملاحظاتك مقفلة بحساب Windows الخاص بك ولا تُرسل إلى أي مكان. لا يمكن الوصول إليها إلا لمن لديه تحكم كامل كمسؤول على هذا الكمبيوتر.",
   "It never leaves this computer. It is locked to your Windows account, so other people who use this computer or copy its files can't read it. Someone with full admin control of this PC still could.": "لا يغادر هذا الكمبيوتر أبدًا. وهو مقفل بحساب Windows الخاص بك، فلا يستطيع قراءته من يستخدم هذا الكمبيوتر أو ينسخ ملفاته. لكن من لديه تحكم كامل كمسؤول على هذا الكمبيوتر يستطيع ذلك.",
-  "Your saved notes are locked to a Windows account that can't open them here, so hello-world set them aside as a backup copy and started fresh. Menu option 4 deletes the backup.": "ملاحظاتك المحفوظة مقفلة بحساب Windows لا يمكنه فتحها هنا، لذلك وضعها hello-world جانبًا كنسخة احتياطية وبدأ من جديد. خيار القائمة 4 يحذف النسخة الاحتياطية."
+  "Your saved notes are locked to a Windows account that can't open them here, so hello-world set them aside as a backup copy and started fresh. Menu option 4 deletes the backup.": "ملاحظاتك المحفوظة مقفلة بحساب Windows لا يمكنه فتحها هنا، لذلك وضعها hello-world جانبًا كنسخة احتياطية وبدأ من جديد. خيار القائمة 4 يحذف النسخة الاحتياطية.",
+  "People who did today's tip so far: {n}": "عدد من نفّذوا نصيحة اليوم حتى الآن: {n}",
+  "Type tip at the end once you have done it.": "اكتب tip في النهاية بعد أن تنفّذها.",
+  "See how many people do each day's tip? It sends only that you did the tip, never your plans or your name. (y or n, Enter for no) > ": "هل تريد رؤية عدد من ينفّذون نصيحة كل يوم؟ يُرسل فقط أنك نفّذت النصيحة، ولا يُرسل أبدًا خططك أو اسمك. (y أو n، Enter للرفض) > ",
+  "Type y or n, or press Enter for no.": "اكتب y أو n، أو اضغط Enter للرفض.",
+  "No problem. Menu option 12 can turn it on later.": "لا بأس. يمكن تشغيله لاحقًا من خيار القائمة 12.",
+  "The shared count can't be reached just now.": "لا يمكن الوصول إلى العدّ المشترك الآن.",
+  "Counted. People who did today's tip so far: {n}": "تم العدّ. عدد من نفّذوا نصيحة اليوم حتى الآن: {n}",
+  "Show how many people did the tip": "عرض عدد من نفّذوا النصيحة",
+  "Done. You'll see how many people did the tip.": "تم. سترى عدد من نفّذوا النصيحة.",
+  "Done. Nothing is sent, and no count shows.": "تم. لا يُرسل أي شيء ولا يظهر أي عدد.",
+  "I did this &tip": "نفّذتُ هذه ال&نصيحة"
  },
  "tips_floor": [
   "التأكد من خلو الممر قبل أول مهمة في الوردية.",

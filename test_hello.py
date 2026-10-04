@@ -3406,3 +3406,118 @@ def test_windows_locks_notes_to_the_account():
     assert hello.unseal(json.loads(sealed)) == {"visits": [], "intent": None}
     hello.POLICY = {"UnlockedNotes": 1}
     assert hello.lock_kind() == "plain"
+
+
+def _counts_server():
+    """The reference counts server on a free local port, in a thread."""
+    import importlib.util
+    import threading
+    path = os.path.join(os.path.dirname(HELLO), "server", "counts_server.py")
+    spec = importlib.util.spec_from_file_location("counts_server", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    folder = mkdtemp()
+    server = mod.serve(0, folder, "127.0.0.1")
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server, f"http://127.0.0.1:{server.server_address[1]}", folder
+
+
+def _utc_today():
+    import datetime
+    return datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+
+
+def test_the_counts_server_counts_each_pc_once_a_day_and_keeps_only_numbers():
+    import urllib.error
+    import urllib.request
+    server, url, folder = _counts_server()
+    day = _utc_today()
+    try:
+        def call(path, post=False):
+            request = urllib.request.Request(url + path, data=b"{}" if post else None,
+                                             method="POST" if post else "GET")
+            with urllib.request.urlopen(request, timeout=5) as r:
+                return json.loads(r.read())
+        assert call(f"/v1/day/{day}") == {"tip": 0}
+        assert call(f"/v1/day/{day}/tip", post=True) == {"tip": 1}
+        assert call(f"/v1/day/{day}/tip", post=True) == {"tip": 1}
+        for bad in ("/v1/day/2020-01-01", "/v1/day/nonsense", "/v1/day/../../etc"):
+            try:
+                call(bad)
+                raise AssertionError(bad)
+            except urllib.error.HTTPError as e:
+                assert e.code == 404, bad
+        with open(os.path.join(folder, f"{day}.json"), encoding="utf-8") as f:
+            assert json.load(f) == {"tip": 1}
+        assert os.listdir(folder) == [f"{day}.json"]
+    finally:
+        server.shutdown()
+
+
+def test_the_text_screen_offers_the_shared_count_and_counts_the_tip():
+    server, url, _ = _counts_server()
+    day = _utc_today()
+    policy = {"SharedCountsServer": url}
+    try:
+        p = run(text="y\nCall Ana about the secret project\ntip\n\n", day=day, policy=policy)
+        out = " ".join(p.stdout.split())
+        assert "See how many people do each day's tip?" in out
+        assert "People who did today's tip so far: 0" in out
+        assert "Counted. People who did today's tip so far: 1" in out
+        saved = notes(p.home)
+        assert saved["shared"] is True and saved["tip_day"] == day
+        # Typed again the same day, it isn't counted twice.
+        again = run(text="tip\n\n", day=day, policy=policy, home=p.home)
+        assert "so far: 1" in again.stdout
+        # Someone who says no is asked once and sends nothing.
+        q = run(text="n\n\n\n", day=day, policy=policy)
+        assert "Menu option 12 can turn it on later." in q.stdout
+        assert "so far" not in q.stdout and "shared" not in notes(q.home)
+        assert "See how many" not in run(text="\n\n", day=day, policy=policy,
+                                         home=q.home).stdout
+    finally:
+        server.shutdown()
+
+
+def test_without_a_server_or_with_the_policy_nothing_is_asked_or_sent():
+    assert "See how many" not in run(text="\n\n\n").stdout
+    server, url, folder = _counts_server()
+    try:
+        p = run(text="\n\n\n", day=_utc_today(),
+                policy={"SharedCountsServer": url, "TurnOffSharedCounts": 1})
+        assert "See how many" not in p.stdout and not os.listdir(folder)
+    finally:
+        server.shutdown()
+    hello = _load_hello()
+    for address in ("http://counts.example.com", "ftp://x", "counts.example.com"):
+        hello.POLICY = {"SharedCountsServer": address}
+        assert hello.counts_server() == "", address
+    hello.POLICY = {"SharedCountsServer": "https://counts.example.com/"}
+    assert hello.counts_server() == "https://counts.example.com"
+
+
+def test_an_unreachable_server_shows_nothing_and_does_not_stall():
+    import time
+    start = time.time()
+    p = run(text="y\n\ntip\n\n", day=_utc_today(),
+            policy={"SharedCountsServer": "http://127.0.0.1:9"})
+    assert "so far" not in p.stdout.split("Counted")[0]
+    assert "can't be reached just now" in p.stdout
+    assert time.time() - start < 15
+
+
+def test_the_window_counts_the_tip():
+    server, url, _ = _counts_server()
+    day = _utc_today()
+    try:
+        first = run(text="y\n\n\n", day=day, policy={"SharedCountsServer": url})
+        hello = _window_hello(day=day, home=first.home)
+        hello.POLICY = {"SharedCountsServer": url}
+        visit = hello.Visit()
+        assert visit.tip_people == 0
+        assert visit.did_tip() == "Counted. People who did today's tip so far: 1"
+        assert visit.tip_people == 1
+        assert visit.shared_switch() == "Done. Nothing is sent, and no count shows."
+        assert "shared" not in notes(first.home)
+    finally:
+        server.shutdown()

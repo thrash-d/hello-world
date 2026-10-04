@@ -50,7 +50,7 @@ only administrators can read, and success and failure go to the Application
 event log under the source hello-world.
 
 .EXAMPLE
-$tag = 'v1.44.0'
+$tag = 'v1.45.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
@@ -471,10 +471,11 @@ try {
     # own profile puts first.
     Import-Module (Join-Path $PSHOME 'Modules\Microsoft.PowerShell.Archive\Microsoft.PowerShell.Archive.psd1')
     Expand-Archive -LiteralPath $zip -DestinationPath (Join-Path $new 'python')
-    # hello.py uses none of these, and vulnerability scanners flag every PC
-    # that carries an OpenSSL or SQLite build.
+    # hello.py doesn't use SQLite, and vulnerability scanners flag every PC
+    # that carries a build of it. OpenSSL stays, for the shared counts
+    # server's https (1.45.0); Python updates bring its fixes.
     # The rest are modules hello.py never loads; CI runs the trimmed copy.
-    foreach ($pattern in '_ssl.pyd', '_hashlib.pyd', 'libssl-*.dll', 'libcrypto-*.dll', '_sqlite3.pyd', 'sqlite3.dll',
+    foreach ($pattern in '_sqlite3.pyd', 'sqlite3.dll',
             '_lzma.pyd', '_bz2.pyd', '_elementtree.pyd', 'pyexpat.pyd', 'winsound.pyd', '_multiprocessing.pyd',
             '_overlapped.pyd', '_asyncio.pyd', '_zoneinfo.pyd', '_decimal.pyd', '_test*.pyd', 'xxlimited*.pyd') {
         Get-ChildItem -LiteralPath (Join-Path $new 'python') -Filter $pattern -Force | Remove-Item -Force

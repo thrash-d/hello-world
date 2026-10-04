@@ -232,7 +232,18 @@
   "Type numbers from 1 to {n}, such as 1 3 or 1-3, y for all, or press Enter to go back.": "Escreva números de 1 a {n}, como 1 3 ou 1-3, s para todas, ou prima Enter para voltar.",
   "If you type a plan, it asks next time how it went. It can be anything you want to get done, at work or not. Your notes are locked to your Windows account and never sent anywhere. Only someone with full admin control of this PC could get to them.": "Se escrever um plano, da próxima vez é perguntado como correu. Pode ser qualquer coisa que queira fazer, do trabalho ou não. As notas ficam bloqueadas na sua conta do Windows e nunca são enviadas para lado nenhum. Só alguém com controlo total de administrador deste computador lhes poderia aceder.",
   "It never leaves this computer. It is locked to your Windows account, so other people who use this computer or copy its files can't read it. Someone with full admin control of this PC still could.": "Nunca sai deste computador. Fica bloqueado na sua conta do Windows, por isso quem usar este computador ou copiar os ficheiros não o consegue ler. Alguém com controlo total de administrador deste computador ainda conseguiria.",
-  "Your saved notes are locked to a Windows account that can't open them here, so hello-world set them aside as a backup copy and started fresh. Menu option 4 deletes the backup.": "As notas guardadas estão bloqueadas numa conta do Windows que não as consegue abrir aqui, por isso o hello-world guardou-as como cópia de segurança e começou do zero. A opção 4 do menu apaga a cópia."
+  "Your saved notes are locked to a Windows account that can't open them here, so hello-world set them aside as a backup copy and started fresh. Menu option 4 deletes the backup.": "As notas guardadas estão bloqueadas numa conta do Windows que não as consegue abrir aqui, por isso o hello-world guardou-as como cópia de segurança e começou do zero. A opção 4 do menu apaga a cópia.",
+  "People who did today's tip so far: {n}": "Pessoas que fizeram a dica de hoje até agora: {n}",
+  "Type tip at the end once you have done it.": "Escreva dica no fim quando a tiver feito.",
+  "See how many people do each day's tip? It sends only that you did the tip, never your plans or your name. (y or n, Enter for no) > ": "Quer ver quantas pessoas fazem a dica de cada dia? Só é enviado que fez a dica, nunca os seus planos nem o seu nome. (s ou n, Enter para não) > ",
+  "Type y or n, or press Enter for no.": "Escreva s ou n, ou prima Enter para não.",
+  "No problem. Menu option 12 can turn it on later.": "Não há problema. A opção 12 do menu ativa isto mais tarde.",
+  "The shared count can't be reached just now.": "Não é possível chegar à contagem partilhada neste momento.",
+  "Counted. People who did today's tip so far: {n}": "Contado. Pessoas que fizeram a dica de hoje até agora: {n}",
+  "Show how many people did the tip": "Mostrar quantas pessoas fizeram a dica",
+  "Done. You'll see how many people did the tip.": "Feito. Vai ver quantas pessoas fizeram a dica.",
+  "Done. Nothing is sent, and no count shows.": "Feito. Nada é enviado e não aparece nenhuma contagem.",
+  "I did this &tip": "&Fiz esta dica"
  },
  "thoughts": {
   "0": "Abrir aquele documento que tem andado a adiar e ler só o primeiro parágrafo.",

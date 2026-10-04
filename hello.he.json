@@ -562,7 +562,18 @@
   "tomorrow": "מחר",
   "If you type a plan, it asks next time how it went. It can be anything you want to get done, at work or not. Your notes are locked to your Windows account and never sent anywhere. Only someone with full admin control of this PC could get to them.": "אם מקלידים תוכנית, בפעם הבאה תופיע שאלה איך זה הלך. זה יכול להיות כל דבר שרוצים לעשות, בעבודה או מחוצה לה. הרשומות נעולות לחשבון ה-Windows שלך ולא נשלחות לשום מקום. רק מי שיש לו שליטה מלאה כמנהל במחשב הזה יכול להגיע אליהן.",
   "It never leaves this computer. It is locked to your Windows account, so other people who use this computer or copy its files can't read it. Someone with full admin control of this PC still could.": "המידע לא יוצא מהמחשב הזה. הוא נעול לחשבון ה-Windows שלך, כך שאנשים אחרים שמשתמשים במחשב או מעתיקים את הקבצים שלו לא יכולים לקרוא אותו. מי שיש לו שליטה מלאה כמנהל במחשב עדיין יכול.",
-  "Your saved notes are locked to a Windows account that can't open them here, so hello-world set them aside as a backup copy and started fresh. Menu option 4 deletes the backup.": "הרשומות השמורות נעולות לחשבון Windows שלא יכול לפתוח אותן כאן, ולכן hello-world שמר אותן בצד כעותק גיבוי והתחיל מחדש. אפשרות 4 בתפריט מוחקת את הגיבוי."
+  "Your saved notes are locked to a Windows account that can't open them here, so hello-world set them aside as a backup copy and started fresh. Menu option 4 deletes the backup.": "הרשומות השמורות נעולות לחשבון Windows שלא יכול לפתוח אותן כאן, ולכן hello-world שמר אותן בצד כעותק גיבוי והתחיל מחדש. אפשרות 4 בתפריט מוחקת את הגיבוי.",
+  "People who did today's tip so far: {n}": "אנשים שעשו את הטיפ של היום עד עכשיו: {n}",
+  "Type tip at the end once you have done it.": "אחרי שעשית אותו, אפשר להקליד tip בסוף.",
+  "See how many people do each day's tip? It sends only that you did the tip, never your plans or your name. (y or n, Enter for no) > ": "להציג כמה אנשים עושים את הטיפ של כל יום? נשלח רק שעשית את הטיפ, אף פעם לא התוכניות או השם שלך. (y או n, ‏Enter ללא) > ",
+  "Type y or n, or press Enter for no.": "יש להקליד y או n, או ללחוץ Enter ללא.",
+  "No problem. Menu option 12 can turn it on later.": "אין בעיה. אפשר להפעיל את זה אחר כך באפשרות 12 בתפריט.",
+  "The shared count can't be reached just now.": "אי אפשר להגיע לספירה המשותפת כרגע.",
+  "Counted. People who did today's tip so far: {n}": "נספר. אנשים שעשו את הטיפ של היום עד עכשיו: {n}",
+  "Show how many people did the tip": "להציג כמה אנשים עשו את הטיפ",
+  "Done. You'll see how many people did the tip.": "בוצע. יוצג כמה אנשים עשו את הטיפ.",
+  "Done. Nothing is sent, and no count shows.": "בוצע. שום דבר לא נשלח ולא מוצגת ספירה.",
+  "I did this &tip": "עשיתי את ה&טיפ הזה"
  },
  "tips_floor": [
   "לבדוק שהמעבר פנוי לפני המשימה הראשונה במשמרת.",

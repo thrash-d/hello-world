@@ -85,6 +85,15 @@ Eine Inhaltsdatei der Organisation ersetzt beide Listen.</string>
       <string id="UnlockedNotes_Help">Wenn Sie diese Einstellung aktivieren, speichert hello-world die Notizen jeder Person als Klartext, den jeder lesen kann, der die Datei lesen kann, wie vor Version 1.44.0. Verwenden Sie sie nur, wo Aufbewahrungsregeln es verlangen, und informieren Sie die Personen, denn der Bildschirm bittet sie dann, bei alltäglichen Aufgaben zu bleiben.
 
 Wenn Sie diese Einstellung deaktivieren oder nicht konfigurieren, werden die Notizen mit der Windows-Datenschutz-API an das Windows-Konto der Person gebunden. Andere Benutzer und Kopien der Datei können sie nicht lesen; ein Administrator mit voller Kontrolle über den PC könnte es weiterhin. Ein lokales Konto, dessen Kennwort ein Administrator zurücksetzt, verliert seine gesperrten Notizen.</string>
+      <string id="SUPPORTED_1_45">hello-world 1.45.0 oder höher</string>
+      <string id="SharedCountsServer">Server für gemeinsame Zählungen</string>
+      <string id="SharedCountsServer_Help">Wenn Sie diese Einstellung aktivieren, fragt hello-world jede Person einmal, ob sie sehen möchte, wie viele Personen den Tipp des Tages umgesetzt haben. Wer zustimmt, sieht die Zahl unter dem Tipp, und die Eingabe tipp oder ein Klick auf Diesen Tipp gemacht erhöht sie um eins. Jede Zählung sendet nur das Datum per https an diesen Server, nie einen Plan, einen Namen oder einen Computernamen. Der Server sieht wie bei jeder Webanfrage trotzdem die Netzwerkadresse des PCs. server/counts_server.py im Release ist ein kleiner Server, den Sie selbst betreiben können.
+
+Wenn Sie diese Einstellung deaktivieren oder nicht konfigurieren, wird der im Paket eingebaute Server verwendet, falls es einen gibt.</string>
+      <string id="TurnOffSharedCounts">Gemeinsame Zählungen ausschalten</string>
+      <string id="TurnOffSharedCounts_Help">Wenn Sie diese Einstellung aktivieren, kontaktiert hello-world nie einen Server für gemeinsame Zählungen und fragt auch nicht danach.
+
+Wenn Sie diese Einstellung deaktivieren oder nicht konfigurieren, gilt die Richtlinie Server für gemeinsame Zählungen oder der im Paket eingebaute Server.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -92,6 +101,9 @@ Wenn Sie diese Einstellung deaktivieren oder nicht konfigurieren, werden die Not
       </presentation>
       <presentation id="MaxBackups">
         <decimalTextBox refId="MaxBackups" defaultValue="5">Zu behaltende Sicherungen:</decimalTextBox>
+      </presentation>
+      <presentation id="SharedCountsServer">
+        <textBox refId="SharedCountsServer"><label>Serveradresse:</label></textBox>
       </presentation>
     </presentationTable>
   </resources>

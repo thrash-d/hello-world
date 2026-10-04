@@ -16,6 +16,14 @@ It is meant to be useful in under twenty seconds, which is why people keep
 opening it. It has no accounts, no network access, no scores and no reminders
 unless you ask for one.
 
+## For anyone, at home or at work
+
+hello-world isn't only for companies. Anyone on Windows can install it for
+themselves, with no administrator and no account: see "For one person,
+without an administrator" below. A package built for people outside an
+organization sets `COUNTS_SERVER` in `hello.py` to a public counts server, so
+the shared count works for them too once they say yes to it.
+
 ## For employees
 
 Open **hello-world** from the Start menu, or type "hello-world" in Windows
@@ -181,7 +189,28 @@ Turning the reminder on adds three entries to your own part of the Windows
 registry: the sign-in value under `Run`, the name the notification shows, and
 the `hello-world:` links its buttons open. Turning it off removes them.
 
-It makes no network connections and reports nothing to IT or managers.
+It reports nothing to IT or managers. The only network connection it can
+make is the shared count below, and only after you say yes to it.
+
+### The shared count
+
+When a shared counts server is set up, either by your organization's policy
+or in the package you installed, hello-world asks you once: "See how many
+people do each day's tip?" Say yes and the count shows under the tip. Type
+`tip` at the last prompt, or click **I did this tip** in the window, when you
+have done it, and you are counted once for that day.
+
+Each count sends the date and nothing else: never a plan, a name or a
+computer name. The server sees your PC's network address, as any website
+does. The reference server, `server/counts_server.py`, doesn't write
+addresses anywhere. It keeps only a daily, in-memory hash of them, so each
+PC counts once a day. Turn the count on or off in the window under
+**Options > What the window shows**, or with menu option 12 in the text
+screen, or `hello.cmd --set shared off`. Without a server, nothing is asked
+and nothing is sent.
+
+The file also holds the day you last counted yourself for the tip, and
+whether you answered the shared count question.
 
 Since 1.44.0 the file is locked to your Windows account with the Windows
 Data Protection API, so a plan can be anything you want to get done, at work
@@ -253,7 +282,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.44.0'
+$tag = 'v1.45.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

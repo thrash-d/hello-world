@@ -85,6 +85,15 @@ Un archivo de contenido de la organización reemplaza ambas listas.</string>
       <string id="UnlockedNotes_Help">Si se habilita, hello-world guarda las notas de cada persona como texto sin cifrar que puede leer cualquiera con acceso al archivo, como en las versiones anteriores a 1.44.0. Úsela solo donde las normas de registros lo exijan y avise a las personas, porque la pantalla les pedirá entonces que se limiten a tareas del día a día.
 
 Si se deshabilita o no se configura, las notas se bloquean con la cuenta de Windows de cada persona mediante la API de protección de datos de Windows. Otros usuarios y las copias del archivo no pueden leerlas; un administrador con control total del equipo sí podría. Una cuenta local cuya contraseña restablece un administrador pierde sus notas bloqueadas.</string>
+      <string id="SUPPORTED_1_45">hello-world 1.45.0 o posterior</string>
+      <string id="SharedCountsServer">Servidor de recuentos compartidos</string>
+      <string id="SharedCountsServer_Help">Si se habilita, hello-world pregunta una vez a cada persona si quiere ver cuántas personas hicieron la sugerencia del día. Quienes dicen que sí ven el recuento bajo la sugerencia, y escribir tip o hacer clic en Hice esta sugerencia lo aumenta en uno. Cada recuento envía a este servidor solo la fecha, por https; nunca un plan, un nombre ni el nombre del equipo. El servidor sigue viendo la dirección de red del equipo, como en cualquier petición web. server/counts_server.py, incluido en la versión, es un servidor pequeño que puede ejecutar.
+
+Si se deshabilita o no se configura, se usa el servidor integrado en el paquete, si lo tiene.</string>
+      <string id="TurnOffSharedCounts">Desactivar los recuentos compartidos</string>
+      <string id="TurnOffSharedCounts_Help">Si se habilita, hello-world nunca contacta con un servidor de recuentos compartidos ni pregunta por ello.
+
+Si se deshabilita o no se configura, usa la directiva Servidor de recuentos compartidos o el servidor integrado en el paquete.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -92,6 +101,9 @@ Si se deshabilita o no se configura, las notas se bloquean con la cuenta de Wind
       </presentation>
       <presentation id="MaxBackups">
         <decimalTextBox refId="MaxBackups" defaultValue="5">Copias que guardar:</decimalTextBox>
+      </presentation>
+      <presentation id="SharedCountsServer">
+        <textBox refId="SharedCountsServer"><label>Dirección del servidor:</label></textBox>
       </presentation>
     </presentationTable>
   </resources>

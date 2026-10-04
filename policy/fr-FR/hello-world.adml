@@ -85,6 +85,15 @@ Un fichier de contenu de l'organisation remplace les deux listes.</string>
       <string id="UnlockedNotes_Help">Si vous activez ce paramètre, hello-world enregistre les notes de chaque personne en texte clair, lisible par toute personne pouvant lire le fichier, comme avant la version 1.44.0. Ne l'utilisez que si des règles d'archivage l'exigent, et prévenez les personnes, car l'écran leur demandera alors de s'en tenir aux tâches courantes.
 
 Si vous désactivez ce paramètre ou ne le configurez pas, les notes sont verrouillées sur le compte Windows de la personne avec l'API de protection des données de Windows. Les autres utilisateurs et les copies du fichier ne peuvent pas les lire ; un administrateur ayant le contrôle complet du PC le pourrait encore. Un compte local dont un administrateur réinitialise le mot de passe perd ses notes verrouillées.</string>
+      <string id="SUPPORTED_1_45">hello-world 1.45.0 ou version ultérieure</string>
+      <string id="SharedCountsServer">Serveur de comptes partagés</string>
+      <string id="SharedCountsServer_Help">Si vous activez ce paramètre, hello-world demande une fois à chaque personne si elle veut voir combien de personnes ont suivi l'astuce du jour. Celles qui répondent oui voient le compte sous l'astuce, et taper tip ou cliquer sur J'ai fait cette astuce l'augmente de un. Chaque compte n'envoie à ce serveur que la date, en https ; jamais un plan, un nom ou un nom d'ordinateur. Le serveur voit tout de même l'adresse réseau du PC, comme pour toute requête web. server/counts_server.py, fourni avec la version, est un petit serveur que vous pouvez exécuter.
+
+Si vous désactivez ce paramètre ou ne le configurez pas, le serveur intégré au paquet est utilisé, s'il en a un.</string>
+      <string id="TurnOffSharedCounts">Désactiver les comptes partagés</string>
+      <string id="TurnOffSharedCounts_Help">Si vous activez ce paramètre, hello-world ne contacte jamais de serveur de comptes partagés et ne pose pas la question.
+
+Si vous désactivez ce paramètre ou ne le configurez pas, il utilise le paramètre Serveur de comptes partagés ou le serveur intégré au paquet.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -92,6 +101,9 @@ Si vous désactivez ce paramètre ou ne le configurez pas, les notes sont verrou
       </presentation>
       <presentation id="MaxBackups">
         <decimalTextBox refId="MaxBackups" defaultValue="5">Copies à garder :</decimalTextBox>
+      </presentation>
+      <presentation id="SharedCountsServer">
+        <textBox refId="SharedCountsServer"><label>Adresse du serveur :</label></textBox>
       </presentation>
     </presentationTable>
   </resources>

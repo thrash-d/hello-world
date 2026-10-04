@@ -562,7 +562,18 @@
   "tomorrow": "내일",
   "If you type a plan, it asks next time how it went. It can be anything you want to get done, at work or not. Your notes are locked to your Windows account and never sent anywhere. Only someone with full admin control of this PC could get to them.": "계획을 입력하면 다음번에 어떻게 됐는지 물어봐요. 업무든 아니든, 하고 싶은 일이면 무엇이든 괜찮아요. 메모는 내 Windows 계정으로 잠겨 있고 어디로도 보내지 않아요. 이 PC의 관리자 권한을 모두 가진 사람만 볼 수 있어요.",
   "It never leaves this computer. It is locked to your Windows account, so other people who use this computer or copy its files can't read it. Someone with full admin control of this PC still could.": "이 컴퓨터 밖으로 나가지 않아요. 내 Windows 계정으로 잠겨 있어서 이 컴퓨터를 쓰는 다른 사람이나 파일을 복사한 사람은 읽을 수 없어요. 이 PC의 관리자 권한을 모두 가진 사람은 볼 수 있어요.",
-  "Your saved notes are locked to a Windows account that can't open them here, so hello-world set them aside as a backup copy and started fresh. Menu option 4 deletes the backup.": "저장된 메모가 여기서 열 수 없는 Windows 계정으로 잠겨 있어서, hello-world가 백업 사본으로 따로 두고 새로 시작했어요. 메뉴 4번으로 백업을 지울 수 있어요."
+  "Your saved notes are locked to a Windows account that can't open them here, so hello-world set them aside as a backup copy and started fresh. Menu option 4 deletes the backup.": "저장된 메모가 여기서 열 수 없는 Windows 계정으로 잠겨 있어서, hello-world가 백업 사본으로 따로 두고 새로 시작했어요. 메뉴 4번으로 백업을 지울 수 있어요.",
+  "People who did today's tip so far: {n}": "오늘의 팁을 한 사람 (지금까지): {n}명",
+  "Type tip at the end once you have done it.": "다 했으면 마지막에 tip을 입력하세요.",
+  "See how many people do each day's tip? It sends only that you did the tip, never your plans or your name. (y or n, Enter for no) > ": "매일 팁을 몇 명이 했는지 볼까요? 팁을 했다는 사실만 보내고, 계획이나 이름은 절대 보내지 않아요. (y 또는 n, Enter는 아니요) > ",
+  "Type y or n, or press Enter for no.": "y 또는 n을 입력하거나 Enter를 누르면 아니요예요.",
+  "No problem. Menu option 12 can turn it on later.": "괜찮아요. 나중에 메뉴 12번에서 켤 수 있어요.",
+  "The shared count can't be reached just now.": "지금은 공유 집계에 연결할 수 없어요.",
+  "Counted. People who did today's tip so far: {n}": "집계했어요. 오늘의 팁을 한 사람 (지금까지): {n}명",
+  "Show how many people did the tip": "팁을 한 사람 수 보기",
+  "Done. You'll see how many people did the tip.": "완료됐어요. 팁을 한 사람 수가 보여요.",
+  "Done. Nothing is sent, and no count shows.": "완료됐어요. 아무것도 보내지 않고 인원수도 보이지 않아요.",
+  "I did this &tip": "이 팁 했어요(&T)"
  },
  "tips_floor": [
   "첫 작업 전에 다니는 통로에 걸리는 게 없는지 확인하세요.",
