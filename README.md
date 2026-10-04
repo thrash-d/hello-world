@@ -31,11 +31,13 @@ The next day the window asks "Did you do it?" with three buttons: **Done**,
 **Not yet** (keeps the plan for today) and **Skip** (asks again next time).
 For a plan of a few things, up to ten, tick the ones you did before clicking
 Done, and the rest are kept for today. The text screen asks the same with
-numbers: `1 3` means the first and third are done.
-When today's plan is finished, click **I did it**. A plan of a few things has
-a tick box for each under the plan box: tick what you finished, then click
-**I did it**. If you changed the words in the box first, the new words are
-what's marked done. To drop a plan, empty the box and click **Save**. Typing a
+numbers: `1 3` means the first and third are done, and `1-3` the first
+three.
+When today's plan is finished, click **Done** under the plan box. A plan of
+a few things has a tick box for each: tick what you finished, then click
+**Done**. If you changed the words in the box first, the new words are what's
+marked done, and today's unfinished things stay. While the window asks about
+an earlier plan, only that plan's **Done** shows. To drop a plan, empty the box and click **Save**. Typing a
 new plan instead of answering asks whether to keep the old one for today too.
 A plan can be up to 400 characters.
 
@@ -54,8 +56,8 @@ moves the reminder to 8:00, 9:00, 10:00 or 13:00 instead of sign-in, opens
 the window after you answer, and comes on weekends only if you choose **Also
 on weekends**. Days your organization
 lists as holidays are quiet too. **Options > Greet me by name** puts your
-first name at the top, and **What the window shows > Show the thought** hides
-the thought and keeps the tip.
+first name at the top. Turning off **What the window shows > Also show the
+thought** hides the thought and keeps the tip.
 
 Options also has **This week...** (what you finished since Monday, and last
 week), **My
@@ -227,7 +229,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.40.0'
+$tag = 'v1.41.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

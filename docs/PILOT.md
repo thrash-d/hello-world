@@ -222,6 +222,36 @@ export wrote to the real Documents folder.
 **I did it** and **Done** keep their two names. Both can be on screen at once,
 one for today's plan and one for the question about an earlier plan.
 
+## Sixth round, on 1.40.0
+
+The same five ran 19 to 26 October. Ratings: Dana 5, Rafael 7, Mónica 6,
+Tom 6, Priya 7.
+
+They found:
+- Typing a new plan over one kept from an earlier day dropped it without the
+  question 1.40.0 added, which covered only plans of the same day (Dana,
+  Priya, Mónica).
+- **I did it** and **Done** were still two names for one act, raised by all
+  five. The window now shows one **Done** at a time: while it asks about an
+  earlier plan, today's button is hidden.
+- "Your plan is still open." after Skip didn't say what happens next (Dana,
+  Priya).
+- The text menu's hints named commands it doesn't have, "Type plan" and
+  "Type done" (Tom).
+- A cut plan didn't say how many things were left out, and `done` refused
+  ranges such as `1-3` (Tom).
+- **Show the thought and tip** and **Show the thought** read as the same
+  switch (Tom).
+- My numbers didn't say it counts only from the day it was turned on, or
+  that nobody else gets the numbers (Mónica).
+- The exported plans file had an English name in every language (Rafael).
+- Spanish and Brazilian Portuguese wording (Mónica, Rafael).
+
+1.41.0 fixes all of these. The rest is queued in `TODO.md`. Two reports were
+the pilot tool: its yes-or-no boxes are drawn with English labels, and its
+text menu ran without the tool's stand-ins, so the timed reminder Tom set
+was real and the tool's sign-in said the reminder was off.
+
 ## Not changed, and why
 
 - NVDA saying "greater" at the end of every prompt (Ruth). It's unclear

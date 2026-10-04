@@ -3154,11 +3154,11 @@ def test_done_in_the_text_screen_asks_which_of_several():
 def test_a_new_plan_asks_before_dropping_todays_unfinished_things():
     first = run(text="Call Ana; send it\ndone\n1\nBook travel\ny\n\n")
     assert "Keep the ones you haven't finished too? send it" in first.stdout
-    assert notes(first.home)["intent"]["text"] == "Book travel; send it"
+    assert notes(first.home)["intent"]["text"] == "send it; Book travel"
     hello = _window_hello(home=first.home, day="2026-10-01")
     visit = hello.Visit()
     assert hello.leftovers(visit.state, "Write report", visit.iso) == [
-        "Book travel", "send it"]
+        "send it", "Book travel"]
     assert hello.leftovers(visit.state, "Book travel; x", visit.iso) == []
 
 
@@ -3205,3 +3205,60 @@ def test_the_notification_for_several_things_says_what_open_is_for():
     hello.show_reminder("Call Ana; send it", "2026-10-01")
     assert "Open it to tick the ones you did." in hello.SHOWN[0]
     assert "Did you do it?" not in hello.SHOWN[0]
+
+
+def test_a_plan_carried_from_an_earlier_day_asks_before_it_is_dropped():
+    hello = _load_hello()
+    state = hello.new_state()
+    state["intent"] = {"text": "Fix dock door", "date": "2026-10-02",
+                       "since": "2026-10-01"}
+    assert hello.leftovers(state, "Ship orders", "2026-10-02") == ["Fix dock door"]
+    assert hello.leftovers(state, "fix dock door", "2026-10-02") == []
+    del state["intent"]["since"]
+    assert hello.leftovers(state, "Ship orders", "2026-10-02") == []
+
+
+def test_kept_things_go_first_so_a_long_new_plan_cannot_push_them_out():
+    p = run(text="Call Ana; send it\ndone\n1\n" + "x" * 395 + "\ny\n\n")
+    assert notes(p.home)["intent"]["text"].startswith("send it; ")
+
+
+def test_a_cut_after_a_semicolon_saves_the_same_text_it_loads():
+    hello = _load_hello()
+    cut = hello.clean("x" * 395 + "; next thing")
+    assert cut == hello.clean(cut) and not cut.endswith(";")
+    many = "; ".join(f"thing {n}" for n in range(60))
+    assert "Things left out: " in hello.shortened(many, hello.clean(many))
+
+
+def test_done_numbers_take_ranges():
+    hello = _load_hello()
+    assert hello.picked(["1-3"], 4) == [0, 1, 2]
+    assert hello.picked(["1", "1", "3"], 3) == [0, 2]
+    for wrong in (["2-5"], ["3-1"], ["0"], ["y"], ["1-"]):
+        assert hello.picked(wrong, 4) is None
+    p = run(text="Call Ana; send it; book travel\ndone\n1-2\n\n")
+    assert notes(p.home)["intent"]["text"] == "book travel"
+
+
+def test_the_text_menu_points_to_its_own_options():
+    p = run(text="m\n11\n6\nCall Ana\n\n\n")
+    assert "There is no plan to mark as done. Choose 6 to set one." in p.stdout
+    assert "Saved. Choose 11 when you finish it" in p.stdout
+
+
+def test_turning_on_the_sign_in_reminder_keeps_the_timed_one_when_it_fails():
+    hello = _window_hello()
+    hello.STARTUP_DIR, hello.TASKS = mkdtemp(), []
+    visit = hello.Visit()
+    visit.reminder_at("09:00")
+    hello.remind = lambda on, quiet=False: False
+    visit.set_reminder(True)
+    assert hello.task_on() and notes(hello.HOME)["remind_at"] == "09:00"
+
+
+def test_old_no_weekends_scripts_still_work():
+    p = run(args=["--set", "no_weekends", "off"])
+    assert p.returncode == 0 and notes(p.home).get("weekends") is True
+    p = run(args=["--set", "no_weekends", "on"], home=p.home)
+    assert p.returncode == 0 and "weekends" not in notes(p.home)
