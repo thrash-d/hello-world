@@ -534,6 +534,8 @@ FULL_WORDS = ("full", "todo", "tout", "tudo", "alles")
 
 # The tests set these after importing the module, to run against a fixed date,
 # a temporary folder, and typed input. Nothing outside the program sets them.
+# Tests that check the done count set this rather than turn on My numbers.
+COUNT_ALWAYS = False
 TODAY = None
 HOME = None
 STARTUP_DIR = None
@@ -1036,7 +1038,7 @@ def load(repair=True):
     prev = raw.get("previous")
     if isinstance(prev, str) and clean(prev):
         state["previous"] = clean(prev)
-    n = raw.get("done")
+    n = raw.get("done") if raw.get("numbers") is True or COUNT_ALWAYS else None
     if isinstance(n, int) and not isinstance(n, bool) and n > 0:
         state["done"] = min(n, 99999)
     visits = []
@@ -2144,7 +2146,8 @@ def _finish_plan(state, text, d, parts=None):
     every = plan_parts(text)
     chosen = [every[i] for i in sorted(set(parts))] if parts else every
     for part in chosen:
-        if not state.get("no_count"):
+        # A count only for someone who keeps "My numbers".
+        if (state.get("numbers") or COUNT_ALWAYS) and not state.get("no_count"):
             state["done"] = min(state.get("done", 0) + 1, 99999)
         state["finished"] = (state.get("finished", [])
                              + [{"text": part, "date": d.isoformat()}])[-finished_cap(state):]

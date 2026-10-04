@@ -46,7 +46,7 @@ def launch(args=(), prelude="", **values):
 
 
 def run(args=(), text=None, day="2026-10-01", home=None, startup=None,
-        policy=None, env=None, lang="en"):
+        policy=None, env=None, lang="en", count=True):
     """Run hello.py with its own data folder. text is typed at the prompts.
 
     Without text, stdin is the null device, so the result doesn't depend on
@@ -60,7 +60,10 @@ def run(args=(), text=None, day="2026-10-01", home=None, startup=None,
               "FORCE_INTERACTIVE": text is not None,
               # Policies come from here, never from the real registry.
               "POLICY": policy or {},
-              "LANGUAGE": lang}
+              "LANGUAGE": lang,
+              # The done count is kept only with My numbers on; most tests
+              # check it, so they keep it.
+              "COUNT_ALWAYS": count}
     stdin = {"input": text} if text is not None else {"stdin": subprocess.DEVNULL}
     p = subprocess.run(launch(args, **values), capture_output=True,
                        encoding="utf-8", env=env, **stdin)
@@ -485,6 +488,7 @@ def _load_hello(day="2026-10-01"):
     mod.STARTUP_DIR = ""  # never the real Startup folder
     mod.POLICY = {}  # never the real policy registry
     mod.LANGUAGE = "en"
+    mod.COUNT_ALWAYS = True
     return mod
 
 
@@ -1387,7 +1391,7 @@ def test_two_real_windows_merge_their_saves():
         json.dump({"visits": ["2026-10-01"],
                    "intent": {"text": "Send it", "date": "2026-10-01"}}, f)
     values = {"TODAY": "2026-10-02", "HOME": home, "STARTUP_DIR": "",
-              "FORCE_INTERACTIVE": True}
+              "FORCE_INTERACTIVE": True, "COUNT_ALWAYS": True}
     a = subprocess.Popen(launch(**values), stdin=subprocess.PIPE,
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                          encoding="utf-8")
@@ -2994,3 +2998,12 @@ def test_the_floor_tips_policy_sets_them_for_everyone():
     hello = _load_hello()
     hello.POLICY = {"FloorTips": 1}
     assert hello.built_in_lists()[1] == hello.TIPS_FLOOR
+
+
+def test_no_done_count_is_kept_without_my_numbers():
+    p = run(text="Call Ana\ndone\n\n", count=False)
+    saved = notes(p.home)
+    assert "done" not in saved
+    run(["--set", "numbers", "on"], home=p.home, count=False)
+    run(text="Send it\ndone\n\n", home=p.home, day="2026-10-02", count=False)
+    assert notes(p.home)["done"] == 1
