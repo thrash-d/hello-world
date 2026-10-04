@@ -559,7 +559,10 @@
   "Which did you finish? Type numbers such as 1 3 or 1-3, y for all, or Enter to go back > ": "Welche haben Sie erledigt? Nummern eingeben, etwa 1 3 oder 1-3, j für alle, oder Eingabetaste zum Zurückkehren > ",
   "by|due|before": "bis|spätestens|fällig|vor",
   "today": "heute",
-  "tomorrow": "morgen"
+  "tomorrow": "morgen",
+  "If you type a plan, it asks next time how it went. It can be anything you want to get done, at work or not. Your notes are locked to your Windows account and never sent anywhere. Only someone with full admin control of this PC could get to them.": "Wenn Sie einen Plan eingeben, fragt hello-world beim nächsten Mal, wie es lief. Das kann alles sein, was Sie erledigen möchten, beruflich oder nicht. Ihre Notizen sind an Ihr Windows-Konto gebunden und werden nie gesendet. Nur wer die volle Administratorkontrolle über diesen PC hat, käme an sie heran.",
+  "It never leaves this computer. It is locked to your Windows account, so other people who use this computer or copy its files can't read it. Someone with full admin control of this PC still could.": "Die Daten verlassen diesen Computer nie. Sie sind an Ihr Windows-Konto gebunden, daher können andere, die diesen Computer nutzen oder seine Dateien kopieren, sie nicht lesen. Wer die volle Administratorkontrolle über diesen PC hat, könnte es trotzdem.",
+  "Your saved notes are locked to a Windows account that can't open them here, so hello-world set them aside as a backup copy and started fresh. Menu option 4 deletes the backup.": "Ihre gespeicherten Notizen sind an ein Windows-Konto gebunden, das sie hier nicht öffnen kann. hello-world hat sie daher als Sicherungskopie beiseitegelegt und neu angefangen. Menüpunkt 4 löscht die Sicherungskopie."
  },
  "tips_floor": [
   "Prüfen Sie vor der ersten Aufgabe der Schicht, ob Ihr Laufweg frei ist.",

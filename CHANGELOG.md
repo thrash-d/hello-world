@@ -1,5 +1,48 @@
 # Changelog
 
+## 2026-10-04: notes locked to the person, so a plan can be personal
+
+Version 1.44.0. Seven simulated users of 1.43.0, from a cynical engineer to a
+79-year-old receptionist and an employee in a depressive low, all respected
+the line that said the notes were "not secret", and all then typed only safe
+work tasks. The owner asked for more personal, authentic plans. Asking people
+to write private things into a file IT can read would have been a trap, so
+this round makes the file one IT can't casually read, then says so.
+
+- The notes file is locked to the person's Windows account with the Windows
+  Data Protection API. Other users of the PC and anyone who copies the file
+  see only scrambled data. On disk it is `{"locked": "dpapi", "data": ...}`.
+- A plain file from an older version is read as before and locked at the
+  next save.
+- A file locked to an account that can't open it here, such as a local
+  account whose password an administrator reset, is set aside as a backup
+  with its own message, and hello-world starts fresh.
+- Where notes are locked, the first screen invites any kind of plan, "at work
+  or not", and says plainly that only someone with full admin control of the
+  PC could get to them. Option 1 says the same. Where they aren't (outside
+  Windows, or under the new policy), the old wording stays, "not secret, so
+  keep them to everyday tasks".
+- New computer policy `UnlockedNotes` keeps notes as plain text for records
+  rules that need them readable. ADMX and all 12 ADML files have it.
+- Exported files are not locked; the README says so.
+
+The owner also dropped two rules in `PLAN.md`: "no network access of any
+kind" and "nothing opens by itself". The rules the personas said would make
+them uninstall stay: no view of anyone's plans for managers or teams, no
+leaderboards, no mood tracking, and plan text never leaves the PC.
+`TODO.md` lists the next rounds from the persona review and a Profit
+Maximizer memo: shared counts, shift handoff notes, Harold's "I don't
+remember", gentle mode, the reminder offered on day one, a desk pet and boss
+fight, and a command line for engineers.
+
+Translations of the three new sentences and the policy text are simulated,
+like the earlier ones, and wait for a native speaker.
+
+Tests: the notes are locked on disk and read back, an old plain file is read
+and then locked, a file locked to another account is set aside, and the
+welcome changes with the lock. A Windows-only test locks and unlocks with
+the real Data Protection API and checks the policy. 285 pass on Linux.
+
 ## 2026-10-04: dates written in a plan, and nothing dropped without asking
 
 Version 1.43.0. The seventh pilot and a review of rounds 66 and 67.

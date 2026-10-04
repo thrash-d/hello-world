@@ -21,12 +21,18 @@ Ranked from a design review of the first version, then built:
 ## What was kept out on purpose
 
 - Visit counts, "best streak" and scores. A count is not value.
-- A reminder that is on by default, pop-ups, sounds or anything that opens by
-  itself without the employee choosing it.
 - A long history of plans or a score. What it does keep is deliberate and
   small, and the README's "What is saved, and who can see it" section is the
   one list of it. Nothing reports any of it.
-- Network access of any kind, and any report of use to IT or managers.
+- Any view of a person's plans for IT, managers or a team, leaderboards, and
+  mood tracking. Seven simulated users in October 2026 said each of these
+  would make them uninstall and tell their team.
+- Plan text leaving the PC. Network features (owner's decision, October 2026)
+  send only anonymous counts, are opt-in, and say on screen what they send.
+
+The owner dropped two earlier rules in October 2026: "no network access of
+any kind" and "nothing opens by itself", so shared counts and a sign-in
+reminder offered on the first day can be built.
 
 ## Trust
 

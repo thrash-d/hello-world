@@ -80,6 +80,11 @@
 如果禁用或未配置此策略设置，每个人可以在“选项”&gt;“窗口显示的内容”中自行选择。
 
 组织内容文件会替换这两组小贴士。</string>
+      <string id="SUPPORTED_1_44">hello-world 1.44.0 或更高版本</string>
+      <string id="UnlockedNotes">不锁定记录</string>
+      <string id="UnlockedNotes_Help">启用此策略后，hello-world 会像 1.44.0 之前的版本一样，把每个人的记录保存为纯文本，任何能读取该文件的人都能看到。仅在记录保存规定要求时使用，并告知用户，因为界面会请他们只写日常事务。
+
+禁用或未配置此策略时，记录会通过 Windows 数据保护 API 锁定在本人的 Windows 帐户中。其他用户和文件副本无法读取；拥有这台电脑完全控制权的管理员仍然可以。管理员重置了密码的本地帐户会丢失已锁定的记录。</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">

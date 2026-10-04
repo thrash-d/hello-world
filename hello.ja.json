@@ -559,7 +559,10 @@
   "Which did you finish? Type numbers such as 1 3 or 1-3, y for all, or Enter to go back > ": "どれができましたか？番号を入力（例: 1 3、1-3、y: すべて、Enter で戻る） > ",
   "by|due|before": "まで|までに|期限|締切|締め切り|前",
   "today": "今日|本日|きょう",
-  "tomorrow": "明日|あした|あす"
+  "tomorrow": "明日|あした|あす",
+  "If you type a plan, it asks next time how it went. It can be anything you want to get done, at work or not. Your notes are locked to your Windows account and never sent anywhere. Only someone with full admin control of this PC could get to them.": "予定を入力すると、次回どうだったかをたずねます。仕事でもそれ以外でも、やりたいことなら何でもかまいません。メモはあなたの Windows アカウントでロックされ、どこにも送信されません。読めるのは、この PC の管理者権限をすべて持つ人だけです。",
+  "It never leaves this computer. It is locked to your Windows account, so other people who use this computer or copy its files can't read it. Someone with full admin control of this PC still could.": "このコンピューターの外には出ません。あなたの Windows アカウントでロックされているので、このコンピューターを使うほかの人やファイルをコピーした人は読めません。この PC の管理者権限をすべて持つ人なら読むことができます。",
+  "Your saved notes are locked to a Windows account that can't open them here, so hello-world set them aside as a backup copy and started fresh. Menu option 4 deletes the backup.": "保存したメモは、ここでは開けない Windows アカウントでロックされているため、hello-world はバックアップとして別に保存し、最初からやり直しました。メニューの 4 でバックアップを削除できます。"
  },
  "tips_floor": [
   "シフト最初の作業の前に、通路に物が置かれていないか確認しましょう。",

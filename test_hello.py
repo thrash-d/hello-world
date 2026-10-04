@@ -46,7 +46,7 @@ def launch(args=(), prelude="", **values):
 
 
 def run(args=(), text=None, day="2026-10-01", home=None, startup=None,
-        policy=None, env=None, lang="en", count=True):
+        policy=None, env=None, lang="en", count=True, lock="plain"):
     """Run hello.py with its own data folder. text is typed at the prompts.
 
     Without text, stdin is the null device, so the result doesn't depend on
@@ -65,7 +65,9 @@ def run(args=(), text=None, day="2026-10-01", home=None, startup=None,
               # check it, so they keep it.
               "COUNT_ALWAYS": count,
               # Never the real Task Scheduler.
-              "TASKS": []}
+              "TASKS": [],
+              # Plain notes, so tests can read the file; the lock has its own.
+              "LOCK": lock}
     stdin = {"input": text} if text is not None else {"stdin": subprocess.DEVNULL}
     p = subprocess.run(launch(args, **values), capture_output=True,
                        encoding="utf-8", env=env, **stdin)
@@ -491,6 +493,7 @@ def _load_hello(day="2026-10-01"):
     mod.POLICY = {}  # never the real policy registry
     mod.LANGUAGE = "en"
     mod.COUNT_ALWAYS = True
+    mod.LOCK = "plain"
     return mod
 
 
@@ -1393,7 +1396,7 @@ def test_two_real_windows_merge_their_saves():
         json.dump({"visits": ["2026-10-01"],
                    "intent": {"text": "Send it", "date": "2026-10-01"}}, f)
     values = {"TODAY": "2026-10-02", "HOME": home, "STARTUP_DIR": "",
-              "FORCE_INTERACTIVE": True, "COUNT_ALWAYS": True}
+              "FORCE_INTERACTIVE": True, "COUNT_ALWAYS": True, "LOCK": "plain"}
     a = subprocess.Popen(launch(**values), stdin=subprocess.PIPE,
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                          encoding="utf-8")
@@ -1812,7 +1815,8 @@ def test_an_old_startup_launcher_becomes_the_run_value():
         f.write("@echo off\r\nstart hello.cmd --startup\r\n")
     env = dict(os.environ, APPDATA=appdata)
     values = {"TODAY": "2026-10-01", "HOME": mkdtemp(), "STARTUP_DIR": None,
-              "FORCE_INTERACTIVE": True, "POLICY": {}, "RUN_KEY": key}
+              "FORCE_INTERACTIVE": True, "POLICY": {}, "RUN_KEY": key,
+              "LOCK": "plain"}
     try:
         p = subprocess.run(launch((), **values), input="\n\n", capture_output=True,
                            encoding="utf-8", env=env)
@@ -3355,3 +3359,50 @@ def test_exported_files_are_found_in_any_language_and_digits_never_crash():
     hello.delete_export()
     assert not os.listdir(hello.EXPORT_DIR)
     assert hello.picked(["\u00b2"], 3) is None
+
+
+def test_notes_are_locked_on_disk_and_read_back():
+    p = run(text="Call my sister about Dad's surgery\n\n", lock="test")
+    with open(os.path.join(p.home, "notes.json"), encoding="utf-8") as f:
+        raw = f.read()
+    assert "sister" not in raw and json.loads(raw)["locked"] == "test"
+    later = run(text="\n\n\n", day="2026-10-02", home=p.home, lock="test")
+    assert "Call my sister about Dad's surgery" in later.stdout
+
+
+def test_a_plain_file_from_before_is_read_and_locked_at_the_next_save():
+    first = run(text="Book travel\n\n")
+    assert notes(first.home)["intent"]["text"] == "Book travel"
+    later = run(text="\n\n\n", day="2026-10-02", home=first.home, lock="test")
+    assert "Last time you planned: Book travel" in later.stdout
+    with open(os.path.join(first.home, "notes.json"), encoding="utf-8") as f:
+        assert set(json.load(f)) == {"locked", "data"}
+
+
+def test_notes_locked_to_another_account_are_set_aside_not_lost():
+    home = mkdtemp()
+    with open(os.path.join(home, "notes.json"), "w", encoding="utf-8") as f:
+        json.dump({"locked": "dpapi", "data": "bm90IGEgcmVhbCBibG9i"}, f)
+    p = run(text="\n\n", home=home, lock="test")
+    assert "locked to a Windows account" in " ".join(p.stdout.split())
+    assert any(n.startswith("notes.json.bak") for n in os.listdir(home))
+
+
+def test_the_welcome_invites_any_plan_only_where_notes_are_locked():
+    locked = " ".join(run(text="\n\n", lock="test").stdout.split())
+    assert "at work or not" in locked and "not secret" not in locked
+    assert "full admin control" in locked
+    plain = " ".join(run(text="\n\n").stdout.split())
+    assert "not secret" in plain and "at work or not" not in plain
+
+
+@unittest.skipUnless(os.name == "nt", "the Data Protection API is Windows only")
+def test_windows_locks_notes_to_the_account():
+    hello = _load_hello()
+    hello.LOCK = None
+    assert hello.lock_kind() == "dpapi"
+    sealed = hello.seal('{"visits": [], "intent": null}')
+    assert json.loads(sealed)["locked"] == "dpapi"
+    assert hello.unseal(json.loads(sealed)) == {"visits": [], "intent": None}
+    hello.POLICY = {"UnlockedNotes": 1}
+    assert hello.lock_kind() == "plain"

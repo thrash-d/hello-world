@@ -560,7 +560,10 @@
   "Which did you finish? Type numbers such as 1 3 or 1-3, y for all, or Enter to go back > ": "Lesquelles avez-vous terminées ? Tapez les numéros, par exemple 1 3 ou 1-3, o pour toutes, ou Entrée pour revenir > ",
   "by|due|before": "avant|pour|d'ici|jusqu'à|jusqu'au|échéance|au plus tard",
   "today": "aujourd'hui|ajd",
-  "tomorrow": "demain"
+  "tomorrow": "demain",
+  "If you type a plan, it asks next time how it went. It can be anything you want to get done, at work or not. Your notes are locked to your Windows account and never sent anywhere. Only someone with full admin control of this PC could get to them.": "Si vous tapez un plan, la prochaine fois on vous demandera comment ça s'est passé. Ce peut être tout ce que vous voulez faire, au travail ou non. Vos notes sont verrouillées sur votre compte Windows et ne sont jamais envoyées nulle part. Seule une personne ayant le contrôle administrateur complet de ce PC pourrait y accéder.",
+  "It never leaves this computer. It is locked to your Windows account, so other people who use this computer or copy its files can't read it. Someone with full admin control of this PC still could.": "Ces données ne quittent jamais cet ordinateur. Elles sont verrouillées sur votre compte Windows : les autres personnes qui utilisent cet ordinateur ou copient ses fichiers ne peuvent pas les lire. Une personne ayant le contrôle administrateur complet de ce PC le pourrait encore.",
+  "Your saved notes are locked to a Windows account that can't open them here, so hello-world set them aside as a backup copy and started fresh. Menu option 4 deletes the backup.": "Vos notes enregistrées sont verrouillées sur un compte Windows qui ne peut pas les ouvrir ici, donc hello-world les a mises de côté comme copie de secours et a recommencé à zéro. L'option 4 du menu supprime la copie."
  },
  "tips_floor": [
   "Vérifiez que votre allée est dégagée avant la première tâche du poste.",

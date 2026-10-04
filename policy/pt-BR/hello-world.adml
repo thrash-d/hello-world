@@ -80,6 +80,11 @@ Se desabilitada ou não configurada, não há opção de comentários.</string>
 Se você desabilitar ou não definir esta configuração, cada pessoa escolhe em Opções &gt; O que a janela mostra.
 
 Um arquivo de conteúdo da organização substitui as duas listas.</string>
+      <string id="SUPPORTED_1_44">hello-world 1.44.0 ou posterior</string>
+      <string id="UnlockedNotes">Deixar as notas desbloqueadas</string>
+      <string id="UnlockedNotes_Help">Quando habilitada, o hello-world salva as notas de cada pessoa como texto simples, que qualquer um que consiga ler o arquivo pode ler, como nas versões anteriores à 1.44.0. Use somente onde as regras de registros exigirem e avise as pessoas, porque a tela vai pedir que elas se limitem a tarefas do dia a dia.
+
+Quando desabilitada ou não configurada, as notas ficam bloqueadas na conta do Windows da pessoa com a API de Proteção de Dados do Windows. Outros usuários e cópias do arquivo não conseguem lê-las; um administrador com controle total do computador ainda conseguiria. Uma conta local cuja senha um administrador redefine perde as notas bloqueadas.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">

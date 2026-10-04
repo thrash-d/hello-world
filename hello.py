@@ -10,6 +10,7 @@ nothing is sent anywhere. Exit 0 when the text was written, 1 when stdout
 could not be written or a command (--reset, --stats, --remind, --streak)
 failed, 2 for an unknown option or a reminder link it doesn't know.
 """
+import base64
 import collections
 import contextlib
 import copy
@@ -506,7 +507,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.43.0"
+VERSION = "1.44.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -554,6 +555,9 @@ LANGUAGE = None
 SHOWN = None
 # Milliseconds after which tests close the window by itself.
 CLOSE_WINDOW_AFTER = None
+# How the notes file is locked: "plain" or "test" in tests; None locks it to
+# the person's Windows account on Windows.
+LOCK = None
 # True while the window runs, so nothing waits for typed input.
 WINDOW = False
 # When Ctrl+C last skipped a question, for "twice in a row closes".
@@ -1012,6 +1016,100 @@ def backup_name(path):
     return name
 
 
+def lock_kind():
+    """How notes are locked when saved: "dpapi" to the person's Windows
+    account, or "plain" where that isn't possible or policy keeps them open.
+    """
+    if LOCK is not None:
+        return LOCK
+    if os.name == "nt" and not policy("UnlockedNotes"):
+        return "dpapi"
+    return "plain"
+
+
+def notes_locked():
+    return lock_kind() != "plain"
+
+
+# Ties the lock to this program, so another program running as the same
+# person can't open the notes by accident.
+LOCK_ENTROPY = b"hello-world notes"
+
+
+def _dpapi(data, protect):
+    """Windows' Data Protection API, scoped to the signed-in account."""
+    import ctypes
+    from ctypes import wintypes
+
+    class Blob(ctypes.Structure):
+        _fields_ = [("cbData", wintypes.DWORD),
+                    ("pbData", ctypes.POINTER(ctypes.c_char))]
+
+    def blob(raw):
+        buffer = ctypes.create_string_buffer(raw, len(raw))
+        return Blob(len(raw), ctypes.cast(buffer, ctypes.POINTER(ctypes.c_char))), buffer
+
+    crypt = ctypes.windll.crypt32
+    source, keep = blob(data)
+    entropy, keep_entropy = blob(LOCK_ENTROPY)
+    out = Blob()
+    call = crypt.CryptProtectData if protect else crypt.CryptUnprotectData
+    # CRYPTPROTECT_UI_FORBIDDEN: never ask anything on screen.
+    if not call(ctypes.byref(source), None, ctypes.byref(entropy), None, None,
+                0x1, ctypes.byref(out)):
+        raise OSError("the notes could not be " + ("locked" if protect else "unlocked"))
+    try:
+        return ctypes.string_at(out.pbData, out.cbData)
+    finally:
+        ctypes.windll.kernel32.LocalFree(out.pbData)
+
+
+def seal(text):
+    """The file's contents for the state's JSON text, locked if possible."""
+    kind = lock_kind()
+    if kind == "plain":
+        return text
+    data = text.encode("utf-8")
+    sealed = _dpapi(data, True) if kind == "dpapi" else data[::-1]
+    return json.dumps({"locked": kind,
+                       "data": base64.b64encode(sealed).decode("ascii")})
+
+
+def unseal(raw):
+    """The state dict inside a locked file, or raw as it is. ValueError when
+    it can't be unlocked, such as a file from another Windows account."""
+    if set(raw) != {"locked", "data"}:
+        return raw
+    try:
+        data = base64.b64decode(raw["data"], validate=True)
+        if raw["locked"] == "dpapi":
+            data = _dpapi(data, False)
+        elif raw["locked"] == "test":
+            data = data[::-1]
+        else:
+            raise ValueError("unknown lock")
+        inner = json.loads(data.decode("utf-8"))
+    except (OSError, AttributeError, TypeError, UnicodeError) as e:
+        raise ValueError("locked") from e
+    if not isinstance(inner, dict):
+        raise ValueError("not an object")
+    return inner
+
+
+def privacy_note():
+    """The first-run sentence about plans and who can read them. It invites
+    any kind of plan only where the notes are locked to the person."""
+    if notes_locked():
+        return tr("If you type a plan, it asks next time how it went. It can "
+                  "be anything you want to get done, at work or not. Your "
+                  "notes are locked to your Windows account and never sent "
+                  "anywhere. Only someone with full admin control of this PC "
+                  "could get to them.")
+    return tr("If you type a plan, it asks next time how it went. Your notes "
+              "stay on this computer and are never sent anywhere. Like any "
+              "work file they are not secret, so keep them to everyday tasks.")
+
+
 def load(repair=True):
     """Read the saved file. Returns (state, can_save).
 
@@ -1022,6 +1120,7 @@ def load(repair=True):
     """
     state = new_state()
     path = data_file()
+    locked = False
     try:
         with open(path, encoding="utf-8-sig") as f:
             text = f.read(MAX_FILE + 1)
@@ -1037,6 +1136,8 @@ def load(repair=True):
         raw = json.loads(text)
         if not isinstance(raw, dict):
             raise ValueError("not an object")
+        locked = set(raw) == {"locked", "data"}
+        raw = unseal(raw)
     except (ValueError, RecursionError, MemoryError):
         if not repair:
             return state, False
@@ -1045,9 +1146,16 @@ def load(repair=True):
             os.replace(path, backup)
         except OSError:
             return state, False
-        para(tr("Your saved file was damaged, so hello-world set it aside as a "
-                "backup copy and started fresh. Your earlier days and plan "
-                "could not be read. Menu option 4 deletes the backup."))
+        if locked:
+            para(tr("Your saved notes are locked to a Windows account that "
+                    "can't open them here, so hello-world set them aside as a "
+                    "backup copy and started fresh. Menu option 4 deletes "
+                    "the backup."))
+        else:
+            para(tr("Your saved file was damaged, so hello-world set it aside "
+                    "as a backup copy and started fresh. Your earlier days and "
+                    "plan could not be read. Menu option 4 deletes the "
+                    "backup."))
         say(tr("Backup copy: ") + os.path.basename(backup))
         say(tr("In the folder: ") + data_dir())
         say()
@@ -1223,7 +1331,7 @@ def save(state):
         # replaces the real file, so a power cut can't leave a half-written one.
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
         with os.fdopen(os.open(tmp, flags, 0o600), "w", encoding="utf-8") as f:
-            json.dump(file_form(state), f, indent=2)
+            f.write(seal(json.dumps(file_form(state), indent=2)))
             f.flush()
             os.fsync(f.fileno())
         # Antivirus or another window reading the file can hold it for a
@@ -1560,7 +1668,11 @@ def show_saved(state, full=True):
             if policy("DisableSignInLauncher") else
             tr("Reminder when you sign in: on.") if launcher_on() else
             tr("Reminder when you sign in: off."))
-    para(tr("It never leaves this computer. Others who can read this "
+    para(tr("It never leaves this computer. It is locked to your Windows "
+            "account, so other people who use this computer or copy its "
+            "files can't read it. Someone with full admin control of this PC "
+            "still could.") if notes_locked() else
+         tr("It never leaves this computer. Others who can read this "
             "computer's files, such as IT staff, could read it."))
     if full:
         say(tr("After tidying, the file holds only this:"))
@@ -2918,11 +3030,7 @@ def daily(startup):
             welcome.append(tr("Each day you get one thought and one small "
                               "thing to try, the same for everyone."))
         if not plans_off():
-            welcome.append(tr("If you type a plan, it asks next time how it "
-                              "went. Your notes stay on this computer and are "
-                              "never sent anywhere. Like any work file they "
-                              "are not secret, so keep them to everyday "
-                              "tasks."))
+            welcome.append(privacy_note())
         welcome.append(tr("Type menu at the end for the options."))
         para(" ".join(welcome))
         say()
@@ -3784,11 +3892,7 @@ class Visit:
                 notes.append(tr("Each day you get one thought and one small "
                                 "thing to try, the same for everyone."))
             if not plans_off():
-                notes.append(tr("If you type a plan, it asks next time how it "
-                                "went. Your notes stay on this computer and are "
-                                "never sent anywhere. Like any work file they "
-                                "are not secret, so keep them to everyday "
-                                "tasks."))
+                notes.append(privacy_note())
         elif not seen:
             row = in_a_row(state["visits"], d)
             if missed_a_workday(state["visits"][-1], d):

@@ -80,6 +80,11 @@
 이 정책 설정을 사용하지 않거나 구성하지 않으면 각 사용자가 [옵션] &gt; [창에 표시할 내용]에서 선택합니다.
 
 조직 콘텐츠 파일을 사용하면 두 목록 모두 해당 파일의 내용으로 바뀝니다.</string>
+      <string id="SUPPORTED_1_44">hello-world 1.44.0 이상</string>
+      <string id="UnlockedNotes">메모를 잠그지 않음</string>
+      <string id="UnlockedNotes_Help">이 정책 설정을 사용하면 hello-world는 1.44.0 이전 버전처럼 각 사용자의 메모를 파일을 읽을 수 있는 누구나 읽을 수 있는 일반 텍스트로 저장합니다. 기록 보존 규정상 필요한 경우에만 사용하고 사용자에게 알리세요. 화면에서는 일상 업무만 적어 달라고 안내합니다.
+
+사용하지 않거나 구성하지 않으면 메모는 Windows 데이터 보호 API로 사용자의 Windows 계정에 잠깁니다. 다른 사용자나 파일 사본으로는 읽을 수 없지만, PC에 대한 전체 관리자 권한이 있는 관리자는 읽을 수 있습니다. 관리자가 암호를 재설정한 로컬 계정은 잠긴 메모를 잃습니다.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">

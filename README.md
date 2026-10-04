@@ -181,9 +181,22 @@ Turning the reminder on adds three entries to your own part of the Windows
 registry: the sign-in value under `Run`, the name the notification shows, and
 the `hello-world:` links its buttons open. Turning it off removes them.
 
-It makes no network connections and reports nothing to IT or managers. Other
-people who can read your computer's files, such as IT staff, could read the
-file, so don't type passwords or private details.
+It makes no network connections and reports nothing to IT or managers.
+
+Since 1.44.0 the file is locked to your Windows account with the Windows
+Data Protection API, so a plan can be anything you want to get done, at work
+or not. Other people who use the PC, and anyone who copies the file, see only
+scrambled data. Someone with full admin control of the PC could still get to
+it while you are signed in, so don't type passwords. A file saved by an older
+version is locked the next time you save. If your organization turns on the
+`UnlockedNotes` policy, the file stays readable as before, and the first
+screen says so and asks you to keep it to everyday tasks.
+
+If IT resets the password of a local (not domain) account, Windows can no
+longer unlock that account's notes. hello-world then sets them aside as a
+backup and starts fresh. Domain accounts keep their notes through a reset.
+
+Files you save yourself with **Save my plans to a file** are not locked.
 
 Menu option 1 shows all of it, and whether it opens by itself at sign-in.
 Option 7 forgets one finished plan, and option 4 deletes everything. After a delete the file holds only a random marker, so
@@ -240,7 +253,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.43.0'
+$tag = 'v1.44.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
