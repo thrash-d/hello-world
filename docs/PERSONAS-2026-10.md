@@ -35,7 +35,11 @@ day by day; these personas read a transcript instead.
    persona can misread a transcript; the program decides.
 8. **Ask an adversarial advisor.** A Profit Maximizer agent got the summary
    and the owner's goals and was told to maximize paying users.
-9. **Filter, then plan rounds.** Ideas went into numbered rounds in
+9. **Review each design before building it.** From round 72 on, the plan
+   for a round goes back to the personas who asked for it, the same agents
+   with their earlier answers in memory, in under 300 words. Where they
+   disagree, the round says which way it went and why, and queues the other.
+10. **Filter, then plan rounds.** Ideas went into numbered rounds in
    `TODO.md`. Each round is one pull request with tests and a changelog entry
    that names the persona it came from. Things that would make the personas
    uninstall, by their own account, were kept out; things that need hardware
@@ -109,7 +113,10 @@ the pull request named.
 | Personas, 1.43.0 | Self-censoring because IT could read the notes | All seven | Notes locked to the Windows account, 1.44.0 (#70) |
 | Personas, 1.43.0 | Nothing built on the shared tip | Skye, Jaylen | Shared tip count and reference server, 1.45.0 (#71) |
 | Personas, 1.43.0 | Plan text shown on a shared screen | Denise, Rick | Queued: plan-free notification on shared PCs (`TODO.md`) |
-| Personas, 1.43.0 | Shift handoff notes | Denise, Rick, Profit Maximizer | Next round (1.46.0) |
+| Personas, 1.43.0 | Shift handoff notes | Denise, Rick, Profit Maximizer | Built in 1.46.0 (#72) after a design review with both |
+| Design review of handoff | Ages not times; hours set per site; keep until cleared; not a safety record; a unit-wide folder | Denise, Rick | Built in 1.46.0 |
+| Design review of handoff | Signed by default (Denise) vs. never automatic (Rick) | Disagreement | Unsigned with a hint; a signing policy queued |
+| Design review of handoff | Open by itself at sign-in on handoff PCs | Rick | Queued |
 | Personas, 1.43.0 | "I don't remember", the day a plan was written, big print | Harold | Queued |
 | Personas, 1.43.0 | Gentle mode, a static support link | Sam | Queued |
 | Personas, 1.43.0 | Desk pet, plan graveyard, boss fight | Jaylen, Skye | Queued |

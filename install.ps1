@@ -50,7 +50,7 @@ only administrators can read, and success and failure go to the Application
 event log under the source hello-world.
 
 .EXAMPLE
-$tag = 'v1.45.0'
+$tag = 'v1.46.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
@@ -532,6 +532,14 @@ finally {
 }
 
 # === FINALIZATION: Register the installation in Windows settings and Start menu ===
+# The shift handoff's notes belong to the PC, not to one person, so every
+# user of it can write them. Made even while the policy is off, so turning
+# it on needs no reinstall. Nothing is in it until someone leaves a note.
+$shared = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'hello-world'
+if (-not (Test-Path -LiteralPath $shared)) { New-Item -ItemType Directory -Path $shared | Out-Null }
+& $icacls $shared /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-545:(OI)(CI)M' | Out-Null
+if ($LASTEXITCODE) { throw "icacls failed on $shared" }
+
 Write-Step '[6/6] Adding the Start menu shortcut and the Settings > Apps entry'
 # Added only after the checks pass. The entry in Settings > Apps, whose Uninstall button runs uninstall.ps1.
 $pyExe = Join-Path $dir 'python\python.exe'

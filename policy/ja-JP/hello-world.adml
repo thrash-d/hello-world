@@ -94,6 +94,21 @@
       <string id="TurnOffSharedCounts_Help">このポリシー設定を有効にすると、hello-world は共有カウントのサーバーに接続せず、それについてたずねることもありません。
 
 無効にするか構成しない場合、［共有カウントのサーバー］ポリシーか、パッケージに組み込まれたサーバーが使われます。</string>
+      <string id="SUPPORTED_1_46">hello-world 1.46.0 以降</string>
+      <string id="ShiftHandoff">この PC でのシフト引き継ぎ</string>
+      <string id="ShiftHandoff_Help">このポリシー設定を有効にすると、この PC の hello-world の上部に、次のシフト向けに残されたメモが、それぞれ何時間前に残されたかとともに表示され、メモを残す欄も表示されます。この PC にサインインした人は誰でも読めます。安全に関わる問題のメモは、誰かが消すまで残せます。それ以外は［引き継ぎの時間］ポリシーで決めた時間だけ表示されます。画面には、メモは安全記録や不具合記録ではないこと、患者や顧客の情報を書かないことが表示されます。病室番号などは事前に個人情報保護の担当者に確認してください。
+
+［引き継ぎフォルダー］を設定しない限り、メモは Windows データ保護 API でこの PC にロックされます。各ユーザー自身の予定はその人のアカウントだけのものです。
+
+無効にするか構成しない場合、引き継ぎはありません。</string>
+      <string id="HandoffFolder">引き継ぎフォルダー</string>
+      <string id="HandoffFolder_Help">このポリシー設定を有効にすると、引き継ぎメモはこのフォルダー (病棟ごとの共有など) に保存され、ここを指すすべての PC に同じメモが表示されます。そこではメモはプレーン テキストで、誰が読めるかはフォルダーのアクセス許可で決まります。対象 PC のユーザーにだけ読み書きを許可してください。
+
+無効にするか構成しない場合、各 PC は自分のメモを ProgramData に保存し、その PC にロックします。</string>
+      <string id="HandoffHours">引き継ぎの時間</string>
+      <string id="HandoffHours_Help">このポリシー設定を有効にすると、引き継ぎメモは 1 から 336 までのこの時間数だけ表示されます (消すまで残すメモを除く)。12 時間勤務なら 24、連休をまたぐなら 168 が目安です。
+
+無効にするか構成しない場合、メモは 72 時間表示されます。</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -104,6 +119,12 @@
       </presentation>
       <presentation id="SharedCountsServer">
         <textBox refId="SharedCountsServer"><label>サーバーのアドレス:</label></textBox>
+      </presentation>
+      <presentation id="HandoffFolder">
+        <textBox refId="HandoffFolder"><label>フォルダー:</label></textBox>
+      </presentation>
+      <presentation id="HandoffHours">
+        <decimalTextBox refId="HandoffHours" defaultValue="72">時間:</decimalTextBox>
       </presentation>
     </presentationTable>
   </resources>

@@ -94,6 +94,21 @@ Quando desabilitada ou não configurada, é usado o servidor embutido no pacote,
       <string id="TurnOffSharedCounts_Help">Quando habilitada, o hello-world nunca entra em contato com um servidor de contagens compartilhadas e não pergunta sobre isso.
 
 Quando desabilitada ou não configurada, ele usa a política Servidor de contagens compartilhadas ou o servidor embutido no pacote.</string>
+      <string id="SUPPORTED_1_46">hello-world 1.46.0 ou posterior</string>
+      <string id="ShiftHandoff">Passagem de turno neste computador</string>
+      <string id="ShiftHandoff_Help">Quando habilitada, o topo do hello-world neste computador mostra as notas deixadas para o próximo turno, com há quanto tempo cada uma foi deixada, e uma caixa para deixar uma. Todos que entram neste computador as leem. Uma nota pode ficar até alguém apagá-la, para problemas de segurança; as outras aparecem pelas horas que a política Horas da passagem definir. A tela diz que as notas não são registro de segurança nem de defeitos e não devem ter dados de pacientes ou clientes. Confirme antes números de quarto e similares com o responsável pela privacidade.
+
+As notas ficam bloqueadas neste computador com a API de Proteção de Dados do Windows, a menos que Pasta da passagem esteja definida. O plano de cada pessoa continua privado na conta dela.
+
+Quando desabilitada ou não configurada, não há passagem de turno.</string>
+      <string id="HandoffFolder">Pasta da passagem</string>
+      <string id="HandoffFolder_Help">Quando habilitada, as notas da passagem ficam nesta pasta, como um compartilhamento de uma unidade do hospital, para que todos os computadores que apontam para ela mostrem as mesmas notas. Lá as notas são texto simples: as permissões da pasta decidem quem as lê. Dê acesso de leitura e gravação aos usuários desses computadores e a mais ninguém.
+
+Quando desabilitada ou não configurada, cada computador guarda suas próprias notas em ProgramData, bloqueadas nele.</string>
+      <string id="HandoffHours">Horas da passagem</string>
+      <string id="HandoffHours_Help">Quando habilitada, as notas da passagem aparecem por esse número de horas, de 1 a 336, exceto as que ficam até serem apagadas. 24 serve para turnos de 12 horas; 168 cobre um feriado prolongado.
+
+Quando desabilitada ou não configurada, as notas aparecem por 72 horas.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -104,6 +119,12 @@ Quando desabilitada ou não configurada, ele usa a política Servidor de contage
       </presentation>
       <presentation id="SharedCountsServer">
         <textBox refId="SharedCountsServer"><label>Endereço do servidor:</label></textBox>
+      </presentation>
+      <presentation id="HandoffFolder">
+        <textBox refId="HandoffFolder"><label>Pasta:</label></textBox>
+      </presentation>
+      <presentation id="HandoffHours">
+        <decimalTextBox refId="HandoffHours" defaultValue="72">Horas:</decimalTextBox>
       </presentation>
     </presentationTable>
   </resources>

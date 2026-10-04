@@ -94,6 +94,21 @@ Si vous désactivez ce paramètre ou ne le configurez pas, le serveur intégré 
       <string id="TurnOffSharedCounts_Help">Si vous activez ce paramètre, hello-world ne contacte jamais de serveur de comptes partagés et ne pose pas la question.
 
 Si vous désactivez ce paramètre ou ne le configurez pas, il utilise le paramètre Serveur de comptes partagés ou le serveur intégré au paquet.</string>
+      <string id="SUPPORTED_1_46">hello-world 1.46.0 ou version ultérieure</string>
+      <string id="ShiftHandoff">Relève d'équipe sur ce PC</string>
+      <string id="ShiftHandoff_Help">Si vous activez ce paramètre, le haut de hello-world sur ce PC affiche les notes laissées pour l'équipe suivante, avec depuis combien de temps chacune a été laissée, et une zone pour en laisser une. Toute personne qui se connecte à ce PC les lit. Une note peut être conservée jusqu'à ce que quelqu'un l'efface, pour les problèmes de sécurité; les autres s'affichent pendant le nombre d'heures fixé par le paramètre Heures de relève. L'écran indique que les notes ne sont pas un registre de sécurité ou de défauts et ne doivent contenir aucune information sur des patients ou des clients. Vérifiez d'abord les numéros de chambre et similaires avec votre responsable de la protection des données.
+
+Les notes sont verrouillées sur ce PC avec l'API de protection des données de Windows, sauf si Dossier de relève est défini. Le plan de chaque personne reste privé à son compte.
+
+Si vous désactivez ce paramètre ou ne le configurez pas, il n'y a pas de relève.</string>
+      <string id="HandoffFolder">Dossier de relève</string>
+      <string id="HandoffFolder_Help">Si vous activez ce paramètre, les notes de relève sont conservées dans ce dossier, par exemple un partage pour une unité de soins, afin que tous les PC qui y pointent affichent les mêmes notes. Les notes y sont en texte clair: les autorisations du dossier décident qui les lit. Donnez l'accès en lecture et écriture aux utilisateurs de ces PC, et à personne d'autre.
+
+Si vous désactivez ce paramètre ou ne le configurez pas, chaque PC garde ses propres notes dans ProgramData, verrouillées sur ce PC.</string>
+      <string id="HandoffHours">Heures de relève</string>
+      <string id="HandoffHours_Help">Si vous activez ce paramètre, les notes de relève s'affichent pendant ce nombre d'heures, de 1 à 336, sauf celles conservées jusqu'à effacement. 24 convient aux postes de 12 heures; 168 couvre un long week-end.
+
+Si vous désactivez ce paramètre ou ne le configurez pas, les notes s'affichent 72 heures.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -104,6 +119,12 @@ Si vous désactivez ce paramètre ou ne le configurez pas, il utilise le paramè
       </presentation>
       <presentation id="SharedCountsServer">
         <textBox refId="SharedCountsServer"><label>Adresse du serveur :</label></textBox>
+      </presentation>
+      <presentation id="HandoffFolder">
+        <textBox refId="HandoffFolder"><label>Dossier:</label></textBox>
+      </presentation>
+      <presentation id="HandoffHours">
+        <decimalTextBox refId="HandoffHours" defaultValue="72">Heures:</decimalTextBox>
       </presentation>
     </presentationTable>
   </resources>

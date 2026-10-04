@@ -94,6 +94,21 @@ Wenn Sie diese Einstellung deaktivieren oder nicht konfigurieren, wird der im Pa
       <string id="TurnOffSharedCounts_Help">Wenn Sie diese Einstellung aktivieren, kontaktiert hello-world nie einen Server für gemeinsame Zählungen und fragt auch nicht danach.
 
 Wenn Sie diese Einstellung deaktivieren oder nicht konfigurieren, gilt die Richtlinie Server für gemeinsame Zählungen oder der im Paket eingebaute Server.</string>
+      <string id="SUPPORTED_1_46">hello-world 1.46.0 oder höher</string>
+      <string id="ShiftHandoff">Schichtübergabe auf diesem PC</string>
+      <string id="ShiftHandoff_Help">Wenn Sie diese Einstellung aktivieren, zeigt hello-world auf diesem PC oben die Notizen für die nächste Schicht an, jeweils mit ihrem Alter, und ein Feld, um eine zu hinterlassen. Jeder, der sich an diesem PC anmeldet, liest sie. Eine Notiz kann bei Sicherheitsthemen bleiben, bis jemand sie löscht; die übrigen werden so viele Stunden angezeigt, wie die Richtlinie Übergabestunden festlegt. Der Bildschirm sagt, dass die Notizen kein Sicherheits- oder Mängelprotokoll sind und keine Patienten- oder Kundendaten enthalten dürfen. Klären Sie Zimmernummern und Ähnliches vorher mit Ihrem Datenschutzbeauftragten.
+
+Die Notizen werden mit der Windows-Datenschutz-API an diesen PC gebunden, es sei denn, Übergabeordner ist gesetzt. Der eigene Plan jeder Person bleibt privat in ihrem Konto.
+
+Wenn Sie diese Einstellung deaktivieren oder nicht konfigurieren, gibt es keine Übergabe.</string>
+      <string id="HandoffFolder">Übergabeordner</string>
+      <string id="HandoffFolder_Help">Wenn Sie diese Einstellung aktivieren, werden die Übergabenotizen in diesem Ordner gespeichert, etwa einer Freigabe für eine Station, sodass alle PCs, die darauf zeigen, dieselben Notizen anzeigen. Dort sind die Notizen Klartext: Die Berechtigungen des Ordners bestimmen, wer sie liest. Geben Sie den Benutzern dieser PCs Lese- und Schreibzugriff und niemandem sonst.
+
+Wenn Sie diese Einstellung deaktivieren oder nicht konfigurieren, speichert jeder PC seine eigenen Notizen in ProgramData, an diesen PC gebunden.</string>
+      <string id="HandoffHours">Übergabestunden</string>
+      <string id="HandoffHours_Help">Wenn Sie diese Einstellung aktivieren, werden Übergabenotizen so viele Stunden angezeigt, von 1 bis 336, außer denen, die bis zum Löschen bleiben. 24 passt zu 12-Stunden-Schichten; 168 deckt ein langes Wochenende ab.
+
+Wenn Sie diese Einstellung deaktivieren oder nicht konfigurieren, werden Notizen 72 Stunden angezeigt.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -104,6 +119,12 @@ Wenn Sie diese Einstellung deaktivieren oder nicht konfigurieren, gilt die Richt
       </presentation>
       <presentation id="SharedCountsServer">
         <textBox refId="SharedCountsServer"><label>Serveradresse:</label></textBox>
+      </presentation>
+      <presentation id="HandoffFolder">
+        <textBox refId="HandoffFolder"><label>Ordner:</label></textBox>
+      </presentation>
+      <presentation id="HandoffHours">
+        <decimalTextBox refId="HandoffHours" defaultValue="72">Stunden:</decimalTextBox>
       </presentation>
     </presentationTable>
   </resources>

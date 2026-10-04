@@ -15,6 +15,7 @@
       <definition name="SUPPORTED_1_37" displayName="$(string.SUPPORTED_1_37)" />
       <definition name="SUPPORTED_1_44" displayName="$(string.SUPPORTED_1_44)" />
       <definition name="SUPPORTED_1_45" displayName="$(string.SUPPORTED_1_45)" />
+      <definition name="SUPPORTED_1_46" displayName="$(string.SUPPORTED_1_46)" />
     </definitions>
   </supportedOn>
   <categories>
@@ -119,6 +120,22 @@
       <supportedOn ref="SUPPORTED_1_45" />
       <enabledValue><decimal value="1" /></enabledValue>
       <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+    <policy name="ShiftHandoff" class="Machine" displayName="$(string.ShiftHandoff)" explainText="$(string.ShiftHandoff_Help)" key="SOFTWARE\Policies\hello-world" valueName="ShiftHandoff">
+      <parentCategory ref="HelloWorld" />
+      <supportedOn ref="SUPPORTED_1_46" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+    <policy name="HandoffFolder" class="Machine" displayName="$(string.HandoffFolder)" explainText="$(string.HandoffFolder_Help)" presentation="$(presentation.HandoffFolder)" key="SOFTWARE\Policies\hello-world">
+      <parentCategory ref="HelloWorld" />
+      <supportedOn ref="SUPPORTED_1_46" />
+      <elements><text id="HandoffFolder" valueName="HandoffFolder" maxLength="260" /></elements>
+    </policy>
+    <policy name="HandoffHours" class="Machine" displayName="$(string.HandoffHours)" explainText="$(string.HandoffHours_Help)" presentation="$(presentation.HandoffHours)" key="SOFTWARE\Policies\hello-world">
+      <parentCategory ref="HelloWorld" />
+      <supportedOn ref="SUPPORTED_1_46" />
+      <elements><decimal id="HandoffHours" valueName="HandoffHours" minValue="1" maxValue="336" /></elements>
     </policy>
   </policies>
 </policyDefinitions>

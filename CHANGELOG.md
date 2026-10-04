@@ -1,5 +1,47 @@
 # Changelog
 
+## 2026-10-04: shift handoff notes for shared PCs
+
+Version 1.46.0. Denise (nurse manager) and Rick (warehouse supervisor) both
+asked for this on their own in the persona review, and it was the Profit
+Maximizer's first pick. Before building it, the design went back to both of
+them, the same agents with their two weeks in memory. What they changed:
+
+- Notes show their age, "8 h ago", not a time: "my tired brain can't do date
+  math" (Denise).
+- How long they show is the organization's choice, `HandoffHours`, 72 hours
+  by default: Denise wanted 24 to 36 for 12-hour shifts, Rick 7 days for a
+  long weekend.
+- A note can be kept until someone clears it, for a safety issue that
+  shouldn't expire, and anyone can clear a wrong note (Rick).
+- The screen says it isn't a safety or defect record (Rick) and holds no
+  patient or customer details, and the policy text tells IT to check room
+  numbers with their privacy officer first (Denise).
+- `HandoffFolder` points every PC on a unit at one shared folder, because
+  hospital carts roam and a missing note reads as "all clear" (Denise).
+- Notes aren't signed unless the writer signs them, with a hint to sign
+  when the next shift may need to ask: Rick said an automatic name is a
+  liability trail, Denise wanted one for accountability. The default
+  follows Rick; a policy for Denise's units is queued.
+
+What it does: with `ShiftHandoff` on for a PC, the top of the screen lists
+the notes left on it, newest first, kept ones on top. `handoff` at the last
+prompt, or the box and **Leave note** in the window, leaves one; `clear`
+there, or **Options > Clear a handoff note...**, removes one. It keeps the
+last 5 notes and 5 kept ones. Notes are locked to the PC with the Data
+Protection API's machine scope in `ProgramData\hello-world`, which the
+installer now makes with write access for the PC's users; in a
+`HandoffFolder` they are plain text and the share's permissions decide.
+Each person's own plan stays private. Nothing leaves the PC or the share.
+
+Translations of the 18 new strings and the policy text are simulated.
+
+Tests: off without the policy; a note seen by the next person with its age
+and not in their own notes; expiry by hours and by policy; a kept note
+outliving them until cleared; only the last five kept; locked on disk; a
+unit folder shared by two PCs; and the window's handoff controls. CI checks
+the installer made the folder and that users can write it.
+
 ## 2026-10-04: the shared tip count, and a server that runs anywhere
 
 Version 1.45.0. The persona review found that everyone seeing the same tip on
