@@ -1,5 +1,76 @@
 # Changelog
 
+## 2026-10-03: one way to tick things off, and the review's fixes
+
+Version 1.38.0. A fourth simulated pilot ran on 1.37.0 alongside a code and
+security review of it. Ratings: Dana 4, Rafael 4, Mónica 6, Tom 6, Priya 6.
+
+From the review:
+- "After an upgrade, a timed reminder can't be turned off, not even by
+  policy." 1.37.0 renamed the task to carry the domain, and nothing looked
+  for the old name. hello-world now moves a task under the old name to the
+  new one at the same time, or removes it under `DisableSignInLauncher`, and
+  `uninstall-user.ps1` removes both names.
+- "`Visit.finish_parts` uses tick indexes from a plan that may have changed."
+  The window now finishes things by their words, checked against the plan as
+  saved, and changes nothing when another window has changed it.
+- "Turning My numbers back on wipes the earlier counts." It keeps them.
+- "Redrawing the window throws away what was typed." What was typed and
+  ticked comes back after a redraw, and a redraw isn't logged as another
+  opening under `ReportUsage`.
+- "`language_fits` still lets through a translation file that crashes the
+  program." An empty or wrong `tips_floor`, or a translation whose `{names}`
+  differ from the English, now skips that language.
+- "`release.yml` can publish a package under a tag that points at a different
+  commit." The release stops when the tag exists at another commit.
+- "`dependabot-automerge.yml` checks only one tests run." It waits for every
+  run on the commit, and `.github/dependabot.yml` now asks for weekly action
+  updates, so the workflow has something to merge.
+- "Forget removes every identical row but takes back only one done." It
+  removes one, in the window and the text menu.
+- "`uninstall.ps1` leaves each user's protocol and notification
+  registrations." It removes them where they point at the install it removes.
+- "Emptying the box and clicking I did it finishes a multi-part plan without
+  asking." It asks now, as part of the tick boxes below.
+
+From the pilot:
+- Today's plan of a few things has a tick box for each under the plan box;
+  tick what you finished and click **I did it**. The Yes or No box per thing
+  is gone, and nothing ticked asks before marking everything.
+- The morning-after question says "Tick the ones you did, then click Done."
+  and no longer says that nothing ticked means all of them.
+- A notification about a plan of a few things offers Open instead of Done.
+- A plan holds up to ten things and 400 characters, and a cut plan says so.
+  A part with nothing in it but dashes or punctuation isn't a thing to do.
+- Finishing several things says how many: "Good. 2 things are off your list."
+- The question shows the plan's date: "Your plan from Monday, 5 October".
+- Saving a new plan while the old one is unanswered asks whether to keep the
+  old one for today too.
+- The done count is kept only with **My numbers** on. The finished list stays
+  either way.
+- **My saved notes > Forget the earlier plan** clears what `same` brings back.
+- **This week** shows last week too, My numbers says what a run is, and the
+  saved summary says why "Last opened" is kept.
+- Save with an empty box says to type a plan first instead of closing.
+- The reminder settings each say what changed, Keep a longer history says the
+  usual is 14 days, **Use the text screen** shows a tick when it's on, and
+  **More options** is now **Open the text menu**, which is what it does.
+- The text menu's help says "see" the options, not "hear".
+
+Still queued in `TODO.md`: tips that read like office posters, the window's
+settings in the text menu, one wording for Enter in the text menu, and two
+checks on real hardware.
+
+The pilot tool now follows the window when it redraws, which is why the
+display settings seemed to close it, and ticks up to ten boxes.
+
+Every new string is translated into the ten other languages by three agents.
+Tests: the old task name moved, ticks from a changed plan refused, the
+notification for several things, last week, forgetting one of two identical
+rows, numbers kept when turned on again, a wrong placeholder or empty floor
+tips skipped, the done count only with My numbers, the empty Save and a cut
+plan. 262 run here on Windows: all pass but 2 POSIX-only ones.
+
 ## 2026-10-03: a review, a third pilot, and everything they found
 
 Version 1.37.0. With the queue empty, round 62 reviewed 1.36.0: one code and security reviewer, and the five simulated employees again, fresh, on the new features. The pilot ratings were Dana 3, Rafael 3, Mónica 4, Tom 5 and Priya 6, down from the last round, and the reasons were records they couldn't trust and a menu that had grown to sixteen items.

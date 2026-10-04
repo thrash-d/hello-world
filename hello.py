@@ -17,6 +17,7 @@ import datetime
 import io
 import json
 import os
+import re
 import shutil
 import sys
 import textwrap
@@ -326,7 +327,7 @@ When it asks "Did you do it?", n means not yet, and you can keep the
 plan for today. q closes from any question.
 In this menu, 1 shows what is saved, 7 forgets one finished plan,
 and 8 hides the thought and tip.
-Type m to hear the options again. Nothing is sent anywhere."""
+Type m to see the options again. Nothing is sent anywhere."""
 
 
 # A thought that shares one of these with the day's tip moves on by one, so
@@ -500,7 +501,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.37.0"
+VERSION = "1.38.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -795,9 +796,9 @@ def new_state():
     return {"visits": [], "intent": None, "streak": False}
 
 
-MAX_PLAN = 200
+MAX_PLAN = 400
 # A plan can be a few things with ; between them, each finished on its own.
-MAX_PARTS = 5
+MAX_PARTS = 10
 SAVED_PLAN = "Saved. Type done when you finish it, or it asks next time you open this."
 MAX_FINISHED = 50
 # Finished plans are kept for 14 days, or 90 with "long_history", and at most
@@ -1471,6 +1472,8 @@ def show_saved(state, full=True):
         # Only the latest date is kept when nothing counts days.
         say(tr("Last opened: {date}").format(date=long_date(
             datetime.date.fromisoformat(state["visits"][-1]))))
+        para(tr("Only this date is kept, so it can say welcome back after a "
+                "while away."))
     if state.get("done"):
         say(tr("Times you marked a plan done: {n}").format(n=state["done"]))
     if state["intent"]:
@@ -1871,7 +1874,7 @@ def forget_finished(state, can_save):
         say(tr("That plan was already forgotten. Nothing changed."))
         return
     base = copy.deepcopy(state)
-    state["finished"] = [i for i in state["finished"] if i != item]
+    state["finished"].remove(item)
     if state.get("done"):
         state["done"] -= 1
     if also_same and state.get("previous") == item["text"]:
@@ -2126,7 +2129,8 @@ def offer_reminder(state, can_save, planned=False):
 def plan_parts(text):
     """The things in one plan: "Call Ana; send the report" is two. A plan
     of more than MAX_PARTS keeps the extra ones together in the last part."""
-    parts = [part.strip() for part in text.split(";") if part.strip()]
+    parts = [part.strip() for part in text.split(";")
+             if any(c.isalnum() or unicodedata.category(c) == "So" for c in part)]
     if len(parts) > MAX_PARTS:
         parts = parts[:MAX_PARTS - 1] + ["; ".join(parts[MAX_PARTS - 1:])]
     return parts or [text]
@@ -2161,6 +2165,13 @@ def done_lines(state, d):
     data = translation()
     lines = data["done"] if data else DONE_LINES
     return [lines[d.toordinal() % len(lines)]]
+
+
+def done_message(state, d, n):
+    """The day's done line for one thing, or a count for several."""
+    if n > 1:
+        return tr("Good. {n} things are off your list.").format(n=n)
+    return done_lines(state, d)[0]
 
 
 def ask_parts(parts):
@@ -2249,8 +2260,7 @@ def mark_done_now(state, can_save, d):
         undo(state, base)
         say(tr("Could not save that on this computer. The plan is still open."))
         return False
-    for line in done_lines(state, d):
-        say(line)
+    say(done_message(state, d, len(plan_parts(plan["text"]))))
     show_finished(state, SHOWN_AFTER_DONE)
     return True
 
@@ -2284,18 +2294,26 @@ def numbers_text(state):
     return "\n".join([
         tr("Days you opened hello-world: {n}").format(n=state.get("opens", 0)),
         tr("Longest run of days: {n}").format(n=state.get("best_run", 0)),
-        tr("Plans finished: {n}").format(n=state.get("done", 0))])
+        tr("Plans finished: {n}").format(n=state.get("done", 0)), "",
+        tr("A run goes on over a gap of up to three days, such as a weekend.")])
 
 
 def week_text(state, d):
     """What was finished since Monday."""
-    monday = (d - datetime.timedelta(days=d.weekday())).isoformat()
-    items = [i for i in state.get("finished", []) if i["date"] >= monday]
-    if not items:
-        return tr("Nothing finished yet this week. That is fine.")
-    return "\n".join([tr("This week you finished {n}:").format(n=len(items))] + [
-        "  " + tr("{date}: ").format(date=long_date(datetime.date.fromisoformat(
-            i["date"]))) + i["text"] for i in items])
+    start = d - datetime.timedelta(days=d.weekday())
+    monday, before = start.isoformat(), (start - datetime.timedelta(days=7)).isoformat()
+    finished = state.get("finished", [])
+    items = [i for i in finished if i["date"] >= monday]
+    earlier = [i for i in finished if before <= i["date"] < monday]
+
+    def rows(found):
+        return ["  " + tr("{date}: ").format(date=long_date(
+            datetime.date.fromisoformat(i["date"]))) + i["text"] for i in found]
+    lines = ([tr("This week you finished {n}:").format(n=len(items))] + rows(items)
+             if items else [tr("Nothing finished yet this week. That is fine.")])
+    if earlier:
+        lines += ["", tr("Last week you finished {n}:").format(n=len(earlier))] + rows(earlier)
+    return "\n".join(lines)
 
 
 # Where --export and Options save the plans; None is the Documents folder.
@@ -2347,6 +2365,7 @@ def tidy_launcher():
     that starts pythonw.exe."""
     if launcher_on() and "hello.cmd --startup" in launcher_value():
         remind(True, quiet=True)
+    move_old_task()
     if policy("DisableSignInLauncher"):
         if launcher_on() or legacy_launcher() and os.path.isfile(legacy_launcher()):
             remind(False, quiet=True)
@@ -2414,7 +2433,8 @@ def answer_plan(state, can_save, d, choice, text, parts=None):
         return False, tr("Could not save that on this computer. Your answer "
                          "was not counted.")
     if choice == "yes":
-        return True, done_lines(state, d)[0] + (
+        n = len(set(parts)) if parts else len(plan_parts(text))
+        return True, done_message(state, d, n) + (
             " " + tr("The rest is kept for today.") if rest else "")
     return True, tr("Kept for today.") if choice == "no" else tr(
         "Your plan is still open.")
@@ -2953,13 +2973,13 @@ def show_window():
         open_console()
         return 0
     try:
-        message = None
+        message, keep = None, None
         while True:
-            window = Window(Visit(), message)
+            window = Window(Visit(redraw=keep is not None), message, keep)
             window.run()
             if window.reopened is None:
                 break
-            message = window.reopened
+            message, keep = window.reopened, window.keep
     except Exception as e:
         log_error(e)
         # A PC where the window can't be drawn still gets the text screens.
@@ -2979,7 +2999,29 @@ TASKS = None
 # carries their user name.
 TASK_NAME = "hello-world reminder " + "-".join(
     filter(None, (os.environ.get("USERDOMAIN"), os.environ.get("USERNAME") or "user")))
+# Before 1.37.0 the task carried only the user name.
+OLD_TASK_NAME = "hello-world reminder " + (os.environ.get("USERNAME") or "user")
 REMINDER_TIMES = ("08:00", "09:00", "10:00", "13:00")
+
+
+def move_old_task():
+    """Remove a reminder task under its pre-1.37.0 name, which nothing else
+    finds, and set it up again under the current name at the same time unless
+    the policy turns reminders off."""
+    if TASKS is not None or os.name != "nt" or OLD_TASK_NAME == TASK_NAME:
+        return
+    import subprocess
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    r = subprocess.run(["schtasks", "/Query", "/XML", "/TN", OLD_TASK_NAME],
+                       capture_output=True, creationflags=flags)
+    if r.returncode:
+        return
+    found = re.search(rb"StartBoundary>[^<T]*T(\d\d:\d\d)", r.stdout.replace(b"\0", b""))
+    subprocess.run(["schtasks", "/Delete", "/F", "/TN", OLD_TASK_NAME],
+                   capture_output=True, creationflags=flags)
+    at = found and found.group(1).decode()
+    if at in REMINDER_TIMES and not policy("DisableSignInLauncher"):
+        reminder_task(at)
 
 
 def reminder_task(at):
@@ -3159,14 +3201,17 @@ def show_reminder(text, date=None, private=False):
     escape = xml_text
     key = plan_key(text, date or "")
     shown = tr("Did you do it?") if private else tr("Last time you planned: ") + text
+    # One Done would finish every thing, so several open the tick boxes.
+    first = ((tr("&Open"), "hello-world:open") if len(plan_parts(text)) > 1
+             else (tr("&Done"), f"hello-world:done/{key}"))
     return notify('<toast activationType="protocol" launch="hello-world:open">'
            '<visual><binding template="ToastGeneric">'
            f'<text>{escape(shown)}</text>'
            + ("" if private else f'<text>{escape(tr("Did you do it?"))}</text>')
            + '</binding></visual>'
            '<actions>'
-           f'<action content="{escape(tr("&Done").replace("&", ""))}" '
-           f'activationType="protocol" arguments="hello-world:done/{key}"/>'
+           f'<action content="{escape(first[0].replace("&", ""))}" '
+           f'activationType="protocol" arguments="{first[1]}"/>'
            f'<action content="{escape(tr("&Not yet").replace("&", ""))}" '
            f'activationType="protocol" arguments="hello-world:notyet/{key}"/>'
            f'<action content="{escape(tr("S&kip").replace("&", ""))}" '
@@ -3238,7 +3283,7 @@ class Visit:
     """One opening of the window: what it shows, and what its buttons do.
     The window only draws this, so the tests drive it directly."""
 
-    def __init__(self):
+    def __init__(self, redraw=False):
         self.d = today()
         self.iso = self.d.isoformat()
         (self.state, self.can_save), said = quietly(load)
@@ -3273,7 +3318,8 @@ class Visit:
                 notes.append(tr("You have opened this {row} days in a row. "
                                 "Nice to see you.").format(row=row))
         state["intent"] = intent
-        report_usage("opened")
+        if not redraw:
+            report_usage("opened")
         if not seen:
             count_visit(state, d)
             state["visits"] = (state["visits"] + [self.iso])[-MAX_VISITS:]
@@ -3313,6 +3359,9 @@ class Visit:
         if plans_off():
             return True, "", False
         quietly(refresh, self.state, self.can_save)
+        if not tidy(typed) and not self.plan():
+            return False, tr("Type a plan in the box first. Not today closes "
+                             "the window."), False
         if not tidy(typed) or clean(typed) == self.plan():
             return True, "", False
         if is_same(typed) and not self.state.get("previous"):
@@ -3336,7 +3385,9 @@ class Visit:
                                      "Your plan is unchanged."), False
         self.followup = None
         _, several = quietly(nudge_if_several, text)
-        return False, " ".join([tr("Saved.")] + ([several] if several else [])), True
+        cut = [tr("Shortened to {n} characters.").format(n=MAX_PLAN)
+               ] if len(tidy(typed)) > MAX_PLAN else []
+        return False, " ".join([tr("Saved.")] + cut + ([several] if several else [])), True
 
     def saved_summary(self):
         """What is saved, in words, and where the file is. The raw file stays
@@ -3383,12 +3434,19 @@ class Visit:
         # The finished list after it is for the text screen.
         return said.split(tr("Finished lately:"))[0].strip()
 
-    def finish_parts(self, parts):
-        """Some things in today's plan are finished; the rest stay today's."""
+    def finish_parts(self, names):
+        """The things in today's plan with these words are finished; the rest
+        stay today's. Another window may have changed the plan since these
+        were ticked, so a name it no longer has changes nothing."""
         quietly(refresh, self.state, self.can_save)
         intent = self.state["intent"]
         if not intent or intent["date"] != self.iso:
             return tr("There is no plan to mark as done. Type plan to set one.")
+        every = plan_parts(intent["text"])
+        if not names or any(name not in every for name in names):
+            return tr("The other open window changed the plan, so its plan "
+                      "is kept.")
+        parts = [every.index(name) for name in names]
         base = copy.deepcopy(self.state)
         rest = finish_plan(self.state, intent["text"], self.d, parts)
         self.state["intent"] = dict(intent, text=rest) if rest else None
@@ -3396,7 +3454,7 @@ class Visit:
         if not saved:
             undo(self.state, base)
             return said or tr("Could not save that on this computer. The plan is still open.")
-        return done_lines(self.state, self.d)[0] + (
+        return done_message(self.state, self.d, len(set(parts))) + (
             " " + tr("The rest is kept for today.") if rest else "")
 
     def forget(self, item):
@@ -3405,7 +3463,7 @@ class Visit:
         if item not in self.state.get("finished", []):
             return tr("That plan was already forgotten. Nothing changed.")
         base = copy.deepcopy(self.state)
-        self.state["finished"] = [i for i in self.state["finished"] if i != item]
+        self.state["finished"].remove(item)
         if self.state.get("done"):
             self.state["done"] -= 1
         saved, said = quietly(commit, self.state, base, self.can_save)
@@ -3480,7 +3538,8 @@ class Visit:
                 self.state[key] = True
                 # Today counts from the moment numbers are on.
                 if key == "numbers" and self.iso in self.state["visits"]:
-                    self.state.update(opens=1, run=1, best_run=1)
+                    for count in ("opens", "run", "best_run"):
+                        self.state.setdefault(count, 1)
         elif self.state.pop("text", None) is None:
             self.state["text"] = True
         saved, _ = quietly(commit, self.state, base, self.can_save)
@@ -3540,12 +3599,16 @@ class Window:
     TITLE, DATE, NOTE, PLANNED, ASK, DONE, NOT_YET, SKIP = range(100, 108)
     THOUGHT_LABEL, THOUGHT, TIP_LABEL, TIP = range(110, 114)
     PLAN_LABEL, PLAN, STATUS, OPTIONS, DID_IT = range(120, 125)
-    TICK = 130  # to 134, one tick box for each thing in yesterday's plan
+    TICK = 130  # to 139, one tick box for each thing in the plan
     SAVE, CLOSE = 1, 2  # IDOK and IDCANCEL, so Enter and Esc work
 
-    def __init__(self, visit, message=None):
+    def __init__(self, visit, message=None, keep=None):
         self.visit = visit
         self.message = message  # shown in the status line after a reopen
+        # What was typed and ticked before a reopen, put back after it.
+        self.keep = keep
+        self.fresh = False  # a reopen draws the new plan, not what was typed
+        self.parts = []
         self.reopened = None
         self.error = None
         self.fonts = []
@@ -3580,11 +3643,9 @@ class Window:
         para(self.DATE, header[0].upper() + header[1:], 8)
         if v.note:
             para(self.NOTE, v.note, 8)
-        parts = plan_parts(v.followup) if v.followup else []
-        if len(parts) > 1:
-            para(self.PLANNED, tr("Last time you planned:"), 2)
-            para(self.ASK, tr("Tick the ones you did, then click Done. With "
-                              "none ticked, Done means all of them."), 2)
+        def ticks(parts):
+            nonlocal y
+            self.parts = parts
             for n, part in enumerate(parts):
                 h = self.lines(part) * line
                 # A tick box draws & as an underline, so it is doubled.
@@ -3593,8 +3654,16 @@ class Window:
                     w - 6)  # BS_AUTOCHECKBOX | BS_MULTILINE
                 y += h + 2
             y += 4
+
+        parts = plan_parts(v.followup) if v.followup else []
+        since = tr("Your plan from {date}: ").format(date=long_date(
+            datetime.date.fromisoformat(v.state["intent"]["date"]))) if v.followup else ""
+        if len(parts) > 1:
+            para(self.PLANNED, since.strip(), 2)
+            para(self.ASK, tr("Tick the ones you did, then click Done."), 2)
+            ticks(parts)
         elif v.followup:
-            para(self.PLANNED, tr("Last time you planned: ") + v.followup, 2)
+            para(self.PLANNED, since + v.followup, 2)
             para(self.ASK, tr("Did you do it?"), 4)
         if v.followup:
             for n, (cid, label) in enumerate(((self.DONE, tr("&Done")),
@@ -3611,6 +3680,10 @@ class Window:
             para(self.PLAN_LABEL, self.plan_label(), 2)
             add(edit, self.PLAN, v.plan(), tab | 0x800000 | 0x80, m, 15)
             y += 19
+            today_parts = plan_parts(v.plan()) if v.plan() and not v.followup else []
+            if len(today_parts) > 1:
+                para(self.ASK, tr("Tick the ones you finish, then click I did it."), 2)
+                ticks(today_parts)
         add(static, self.STATUS, "" if plans_off() else tr(
             "A few things? Put ; between them."), text_style, m, 2 * line)
         y += 2 * line + 6
@@ -3808,14 +3881,26 @@ class Window:
             self.focus_plan()
         if self.message:
             self.set_text(self.STATUS, self.message)
+        if self.keep:
+            typed, ticked = self.keep
+            if typed and self.item(self.PLAN):
+                self.set_text(self.PLAN, typed)
+                self.focus_plan()
+            for n, part in enumerate(self.parts):
+                if part in ticked:
+                    user.SendMessageW(self.item(self.TICK + n), 0xF1, 1, 0)  # BM_SETCHECK
         if CLOSE_WINDOW_AFTER:
             user.SetTimer(self.hwnd, 1, CLOSE_WINDOW_AFTER, None)
+
+    def ticked(self):
+        """The indexes of the ticked things."""
+        return [n for n in range(len(self.parts))
+                if self.user.SendMessageW(self.item(self.TICK + n), 0xF0, 0, 0)]  # BM_GETCHECK
 
     def command(self, cid):
         v = self.visit
         if cid in (self.DONE, self.NOT_YET, self.SKIP):
-            ticks = [n for n in range(MAX_PARTS) if self.item(self.TICK + n)
-                     and self.user.SendMessageW(self.item(self.TICK + n), 0xF0, 0, 0)]
+            ticks = self.ticked()
             # A tick missed by mistake must not finish everything.
             if (cid == self.DONE and self.item(self.TICK) and not ticks
                     and not self.confirm(tr("Mark all of them done?"))):
@@ -3824,6 +3909,11 @@ class Window:
                                ticks if cid == self.DONE and ticks else None)
             if v.followup:
                 self.set_text(self.STATUS, message)
+                return
+            if len(plan_parts(v.plan())) > 1:
+                # Today's plan of several things gets its own tick boxes.
+                self.fresh = True
+                self.reopen(message)
                 return
             for hidden in (self.ASK, self.DONE, self.NOT_YET, self.SKIP) + tuple(
                     self.TICK + n for n in range(MAX_PARTS)):
@@ -3836,12 +3926,13 @@ class Window:
             self.refresh_plan()
             self.focus_plan()
         elif cid == self.DID_IT:
-            parts = plan_parts(clean(self.typed()) or v.plan())
-            if len(parts) > 1 and clean(self.typed()) == v.plan():
-                done = [n for n, part in enumerate(parts)
-                        if self.confirm(tr("Did you finish this: {part}?").format(part=part))]
-                self.set_text(self.STATUS, v.finish_parts(done) if done else
-                              tr("Nothing changed."))
+            if self.parts and clean(self.typed()) in ("", v.plan()):
+                names = [self.parts[n] for n in self.ticked()]
+                if not names and not self.confirm(tr("Mark all of them done?")):
+                    return
+                self.fresh = True
+                self.reopen(v.finish_parts(names or self.parts))
+                return
             else:
                 self.set_text(self.STATUS, v.did_it(self.typed()))
             self.finished = not v.plan()
@@ -3854,7 +3945,7 @@ class Window:
                     self.set_text(self.STATUS, v.clear())
                     self.refresh_plan()
                 self.focus_plan()
-            elif self.save_typed() is None:
+            elif self.save_typed(redraw=True) is None:
                 self.user.EndDialog(self.hwnd, 1)
         elif cid == self.CLOSE:
             if (self.item(self.PLAN) and any(c.isalpha() for c in self.typed())
@@ -3866,11 +3957,19 @@ class Window:
         elif cid == self.OPTIONS:
             self.options()
 
-    def save_typed(self):
+    def save_typed(self, redraw=False):
         """Save the box. True when saved, False when refused (the window
-        says why), None when there was nothing to save."""
+        says why), None when there was nothing to save. With `redraw`, a plan
+        of several things reopens the window to show its tick boxes."""
         v = self.visit
-        close, message, saved = v.save(self.typed())
+        typed = self.typed()
+        command, _ = quietly(is_command, typed)
+        if (self.asking and v.followup and tidy(typed) and not command
+                and not is_same(typed) and clean(typed) != v.followup
+                and self.confirm(tr("Keep your plan from {date} for today too?").format(
+                    date=long_date(datetime.date.fromisoformat(v.state["intent"]["date"]))))):
+            typed = v.followup + "; " + typed
+        close, message, saved = v.save(typed)
         if close:
             return None
         self.set_text(self.STATUS, message)
@@ -3890,6 +3989,9 @@ class Window:
                     "Want a reminder when you sign in? It shows your plan from "
                     "last time, and you answer with one click. You can turn it "
                     "off under Options.")))
+            if redraw and (self.parts or len(plan_parts(v.plan())) > 1):
+                self.fresh = True
+                self.reopen(message)
         self.focus_plan()
         return saved
 
@@ -4001,9 +4103,19 @@ class Window:
         elif 2 <= choice < 2 + len(REMINDER_TIMES):
             self.set_text(self.STATUS, v.reminder_at(REMINDER_TIMES[choice - 2]))
         elif choice in (20, 21, 22, 23):
-            saved = v.toggle({20: "nudge", 21: "open_after", 22: "no_weekends",
-                              23: "private_reminder"}[choice])
-            self.set_text(self.STATUS, tr("Saved.") if saved else
+            key = {20: "nudge", 21: "open_after", 22: "no_weekends",
+                   23: "private_reminder"}[choice]
+            said = {"nudge": (tr("Done. The reminder also comes on days with no plan."),
+                              tr("Done. The reminder comes only when there is a plan.")),
+                    "open_after": (tr("Done. hello-world opens after you answer."),
+                                   tr("Done. Answering no longer opens hello-world.")),
+                    "no_weekends": (tr("Done. No reminder on Saturday or Sunday."),
+                                    tr("Done. The reminder comes on weekends too.")),
+                    "private_reminder": (tr("Done. The reminder leaves your plan out."),
+                                         tr("Done. The reminder shows your plan."))}[key]
+            saved = v.toggle(key)
+            self.set_text(self.STATUS, said[0] if saved and v.state.get(key) else
+                          said[1] if saved else
                           tr("Could not save that choice on this computer."))
 
     def options(self):
@@ -4026,9 +4138,10 @@ class Window:
         if feedback_address():
             entries.append((0, 11, tr("Send feedback...")))
         entries.append((0x800, 0, None))  # MF_SEPARATOR
-        entries.append((grayed if policy("UseTextScreen") else 0, 3,
+        entries.append(((grayed if policy("UseTextScreen") else 0)
+                        | (checked if text_screen(v.state) else 0), 3,
                         tr("Use the text screen")))
-        entries.append((0, 4, tr("More options")))
+        entries.append((0, 4, tr("Open the text menu")))
         choice = self.popup(entries)
         if choice == 1:
             self.set_text(self.STATUS, v.set_reminder(not reminder_on()))
@@ -4059,8 +4172,13 @@ class Window:
             self.user.EndDialog(self.hwnd, 2)
 
     def reopen(self, message):
-        """Draw the window again, so a change to what it shows shows now."""
+        """Draw the window again, so a change to what it shows shows now.
+        What was typed and ticked comes back, unless `fresh` is set."""
         self.reopened = message
+        typed = self.typed()
+        self.keep = ("", set()) if self.fresh else (
+            typed if clean(typed) != self.visit.plan() else "",
+            {self.parts[n] for n in self.ticked()})
         self.user.EndDialog(self.hwnd, 2)
 
     def toggled(self, key, on_text, off_text):
@@ -4124,9 +4242,9 @@ class Window:
             saved = v.toggle("long_history")
             self.set_text(self.STATUS, (
                 tr("Could not save that choice on this computer.") if not saved
-                else tr("Done. Finished plans are kept for 90 days.")
+                else tr("Done. Finished plans are kept for 90 days instead of 14.")
                 if v.state.get("long_history") else
-                tr("Done. Finished plans are kept for 14 days.")))
+                tr("Done. Finished plans are kept for 14 days, as usual.")))
         elif choice == 18:
             items = list(reversed(v.state["finished"]))[:20]
             picked = self.popup([(0, 200 + n, tr("{date}: ").format(date=long_date(
@@ -4138,9 +4256,18 @@ class Window:
 
     def saved_menu(self):
         v = self.visit
-        choice = self.popup([(0, 5, tr("Show what is saved on this computer")),
-                             (0, 6, tr("Delete everything saved"))])
-        if choice == 5:
+        entries = [(0, 5, tr("Show what is saved on this computer"))]
+        if v.state.get("previous"):
+            entries.append((0, 19, tr("Forget the earlier plan")))
+        entries.append((0, 6, tr("Delete everything saved")))
+        choice = self.popup(entries)
+        if choice == 19:
+            if self.confirm(tr("Forget the earlier plan? {text}").format(
+                    text=v.state["previous"])):
+                self.set_text(self.STATUS, tr("Done. The earlier plan is forgotten.")
+                              if v.setting("previous", None) else
+                              tr("Could not save that on this computer. Nothing changed."))
+        elif choice == 5:
             self.inform(v.saved_summary())
         elif choice == 6:
             if self.confirm(tr("Delete all saved notes, dates and plans on this "
@@ -4174,6 +4301,9 @@ class Window:
 # index. The installer copies and checks them like hello.py.
 
 
+PLACEHOLDER = re.compile(r"\{(\w*)\}")
+
+
 def language_fits(data):
     """True when a language has everything the screens read from it."""
     lists = ("days", "months", "thoughts", "tips", "done")
@@ -4181,7 +4311,12 @@ def language_fits(data):
             and all(isinstance(data.get(k), tuple) and data[k]
                     and all(isinstance(x, str) for x in data[k]) for k in lists)
             and len(data["days"]) == 7 and len(data["months"]) == 12
-            and all(isinstance(x, str) for x in data.get("tips_floor", ())))
+            and isinstance(data.get("tips_floor", ("",)), tuple)
+            and all(isinstance(x, str) for x in data.get("tips_floor", ("",)))
+            and data.get("tips_floor", ("",)) != ()
+            # The same {names} as the English, or showing it raises KeyError.
+            and all(set(PLACEHOLDER.findall(k)) == set(PLACEHOLDER.findall(v))
+                    for k, v in data["text"].items()))
 
 
 def load_languages(folder=None):

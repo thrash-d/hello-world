@@ -507,8 +507,8 @@ def test_visits_dated_after_today_are_dropped_from_the_file():
 def test_a_plan_of_only_joiners_is_empty_and_a_long_plan_says_it_was_cut():
     hello = _load_hello()
     assert hello.clean("\u200d \u200c") == ""
-    p = run(text="x" * 210 + "\n\n")
-    assert "Shortened to 200 characters." in p.stdout
+    p = run(text="x" * 410 + "\n\n")
+    assert "Shortened to 400 characters." in p.stdout
 
 
 def test_a_second_damaged_file_does_not_overwrite_the_first_backup():
@@ -2264,7 +2264,11 @@ def test_the_window_saves_a_plan_and_refuses_what_is_not_one():
     close, message, saved = visit.save("12")
     assert not close and not saved and "A plan needs a word or two" in message
     assert visit.save("skip") == (True, "", False) and visit.plan() == ""
+    close, message, saved = visit.save("  ")
+    assert not close and not saved and "Type a plan in the box first" in message
+    assert visit.save("Call the bank") == (False, "Saved.", True)
     assert visit.save("  ") == (True, "", False)
+    assert visit.save("x" * 410)[1] == "Saved. Shortened to 400 characters."
     assert visit.save("Call the bank") == (False, "Saved.", True)
     assert notes(hello.HOME)["intent"]["text"] == "Call the bank"
     assert visit.save("Call the bank") == (True, "", False)
@@ -2474,7 +2478,9 @@ def test_a_plan_of_several_things_is_split_and_each_is_finished_on_its_own():
     hello = _load_hello()
     assert hello.plan_parts("Call Ana; ; send the report ") == ["Call Ana", "send the report"]
     assert hello.plan_parts("one thing") == ["one thing"]
-    assert len(hello.plan_parts(";".join("abcdefg"))) == hello.MAX_PARTS
+    assert len(hello.plan_parts(";".join("abcdefghijkl"))) == hello.MAX_PARTS
+    # Nothing to do in "--", but an emoji alone is something.
+    assert hello.plan_parts("Call Ana; --; \U0001f680") == ["Call Ana", "\U0001f680"]
     first = run(text="Call Ana; send the report; book travel\n\n")
     p = run(text="1 3\n\n", day="2026-10-02", home=first.home)
     assert "1  Call Ana" in p.stdout and "The rest is kept for today." in p.stdout
@@ -2509,7 +2515,7 @@ def test_the_window_ticks_some_things_done_and_keeps_the_rest():
     saved = notes(first.home)
     assert [f["text"] for f in saved["finished"]] == ["send the report"]
     assert visit.plan() == "Call Ana; book travel"
-    assert visit.did_it("Call Ana; book travel") in hello.DONE_LINES
+    assert visit.did_it("Call Ana; book travel") == "Good. 2 things are off your list."
     assert notes(first.home)["done"] == 3
 
 
@@ -2961,11 +2967,75 @@ def test_some_parts_of_todays_plan_can_be_finished_from_the_window():
     first = run(text="Call Ana; send the report; book travel\n\n")
     hello = _window_hello(home=first.home, day="2026-10-01")
     visit = hello.Visit()
-    message = visit.finish_parts([0, 2])
-    assert message.endswith("The rest is kept for today.")
+    message = visit.finish_parts(["Call Ana", "book travel"])
+    assert message == "Good. 2 things are off your list. The rest is kept for today."
     saved = notes(first.home)
     assert [i["text"] for i in saved["finished"]] == ["Call Ana", "book travel"]
     assert saved["intent"]["text"] == "send the report"
+
+
+def test_ticks_from_a_plan_another_window_changed_finish_nothing():
+    first = run(text="x; y; z\n\n")
+    hello = _window_hello(home=first.home, day="2026-10-01")
+    visit = hello.Visit()
+    other = hello.Visit()
+    other.save("p; q")
+    assert "changed the plan" in visit.finish_parts(["x"])
+    saved = notes(first.home)
+    assert "finished" not in saved and saved["intent"]["text"] == "p; q"
+
+
+def test_a_plan_of_several_things_gets_open_instead_of_done_in_the_reminder():
+    hello = _load_hello()
+    hello.SHOWN = []
+    hello.show_reminder("Call Ana; send it", "2026-10-01")
+    hello.show_reminder("Call Ana", "2026-10-01")
+    several, one = hello.SHOWN
+    assert 'arguments="hello-world:open"' in several and "done/" not in several
+    assert "hello-world:done/2026-10-01-" in one
+
+
+def test_the_week_shows_last_week_too():
+    hello = _load_hello(day="2026-10-07")
+    state = hello.new_state()
+    state["finished"] = [{"text": "old", "date": "2026-09-28"},
+                         {"text": "older", "date": "2026-09-20"}]
+    text = hello.week_text(state, hello.today())
+    assert text.startswith("Nothing finished yet this week.")
+    assert "Last week you finished 1:" in text and "old" in text and "older" not in text
+
+
+def test_forgetting_one_of_two_identical_rows_keeps_the_other():
+    first = run(text="Call Ana; Call Ana\ndone\n\n")
+    hello = _window_hello(home=first.home, day="2026-10-01")
+    visit = hello.Visit()
+    item = notes(first.home)["finished"][0]
+    visit.forget(item)
+    assert [i["text"] for i in notes(first.home)["finished"]] == ["Call Ana"]
+
+
+def test_turning_my_numbers_on_again_keeps_the_numbers():
+    home = mkdtemp()
+    with open(os.path.join(home, "notes.json"), "w") as f:
+        json.dump({"visits": ["2026-10-02"], "opens": 40, "run": 3,
+                   "best_run": 30}, f)
+    hello = _window_hello(home=home)
+    visit = hello.Visit()
+    assert visit.toggle("numbers")
+    saved = notes(home)
+    assert saved["opens"] == 40 and saved["best_run"] == 30
+
+
+def test_a_translation_with_a_wrong_placeholder_or_empty_floor_tips_is_skipped():
+    hello = _load_hello()
+    hello.load_languages()
+    good = dict(hello.LANGUAGES["es"])
+    assert hello.language_fits(good)
+    assert not hello.language_fits(dict(good, tips_floor=()))
+    assert not hello.language_fits(dict(good, tips_floor="abc"))
+    text = dict(good["text"])
+    text["Longest run of days: {n}"] = "Racha: {m}"
+    assert not hello.language_fits(dict(good, text=text))
 
 
 def test_a_finished_plan_can_be_forgotten_from_the_window():
@@ -3007,3 +3077,25 @@ def test_no_done_count_is_kept_without_my_numbers():
     run(["--set", "numbers", "on"], home=p.home, count=False)
     run(text="Send it\ndone\n\n", home=p.home, day="2026-10-02", count=False)
     assert notes(p.home)["done"] == 1
+
+
+def test_a_task_under_the_old_name_moves_to_the_new_one():
+    import subprocess as sp
+    hello = _load_hello()
+    hello.os.name, real_name = "nt", hello.os.name
+    hello.OLD_TASK_NAME, hello.TASK_NAME = "old", "new"
+    calls, made = [], []
+    xml = "<Task><StartBoundary>2026-01-01T09:00:00</StartBoundary></Task>".encode("utf-16")
+
+    def fake(args, **kw):
+        calls.append(args[1])
+        return sp.CompletedProcess(args, 0, xml if args[1] == "/Query" else b"", b"")
+    real_run, sp.run = sp.run, fake
+    hello.reminder_task = made.append
+    try:
+        hello.move_old_task()
+        hello.POLICY = {"DisableSignInLauncher": 1}
+        hello.move_old_task()
+    finally:
+        sp.run, hello.os.name = real_run, real_name
+    assert calls == ["/Query", "/Delete"] * 2 and made == ["09:00"]

@@ -171,6 +171,29 @@ several plans (Rafael), "partly done" (Priya, Rafael), tips for shift work
 Rafael), a different title than "Hello, world!" (Dana, Rafael), and Skip on
 the notification (Priya).
 
+## Third and fourth rounds, on 1.36.0 and 1.37.0
+
+The same five ran again, fresh each time, on the new features. Ratings, third
+round then fourth: Dana 3 and 4, Rafael 3 and 4, Mónica 4 and 6, Tom 5 and 6,
+Priya 6 and 6.
+
+The third round's complaints were records they couldn't trust and a menu of
+sixteen items; 1.37.0 answers them. The fourth round found:
+- Marking things done took a different path in each place: tick boxes the
+  morning after, a Yes or No box per thing under **I did it**, and an
+  all-or-nothing Done on the notification (all five).
+- "With none ticked, Done means all of them" was a trap (Tom, Priya).
+- A plan of more than five things had its last ones merged, and a long plan
+  was cut at 200 characters with only "Saved." (Rafael, Tom).
+- "That is done" after finishing two things (Tom).
+- An unanswered plan moved silently to `same` when a new one was saved (Dana).
+- A count of finished plans they never asked for (Mónica).
+- Save with an empty box closed the window without a word (Tom).
+- The display settings seemed to close the window. That was the pilot tool,
+  which didn't follow the window when it redrew; it does now.
+
+1.38.0 fixes all of these.
+
 ## Not changed, and why
 
 - NVDA saying "greater" at the end of every prompt (Ruth). It's unclear

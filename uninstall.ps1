@@ -125,6 +125,14 @@ function Remove-UserReminders {
         if ($value -and $value -match 'hello\.(py|cmd)"? --startup$' -and $value -like "*$dir\*") {
             Remove-ItemProperty -LiteralPath $run -Name 'hello-world' -ErrorAction SilentlyContinue
         }
+        # The notification's answer links and name, when they point here.
+        $classes = "Registry::HKEY_USERS\$sid\Software\Classes"
+        $link = (Get-ItemProperty -LiteralPath "$classes\hello-world\shell\open\command" -ErrorAction SilentlyContinue).'(default)'
+        if ($link -and $link -like "*$dir\*") {
+            foreach ($k in "$classes\hello-world", "$classes\AppUserModelId\hello-world") {
+                Remove-Item -LiteralPath $k -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
     }
     $schtasks = Join-Path $sys32 'schtasks.exe'
     # Through cmd: Windows PowerShell 5.1 stops on any stderr from a native

@@ -15,7 +15,7 @@ Subject: A 20-second start to the day, if you want one
 > It's optional. Click Not today to skip it. Nothing is sent anywhere and
 > nothing is reported to managers or IT. Your notes stay in a small file in
 > your own user folder, which IT staff could read, so don't type passwords or
-> private details. Options > More options shows everything saved, and can
+> private details. Options > My saved notes shows everything saved, and can
 > delete it.
 >
 > Questions: <help desk contact>.
@@ -32,7 +32,7 @@ Subject: A 20-second start to the day, if you want one
 - Can it remind me? Only if you say yes when it asks. Then a notification
   comes at your first sign-in of the day, only when there is a plan to ask
   about, and you answer with one click. Options in the window turns it off.
-- How do I delete what it saved? Options > More options, then option 4.
+- How do I delete what it saved? Options > My saved notes > Delete everything saved.
 - I don't want the thought and tip. Options > Show the thought and tip.
 - Is it in my language? It follows the Windows display language: English, Spanish, French (France and Canada), Portuguese (Brazil and Portugal), German, Simplified Chinese, Japanese, Korean, Arabic and Hebrew.
   Options > Language picks another.
