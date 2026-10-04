@@ -1,5 +1,50 @@
 # Changelog
 
+## 2026-10-03: a fifth pilot and a review, and what they found
+
+Version 1.40.0. The five simulated employees ran a fresh week on 1.39.0
+alongside a code review. Ratings: Dana 5, Rafael 6, Mónica 7, Tom 6, Priya 7.
+
+From the review:
+- "The text screen can turn on a timed reminder but can't turn it off, and
+  option 2 adds a second reminder on top of it." Option 2 and `--remind` now
+  see the reminder at a set time and remove it, option 12's reminder list has
+  **No reminder**, and the text screen's own wording says it opens whether or
+  not there is a plan.
+- "`uninstall-user.ps1` never deletes the current reminder task." `-join`
+  bound looser than `+`, so the name came out with spaces. It has its own
+  parentheses now.
+- "My numbers says nothing when turning it on could not be saved." It says so,
+  in the window and the text menu, and Enter at its question goes back.
+
+From the pilot:
+- A new plan typed over today's unfinished things asks whether to keep them
+  too, in the window and the text screen.
+- The reminder stays quiet on weekends unless **Also on weekends** is on. The
+  setting is now `weekends`; the old `no_weekends` is no longer read.
+- `done` in the text screen asks which things of a plan of several are
+  finished, by number, as the window's tick boxes do.
+- A plan over 400 characters is cut at a word, and a list with `;` is tidied
+  when saved, so `a; ;; b` becomes `a; b`.
+- The notification about a plan of several things says "Open it to tick the
+  ones you did." instead of "Did you do it?".
+- Five thoughts that read like posters are now concrete, and **Show the
+  thought** hides the thought and keeps the tip.
+- Delete everything says when the plans file you exported is still there.
+- Spanish and Brazilian Portuguese wording the pilot's native speakers
+  flagged is fixed.
+
+Not changed: **I did it** and **Done** keep their two names, because both can
+be on screen at once. The pilot tool was fixed for four reports that were its
+own: Done on a notification that offers only Open, No as the answer when none
+was given, the reminder at a set time it doesn't simulate, and an export into
+the real Documents folder.
+
+The tests now give every subprocess run an empty task list, so no test can
+reach the real Task Scheduler. New tests: done by number, keeping leftovers,
+the cut at a word, turning off a timed reminder from the text menu, weekends,
+the thought on its own and the notification for several things.
+
 ## 2026-10-03: the window's settings in the text menu, and concrete tips
 
 Version 1.39.0. This round built the queue the fourth pilot left.

@@ -45,13 +45,17 @@ day, only when there is a plan to ask about: "Last time you planned: ... Did
 you do it?". Click **Done** or **Not yet** on it and that's the answer; nothing
 else opens, and Done brings a short thank-you. Skip is there too. For a plan
 of a few things the notification has **Open** instead of Done, so you tick
-the ones you did. Click the notification itself
+the ones you did. In the text screen, `done` on a plan of a few things asks
+which ones, by number. Typing a new plan over today's unfinished things asks
+whether to keep them too. Click the notification itself
 to open the window. With no plan, it stays quiet, unless you choose
 **Options > Reminder settings > Also on days with no plan**. The same menu
 moves the reminder to 8:00, 9:00, 10:00 or 13:00 instead of sign-in, opens
-the window after you answer, and keeps weekends quiet. Days your organization
+the window after you answer, and comes on weekends only if you choose **Also
+on weekends**. Days your organization
 lists as holidays are quiet too. **Options > Greet me by name** puts your
-first name at the top.
+first name at the top, and **What the window shows > Show the thought** hides
+the thought and keeps the tip.
 
 Options also has **This week...** (what you finished since Monday, and last
 week), **My
@@ -63,11 +67,12 @@ factories and shifts in place of the desk ones.
 
 Every on-or-off choice also works from the command line, for example
 `hello.cmd --set numbers on`. The names are `nudge`, `open_after`,
-`no_weekends`, `name`, `no_startup_visits`, `long_history`, `hide_finished`
+`weekends`, `name`, `no_startup_visits`, `long_history`, `hide_finished`
 (no finished list in the text screen), `expire_same` (`same` forgets an
 earlier plan after 30 days), `no_count` (no done count kept), `numbers`,
 `close_after_done` (the text screen closes after `done` and the next plan)
-`colon_prompts` (prompts end in `:` instead of `>`) and `floor_tips`. `--week`,
+`colon_prompts` (prompts end in `:` instead of `>`), `floor_tips`,
+`private_reminder` and `hide_thought`. `--week`,
 `--numbers` and `--export` print or save the same as the window, and
 `--plain-local` prints the greeting in your language. **Options** in the window
 turns the reminder off, hides the thought and tip, turns on the days-in-a-row
@@ -222,7 +227,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.39.0'
+$tag = 'v1.40.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
