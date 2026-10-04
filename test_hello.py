@@ -1,4 +1,5 @@
 import atexit
+import csv
 import json
 import os
 import shutil
@@ -3311,6 +3312,17 @@ def test_the_export_has_a_spreadsheet_copy_and_can_be_deleted():
                                              "2026-10-01;Call Ana;;"]
     assert hello.delete_export() == "Done. The plans file you saved is deleted."
     assert not os.listdir(hello.EXPORT_DIR)
+
+
+def test_formulas_typed_into_a_plan_stay_text_in_the_spreadsheet_copy():
+    first = run(text="=HYPERLINK(\"http://x\"); +1+1; @SUM(A1); -2 hours\n\n")
+    hello = _window_hello(day="2026-10-01", home=first.home)
+    hello.EXPORT_DIR = mkdtemp()
+    hello.list_separator = lambda: ","
+    hello.export_plans(hello.Visit().state)
+    with open(hello.export_file(".csv"), encoding="utf-8-sig", newline="") as f:
+        plans = [row[1] for row in csv.reader(f)][1:]
+    assert plans == ["'=HYPERLINK(\"http://x\")", "'+1+1", "'@SUM(A1)", "'-2 hours"]
 
 
 def test_a_date_written_in_a_plan_becomes_its_due_date():

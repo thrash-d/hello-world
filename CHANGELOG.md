@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-10-04: formulas in a plan stay text in the spreadsheet copy
+
+Version 1.46.1. The persona review of 1.43.0 found, and the code confirmed:
+"Formulas typed into a plan run in the spreadsheet export" (Skye). A plan
+saved as `=HYPERLINK(...)`, `+1+1` or `@SUM(A1)` went into the `.csv` as a
+live formula, and Excel runs it when the file opens; a formula can open a
+link or fetch data. `docs/PERSONAS-2026-10.md` marked it queued, but it never
+reached `TODO.md`, so it was not built until now.
+
+A cell that starts with `=`, `+`, `-`, `@`, a tab or a carriage return now
+starts with an apostrophe in the `.csv`, the usual guard. Excel shows the
+apostrophe in such a cell, so "-2 hours" reads "'-2 hours" there. The `.md`
+copy is unchanged.
+
+Tests: a plan of four formula-like things exports as four text cells.
+
 ## 2026-10-04: shift handoff notes for shared PCs
 
 Version 1.46.0. Denise (nurse manager) and Rick (warehouse supervisor) both
