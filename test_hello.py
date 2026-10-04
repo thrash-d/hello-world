@@ -3324,6 +3324,14 @@ def test_a_date_written_in_a_plan_becomes_its_due_date():
     assert due("email x due tomorrow", monday) == "2026-10-27"
     assert due("Staff schedule Friday", monday) == "2026-10-30"
     assert due("baby shower gifts; 3.5 hours", monday) is None
+    # A date already past, a fraction, or a number months away is no due date.
+    assert due("Pay rent 1/10", monday) is None
+    assert due("Read 2026-09-01 audit", monday) is None
+    assert due("Read chapters 3/4", monday) is None
+    assert due("Finish 1/2 of the report", monday) is None
+    assert due("Fix 24/7 support rota", monday) is None
+    assert due("Pay rent 1/11", monday) == "2026-11-01"
+    assert due("Budget 2027-03-01", monday) == "2027-03-01"
     hello.DATE_ORDER = "mdy"
     assert due("Send it 10/30", monday) == "2026-10-30"
     first = run(text="Inventory report by Friday\n\n", day="2026-10-26")
@@ -3596,3 +3604,8 @@ def test_the_window_shows_handoff_notes():
     assert hello.Window.HANDOFF_LEAVE in texts
     assert hello.leave_handoff("Scanner in 22", keep=True) == "Left for the next shift."
     assert hello.clear_handoff(9) == "Nothing changed."
+
+def test_a_new_plan_is_never_overdue_the_moment_it_is_saved():
+    p = run(text="Pay rent 1/10\n\n\n", day="2026-10-05")
+    assert "It was due" not in p.stdout
+    assert "due" not in notes(p.home)["intent"]
