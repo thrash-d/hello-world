@@ -144,8 +144,8 @@ hello-world saves one small file, `notes.json`, in the `hello-world` folder
 under `AppData\Local` in your own user folder. It holds the date you last
 opened the program (the dates of the last 60 days only if you turned on the
 days-in-a-row message, which needs them), your current plan, an unfinished
-earlier plan, how many times you marked a plan done, and your last seven finished
-plans (words and date). It also holds your settings for the days-in-a-row
+earlier plan, how many times you marked a plan done, and the plans you
+finished in the last 14 days, or 90 with a longer history (words and date). It also holds your settings for the days-in-a-row
 message, the thought and tip, and the window or text screen, your answer to
 the sign-in question, and the date of the last sign-in reminder, so it comes
 once a day at most.
@@ -216,7 +216,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.36.0'
+$tag = 'v1.37.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

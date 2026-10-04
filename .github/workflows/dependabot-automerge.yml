@@ -51,9 +51,27 @@ jobs:
     needs: check
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: write
       pull-requests: write
     steps:
+      # The Windows, installer and signed jobs in tests.yml must pass too, not
+      # only this Linux check.
+      - name: Wait for the tests workflow on this commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          for i in $(seq 1 90); do
+            result=$(gh run list -R "$REPO" -w tests -c "$SHA" --json status,conclusion -q '.[0] | "\(.status) \(.conclusion)"')
+            case "$result" in
+              "completed success") exit 0 ;;
+              completed*) echo "tests finished as: $result"; exit 1 ;;
+            esac
+            sleep 20
+          done
+          echo "tests didn't finish in 30 minutes"; exit 1
       - run: gh pr merge "$PR" --squash
         env:
           PR: ${{ github.event.pull_request.html_url }}

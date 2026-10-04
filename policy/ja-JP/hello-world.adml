@@ -73,6 +73,13 @@
       <string id="FeedbackAddress_Help">有効にすると、ウィンドウの [オプション] メニューに「フィードバックを送る...」が表示され、ユーザー自身のメール プログラムでこのアドレス宛ての新しいメールを開きます。hello-world 自体は何も送信しません。
 
 無効または未構成の場合、フィードバックの項目は表示されません。</string>
+      <string id="SUPPORTED_1_37">hello-world 1.37.0 以降</string>
+      <string id="FloorTips">現場・シフト勤務向けのヒントを表示する</string>
+      <string id="FloorTips_Help">このポリシー設定を有効にすると、hello-world はデスク向けのヒントの代わりに、倉庫、工場、シフト勤務向けに書かれた 2 つ目のヒント一覧を全員に表示します。ユーザーが元に戻すことはできません。
+
+このポリシー設定を無効にした場合、または構成しなかった場合は、各ユーザーが [オプション] &gt; [ウィンドウに表示する内容] で選択します。
+
+組織のコンテンツ ファイルを使用すると、両方の一覧がそのファイルの内容に置き換わります。</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">

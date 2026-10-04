@@ -210,6 +210,7 @@ settings are under Computer or User Configuration > Administrative Templates
 | Keep at most this many backups of a damaged file | `MaxBackups` (DWORD 1 to 100) | Deletes the oldest backups beyond that number before making a new one |
 | Leave a damaged file alone when nobody is at the screen | `LeaveDamagedFile` | A run with nobody at the keyboard leaves a damaged file in place for the next visit |
 | Address for feedback | `FeedbackAddress` (string) | Adds Options > Send feedback..., which opens a new mail to that address in the person's own mail program |
+| Show the tips for floor and shift work | `FloorTips` | The second tip list, for warehouses, factories and shifts, for everyone |
 | Turn on the sign-in reminder for everyone | `TurnOnReminder` | Turns the reminder on at each person's next open unless they already answered the question; each person can still turn it off |
 | Open hello-world as a text screen | `UseTextScreen` | The Start menu opens the text screen in a console, as before 1.28.0, and the sign-in launcher opens it instead of showing a notification |
 
@@ -271,7 +272,8 @@ organization's certificate.
   Allow that exact value in persistence detections. It starts the
   admin-only install, and Windows skips it once the program is removed.
 - When an employee picks a reminder time instead of sign-in, a scheduled task
-  named `hello-world reminder` in their own task folder, running the same
+  named `hello-world reminder <DOMAIN>-<user>` in the task folder every user
+  shares, one per person, running the same
   `pythonw.exe -I hello.py --startup` daily at 8:00, 9:00, 10:00 or 13:00,
   or at the next sign-in when the PC was off then. It needs no
   administrator, and picking sign-in or turning the reminder off removes it.
@@ -309,8 +311,9 @@ organization's certificate.
 ## Data handling
 
 Each user's `notes.json` holds the date they last opened the program, their
-current plan, one unfinished earlier plan, a count of plans marked done, their
-last seven finished plans with dates, four settings, and the date of the last
+current plan, one unfinished earlier plan, a count of plans marked done, the
+plans they finished in the last 14 days with dates (90 with a longer
+history), four settings, and the date of the last
 sign-in reminder. Only someone who turns on the days-in-a-row message keeps
 the dates of the last 60 days, which the message counts.
 The `DisablePlans` and `HideDaysInARow` policies cut that to the latest visit

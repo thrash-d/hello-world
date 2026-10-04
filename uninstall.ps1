@@ -38,6 +38,7 @@ if (-not [Environment]::Is64BitProcess) {
     }
     $argList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $PSCommandPath)
     if ($Quiet) { $argList += '-Quiet' }
+    if ($RemoveNotes) { $argList += '-RemoveNotes' }
     & $native @argList
     exit $LASTEXITCODE
 }
@@ -117,17 +118,21 @@ function Remove-UserNotes([string]$ProfileDir) {
 # --startup. A value of that name pointing anywhere else is left alone.
 function Remove-UserReminders {
     foreach ($sid in @(Get-ChildItem 'Registry::HKEY_USERS' -ErrorAction SilentlyContinue |
-            Where-Object { $_.PSChildName -match '^S-1-5-21-[\d-]+$' } | ForEach-Object PSChildName)) {
+            Where-Object { $_.PSChildName -match '^S-1-(5-21|12-1)-[\d-]+$' } | ForEach-Object PSChildName)) {
         $run = "Registry::HKEY_USERS\$sid\Software\Microsoft\Windows\CurrentVersion\Run"
         $value = (Get-ItemProperty -LiteralPath $run -Name 'hello-world' -ErrorAction SilentlyContinue).'hello-world'
-        if ($value -and $value -match 'hello\.(py|cmd)"? --startup$') {
+        # Only this install's: a per-user install keeps its own.
+        if ($value -and $value -match 'hello\.(py|cmd)"? --startup$' -and $value -like "*$dir\*") {
             Remove-ItemProperty -LiteralPath $run -Name 'hello-world' -ErrorAction SilentlyContinue
         }
     }
     $schtasks = Join-Path $sys32 'schtasks.exe'
-    $names = @(& $schtasks /Query /FO CSV /NH 2>$null | ForEach-Object { ($_ -split '","')[0].Trim('"') } |
-        Where-Object { $_ -like '\hello-world reminder*' } | Sort-Object -Unique)
-    foreach ($name in $names) { & $schtasks /Delete /F /TN $name 2>$null | Out-Null }
+    # Through cmd: Windows PowerShell 5.1 stops on any stderr from a native
+    # command, and one bad task must not leave the rest.
+    $cmd = Join-Path $sys32 'cmd.exe'
+    $names = @(& $cmd /d /c "`"$schtasks`" /Query /FO CSV /NH /V 2>nul" | ConvertFrom-Csv -Header @(1..30) |
+        Where-Object { $_.'2' -like '\hello-world reminder*' -and $_.'9' -like "*$dir\*" } | ForEach-Object { $_.'2' } | Sort-Object -Unique)
+    foreach ($name in $names) { & $cmd /d /c "`"$schtasks`" /Delete /F /TN `"$name`" >nul 2>&1" }
 }
 
 $ps = Join-Path $sys32 'WindowsPowerShell\v1.0\powershell.exe'

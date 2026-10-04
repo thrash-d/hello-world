@@ -73,6 +73,13 @@ Wenn diese Einstellung deaktiviert oder nicht konfiguriert ist, bleiben alle Sic
       <string id="FeedbackAddress_Help">Wenn diese Einstellung aktiviert ist, hat das Menü Optionen im Fenster „Rückmeldung senden...“, das eine neue E-Mail an diese Adresse im E-Mail-Programm der Person öffnet. hello-world selbst sendet nichts.
 
 Wenn diese Einstellung deaktiviert oder nicht konfiguriert ist, gibt es keinen Eintrag für Rückmeldungen.</string>
+      <string id="SUPPORTED_1_37">hello-world 1.37.0 oder höher</string>
+      <string id="FloorTips">Tipps für Produktion und Schichtarbeit anzeigen</string>
+      <string id="FloorTips_Help">Wenn Sie diese Einstellung aktivieren, zeigt hello-world für alle statt der Bürotipps die zweite Tippliste an, die für Lagerhallen, Fabriken und Schichtarbeit geschrieben ist. Niemand kann zu den Bürotipps zurückwechseln.
+
+Wenn Sie diese Einstellung deaktivieren oder nicht konfigurieren, wählt jede Person selbst unter Optionen &gt; Was das Fenster zeigt.
+
+Eine Inhaltsdatei der Organisation ersetzt beide Listen.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">

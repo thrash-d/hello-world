@@ -1,5 +1,36 @@
 # Changelog
 
+## 2026-10-03: a review, a third pilot, and everything they found
+
+Version 1.37.0. With the queue empty, round 62 reviewed 1.36.0: one code and security reviewer, and the five simulated employees again, fresh, on the new features. The pilot ratings were Dana 3, Rafael 3, Mónica 4, Tom 5 and Priya 6, down from the last round, and the reasons were records they couldn't trust and a menu that had grown to sixteen items.
+
+From the code review:
+- `uninstall.ps1` dropped `-RemoveNotes` when it restarted itself in 64-bit PowerShell, which is how Intune runs it, so nobody's notes were deleted while the result said they were. It is passed on now.
+- A notification's Done answered whatever plan was current, so an old notification in Action Center, or a `hello-world:done` link from anywhere, could finish a plan it never asked about. Each answer link now carries the plan's date and a digest of its words, and anything else is refused.
+- `LeaveDamagedFile` and `DisableSignInLauncher` weren't honoured at sign-in, which is where they matter: a damaged file was set aside with nobody there, and a reminder at a set time kept coming under the policy. Both are honoured, and the policy removes the timed task too.
+- When the notification can't be shown, the window opens in a process of its own, outside the scheduled task's five-minute limit.
+- `uninstall-user.ps1` removed the Apps entry before it knew the folder could go; it renames the folder aside first now, so an open window leaves everything as it was.
+- The uninstaller found no Entra ID users' sign-in values, and one schtasks error could stop it removing the rest; both fixed, and it removes only what points at the install it removes, so a per-user install keeps its own.
+- A translation file that didn't fit could stop the program at start; it is skipped now, as the 1.36.0 notes said.
+- Reminder tasks carry the domain as well as the user name, `export_plans` uses the real Documents folder, a release by hand runs only from main, and Dependabot merges wait for the Windows and installer tests too.
+
+From the pilot:
+- "With none ticked, Done means all of them" finished plans people hadn't done. Done with nothing ticked asks first now, and **I did it** asks about each thing in a plan of several.
+- "This week" held only the last seven finished things, which a few multi-part plans fill in two days. Finished plans are kept for 14 days now, or 90 with a longer history, so the week is always whole.
+- With the days-in-a-row message off, the summary said "Days you opened it: 1" after a week of visits; it says "Last opened" now, since that is all that is kept.
+- A plan answered the next morning counts on its own day again, which four of the five expected.
+- Forgetting a finished plan takes its done back, and the window can forget one too, under My plans.
+- Options has eight items, with the rest in What the window shows, My plans, My saved notes and Language. Turning something on that changes the window redraws it at once: the thought and tip, the floor tips, the greeting and the language. Each says what changed rather than "Saved.".
+- Picking a language mid-session changed the window one choice late; the language is now read once per window and the window redraws.
+- My numbers asks to start when it is off, counts today from that moment, and says nothing about `--set`.
+- The window asks "What do you want to get done today?", which fits a list, under the `;` hint.
+- **Leave my plan out of the reminder**, for shared PCs, and a `FloorTips` policy that sets the floor and shift tips for a whole site.
+- Close asks to save only text that could be saved.
+
+The pilot tool had two faults of its own: its clicks never ticked a tick box, so every partial answer looked like "all of them", and it created a real reminder task and registry links on the PC it ran on. Both are fixed, and the task and keys were removed.
+
+Every new string is translated into the ten other languages by three agents. Tests: the link key, a stale link refused, the policies at sign-in, a broken translation file skipped, the language read once, two weeks of finished plans, finishing some parts of today's plan, forgetting from the window, numbers counting today, "Last opened", and the FloorTips policy. 256 run here on Windows: 254 pass and 2 are POSIX-only.
+
 ## 2026-10-03: translations in their own files, and the queue emptied
 
 Version 1.36.0. Builds the last items in `TODO.md`.

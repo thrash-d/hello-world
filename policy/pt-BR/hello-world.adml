@@ -73,6 +73,13 @@ Se desabilitada ou não configurada, todas as cópias ficam até a pessoa apagar
       <string id="FeedbackAddress_Help">Se habilitada, o menu Opções da janela tem "Enviar comentários...", que abre um novo e-mail para este endereço no programa de e-mail da pessoa. O hello-world não envia nada.
 
 Se desabilitada ou não configurada, não há opção de comentários.</string>
+      <string id="SUPPORTED_1_37">hello-world 1.37.0 ou posterior</string>
+      <string id="FloorTips">Mostrar as dicas para chão de fábrica e trabalho em turnos</string>
+      <string id="FloorTips_Help">Se você habilitar esta configuração, o hello-world mostra sua segunda lista de dicas, escrita para armazéns, fábricas e trabalho em turnos, no lugar das dicas de escritório, para todas as pessoas. Ninguém pode voltar às dicas de escritório.
+
+Se você desabilitar ou não definir esta configuração, cada pessoa escolhe em Opções &gt; O que a janela mostra.
+
+Um arquivo de conteúdo da organização substitui as duas listas.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">

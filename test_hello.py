@@ -922,14 +922,15 @@ def test_finished_plans_are_listed_after_done_and_kept_to_seven():
     mod = _load_hello()
     state = mod.new_state()
     import datetime
-    for i in range(10):
+    for i in range(60):
         mod.finish_plan(state, f"Plan {i}", datetime.date(2026, 10, 1))
-    assert len(state["finished"]) == 7 and state["finished"][-1]["text"] == "Plan 9"
+    assert len(state["finished"]) == mod.MAX_FINISHED
+    assert state["finished"][-1]["text"] == "Plan 59"
 
 
 def test_finished_plans_come_back_after_a_gap_and_in_the_summary():
     first = run(text="A\ndone\nB\ndone\n\n")
-    p = run(text="\n\n", home=first.home, day="2026-10-20")
+    p = run(text="\n\n", home=first.home, day="2026-10-12")
     assert "Welcome back" in p.stdout and "Finished lately" in p.stdout
     assert "Finished lately" in run(["--stats"], home=first.home).stdout
 
@@ -1112,7 +1113,7 @@ def test_one_finished_plan_can_be_forgotten():
     assert "Forgotten: B" in p.stdout
     saved = notes(first.home)
     assert [i["text"] for i in saved["finished"]] == ["A"]
-    assert "previous" not in saved and saved["done"] == 2
+    assert "previous" not in saved and saved["done"] == 1
 
 
 
@@ -2240,7 +2241,7 @@ def test_the_window_asks_about_yesterdays_plan_and_answers_like_the_text_screen(
         assert visit.followup is None, choice
         if choice == "yes":
             assert saved["done"] == 1 and saved["intent"] is None
-            assert saved["finished"][0]["date"] == "2026-10-02"
+            assert saved["finished"][0]["date"] == "2026-10-01"
             assert message in hello.DONE_LINES
         elif choice == "no":
             assert saved["intent"] == {"text": "Write the report",
@@ -2322,8 +2323,9 @@ def test_the_sign_in_reminder_asks_about_a_plan_once_a_day():
     toast = ET.fromstring(hello.SHOWN[0])
     texts = [t.text for t in toast.iter("text")]
     assert texts == ["Last time you planned: Report & slides", "Did you do it?"]
+    key = hello.plan_key("Report & slides", "2026-10-01")
     assert [a.get("arguments") for a in toast.iter("action")] == [
-        "hello-world:done", "hello-world:notyet", "hello-world:skip"]
+        f"hello-world:{w}/{key}" for w in ("done", "notyet", "skip")]
     assert [a.get("content") for a in toast.iter("action")] == [
         "Done", "Not yet", "Skip"]
     assert notes(first.home)["notified"] == "2026-10-02"
@@ -2341,17 +2343,21 @@ def test_the_sign_in_reminder_asks_about_a_plan_once_a_day():
 
 
 def test_the_reminder_answers_with_no_window_and_refuses_other_links():
-    for link, check in (("hello-world:done", lambda s: s["done"] == 1),
-                        ("HELLO-WORLD:notyet/", lambda s: s["intent"]["date"] == "2026-10-02")):
+    key = _load_hello().plan_key("Write the report", "2026-10-01")
+    for link, check in ((f"hello-world:done/{key}", lambda s: s["done"] == 1),
+                        (f"HELLO-WORLD:notyet/{key}/", lambda s: s["intent"]["date"] == "2026-10-02")):
         first = run(text="Write the report\n\n")
         p = run(["--answer", link], day="2026-10-02", home=first.home)
         saved = notes(first.home)
         assert p.returncode == 0 and check(saved), link
         assert saved["visits"] == ["2026-10-01"], link
     first = run(text="Write the report\n\n")
-    for link in ("hello-world:delete", "other:done", "hello-world"):
+    # No key, or another plan's key, as from an old notification or a web page.
+    other = _load_hello().plan_key("Another plan", "2026-10-01")
+    for link in ("hello-world:delete", "other:done", "hello-world", "hello-world:done",
+                 f"hello-world:done/{other}"):
         p = run(["--answer", link], day="2026-10-02", home=first.home)
-        assert p.returncode == 2, link
+        assert p.returncode in (0, 2) and "done" not in notes(first.home), link
     assert notes(first.home)["intent"]["date"] == "2026-10-01"
 
 
@@ -2449,13 +2455,14 @@ def test_done_on_the_reminder_says_thank_you():
     first = run(text="Write the report\n\n")
     hello = _window_hello(home=first.home)
     hello.SHOWN = []
-    assert hello.answer_reminder("hello-world:done") == 0
+    key = hello.plan_key("Write the report", "2026-10-01")
+    assert hello.answer_reminder(f"hello-world:done/{key}") == 0
     assert len(hello.SHOWN) == 1 and "<actions>" not in hello.SHOWN[0]
     assert any(line in hello.SHOWN[0] for line in hello.DONE_LINES)
     first = run(text="Write the report\n\n")
     hello = _window_hello(home=first.home)
     hello.SHOWN = []
-    hello.answer_reminder("hello-world:notyet")
+    hello.answer_reminder(f"hello-world:notyet/{key}")
     assert hello.SHOWN == []
 
 
@@ -2504,7 +2511,8 @@ def test_the_window_ticks_some_things_done_and_keeps_the_rest():
 
 def test_skip_on_the_reminder_counts_a_skip():
     first = run(text="Write the report\n\n")
-    p = run(["--answer", "hello-world:skip"], day="2026-10-02", home=first.home)
+    key = _load_hello().plan_key("Write the report", "2026-10-01")
+    p = run(["--answer", f"hello-world:skip/{key}"], day="2026-10-02", home=first.home)
     assert p.returncode == 0 and notes(first.home)["intent"]["skips"] == 1
 
 
@@ -2625,7 +2633,7 @@ def test_open_after_answering_and_greeting_by_name():
     hello.show_window = lambda: opened.append(1) or 0
     hello.SHOWN = []
     hello.TODAY = "2026-10-03"
-    hello.answer_reminder("hello-world:done")
+    hello.answer_reminder("hello-world:done/" + hello.plan_key("Write the report", "2026-10-01"))
     assert opened == [1] and hello.SHOWN == []
     hello.first_name = lambda: "Ana"
     assert hello.greeting(notes(first.home)) == "Hello, Ana!"
@@ -2882,3 +2890,107 @@ def test_the_startup_folder_comes_from_the_known_folder_api():
     hello.STARTUP_DIR = None
     path = hello.legacy_launcher()
     assert path and path.endswith(os.path.join("Startup", "hello-world-daily.cmd"))
+
+
+def test_a_reminder_shared_screen_leaves_the_plan_out():
+    import xml.etree.ElementTree as ET
+    hello = _load_hello()
+    hello.SHOWN = []
+    hello.show_reminder("Secret plan", "2026-10-01", private=True)
+    texts = [t.text for t in ET.fromstring(hello.SHOWN[0]).iter("text")]
+    assert texts == ["Did you do it?"]
+
+
+def test_the_sign_in_run_honours_the_launcher_and_damaged_file_policies():
+    first = run(text="Write the report\n\n")
+    hello = _window_hello(home=first.home)
+    hello.SHOWN, hello.TASKS = [], ["09:00"]
+    hello.POLICY = {"DisableSignInLauncher": 1}
+    hello.sign_in()
+    assert hello.SHOWN == [] and hello.TASKS[-1] is None
+    with open(os.path.join(first.home, "notes.json"), "w") as f:
+        f.write("damaged")
+    hello.POLICY = {"LeaveDamagedFile": 1}
+    hello.sign_in()
+    hello.answer_reminder("hello-world:done/x")
+    assert os.listdir(first.home) == ["notes.json"] or "notes.lock" in os.listdir(first.home)
+    assert not any(n.endswith(".bak") for n in os.listdir(first.home))
+
+
+def test_a_broken_translation_file_never_stops_the_program():
+    import shutil
+    hello = _load_hello()
+    folder = mkdtemp()
+    shutil.copy(os.path.join(os.path.dirname(HELLO), "hello.fr.json"), folder)
+    bad = {"hello.es.json": {"text": {"a": "b"}, "days": [1]},
+           "hello.fr-CA.json": {"base": "fr", "text": {}, "tips": [1, 2]},
+           "hello.pt-PT.json": {"base": ["fr"], "text": {}},
+           "hello.de.json": {"text": {"a": 5}}}
+    for name, data in bad.items():
+        with open(os.path.join(folder, name), "w") as f:
+            json.dump(data, f)
+    hello.load_languages(folder)
+    assert sorted(hello.LANGUAGES) == ["fr"]
+
+
+def test_a_language_chosen_now_shows_from_the_next_open():
+    hello = _window_hello()
+    visit = hello.Visit()
+    assert hello.language() == "en"
+    assert hello.set_language(visit.state, visit.can_save, "ar")
+    assert hello.language() == "en"
+    assert hello.set_language(visit.state, visit.can_save, None)
+    assert hello.language() == "en"
+
+
+def test_finished_plans_older_than_two_weeks_go():
+    home = mkdtemp()
+    with open(os.path.join(home, "notes.json"), "w") as f:
+        json.dump({"visits": [], "finished": [{"text": "old", "date": "2026-09-01"},
+                                               {"text": "new", "date": "2026-09-28"}]}, f)
+    hello = _load_hello()
+    hello.HOME = home
+    assert [i["text"] for i in hello.load()[0]["finished"]] == ["new"]
+
+
+def test_some_parts_of_todays_plan_can_be_finished_from_the_window():
+    first = run(text="Call Ana; send the report; book travel\n\n")
+    hello = _window_hello(home=first.home, day="2026-10-01")
+    visit = hello.Visit()
+    message = visit.finish_parts([0, 2])
+    assert message.endswith("The rest is kept for today.")
+    saved = notes(first.home)
+    assert [i["text"] for i in saved["finished"]] == ["Call Ana", "book travel"]
+    assert saved["intent"]["text"] == "send the report"
+
+
+def test_a_finished_plan_can_be_forgotten_from_the_window():
+    first = run(text="Call Ana\ndone\n\n")
+    hello = _window_hello(home=first.home, day="2026-10-01")
+    visit = hello.Visit()
+    item = notes(first.home)["finished"][0]
+    assert visit.forget(item) == "Forgotten: Call Ana"
+    saved = notes(first.home)
+    assert "finished" not in saved and saved.get("done", 0) == 0
+    assert "already forgotten" in visit.forget(item)
+
+
+def test_numbers_count_today_from_the_moment_they_are_on():
+    hello = _window_hello()
+    visit = hello.Visit()
+    assert visit.toggle("numbers")
+    assert "Days you opened hello-world: 1" in hello.numbers_text(visit.state)
+    assert hello.numbers_text(hello.new_state()) == "My numbers are off."
+
+
+def test_the_summary_says_the_last_day_when_only_that_is_kept():
+    first = run(text="\n\n")
+    p = run(["--stats"], home=first.home, day="2026-10-03")
+    assert "Last opened: Thursday, 1 October 2026" in p.stdout
+    assert "Days you opened it" not in p.stdout
+
+
+def test_the_floor_tips_policy_sets_them_for_everyone():
+    hello = _load_hello()
+    hello.POLICY = {"FloorTips": 1}
+    assert hello.built_in_lists()[1] == hello.TIPS_FLOOR
