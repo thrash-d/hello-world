@@ -91,6 +91,27 @@ and then locked, a file locked to another account is set aside, and the
 welcome changes with the lock. A Windows-only test locks and unlocks with
 the real Data Protection API and checks the policy. 285 pass on Linux.
 
+## 2026-10-04: dates in a plan that aren't due dates
+
+Version 1.43.1. A review of 1.43.0 typed everyday plans and read the due date
+each one got.
+
+- A date already past made a new plan overdue the moment it was saved. "Pay
+  rent 1/10" typed on 5 October said "It was due Thursday, 1 October 2026."
+  at once, and the next day opened with it. `typed_due()` kept dates up to
+  180 days back, though its docstring said on or after today. Only today or
+  later counts now, with or without a year.
+- Fractions and numbers became due dates months away: "Read chapters 3/4"
+  was due 3 April 2027, "Finish 1/2 of the report" 1 February, and "Fix 24/7
+  support rota" 24 July, which is past. `1/2`, `1/3`, `2/3`, `1/4`, `3/4`,
+  `24/7` and `50/50` are never dates, and a date without a year counts only
+  within about three months (`MAX_GUESSED_DAYS`). A date with its year,
+  such as `2027-03-01`, still counts however far ahead it is.
+
+Left as the code's own note says: a weekday's name anywhere counts, so
+"Review last Friday's numbers" is due this Friday and "Call Dr. Monday" is
+due today. The screen shows the date and No due date removes it.
+
 ## 2026-10-04: dates written in a plan, and nothing dropped without asking
 
 Version 1.43.0. The seventh pilot and a review of rounds 66 and 67.
