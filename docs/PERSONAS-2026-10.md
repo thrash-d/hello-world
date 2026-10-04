@@ -52,7 +52,7 @@ day by day; these personas read a transcript instead.
 | Missing a weekend breaks the days-in-a-row count (Sam) | `in_a_row()` counts any visit within 4 days of the last | Wrong. And the message is off by default since 1.29.0 |
 | Three mornings a week never counts as "in a row" (Harold) | Same function; Mon, Wed, Fri are each within 4 days | Wrong |
 | A shared PC shows other people's plans (Denise, Rick) | Notes live under each Windows login's `LOCALAPPDATA` | Only true where staff share one Windows login, which is common on hospital carts and warehouse terminals. Kept as a real issue for that case |
-| Formulas typed into a plan run in the spreadsheet export (Skye) | Saved `=HYPERLINK(...)`, `+1+1`, `@SUM(A1)` as a plan and exported | **True.** The `.csv` holds them as live formulas. Queued |
+| Formulas typed into a plan run in the spreadsheet export (Skye) | Saved `=HYPERLINK(...)`, `+1+1`, `@SUM(A1)` as a plan and exported | **True.** The `.csv` holds them as live formulas. Fixed in 1.46.1 |
 | `31/02` or several dates in one plan (Skye) | `typed_due()` | `31/02` is ignored; several dates take the earliest without saying so. Noted |
 | `;;;;` makes empty things (Skye) | Typed it | Refused: "A plan needs a word or two" |
 
@@ -121,7 +121,7 @@ the pull request named.
 | Personas, 1.43.0 | Gentle mode, a static support link | Sam | Queued |
 | Personas, 1.43.0 | Desk pet, plan graveyard, boss fight | Jaylen, Skye | Queued |
 | Personas, 1.43.0 | Command line, todo.txt, standup | Priyanka | Queued |
-| Personas, 1.43.0 | Formulas run in the spreadsheet export | Skye, confirmed in code | Queued |
+| Personas, 1.43.0 | Formulas run in the spreadsheet export | Skye, confirmed in code | Fixed in 1.46.1 |
 | Personas, 1.43.0 | Forklift horns, bakery orders, badge login, a supply locator, an email "lie detector" | Rick, Harold, Denise | Not buildable here: they need hardware or outside services |
 
 Of 7 claims checked against the code, 2 were wrong, 1 was true only for

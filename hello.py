@@ -507,7 +507,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.46.0"
+VERSION = "1.46.1"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -2926,6 +2926,12 @@ def list_separator():
     return ","
 
 
+def as_text(cell):
+    """A cell a spreadsheet shows as typed: Excel runs one that starts with
+    = + - or @ as a formula, which can open links or fetch data."""
+    return "'" + cell if cell[:1] in ("=", "+", "-", "@", "\t", "\r") else cell
+
+
 def export_plans(state):
     """Write the current and finished plans to a Markdown file in the
     person's Documents folder, and the same as a .csv for spreadsheets.
@@ -2950,10 +2956,10 @@ def export_plans(state):
             rows = csv.writer(f, delimiter=list_separator())
             rows.writerow([tr("Date"), tr("Plan"), tr("Due"), tr("Finished")])
             if state["intent"]:
-                rows.writerows([state["intent"]["date"], part,
+                rows.writerows([state["intent"]["date"], as_text(part),
                                 state["intent"].get("due", ""), ""]
                                for part in plan_parts(state["intent"]["text"]))
-            rows.writerows([i["date"], i["text"], "", tr("yes")]
+            rows.writerows([i["date"], as_text(i["text"]), "", tr("yes")]
                            for i in newest_first(state.get("finished", [])))
     except OSError:
         # The .md was saved; a .csv open in Excel stays as it was.
