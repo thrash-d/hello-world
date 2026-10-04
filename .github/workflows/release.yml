@@ -42,6 +42,11 @@ jobs:
           $existing = @(gh release list -R $env:REPO --limit 200 --json tagName -q '.[].tagName')
           if ($LASTEXITCODE) { throw "gh release list failed with exit $LASTEXITCODE" }
           if ($existing -contains $tag) { Write-Host "$tag already has a release."; exit 0 }
+          # gh release create reuses an existing tag wherever it points, so a
+          # package from this commit would go out under another commit's tag.
+          $tagged = & cmd /d /c "gh api repos/$env:REPO/commits/$tag --jq .sha 2>nul"
+          if ($LASTEXITCODE) { $tagged = $null }
+          if ($tagged -and $tagged -ne $env:SHA) { throw "$tag points at $tagged, not $env:SHA. Bump VERSION for this commit." }
           $out = Join-Path $env:RUNNER_TEMP "hello-world-$version"
           $hash = (powershell -NoProfile -ExecutionPolicy Bypass -File tools\build-package.ps1 -OutDir $out | Select-Object -Last 1).Trim()
           if ($hash -notmatch '^[0-9a-f]{64}$') { throw "The build printed no package hash: $hash" }

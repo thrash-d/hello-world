@@ -1,7 +1,7 @@
 {
  "base": "fr",
  "text": {
-  "Words you can type at the last prompt:\n  done  marks today's plan finished, then asks for the next one\n  plan  sets or changes today's plan\n  menu  opens these options\n  q     closes the window, and so does Enter\nAt a plan prompt, same brings back your earlier unfinished plan.\nWhen it asks \"Did you do it?\", n means not yet, and you can keep the\nplan for today. q closes from any question.\nIn this menu, 1 shows what is saved, 7 forgets one finished plan,\nand 8 hides the thought and tip.\nType m to hear the options again. Nothing is sent anywhere.": "Mots à taper à la dernière question :\n  fait  marque le plan du jour comme terminé, puis demande le suivant\n  plan  définit ou modifie le plan du jour\n  menu  ouvre ces options\n  q     ferme la fenêtre, tout comme Entrée\nÀ une question de plan, reprendre ramène le plan antérieur non terminé.\nÀ la question « L'avez-vous fait? », n veut dire pas encore, et\nvous pouvez garder le plan pour aujourd'hui. q ferme depuis n'importe\nquelle question.\nDans ce menu, 1 montre ce qui est enregistré, 7 oublie un plan terminé\net 8 masque la pensée et l'astuce.\nTapez m pour revoir les options. Rien n'est envoyé nulle part.",
+  "Words you can type at the last prompt:\n  done  marks today's plan finished, then asks for the next one\n  plan  sets or changes today's plan\n  menu  opens these options\n  q     closes the window, and so does Enter\nAt a plan prompt, same brings back your earlier unfinished plan.\nWhen it asks \"Did you do it?\", n means not yet, and you can keep the\nplan for today. q closes from any question.\nIn this menu, 1 shows what is saved, 7 forgets one finished plan,\nand 8 hides the thought and tip.\nType m to see the options again. Nothing is sent anywhere.": "Mots à taper à la dernière question :\n  fait  marque le plan du jour comme terminé, puis demande le suivant\n  plan  définit ou modifie le plan du jour\n  menu  ouvre ces options\n  q     ferme la fenêtre, tout comme Entrée\nÀ une question de plan, reprendre ramène le plan antérieur non terminé.\nÀ la question « L'avez-vous fait? », n veut dire pas encore, et\nvous pouvez garder le plan pour aujourd'hui. q ferme depuis n'importe\nquelle question.\nDans ce menu, 1 montre ce qui est enregistré, 7 oublie un plan terminé\net 8 masque la pensée et l'astuce.\nTapez m pour revoir les options. Rien n'est envoyé nulle part.",
   "Hello, world!": "Bonjour, le monde!",
   "Delete all saved notes, dates and plans on this computer? (y or n, Enter to cancel) > ": "Supprimer toutes les notes, dates et plans enregistrés sur cet ordinateur? (o ou n, Entrée pour annuler) > ",
   "Also forget it as the earlier plan for same? (y or n, Enter to keep it for same) > ": "L'oublier aussi comme plan à reprendre? (o ou n, Entrée pour le garder) > ",
@@ -20,7 +20,11 @@
   "Hello, {name}!": "Bonjour, {name}!",
   "One thing to get done today? Open hello-world to plan it.": "Une chose à faire aujourd'hui? Ouvrez hello-world pour la planifier.",
   "Not on weekends": "Pas la fin de semaine",
-  "Tips for floor and shift work": "Astuces pour l'usine et le travail par quarts"
+  "Tips for floor and shift work": "Astuces pour l'usine et le travail par quarts",
+  "A run goes on over a gap of up to three days, such as a weekend.": "Une suite de jours continue malgré une pause de trois jours au plus, comme une fin de semaine.",
+  "Done. The reminder comes on weekends too.": "C'est fait. Le rappel s'affiche aussi la fin de semaine.",
+  "Forget the earlier plan? {text}": "Oublier le plan antérieur? {text}",
+  "Keep your plan from {date} for today too?": "Garder aussi pour aujourd'hui votre plan du {date}?"
  },
  "thoughts": {
   "13": "Une matinée sans entrain ne décide pas de l'après-midi. Vous pouvez recommencer après le dîner.",

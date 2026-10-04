@@ -29,19 +29,23 @@ A few things for one day go in the same box with `;` between them, such as
 Enter again closes it.
 The next day the window asks "Did you do it?" with three buttons: **Done**,
 **Not yet** (keeps the plan for today) and **Skip** (asks again next time).
-For a plan of a few things, tick the ones you did before clicking Done, and
-the rest are kept for today. The text screen asks the same with numbers:
-`1 3` means the first and third are done.
-When today's plan is finished, click **I did it**; if you changed the words in
-the box first, the new words are what's marked done. To drop a plan, empty
-the box and click **Save**. Typing a new plan instead of answering keeps the
-old one for `same`.
+For a plan of a few things, up to ten, tick the ones you did before clicking
+Done, and the rest are kept for today. The text screen asks the same with
+numbers: `1 3` means the first and third are done.
+When today's plan is finished, click **I did it**. A plan of a few things has
+a tick box for each under the plan box: tick what you finished, then click
+**I did it**. If you changed the words in the box first, the new words are
+what's marked done. To drop a plan, empty the box and click **Save**. Typing a
+new plan instead of answering asks whether to keep the old one for today too.
+A plan can be up to 400 characters.
 
 After your first plan it asks once whether you want a reminder when you sign
 in. With it on, a Windows notification appears at your first sign-in of the
 day, only when there is a plan to ask about: "Last time you planned: ... Did
 you do it?". Click **Done** or **Not yet** on it and that's the answer; nothing
-else opens, and Done brings a short thank-you. Skip is there too. Click the notification itself
+else opens, and Done brings a short thank-you. Skip is there too. For a plan
+of a few things the notification has **Open** instead of Done, so you tick
+the ones you did. Click the notification itself
 to open the window. With no plan, it stays quiet, unless you choose
 **Options > Reminder settings > Also on days with no plan**. The same menu
 moves the reminder to 8:00, 9:00, 10:00 or 13:00 instead of sign-in, opens
@@ -49,10 +53,11 @@ the window after you answer, and keeps weekends quiet. Days your organization
 lists as holidays are quiet too. **Options > Greet me by name** puts your
 first name at the top.
 
-Options also has **This week...** (what you finished since Monday), **My
+Options also has **This week...** (what you finished since Monday, and last
+week), **My
 numbers...** (days opened, your longest run and plans finished, once you turn
 on **Keep my numbers**), **Save my plans to a file** (a Markdown file in
-Documents), **Keep a longer history** (60 finished plans instead of 7), and
+Documents), **Keep a longer history** (finished plans kept for 90 days instead of 14), and
 **Tips for floor and shift work**, a second list of 40 tips for warehouses,
 factories and shifts in place of the desk ones.
 
@@ -216,7 +221,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.37.0'
+$tag = 'v1.38.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

@@ -63,12 +63,16 @@ jobs:
           REPO: ${{ github.repository }}
           SHA: ${{ github.event.pull_request.head.sha }}
         run: |
+          # The push and the pull request each start a tests run on this
+          # commit, and both must pass.
           for i in $(seq 1 90); do
-            result=$(gh run list -R "$REPO" -w tests -c "$SHA" --json status,conclusion -q '.[0] | "\(.status) \(.conclusion)"')
-            case "$result" in
-              "completed success") exit 0 ;;
-              completed*) echo "tests finished as: $result"; exit 1 ;;
-            esac
+            results=$(gh run list -R "$REPO" -w tests -c "$SHA" --json status,conclusion -q '.[] | "\(.status) \(.conclusion)"')
+            if echo "$results" | grep '^completed' | grep -qv ' success$'; then
+              echo "tests finished as: $results"; exit 1
+            fi
+            if [ -n "$results" ] && ! echo "$results" | grep -qv '^completed success$'; then
+              exit 0
+            fi
             sleep 20
           done
           echo "tests didn't finish in 30 minutes"; exit 1
