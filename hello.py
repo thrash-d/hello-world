@@ -506,7 +506,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.43.0"
+VERSION = "1.43.1"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -2485,6 +2485,11 @@ def kept_note(kept, text):
     return note if note[-1] in ".!?。" else note + "."
 
 
+# Written like dates, but not meant as one.
+NOT_DATES = {"1/2", "1/3", "2/3", "1/4", "3/4", "24/7", "50/50"}
+MAX_GUESSED_DAYS = 92
+
+
 def typed_due(text, d):
     """The earliest date on or after d written in a plan, as ISO, or None:
     2026-10-30, 30/10 (or 10/30 where Windows writes the month first), a
@@ -2501,6 +2506,9 @@ def typed_due(text, d):
     numeric = (re.findall(r"(?<![\d/.-])(\d{1,2})/(\d{1,2})(?:/(\d{2,4}))?(?![\d/.])", low)
                + re.findall(r"(?<![\d/.-])(\d{1,2})\.(\d{1,2})\.(\d{2,4})(?![\d/.])", low))
     for a, b, y in numeric:
+        # Fractions and 24/7 read as dates: half a report is not due 1 Feb.
+        if not y and f"{int(a)}/{int(b)}" in NOT_DATES:
+            continue
         m, n = (a, b) if month_first else (b, a)
         if y:
             found.append((int(y) + (2000 if len(y) == 2 else 0), int(m), int(n)))
@@ -2514,6 +2522,10 @@ def typed_due(text, d):
             continue
         if y is None and (d - when).days > 180:
             when = when.replace(year=d.year + 1)
+        # A date with no year months away is more likely a number, such as
+        # chapters 3/4; the due dates offered are the next ten workdays.
+        if y is None and (when - d).days > MAX_GUESSED_DAYS:
+            continue
         dates.append(when)
     names = [DAYS] + ([translation()["days"]] if translation() else [])
     cues = [w for w in tr("by|due|before").lower().split("|") if w]
@@ -2533,7 +2545,9 @@ def typed_due(text, d):
             dates.append(d)
         elif word in tr("tomorrow").lower().split("|"):
             dates.append(d + datetime.timedelta(days=1))
-    dates = [when for when in dates if (d - when).days <= 180]
+    # A date already past would make a new plan overdue the moment it is
+    # saved ("Pay rent 1/10" on 5 October), so only today or later counts.
+    dates = [when for when in dates if when >= d]
     return min(dates).isoformat() if dates else None
 
 
