@@ -375,3 +375,4 @@ Get-ItemProperty HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\hello
 - `TODO.md`: what a six-voice panel agreed should be done next.
 - `docs/WHY-DAILY-ACTIONS.md`: why it changed from a greeting to a daily program.
 - `docs/PILOT.md`: the simulated 30-day pilot and what it changed.
+- `docs/PERSONAS-2026-10.md`: how simulated personas and an advisor agent were used to decide rounds 70 on, what was checked against the code, and the track record. `docs/personas/` has the brief and prompts to run it again.

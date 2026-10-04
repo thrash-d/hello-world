@@ -2,7 +2,8 @@
 
 Open work only. What's done is in `CHANGELOG.md`, the panel and money reviews
 from October 2026 are in `docs/PANEL-2026-10.md`, and the pilots are in
-`docs/PILOT.md`. Nothing is declined: every idea from a review, a pilot or the
+`docs/PILOT.md`, and the persona reviews and their track record in
+`docs/PERSONAS-2026-10.md`. Nothing is declined: every idea from a review, a pilot or the
 owner is built, and anything that touches privacy or safety is built as an
 opt-in setting or policy with the safe default kept.
 

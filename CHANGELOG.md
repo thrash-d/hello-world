@@ -37,6 +37,11 @@ reactions and the public server for individuals are queued there too.
 Translations of the 12 new screen strings and the policy text are
 simulated, like the earlier ones.
 
+`docs/PERSONAS-2026-10.md` records how the simulated personas and the
+Profit Maximizer were run, which of their claims held up against the code,
+and what each finding became; `docs/personas/` has the brief and the exact
+prompts.
+
 Tests run the real reference server on a local port: each PC counted once a
 day, bad and old dates refused, only numbers on disk; the text screen's
 offer, count and `tip`; a no that sends nothing and isn't asked again; no
