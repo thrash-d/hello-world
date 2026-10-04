@@ -502,7 +502,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.40.0"
+VERSION = "1.41.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -909,14 +909,27 @@ def clean(text):
         cut = text[:MAX_PLAN]
         space = cut.rfind(" ", MAX_PLAN - 40)
         text = cut[:space] if space > 0 and not text[MAX_PLAN].isspace() else cut
+        text = text.rstrip(" ;\u200c\u200d")
     return tidy(text.rstrip(" \u200c\u200d"))
+
+
+def shortened(raw, text):
+    """What to say when the saved plan is shorter than the typed one, or ""."""
+    if len(tidy(raw)) <= MAX_PLAN:
+        return ""
+    # Counted without plan_parts, which folds parts past MAX_PARTS into one.
+    lost = (sum(1 for part in tidy(raw).split(";") if part.strip())
+            - sum(1 for part in text.split(";") if part.strip()))
+    return tr("Shortened to {n} characters.").format(n=MAX_PLAN) + (
+        " " + tr("Things left out: {n}.").format(n=lost) if lost > 0 else "")
 
 
 def typed_plan(raw):
     """Clean a typed plan, and say so when it is cut."""
-    if len(tidy(raw)) > MAX_PLAN:
-        say(tr("Shortened to {n} characters.").format(n=MAX_PLAN))
-    return clean(raw)
+    text = clean(raw)
+    if cut := shortened(raw, text):
+        say(cut)
+    return text
 
 
 def day(value):
@@ -1567,7 +1580,7 @@ def delete_everything(state):
         para(tr("The plans file you saved yourself is not deleted: {path}")
              .format(path=export_file()))
     if save(state):
-        say(tr("Another open hello-world window cannot put it back."))
+        say(tr("A hello-world window still open elsewhere won't save it again."))
     else:
         para(tr("Close any other open hello-world window, or it may save its "
                 "notes again."))
@@ -1788,7 +1801,7 @@ def reuse(state, raw):
     return raw
 
 
-def set_plan(state, can_save, iso=None, after_done=False):
+def set_plan(state, can_save, iso=None, after_done=False, in_menu=False):
     """Returns True when the person chose to close (after a done only)."""
     refresh(state, can_save)
     old = state["intent"]
@@ -1834,12 +1847,18 @@ def set_plan(state, can_save, iso=None, after_done=False):
     if not text:
         say(tr("Nothing changed."))
         return False
-    kept = leftovers(state, text, iso or today().isoformat())
-    if kept and ask_choice(
+    kept = leftovers(state, text, iso)
+    if kept:
+        keep = ask_choice(
             tr("Keep the ones you haven't finished too? {text}").format(
                 text="; ".join(kept)) + " " + tr("(y or n) > "),
-            strict_yes(), NO_WORDS, tr("Type y or n.")) == "yes":
-        text = clean(text + "; " + "; ".join(kept))
+            strict_yes(), NO_WORDS, tr("Type y or n.")) == "yes"
+        refresh(state, can_save)
+        if state["intent"] != old:
+            say(tr("The other open window changed the plan, so its plan is kept."))
+            return False
+        if keep:
+            text = typed_plan("; ".join(kept) + "; " + text)
     base = copy.deepcopy(state)
     # Changing today's plan is a correction, so only a plan carried over from
     # an earlier day is kept for same.
@@ -1847,7 +1866,8 @@ def set_plan(state, can_save, iso=None, after_done=False):
         state["previous"] = old["text"]
     state["intent"] = {"text": text, "date": iso}
     if commit(state, base, can_save):
-        para(tr(SAVED_PLAN))
+        para(tr("Saved. Choose 11 when you finish it, or it asks next time "
+                "you open this.") if in_menu else tr(SAVED_PLAN))
         nudge_if_several(text)
     else:
         undo(state, base)
@@ -2012,7 +2032,7 @@ def menu(state, can_save=True, iso=None, alone=False):
         elif choice in ("6", "7") and plans_off():
             say(tr("Plans are turned off by your organization."))
         elif choice == "6":
-            set_plan(state, can_save, iso)
+            set_plan(state, can_save, iso, in_menu=True)
         elif choice == "7":
             forget_finished(state, can_save)
         elif choice == "8" and policy("HideThoughtAndTip"):
@@ -2034,7 +2054,7 @@ def menu(state, can_save=True, iso=None, alone=False):
         elif choice == "11" and plans_off():
             say(tr("Plans are turned off by your organization."))
         elif choice == "11":
-            mark_done_now(state, can_save, today())
+            mark_done_now(state, can_save, today(), in_menu=True)
         elif choice == "12":
             more_settings(state, can_save)
         elif choice == "10" and policy("ForceEnglish"):
@@ -2094,7 +2114,10 @@ def more_settings(state, can_save):
         entries += [(marked(tr("At {at}").format(at=t.lstrip("0")), on and at == t),
                      lambda t=t: para(v.reminder_at(t))) for t in REMINDER_TIMES]
         entries += [(marked(label, state.get(key)), flip(key, on_text, off_text))
-                    for key, label, on_text, off_text in reminder_switches()]
+                    for key, label, on_text, off_text in reminder_switches()
+                    # The text screen opens whole at sign-in, so only the
+                    # weekend setting means anything to it.
+                    if key == "weekends" or not text_screen(state)]
         entries.append((marked(tr("No reminder"), not on),
                         lambda: para(v.set_reminder(False))))
         pick(entries)
@@ -2142,7 +2165,7 @@ def more_settings(state, can_save):
         "name", tr("Done. The greeting uses your first name."),
         tr("Done. The greeting is back to the usual one."))))
     if not policy("HideThoughtAndTip") and state.get("tips", True):
-        entries.append((marked(tr("Show the thought"), not state.get("hide_thought")),
+        entries.append((marked(tr("Also show the thought"), not state.get("hide_thought")),
                         flip("hide_thought", tr("Done. The thought is off."),
                              tr("Done. The thought is on."))))
     if not (policy("HideThoughtAndTip") or policy("FloorTips") or org_content()):
@@ -2299,7 +2322,6 @@ def ask_parts(parts):
     say(tr("Last time you planned:"))
     for n, part in enumerate(parts, 1):
         say(wrapped(f"  {n}  ", part))
-    numbers = [str(n) for n in range(1, len(parts) + 1)]
     hint = tr("Type y for all, n for not yet, or the numbers you did, such "
               "as 1 3. Enter skips.")
     for _ in range(3):
@@ -2313,8 +2335,7 @@ def ask_parts(parts):
             return "", None
         if text in QUIT_WORDS:
             raise Quit
-        if words and all(w in numbers for w in words):
-            done = sorted({int(w) - 1 for w in words})
+        if (done := picked(words, len(parts))) is not None:
             return "yes", (None if len(done) == len(parts) else done)
         if text in strict_yes() + DONE_WORDS + DID_WORDS:
             return "yes", None
@@ -2322,6 +2343,22 @@ def ask_parts(parts):
             return "no", None
         not_a_choice(typed, hint)
     return None, None
+
+
+def picked(words, count):
+    """The indexes that numbers such as "1 3" or "2-4" name, or None when a
+    word isn't one of 1 to count or a range of them."""
+    done = set()
+    for word in words:
+        low, dash, high = word.partition("-")
+        high = high if dash else low
+        if not (low.isdigit() and high.isdigit()):
+            return None
+        low, high = int(low), int(high)
+        if not 1 <= low <= high <= count:
+            return None
+        done.update(range(low - 1, high))
+    return sorted(done) if done else None
 
 
 def finish_day(plan_day, d):
@@ -2355,14 +2392,16 @@ def finish_day(plan_day, d):
 
 def leftovers(state, text, iso):
     """Today's unfinished things that a new plan sharing none of them would
-    drop: a plan of several things, or what is left after finishing some."""
+    drop: a plan of several things, what is left after finishing some, or a
+    plan carried over from an earlier day."""
     old = state["intent"]
     if not old or old["date"] != iso or not text:
         return []
     before = plan_parts(old["text"])
-    if set(before) & set(plan_parts(text)):
+    if {p.casefold() for p in before} & {p.casefold() for p in plan_parts(text)}:
         return []
-    if len(before) > 1 or any(i["date"] == iso for i in state.get("finished", [])):
+    if (len(before) > 1 or old.get("since", iso) < iso
+            or any(i["date"] == iso for i in state.get("finished", []))):
         return before
     return []
 
@@ -2378,13 +2417,15 @@ def nudge_if_several(text):
                 "part still counts."))
 
 
-def mark_done_now(state, can_save, d, which=True):
+def mark_done_now(state, can_save, d, which=True, in_menu=False):
     """Same-day done: the plan on screen is finished, so say so at once. For
     a plan of several things it asks which, unless `which` is False."""
     refresh(state, can_save)
     plan = state["intent"]
     if not plan:
-        para(tr("There is no plan to mark as done. Type plan to set one."))
+        para(tr("There is no plan to mark as done. Choose 6 to set one.")
+             if in_menu else
+             tr("There is no plan to mark as done. Type plan to set one."))
         return False
     every = plan_parts(plan["text"])
     chosen = None
@@ -2415,7 +2456,6 @@ def ask_which(parts):
     None for all of them, or (False, None) for Enter or no answer."""
     for n, part in enumerate(parts, 1):
         say(wrapped(f"  {n}  ", part))
-    numbers = [str(n) for n in range(1, len(parts) + 1)]
     for _ in range(3):
         typed = ask(tr("Which did you finish? Type the numbers, such as 1 3, "
                        "y for all, or Enter to go back > "))
@@ -2425,8 +2465,7 @@ def ask_which(parts):
         if text in QUIT_WORDS:
             raise Quit
         words = text.replace(",", " ").split()
-        if words and all(w in numbers for w in words):
-            done = sorted({int(w) - 1 for w in words})
+        if (done := picked(words, len(parts))) is not None:
             return True, (None if len(done) == len(parts) else done)
         if text in strict_yes() + DONE_WORDS + DID_WORDS:
             return True, None
@@ -2465,7 +2504,9 @@ def numbers_text(state):
         tr("Days you opened hello-world: {n}").format(n=state.get("opens", 0)),
         tr("Longest run of days: {n}").format(n=state.get("best_run", 0)),
         tr("Plans finished: {n}").format(n=state.get("done", 0)), "",
-        tr("A run goes on over a gap of up to three days, such as a weekend.")])
+        tr("A run goes on over a gap of up to three days, such as a weekend."),
+        tr("They count from the day you turned them on, and stay on this "
+           "computer. Nobody else gets them.")])
 
 
 def week_text(state, d):
@@ -2495,7 +2536,11 @@ def export_file():
     # The Known Folder API follows OneDrive and redirected Documents folders.
     folder = (EXPORT_DIR or known_folder("FDD39AD0-238F-46AF-ADB4-6C85480369C7")
               or os.path.join(os.path.expanduser("~"), "Documents"))
-    return os.path.join(folder, "hello-world plans.md")
+    # The name is translated, so it is checked for a character Windows refuses.
+    name = tr("hello-world plans")
+    if not name.strip(" .") or any(c in name for c in '<>:"/\\|?*'):
+        name = "hello-world plans"
+    return os.path.join(folder, name + ".md")
 
 
 def export_plans(state):
@@ -2612,7 +2657,7 @@ def answer_plan(state, can_save, d, choice, text, parts=None):
         return True, done_message(state, d, n) + (
             " " + tr("The rest is kept for today.") if rest else "")
     return True, tr("Kept for today.") if choice == "no" else tr(
-        "Your plan is still open.")
+        "Skipped. It asks again next time.")
 
 
 def daily(startup):
@@ -2733,7 +2778,7 @@ def daily(startup):
                 say(tr("That was not understood. Your plan is left as it was."))
             elif answer is not None:
                 intent = dict(intent, skips=intent.get("skips", 0) + 1)
-                say(tr("Your plan is still open."))
+                say(tr("Skipped. It asks again next time."))
             say()
 
         if state.get("tips", True) and not policy("HideThoughtAndTip"):
@@ -2903,6 +2948,9 @@ def run(argv):
     if argv == ["--plain-local"]:
         say(tr(GREETING))
         return 0
+    if argv[:2] == ["--set", "no_weekends"] and len(argv) == 3:
+        # The 1.39.0 name, kept so scripts written for it still work.
+        argv = ["--set", "weekends", {"on": "off", "off": "on"}.get(argv[2], "")]
     if len(argv) == 3 and argv[0] == "--set" and argv[1] in SWITCHES and argv[2] in ("on", "off"):
         state, can_save = load()
         base = copy.deepcopy(state)
@@ -3341,7 +3389,8 @@ def sign_in():
         quietly(tidy_launcher)
         return 0
     if text_screen(state):
-        open_console("--startup")
+        if not (holiday(d) or not state.get("weekends") and d.weekday() >= 5):
+            open_console("--startup")
         return 0
     text = reminder_due(state, d)
     if text is None:
@@ -3590,9 +3639,9 @@ class Visit:
                                      "Your plan is unchanged."), False
         self.followup = None
         _, several = quietly(nudge_if_several, text)
-        cut = [tr("Shortened to {n} characters.").format(n=MAX_PLAN)
-               ] if len(tidy(typed)) > MAX_PLAN else []
-        return False, " ".join([tr("Saved.")] + cut + ([several] if several else [])), True
+        cut = shortened(typed, text)
+        return False, " ".join([tr("Saved.")] + ([cut] if cut else [])
+                               + ([several] if several else [])), True
 
     def saved_summary(self):
         """What is saved, in words, and where the file is. The raw file stays
@@ -3632,9 +3681,16 @@ class Visit:
         """Today's plan, or what was typed over it, is finished. Returns the
         message."""
         if tidy(typed) and clean(typed) != self.plan():
-            close, message, saved = self.save(typed)
+            quietly(refresh, self.state, self.can_save)
+            kept = leftovers(self.state, clean(typed), self.iso)
+            close, message, saved = self.save(
+                "; ".join(kept + [typed]) if kept else typed)
             if not saved:
                 return message
+            if kept:
+                now = plan_parts(self.plan())
+                return self.finish_parts(
+                    [p for p in plan_parts(clean(typed)) if p in now])
         _, said = quietly(mark_done_now, self.state, self.can_save, self.d, False)
         # The finished list after it is for the text screen.
         return said.split(tr("Finished lately:"))[0].strip()
@@ -3646,7 +3702,8 @@ class Visit:
         quietly(refresh, self.state, self.can_save)
         intent = self.state["intent"]
         if not intent or intent["date"] != self.iso:
-            return tr("There is no plan to mark as done. Type plan to set one.")
+            return tr("There is no plan to mark as done. Type a plan in the box "
+                      "to set one.")
         every = plan_parts(intent["text"])
         if not names or any(name not in every for name in names):
             return tr("The other open window changed the plan, so its plan "
@@ -3690,9 +3747,14 @@ class Visit:
             self.setting("remind_at", None)
 
     def set_reminder(self, on):
-        """Turn the reminder on at sign-in, or off. Returns the message."""
-        self.drop_timed()
+        """Turn the reminder on at sign-in, or off. Returns the message.
+        The reminder at a set time goes only once that worked, so a failed
+        switch leaves the person with the reminder they had."""
+        if not on:
+            self.drop_timed()
         worked, said = quietly(remind, on)
+        if worked and on:
+            self.drop_timed()
         quietly(refresh, self.state, self.can_save)
         base = copy.deepcopy(self.state)
         self.state["offered"] = True
@@ -3905,7 +3967,7 @@ class Window:
             y += 19
             today_parts = plan_parts(v.plan()) if v.plan() and not v.followup else []
             if len(today_parts) > 1:
-                para(self.ASK, tr("Tick the ones you finish, then click I did it."), 2)
+                para(self.ASK, tr("Tick the ones you finish, then click Done."), 2)
                 ticks(today_parts)
         add(static, self.STATUS, "" if plans_off() else tr(
             "A few things? Put ; between them."), text_style, m, 2 * line)
@@ -3914,7 +3976,7 @@ class Window:
         right = m + w
         # Added left to right, which is the Tab order.
         if not plans_off():
-            add(button, self.DID_IT, tr("&I did it"), tab, right - 204, 16, 64)
+            add(button, self.DID_IT, tr("&Done"), tab, right - 204, 16, 64)
             add(button, self.SAVE, tr("&Save"), tab | 1, right - 134, 16, 64)
             add(button, self.CLOSE, self.close_label(), tab, right - 64, 16, 64)
         else:
@@ -4097,7 +4159,8 @@ class Window:
         for cid in (self.STATUS, self.PLANNED):
             if self.item(cid):
                 live_region(self.item(cid))
-        self.show(self.DID_IT, bool(self.visit.plan()))
+        # One Done at a time: while it asks about an earlier plan, its own.
+        self.show(self.DID_IT, bool(self.visit.plan()) and not self.asking)
         if self.visit.followup:
             self.focus(self.DONE)
         else:
@@ -4196,7 +4259,7 @@ class Window:
               and (kept := leftovers(v.state, clean(typed), v.iso))
               and self.confirm(tr("Keep the ones you haven't finished too? {text}")
                                .format(text="; ".join(kept)))):
-            typed = typed + "; " + "; ".join(kept)
+            typed = "; ".join(kept) + "; " + typed
         close, message, saved = v.save(typed)
         if close:
             return None
@@ -4273,7 +4336,7 @@ class Window:
         self.set_text(self.PLAN_LABEL, self.plan_label())
         self.set_text(self.PLAN, self.visit.plan())
         self.set_text(self.CLOSE, self.close_label())
-        self.show(self.DID_IT, bool(self.visit.plan()))
+        self.show(self.DID_IT, bool(self.visit.plan()) and not self.asking)
 
     def popup(self, entries):
         """Show the Options menu of (flags, id, label) and return the id chosen,
@@ -4410,7 +4473,7 @@ class Window:
                             tr("Show the thought and tip")))
             if v.state.get("tips", True):
                 entries.append((0 if v.state.get("hide_thought") else checked, 16,
-                                tr("Show the thought")))
+                                tr("Also show the thought")))
             if not org_content():
                 entries.append(((checked if v.state.get("floor_tips") or policy("FloorTips")
                                  else 0) | (grayed if policy("FloorTips") else 0), 17,

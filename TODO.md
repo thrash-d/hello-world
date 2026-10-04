@@ -8,11 +8,17 @@ opt-in setting or policy with the safe default kept.
 
 ## Building next
 
-1. Check that the window started by a timed reminder, with
-   `DETACHED_PROCESS`, survives the scheduled task's five-minute end (round
-   63 review). It takes a throwaway scheduled task with a one-minute limit,
-   which the owner runs by hand: the round 64 automated run wasn't allowed to
-   create one.
+1. A due date for a plan, with the reminder on that day, for work run by
+   deadlines such as invoices (Rafael, round 66 pilot).
+2. Save my plans to a file as a spreadsheet file too, which opens in Excel
+   (Rafael).
+3. A short "welcome back" line when the window opens after missed workdays,
+   with nothing that counts what was missed (Priya).
+4. A button that deletes the exported plans file, next to the note in Delete
+   everything that it is still there (Mónica).
+5. Check the pilot tool's text menu with the same stand-ins as its window
+   before the next pilot: the round 66 run of it reached the real Task
+   Scheduler, the user's `HKCU\Software\Classes` and Documents folder.
 
 ## Needs the deploying organization
 
@@ -34,5 +40,7 @@ re-checked:
 - The exit code already passes through `hello.cmd`.
 - `uninstall.ps1` already restarts itself elevated.
 - `$ProgressPreference` is set in the script's own scope.
+- The window a timed reminder opens with `DETACHED_PROCESS` outlives the
+  scheduled task's time limit; the owner checked it with a throwaway task.
 - Unknown keys in `notes.json`, the Dependabot check, and the data folder's
   access list were already handled in Round 43.

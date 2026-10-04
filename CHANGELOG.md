@@ -1,5 +1,53 @@
 # Changelog
 
+## 2026-10-04: a sixth pilot and a review, and what they found
+
+Version 1.41.0. The five simulated employees ran another week, on 1.40.0,
+next to a code review. Ratings: Dana 5, Rafael 7, Mónica 6, Tom 6, Priya 7.
+
+From the review:
+- "Unfinished items the person said yes to keeping can be cut short or lost
+  entirely." The kept things now go first, so a cut at 400 characters takes
+  the new text, and the text screen says what was cut.
+- "Answering the new question can overwrite another window's change." The
+  text screen reads the file again after the question and keeps the other
+  window's plan if it changed.
+- "`--set no_weekends` scripts now fail." The old name works again, turned
+  around: `no_weekends on` turns `weekends` off.
+- "The weekend and other reminder settings do nothing for text-screen users."
+  The text screen no longer opens at sign-in on weekends or the
+  organization's holidays unless `weekends` is on, and option 12 lists only
+  the weekend switch for it.
+- "Turning on the sign-in reminder deletes the timed reminder first, even
+  when turning it on then fails." The timed one goes only once the sign-in
+  one is on.
+- "A plan cut at 400 characters can end in `;`." The cut drops it.
+- "Typing a new plan and clicking I did it throws away today's unfinished
+  items." They stay, and only the typed thing is marked done.
+- "Retyping `call ana` over `Call Ana` counts as no overlap." The comparison
+  ignores case.
+
+From the pilot:
+- A plan kept from an earlier day asks before a new plan drops it, as a plan
+  of several things already did.
+- **I did it** is now **Done**, shown only while the window isn't asking
+  about an earlier plan, so one **Done** is on screen at a time.
+- Skip says "Skipped. It asks again next time."
+- The text menu's hints name its own options 6 and 11.
+- A cut plan says how many things were left out, and `done` takes ranges
+  such as `1-3`.
+- **Show the thought** is now **Also show the thought**.
+- My numbers says it counts from the day it was turned on and that nobody
+  else gets the numbers.
+- The exported plans file is named in the person's language.
+- Spanish and Brazilian Portuguese wording the pilot's native speakers
+  flagged is fixed.
+
+Queued in `TODO.md`: a due date for a plan, a spreadsheet export, a welcome
+back after missed days, and a button that deletes the exported file. The
+timed-reminder check from round 63 passed on the owner's machine and moved
+to the checked list.
+
 ## 2026-10-03: a fifth pilot and a review, and what they found
 
 Version 1.40.0. The five simulated employees ran a fresh week on 1.39.0
