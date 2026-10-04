@@ -71,7 +71,7 @@ foreach ($leftover in $new, $old) {
 New-Item -ItemType Directory $new -Force | Out-Null
 Import-Module (Join-Path $PSHOME 'Modules\Microsoft.PowerShell.Archive\Microsoft.PowerShell.Archive.psd1')
 Expand-Archive -LiteralPath (Join-Path $PSScriptRoot 'python-embed.zip') -DestinationPath (Join-Path $new 'python')
-foreach ($pattern in '_ssl.pyd', '_hashlib.pyd', 'libssl-*.dll', 'libcrypto-*.dll', '_sqlite3.pyd', 'sqlite3.dll') {
+foreach ($pattern in '_sqlite3.pyd', 'sqlite3.dll') {
     Get-ChildItem -LiteralPath (Join-Path $new 'python') -Filter $pattern -Force | Remove-Item -Force
 }
 foreach ($f in $files) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $f) -Destination $new }

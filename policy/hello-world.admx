@@ -14,6 +14,7 @@
       <definition name="SUPPORTED_1_32" displayName="$(string.SUPPORTED_1_32)" />
       <definition name="SUPPORTED_1_37" displayName="$(string.SUPPORTED_1_37)" />
       <definition name="SUPPORTED_1_44" displayName="$(string.SUPPORTED_1_44)" />
+      <definition name="SUPPORTED_1_45" displayName="$(string.SUPPORTED_1_45)" />
     </definitions>
   </supportedOn>
   <categories>
@@ -105,6 +106,17 @@
     <policy name="UnlockedNotes" class="Machine" displayName="$(string.UnlockedNotes)" explainText="$(string.UnlockedNotes_Help)" key="SOFTWARE\Policies\hello-world" valueName="UnlockedNotes">
       <parentCategory ref="HelloWorld" />
       <supportedOn ref="SUPPORTED_1_44" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+    <policy name="SharedCountsServer" class="Both" displayName="$(string.SharedCountsServer)" explainText="$(string.SharedCountsServer_Help)" presentation="$(presentation.SharedCountsServer)" key="SOFTWARE\Policies\hello-world">
+      <parentCategory ref="HelloWorld" />
+      <supportedOn ref="SUPPORTED_1_45" />
+      <elements><text id="SharedCountsServer" valueName="SharedCountsServer" maxLength="200" /></elements>
+    </policy>
+    <policy name="TurnOffSharedCounts" class="Both" displayName="$(string.TurnOffSharedCounts)" explainText="$(string.TurnOffSharedCounts_Help)" key="SOFTWARE\Policies\hello-world" valueName="TurnOffSharedCounts">
+      <parentCategory ref="HelloWorld" />
+      <supportedOn ref="SUPPORTED_1_45" />
       <enabledValue><decimal value="1" /></enabledValue>
       <disabledValue><decimal value="0" /></disabledValue>
     </policy>

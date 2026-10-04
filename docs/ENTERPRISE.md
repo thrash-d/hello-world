@@ -145,8 +145,9 @@ Use the `QuietUninstallString` from the Apps entry, never the plain
 - `NO_COLOR` set to anything turns its colours off.
 - When a file in use blocks an upgrade, the message names the hello-world
   programs that are open.
-- The bundled Python leaves out the modules hello.py never loads, as well as
-  OpenSSL and SQLite, so fewer files are on every PC for scanners to flag.
+- The bundled Python leaves out the modules hello.py never loads, and SQLite,
+  so fewer files are on every PC for scanners to flag. Since 1.45.0 it keeps
+  OpenSSL, for the shared counts server's https.
 - `install-user.ps1` installs for one person with no administrator, into
   their own profile; the README has the trade-off. Settings > Apps lists it
   for that person, and Uninstall removes it.
@@ -211,6 +212,8 @@ settings are under Computer or User Configuration > Administrative Templates
 | Leave a damaged file alone when nobody is at the screen | `LeaveDamagedFile` | A run with nobody at the keyboard leaves a damaged file in place for the next visit |
 | Address for feedback | `FeedbackAddress` (string) | Adds Options > Send feedback..., which opens a new mail to that address in the person's own mail program |
 | Show the tips for floor and shift work | `FloorTips` | The second tip list, for warehouses, factories and shifts, for everyone |
+| Shared counts server | `SharedCountsServer` (string) | An https address. Each person is asked once whether to see how many people did the day's tip; a count sends only the date. Run `server/counts_server.py` behind any https front end |
+| Turn off shared counts | `TurnOffSharedCounts` | Never contacts a counts server and never asks about it |
 | Keep notes unlocked | `UnlockedNotes` | Computer only. Saves notes as plain text as before 1.44.0, for records rules that need them readable. Otherwise notes are locked to each person's Windows account with DPAPI |
 | Turn on the sign-in reminder for everyone | `TurnOnReminder` | Turns the reminder on at each person's next open unless they already answered the question; each person can still turn it off |
 | Open hello-world as a text screen | `UseTextScreen` | The Start menu opens the text screen in a console, as before 1.28.0, and the sign-in launcher opens it instead of showing a notification |
@@ -346,8 +349,9 @@ own profile-cleanup process if notes must go when the program does.
   - Tools run by full path, `cmd` runs with `/d`, and the Archive module loads
     from `$PSHOME`.
   - Git ignores global and system config during a clone install.
-  - Python runs with `-I`. OpenSSL and SQLite are removed from the bundled
-    Python, since the program uses neither.
+  - Python runs with `-I`. SQLite is removed from the bundled Python, which
+    never uses it. OpenSSL stays for https to the shared counts server; with
+    no server set, or with `TurnOffSharedCounts`, nothing connects.
   - User input and file contents are cleaned of control and bidi characters
     before display.
 - Known limits:

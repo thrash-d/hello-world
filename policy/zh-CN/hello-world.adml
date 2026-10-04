@@ -85,6 +85,15 @@
       <string id="UnlockedNotes_Help">启用此策略后，hello-world 会像 1.44.0 之前的版本一样，把每个人的记录保存为纯文本，任何能读取该文件的人都能看到。仅在记录保存规定要求时使用，并告知用户，因为界面会请他们只写日常事务。
 
 禁用或未配置此策略时，记录会通过 Windows 数据保护 API 锁定在本人的 Windows 帐户中。其他用户和文件副本无法读取；拥有这台电脑完全控制权的管理员仍然可以。管理员重置了密码的本地帐户会丢失已锁定的记录。</string>
+      <string id="SUPPORTED_1_45">hello-world 1.45.0 或更高版本</string>
+      <string id="SharedCountsServer">共享计数服务器</string>
+      <string id="SharedCountsServer_Help">启用此策略后，hello-world 会询问每个人一次，是否要查看有多少人完成了当天的提示。同意的人会在提示下方看到人数，输入 tip 或点击“我做了这条提示”会让人数加一。每次计数只通过 https 向此服务器发送日期，绝不发送计划、姓名或电脑名称。和任何网页请求一样，服务器仍会看到这台电脑的网络地址。版本中附带的 server/counts_server.py 是一个可以自行运行的小型服务器。
+
+禁用或未配置此策略时，如果软件包内置了服务器，就使用它。</string>
+      <string id="TurnOffSharedCounts">关闭共享计数</string>
+      <string id="TurnOffSharedCounts_Help">启用此策略后，hello-world 绝不会联系共享计数服务器，也不会询问此事。
+
+禁用或未配置此策略时，使用“共享计数服务器”策略或软件包内置的服务器。</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -92,6 +101,9 @@
       </presentation>
       <presentation id="MaxBackups">
         <decimalTextBox refId="MaxBackups" defaultValue="5">保留的备份数：</decimalTextBox>
+      </presentation>
+      <presentation id="SharedCountsServer">
+        <textBox refId="SharedCountsServer"><label>服务器地址：</label></textBox>
       </presentation>
     </presentationTable>
   </resources>

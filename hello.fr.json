@@ -563,7 +563,18 @@
   "tomorrow": "demain",
   "If you type a plan, it asks next time how it went. It can be anything you want to get done, at work or not. Your notes are locked to your Windows account and never sent anywhere. Only someone with full admin control of this PC could get to them.": "Si vous tapez un plan, la prochaine fois on vous demandera comment ça s'est passé. Ce peut être tout ce que vous voulez faire, au travail ou non. Vos notes sont verrouillées sur votre compte Windows et ne sont jamais envoyées nulle part. Seule une personne ayant le contrôle administrateur complet de ce PC pourrait y accéder.",
   "It never leaves this computer. It is locked to your Windows account, so other people who use this computer or copy its files can't read it. Someone with full admin control of this PC still could.": "Ces données ne quittent jamais cet ordinateur. Elles sont verrouillées sur votre compte Windows : les autres personnes qui utilisent cet ordinateur ou copient ses fichiers ne peuvent pas les lire. Une personne ayant le contrôle administrateur complet de ce PC le pourrait encore.",
-  "Your saved notes are locked to a Windows account that can't open them here, so hello-world set them aside as a backup copy and started fresh. Menu option 4 deletes the backup.": "Vos notes enregistrées sont verrouillées sur un compte Windows qui ne peut pas les ouvrir ici, donc hello-world les a mises de côté comme copie de secours et a recommencé à zéro. L'option 4 du menu supprime la copie."
+  "Your saved notes are locked to a Windows account that can't open them here, so hello-world set them aside as a backup copy and started fresh. Menu option 4 deletes the backup.": "Vos notes enregistrées sont verrouillées sur un compte Windows qui ne peut pas les ouvrir ici, donc hello-world les a mises de côté comme copie de secours et a recommencé à zéro. L'option 4 du menu supprime la copie.",
+  "People who did today's tip so far: {n}": "Personnes qui ont suivi l'astuce du jour jusqu'ici : {n}",
+  "Type tip at the end once you have done it.": "Tapez astuce à la fin une fois que c'est fait.",
+  "See how many people do each day's tip? It sends only that you did the tip, never your plans or your name. (y or n, Enter for no) > ": "Voir combien de personnes suivent l'astuce de chaque jour ? Seul le fait que vous l'avez suivie est envoyé, jamais vos plans ni votre nom. (o ou n, Entrée pour non) > ",
+  "Type y or n, or press Enter for no.": "Tapez o ou n, ou appuyez sur Entrée pour non.",
+  "No problem. Menu option 12 can turn it on later.": "Pas de souci. L'option 12 du menu l'active plus tard.",
+  "The shared count can't be reached just now.": "Le compte partagé est injoignable pour le moment.",
+  "Counted. People who did today's tip so far: {n}": "Compté. Personnes qui ont suivi l'astuce du jour jusqu'ici : {n}",
+  "Show how many people did the tip": "Afficher combien de personnes ont suivi l'astuce",
+  "Done. You'll see how many people did the tip.": "C'est fait. Vous verrez combien de personnes ont suivi l'astuce.",
+  "Done. Nothing is sent, and no count shows.": "C'est fait. Rien n'est envoyé et aucun compte n'est affiché.",
+  "I did this &tip": "J'ai suivi cette as&tuce"
  },
  "tips_floor": [
   "Vérifiez que votre allée est dégagée avant la première tâche du poste.",

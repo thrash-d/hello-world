@@ -85,6 +85,15 @@
       <string id="UnlockedNotes_Help">このポリシー設定を有効にすると、hello-world は 1.44.0 より前のバージョンと同じく、各ユーザーのメモをファイルを読める人なら誰でも読めるプレーン テキストで保存します。記録の規則で必要な場合にだけ使用し、ユーザーに知らせてください。画面には、日常の作業だけを書くよう求める文が表示されます。
 
 無効にするか構成しない場合、メモは Windows データ保護 API によってユーザーの Windows アカウントでロックされます。ほかのユーザーやファイルのコピーからは読めませんが、PC の管理者権限をすべて持つ管理者は読むことができます。管理者がパスワードをリセットしたローカル アカウントは、ロックされたメモを失います。</string>
+      <string id="SUPPORTED_1_45">hello-world 1.45.0 以降</string>
+      <string id="SharedCountsServer">共有カウントのサーバー</string>
+      <string id="SharedCountsServer_Help">このポリシー設定を有効にすると、hello-world は各ユーザーに一度だけ、今日のヒントを何人が実行したかを表示するかどうかをたずねます。「はい」と答えたユーザーにはヒントの下に人数が表示され、tip と入力するか［このヒントをやった］をクリックすると 1 増えます。各カウントでこのサーバーに送られるのは日付だけで、https を使います。予定、名前、コンピューター名は送りません。どの Web 要求とも同じく、サーバーには PC のネットワーク アドレスが見えます。リリースに含まれる server/counts_server.py は、自分で実行できる小さなサーバーです。
+
+無効にするか構成しない場合、パッケージに組み込まれたサーバーがあれば、それが使われます。</string>
+      <string id="TurnOffSharedCounts">共有カウントをオフにする</string>
+      <string id="TurnOffSharedCounts_Help">このポリシー設定を有効にすると、hello-world は共有カウントのサーバーに接続せず、それについてたずねることもありません。
+
+無効にするか構成しない場合、［共有カウントのサーバー］ポリシーか、パッケージに組み込まれたサーバーが使われます。</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -92,6 +101,9 @@
       </presentation>
       <presentation id="MaxBackups">
         <decimalTextBox refId="MaxBackups" defaultValue="5">保持するバックアップの数:</decimalTextBox>
+      </presentation>
+      <presentation id="SharedCountsServer">
+        <textBox refId="SharedCountsServer"><label>サーバーのアドレス:</label></textBox>
       </presentation>
     </presentationTable>
   </resources>

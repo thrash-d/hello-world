@@ -507,7 +507,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.44.0"
+VERSION = "1.45.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -535,6 +535,7 @@ NO_THANKS = NO_WORDS + ("no thanks", "never", "stop", "no gracias", "nunca",
 SAME_WORDS = ("same", "repetir", "retomar", "reprendre", "wieder")
 PLAN_WORDS = ("p", "plan", "plano")
 MENU_WORDS = ("m", "menu", "menú", "menü")
+TIP_WORDS = ("tip", "consejo", "astuce", "dica", "tipp")
 HELP_WORDS = ("h", "help", "?", "ayuda", "aide", "ajuda", "hilfe")
 LIST_WORDS = ("list", "lista", "liste")
 FULL_WORDS = ("full", "todo", "tout", "tudo", "alles")
@@ -695,6 +696,54 @@ def policy_value(name, kind):
     return None
 
 
+# The shared counts server: "212 people did today's tip". A package for
+# people outside an organization sets this; an organization's policy wins.
+# Empty means no server, and nothing is ever sent.
+COUNTS_SERVER = ""
+COUNTS_TIMEOUT = 2
+
+
+def counts_server():
+    """The shared counts server's address, or "" when there is none. Only
+    https, except a server on this same computer, for testing one."""
+    if policy("TurnOffSharedCounts"):
+        return ""
+    url = (policy_value("SharedCountsServer", "text") or COUNTS_SERVER).strip().rstrip("/")
+    local = url.startswith(("http://localhost:", "http://127.0.0.1:"))
+    return url if url.startswith("https://") or local else ""
+
+
+def shared_on(state):
+    return bool(counts_server() and state.get("shared"))
+
+
+def net(path, send=False):
+    """Ask the counts server for a JSON object, or post to it. None when it
+    can't be reached in COUNTS_TIMEOUT seconds or answers nonsense, so a
+    missing server never gets in the way. Nothing about the person is sent:
+    the path holds only a date and what was done."""
+    import urllib.request
+    request = urllib.request.Request(
+        counts_server() + path, data=b"{}" if send else None,
+        method="POST" if send else "GET",
+        headers={"Content-Type": "application/json",
+                 "User-Agent": "hello-world"})
+    try:
+        with urllib.request.urlopen(request, timeout=COUNTS_TIMEOUT) as answer:
+            data = json.loads(answer.read(10_000) or b"{}")
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def tip_count(d, add=False):
+    """How many people did the day's tip, after counting this person when
+    add is set; None when the server can't say."""
+    data = net(f"/v1/day/{d.isoformat()}" + ("/tip" if add else ""), send=add)
+    n = (data or {}).get("tip")
+    return n if isinstance(n, int) and not isinstance(n, bool) and n >= 0 else None
+
+
 def feedback_address():
     """The address the FeedbackAddress policy sets, when it looks like one."""
     value = policy_value("FeedbackAddress", "text") or ""
@@ -833,7 +882,7 @@ def launcher_on():
 SWITCHES = ("nudge", "open_after", "weekends", "name", "no_startup_visits",
             "long_history", "hide_finished", "expire_same", "no_count",
             "numbers", "close_after_done", "colon_prompts", "floor_tips",
-            "private_reminder", "hide_thought")
+            "private_reminder", "hide_thought", "shared", "shared_asked")
 SETTINGS = ("streak", "tips", "text", "offered", "offer_skips", "lang",
             "remind_at") + SWITCHES
 
@@ -1186,6 +1235,11 @@ def load(repair=True):
         pass
     if raw.get("remind_at") in REMINDER_TIMES:
         state["remind_at"] = raw["remind_at"]
+    try:
+        if day(raw.get("tip_day")) <= today().isoformat():
+            state["tip_day"] = day(raw["tip_day"])
+    except ValueError:
+        pass
     global CHOSEN_LANGUAGE, LANGUAGE_READ
     if raw.get("lang") in LANGUAGE_NAMES:
         state["lang"] = raw["lang"]
@@ -2352,6 +2406,9 @@ def more_settings(state, can_save):
         if exported_files():
             entries.append((tr("Delete the plans file I saved"),
                             lambda: para(delete_export())))
+    if counts_server() and state.get("tips", True) and not policy("HideThoughtAndTip"):
+        entries.append((marked(tr("Show how many people did the tip"), state.get("shared")),
+                        lambda: para(v.shared_switch())))
     pick(entries)
 
 
@@ -3132,6 +3189,12 @@ def daily(startup):
                 say()
             say(tr("Try this today:"))
             say(indent(tip))
+            if person and not seen_today:
+                offer_shared(state)
+            if shared_on(state) and (n := tip_count(d)) is not None:
+                say(indent(tr("People who did today's tip so far: {n}").format(n=n)))
+                if state.get("tip_day") != iso:
+                    say(indent(tr("Type tip at the end once you have done it.")))
             say()
 
         if intent and intent["date"] == iso:
@@ -3222,6 +3285,43 @@ def daily(startup):
         say(tr("Closing."))
 
 
+def offer_shared(state):
+    """Ask once whether to see how many people did the day's tip. The
+    answer is saved with the rest of the visit."""
+    if not counts_server() or state.get("shared_asked"):
+        return
+    answer = ask_choice(
+        tr("See how many people do each day's tip? It sends only that you "
+           "did the tip, never your plans or your name. (y or n, Enter for "
+           "no) > "),
+        strict_yes(), NO_THANKS, tr("Type y or n, or press Enter for no."))
+    if answer is None:
+        return
+    state["shared_asked"] = True
+    if answer == "yes":
+        state["shared"] = True
+    else:
+        say(tr("No problem. Menu option 12 can turn it on later."))
+
+
+def did_tip(state, can_save, d):
+    """Count this person once for the day's tip. Returns what to say."""
+    iso = d.isoformat()
+    if state.get("tip_day") == iso:
+        n = tip_count(d)
+    else:
+        n = tip_count(d, add=True)
+        if n is not None:
+            refresh(state, can_save)
+            base = copy.deepcopy(state)
+            state["tip_day"] = iso
+            if not commit(state, base, can_save):
+                undo(state, base)
+    if n is None:
+        return tr("The shared count can't be reached just now.")
+    return tr("Counted. People who did today's tip so far: {n}").format(n=n)
+
+
 def last_prompt(state, can_save, intent, person, d, iso, open_menu=False):
     """Loop at the last prompt until the person closes the window."""
     if open_menu:
@@ -3255,6 +3355,9 @@ def last_prompt(state, can_save, intent, person, d, iso, open_menu=False):
         elif answer in MENU_WORDS + HELP_WORDS:
             menu(state, can_save, iso)
             intent = state["intent"]
+            continue
+        elif answer in TIP_WORDS and shared_on(state):
+            say(did_tip(state, can_save, d))
             continue
         elif answer in QUIT_WORDS:
             pass
@@ -3932,6 +4035,7 @@ class Visit:
         self.followup = intent["text"] if asks_followup(intent, d) else None
         self.pair = (todays_pair(d) if state.get("tips", True)
                      and not policy("HideThoughtAndTip") else None)
+        self.tip_people = tip_count(d) if self.pair and shared_on(state) else None
 
     def plan(self):
         """Today's plan, or "" when there is none for today."""
@@ -4193,6 +4297,19 @@ class Visit:
             undo(self.state, base)
         return saved
 
+    def did_tip(self):
+        """Count this person for the day's tip. Returns what to say."""
+        message, _ = quietly(did_tip, self.state, self.can_save, self.d)
+        self.tip_people = tip_count(self.d)
+        return message
+
+    def shared_switch(self):
+        """Turn the shared count on or off. Returns what to say."""
+        message = self.switch("shared", tr("Done. You'll see how many people did the tip."),
+                              tr("Done. Nothing is sent, and no count shows."))
+        self.setting("shared_asked", True)
+        return message
+
     def switch(self, key, on_text, off_text):
         """Flip an on-or-off setting. Returns what to say."""
         if not self.toggle(key):
@@ -4249,7 +4366,7 @@ class Window:
     # down an eighth of a line. Windows scales them with the font and DPI.
     WIDTH, MARGIN, LINE = 300, 12, 10
     TITLE, DATE, NOTE, PLANNED, ASK, DONE, NOT_YET, SKIP = range(100, 108)
-    THOUGHT_LABEL, THOUGHT, TIP_LABEL, TIP = range(110, 114)
+    THOUGHT_LABEL, THOUGHT, TIP_LABEL, TIP, TIP_COUNT, TIP_DONE = range(110, 116)
     PLAN_LABEL, PLAN, STATUS, OPTIONS, DID_IT = range(120, 125)
     TICK = 130  # to 139, one tick box for each thing in the plan
     SAVE, CLOSE = 1, 2  # IDOK and IDCANCEL, so Enter and Esc work
@@ -4329,6 +4446,12 @@ class Window:
         if v.pair:
             para(self.TIP_LABEL, tr("Try this today:"), 1)
             para(self.TIP, v.pair[1], 8)
+            if v.tip_people is not None:
+                para(self.TIP_COUNT, tr("People who did today's tip so far: {n}")
+                     .format(n=v.tip_people), 2)
+                if v.state.get("tip_day") != v.iso:
+                    add(button, self.TIP_DONE, tr("I did this &tip"), tab, m, 16, 100)
+                    y += 22
         if not plans_off():
             para(self.PLAN_LABEL, self.plan_label(), 2)
             add(edit, self.PLAN, v.plan(), tab | 0x800000 | 0x80, m, 15)
@@ -4584,6 +4707,13 @@ class Window:
             self.asking = False
             self.set_text(self.PLANNED, message)
             self.refresh_plan()
+            self.focus_plan()
+        elif cid == self.TIP_DONE:
+            self.set_text(self.STATUS, v.did_tip())
+            if v.tip_people is not None:
+                self.set_text(self.TIP_COUNT, tr("People who did today's tip so far: {n}")
+                              .format(n=v.tip_people))
+            self.show(self.TIP_DONE, False)
             self.focus_plan()
         elif cid == self.DID_IT:
             if self.parts and clean(self.typed()) in ("", v.plan()):
@@ -4853,7 +4983,12 @@ class Window:
         if not policy("HideDaysInARow"):
             entries.append((checked if v.state["streak"] else 0, 7,
                             tr("Show the days-in-a-row message")))
+        if counts_server() and v.state.get("tips", True) and not policy("HideThoughtAndTip"):
+            entries.append((checked if v.state.get("shared") else 0, 18,
+                            tr("Show how many people did the tip")))
         choice = self.popup(entries)
+        if choice == 18:
+            self.reopen(v.shared_switch())
         if choice == 10:
             self.toggled("name", tr("Done. The greeting uses your first name."),
                          tr("Done. The greeting is back to the usual one."))

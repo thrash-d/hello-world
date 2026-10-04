@@ -1,0 +1,165 @@
+"""The shared counts server for hello-world: "212 people did today's tip".
+
+Run it anywhere Python 3.11 or later runs, behind any https front end
+(a reverse proxy, a cloud load balancer, or a platform that terminates TLS):
+
+    python counts_server.py --port 8080 --data ./counts
+
+Then point hello-world at the https address, through the SharedCountsServer
+Group Policy, or COUNTS_SERVER in hello.py for a package of your own.
+
+It keeps one small JSON file per day holding only numbers. It never writes a
+network address to disk. To count each PC once per day it keeps, in memory
+only, a hash of the address with a random key made fresh each day, so the
+hashes can't be matched to addresses or across days, and are gone at a
+restart or at midnight UTC.
+
+    GET  /v1/day/2026-10-05       {"tip": 212}
+    POST /v1/day/2026-10-05/tip   counts one, then {"tip": 213}
+    GET  /health                  {"ok": true}
+
+Only today and the day either side, in UTC, are accepted, so time zones work
+and nobody can fill the disk with old dates.
+"""
+
+import argparse
+import datetime
+import hashlib
+import json
+import os
+import re
+import secrets
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+DAY_PATH = re.compile(r"^/v1/day/(\d{4}-\d{2}-\d{2})(/tip)?$")
+WHAT = ("tip",)
+
+
+class Counts:
+    """The day files and today's in-memory set of who already counted."""
+
+    def __init__(self, folder):
+        self.folder = folder
+        os.makedirs(folder, exist_ok=True)
+        self.lock = threading.Lock()
+        self.salt_day = None
+        self.salt = b""
+        self.seen = set()
+
+    def path(self, day):
+        return os.path.join(self.folder, f"{day}.json")
+
+    def read(self, day):
+        try:
+            with open(self.path(day), encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            return {}
+        return {k: v for k, v in data.items()
+                if k in WHAT and isinstance(v, int) and v >= 0}
+
+    def add(self, day, what, address):
+        with self.lock:
+            today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+            if self.salt_day != today:
+                # A fresh key each day forgets yesterday's hashes for good.
+                self.salt_day, self.salt, self.seen = today, secrets.token_bytes(32), set()
+            key = hashlib.sha256(self.salt + f"{day}|{what}|{address}".encode()).digest()
+            data = self.read(day)
+            if key not in self.seen:
+                self.seen.add(key)
+                data[what] = data.get(what, 0) + 1
+                tmp = self.path(day) + ".tmp"
+                with open(tmp, "w", encoding="utf-8") as f:
+                    json.dump(data, f)
+                os.replace(tmp, self.path(day))
+            return data
+
+
+def allowed(day):
+    try:
+        when = datetime.date.fromisoformat(day)
+    except ValueError:
+        return False
+    today = datetime.datetime.now(datetime.timezone.utc).date()
+    return abs((when - today).days) <= 1
+
+
+def handler(counts):
+    class Handler(BaseHTTPRequestHandler):
+        server_version = "hello-world-counts"
+        sys_version = ""
+
+        def reply(self, status, body=None):
+            raw = json.dumps(body).encode() if body is not None else b""
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(raw)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(raw)
+
+        def route(self):
+            match = DAY_PATH.match(self.path)
+            if not match or not allowed(match.group(1)):
+                return None, None
+            return match.group(1), match.group(2)
+
+        def do_GET(self):
+            if self.path == "/health":
+                return self.reply(200, {"ok": True})
+            day, add = self.route()
+            if day is None or add:
+                return self.reply(404, {"error": "not found"})
+            self.reply(200, {"tip": counts.read(day).get("tip", 0)})
+
+        def do_POST(self):
+            # Bodies are ignored, and refused when large, so nothing else
+            # can be sent here.
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                length = -1
+            if not 0 <= length <= 1024:
+                return self.reply(413, {"error": "too large"})
+            self.rfile.read(length)
+            day, add = self.route()
+            if day is None or not add:
+                return self.reply(404, {"error": "not found"})
+            # Behind a proxy every request comes from the proxy, so the
+            # address it passes on counts instead, when it is set to.
+            address = self.client_address[0]
+            if self.server.trust_proxy:
+                address = (self.headers.get("X-Forwarded-For") or address).split(",")[0].strip()
+            data = counts.add(day, "tip", address)
+            self.reply(200, {"tip": data.get("tip", 0)})
+
+        def log_message(self, format, *args):
+            # No access log: it would hold addresses.
+            pass
+
+    return Handler
+
+
+def serve(port=8080, folder="counts", host="0.0.0.0", trust_proxy=False):
+    server = ThreadingHTTPServer((host, port), handler(Counts(folder)))
+    server.trust_proxy = trust_proxy
+    return server
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("--port", type=int, default=8080)
+    parser.add_argument("--host", default="0.0.0.0")
+    parser.add_argument("--data", default="counts", help="folder for the day files")
+    parser.add_argument("--trust-proxy", action="store_true",
+                        help="count by X-Forwarded-For, behind your own https proxy")
+    args = parser.parse_args(argv)
+    server = serve(args.port, args.data, args.host, args.trust_proxy)
+    print(f"hello-world counts on {args.host}:{server.server_address[1]}, data in {args.data}")
+    server.serve_forever()
+
+
+if __name__ == "__main__":
+    main()

@@ -562,7 +562,18 @@
   "tomorrow": "mañana",
   "If you type a plan, it asks next time how it went. It can be anything you want to get done, at work or not. Your notes are locked to your Windows account and never sent anywhere. Only someone with full admin control of this PC could get to them.": "Si escribes un plan, la próxima vez te pregunta cómo fue. Puede ser cualquier cosa que quieras hacer, del trabajo o no. Tus notas están bloqueadas con tu cuenta de Windows y nunca se envían a ningún sitio. Solo alguien con control total de administrador de este equipo podría llegar a ellas.",
   "It never leaves this computer. It is locked to your Windows account, so other people who use this computer or copy its files can't read it. Someone with full admin control of this PC still could.": "Nunca sale de este equipo. Está bloqueado con tu cuenta de Windows, así que otras personas que usen este equipo o copien sus archivos no pueden leerlo. Alguien con control total de administrador de este equipo sí podría.",
-  "Your saved notes are locked to a Windows account that can't open them here, so hello-world set them aside as a backup copy and started fresh. Menu option 4 deletes the backup.": "Tus notas guardadas están bloqueadas con una cuenta de Windows que no puede abrirlas aquí, así que hello-world las apartó como copia de seguridad y empezó de cero. La opción 4 del menú borra la copia."
+  "Your saved notes are locked to a Windows account that can't open them here, so hello-world set them aside as a backup copy and started fresh. Menu option 4 deletes the backup.": "Tus notas guardadas están bloqueadas con una cuenta de Windows que no puede abrirlas aquí, así que hello-world las apartó como copia de seguridad y empezó de cero. La opción 4 del menú borra la copia.",
+  "People who did today's tip so far: {n}": "Personas que hicieron la sugerencia de hoy hasta ahora: {n}",
+  "Type tip at the end once you have done it.": "Escribe consejo al final cuando la hayas hecho.",
+  "See how many people do each day's tip? It sends only that you did the tip, never your plans or your name. (y or n, Enter for no) > ": "¿Quieres ver cuántas personas hacen la sugerencia de cada día? Solo envía que la hiciste, nunca tus planes ni tu nombre. (s o n, Enter para no) > ",
+  "Type y or n, or press Enter for no.": "Escribe s o n, o pulsa Enter para no.",
+  "No problem. Menu option 12 can turn it on later.": "Sin problema. La opción 12 del menú lo activa más adelante.",
+  "The shared count can't be reached just now.": "Ahora mismo no se puede llegar al recuento compartido.",
+  "Counted. People who did today's tip so far: {n}": "Contado. Personas que hicieron la sugerencia de hoy hasta ahora: {n}",
+  "Show how many people did the tip": "Mostrar cuántas personas hicieron la sugerencia",
+  "Done. You'll see how many people did the tip.": "Hecho. Verás cuántas personas hicieron la sugerencia.",
+  "Done. Nothing is sent, and no count shows.": "Hecho. No se envía nada y no se muestra ningún recuento.",
+  "I did this &tip": "&Hice esta sugerencia"
  },
  "tips_floor": [
   "Comprueba que tu zona de paso está despejada antes de la primera tarea del turno.",

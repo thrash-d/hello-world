@@ -81,6 +81,15 @@
       <string id="UnlockedNotes_Help">כשההגדרה מופעלת, hello-world שומר את הרשומות של כל אדם כטקסט רגיל שכל מי שיכול לקרוא את הקובץ יכול לקרוא, כמו בגרסאות שלפני 1.44.0. יש להשתמש בה רק במקום שבו כללי שמירת רשומות דורשים זאת, ולהודיע לאנשים, כי המסך יבקש מהם אז לכתוב רק משימות יומיומיות.
 
 כשההגדרה מושבתת או לא מוגדרת, הרשומות ננעלות לחשבון ה-Windows של האדם באמצעות ממשק הגנת הנתונים של Windows. משתמשים אחרים ועותקים של הקובץ לא יכולים לקרוא אותן; מנהל עם שליטה מלאה במחשב עדיין יכול. חשבון מקומי שמנהל איפס את הסיסמה שלו מאבד את הרשומות הנעולות.</string>
+      <string id="SUPPORTED_1_45">hello-world 1.45.0 ואילך</string>
+      <string id="SharedCountsServer">שרת ספירות משותפות</string>
+      <string id="SharedCountsServer_Help">כשההגדרה מופעלת, hello-world שואל כל אדם פעם אחת אם להציג כמה אנשים עשו את הטיפ היומי. מי שעונה כן רואה את המספר מתחת לטיפ, והקלדת tip או לחיצה על עשיתי את הטיפ הזה מוסיפה אחד. כל ספירה שולחת לשרת הזה רק את התאריך, ב-https; אף פעם לא תוכנית, שם או שם מחשב. השרת עדיין רואה את כתובת הרשת של המחשב, כמו בכל בקשת אינטרנט. server/counts_server.py שמגיע עם הגרסה הוא שרת קטן שאפשר להפעיל.
+
+כשההגדרה מושבתת או לא מוגדרת, נעשה שימוש בשרת המובנה בחבילה, אם יש כזה.</string>
+      <string id="TurnOffSharedCounts">כיבוי ספירות משותפות</string>
+      <string id="TurnOffSharedCounts_Help">כשההגדרה מופעלת, hello-world אף פעם לא פונה לשרת ספירות משותפות ולא שואל על כך.
+
+כשההגדרה מושבתת או לא מוגדרת, הוא משתמש במדיניות שרת ספירות משותפות או בשרת המובנה בחבילה.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -88,6 +97,9 @@
       </presentation>
       <presentation id="MaxBackups">
         <decimalTextBox refId="MaxBackups" defaultValue="5">מספר גיבויים לשמירה:</decimalTextBox>
+      </presentation>
+      <presentation id="SharedCountsServer">
+        <textBox refId="SharedCountsServer"><label>כתובת השרת:</label></textBox>
       </presentation>
     </presentationTable>
   </resources>

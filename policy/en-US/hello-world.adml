@@ -85,6 +85,15 @@ An organization content file replaces both lists.</string>
       <string id="UnlockedNotes_Help">When enabled, hello-world saves each person's notes as plain text that anyone who can read the file can read, as versions before 1.44.0 did. Use it only where records rules require it, and tell people, because the screen then asks them to keep notes to everyday tasks.
 
 When disabled or not configured, notes are locked to the person's Windows account with the Windows Data Protection API. Other users and copies of the file can't read them; an administrator with full control of the PC still could. A local account whose password an administrator resets loses its locked notes.</string>
+      <string id="SUPPORTED_1_45">hello-world 1.45.0 or later</string>
+      <string id="SharedCountsServer">Shared counts server</string>
+      <string id="SharedCountsServer_Help">When enabled, hello-world asks each person once whether to see how many people did the day's tip. Those who say yes see the count under the tip, and typing tip or clicking I did this tip adds one to it. Each count sends only the date to this server, over https; never a plan, a name or a computer name. The server still sees the PC's network address, as any web request does. server/counts_server.py in the release is a small server you can run.
+
+When disabled or not configured, the server built into the package is used, if it has one.</string>
+      <string id="TurnOffSharedCounts">Turn off shared counts</string>
+      <string id="TurnOffSharedCounts_Help">When enabled, hello-world never contacts a shared counts server and doesn't ask about it.
+
+When disabled or not configured, it uses the Shared counts server policy or the server built into the package.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -92,6 +101,9 @@ When disabled or not configured, notes are locked to the person's Windows accoun
       </presentation>
       <presentation id="MaxBackups">
         <decimalTextBox refId="MaxBackups" defaultValue="5">Backups to keep:</decimalTextBox>
+      </presentation>
+      <presentation id="SharedCountsServer">
+        <textBox refId="SharedCountsServer"><label>Server address:</label></textBox>
       </presentation>
     </presentationTable>
   </resources>

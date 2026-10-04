@@ -1,5 +1,53 @@
 # Changelog
 
+## 2026-10-04: the shared tip count, and a server that runs anywhere
+
+Version 1.45.0. The persona review found that everyone seeing the same tip on
+the same day was the best idea in the product, with nothing built on it. The
+owner dropped the "no network" rule. This round adds the first network
+feature: "People who did today's tip so far: 212".
+
+- hello-world asks once, after the tip: "See how many people do each day's
+  tip? It sends only that you did the tip, never your plans or your name."
+  Enter means no. Nothing is asked, and nothing sent, without a server.
+- With it on, the count shows under the tip. `tip` at the last prompt, or **I
+  did this tip** in the window, counts the person once that day.
+- A count is a `POST /v1/day/<date>/tip` with an empty body. Plan text,
+  names and computer names never leave the PC.
+- `server/counts_server.py` is the reference server: standard library only,
+  one JSON file of numbers per day, no access log, and each PC counted once
+  a day through an in-memory hash of its address with a key made fresh each
+  day. It accepts only today and the day either side, in UTC. Run it
+  anywhere behind an https front end.
+- The address comes from the new `SharedCountsServer` policy, or from
+  `COUNTS_SERVER` in `hello.py` for a package built for individuals. Only
+  https is used, except a server on the same PC for testing.
+  `TurnOffSharedCounts` turns it all off.
+- On/off: the window's **Options > What the window shows**, menu option 12
+  in the text screen, or `--set shared on|off`.
+- The installers keep OpenSSL in the bundled Python for https; CI checks the
+  installed Python can verify certificates. SQLite is still removed.
+- README has a section for people at home, who install with
+  `install-user.ps1`.
+
+The window asks the server before it opens, so a slow server can hold it
+for up to 2 seconds; a background fetch is queued in `TODO.md`. Emoji
+reactions and the public server for individuals are queued there too.
+
+Translations of the 12 new screen strings and the policy text are
+simulated, like the earlier ones.
+
+`docs/PERSONAS-2026-10.md` records how the simulated personas and the
+Profit Maximizer were run, which of their claims held up against the code,
+and what each finding became; `docs/personas/` has the brief and the exact
+prompts.
+
+Tests run the real reference server on a local port: each PC counted once a
+day, bad and old dates refused, only numbers on disk; the text screen's
+offer, count and `tip`; a no that sends nothing and isn't asked again; no
+server or the off policy asking nothing; a plain http address refused; an
+unreachable server failing fast; and the window's count and switch.
+
 ## 2026-10-04: notes locked to the person, so a plan can be personal
 
 Version 1.44.0. Seven simulated users of 1.43.0, from a cynical engineer to a
