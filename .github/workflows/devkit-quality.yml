@@ -1,6 +1,5 @@
-# Installed by the shared kit, with actions pinned to a commit here. A kit
-# update replaces this file and brings back the version tags, so pin them
-# again after one. Per-repo settings live in .devkit/.
+# Installed by dev-kit. devkit.ps1 update overwrites this file, so edit the
+# copy in dev-kit/repo-files/ instead. Per-repo settings live in .devkit/.
 #
 # The secrets check always fails the run on a finding. Every other check
 # reports but doesn't fail the run until the repo variable DEVKIT_BLOCKING is
@@ -28,11 +27,11 @@ jobs:
   quality:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@v7
         with:
           node-version: "lts/*"
 
