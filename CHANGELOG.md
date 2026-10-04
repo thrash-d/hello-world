@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-10-04: due dates, a spreadsheet copy, and welcome back
+
+Version 1.42.0. This round built the queue the sixth pilot left.
+
+- A plan can have a due date, chosen from the next ten workdays under **My
+  plans > Due date for my plan...** or the text menu's option 12 (Rafael).
+  The plan, the next day's question and the notification say "Due today.",
+  "Due tomorrow." or the date, and "It was due ..." once it has passed. The
+  date stays with a plan carried over with **Not yet** or with the things
+  left after finishing some, and a new plan starts without one.
+- **Save my plans to a file** also writes a `.csv` copy that opens in a
+  spreadsheet, with the date, the plan, its due date and whether it was
+  finished (Rafael). It uses the list separator Windows sets for the
+  person's region, so Excel splits the columns where the decimal mark is a
+  comma, and starts with a byte order mark so Excel reads accents.
+- **Delete the plans file I saved** removes both exported files, and Delete
+  everything points to it when the file is still there (Mónica).
+- "Welcome back." now comes after one missed workday instead of after a week
+  away. Weekends and the organization's holidays don't count as missed, and
+  nothing says how many days it was (Priya).
+
+The pilot tool's text menu now gets the same stand-ins as its window: the
+round 66 run of it had set up a real scheduled task, protocol key and
+exported file on the machine that ran it, which the owner removed.
+
 ## 2026-10-04: a sixth pilot and a review, and what they found
 
 Version 1.41.0. The five simulated employees ran another week, on 1.40.0,

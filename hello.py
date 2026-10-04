@@ -13,6 +13,7 @@ failed, 2 for an unknown option or a reminder link it doesn't know.
 import collections
 import contextlib
 import copy
+import csv
 import datetime
 import io
 import json
@@ -502,7 +503,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.41.0"
+VERSION = "1.42.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -582,6 +583,43 @@ class OutputClosed(Exception):
 
 def today():
     return datetime.date.fromisoformat(TODAY) if TODAY else datetime.date.today()
+
+
+def missed_a_workday(last, d):
+    """True when a weekday passed between the last opening (an ISO date) and
+    d without one, so a weekend away isn't a missed day."""
+    gap = range(1, (d - datetime.date.fromisoformat(last)).days)
+    days = (d - datetime.timedelta(days=n) for n in gap)
+    return any(when.weekday() < 5 and not holiday(when) for when in days)
+
+
+def carried_due(intent):
+    """The due date of a plan carried to another day, as dict items."""
+    return {"due": intent["due"]} if intent.get("due") else {}
+
+
+def due_note(intent, d):
+    """"Due today." and the like for a plan with a due date, or ""."""
+    due = intent and intent.get("due")
+    if not due:
+        return ""
+    when = datetime.date.fromisoformat(due)
+    if when == d:
+        return tr("Due today.")
+    if when == d + datetime.timedelta(days=1):
+        return tr("Due tomorrow.")
+    return (tr("Due {date}.") if when > d else tr("It was due {date}.")).format(
+        date=long_date(when))
+
+
+def due_choices(d):
+    """The dates a due date can be set to: the next ten workdays from d."""
+    days, when = [], d
+    while len(days) < 10:
+        if when.weekday() < 5 and not holiday(when):
+            days.append(when)
+        when += datetime.timedelta(days=1)
+    return days
 
 
 def long_date(d):
@@ -1092,6 +1130,11 @@ def load(repair=True):
                 skips = intent.get("skips")
                 if isinstance(skips, int) and not isinstance(skips, bool) and 0 < skips < 10:
                     state["intent"]["skips"] = skips
+                try:
+                    if intent.get("due") is not None:
+                        state["intent"]["due"] = day(intent["due"])
+                except ValueError:
+                    pass
     except ValueError:
         pass
     finished = []
@@ -1578,7 +1621,8 @@ def delete_everything(state):
         say(tr("Your settings were kept."))
     if os.path.exists(export_file()):
         para(tr("The plans file you saved yourself is not deleted: {path}")
-             .format(path=export_file()))
+             .format(path=export_file()) + " " + tr(
+            "To delete it, choose Delete the plans file I saved."))
     if save(state):
         say(tr("A hello-world window still open elsewhere won't save it again."))
     else:
@@ -1813,6 +1857,8 @@ def set_plan(state, can_save, iso=None, after_done=False, in_menu=False):
                  tr("Your plan from {date}: ").format(date=long_date(
                      datetime.date.fromisoformat(old["date"]))))
         say(wrapped(label, old["text"]))
+        if note := due_note(old, datetime.date.fromisoformat(iso)):
+            say(note)
     same = bool(state.get("previous"))
     if same:
         say(wrapped(tr("Earlier plan: "), state["previous"]))
@@ -2143,9 +2189,12 @@ def more_settings(state, can_save):
             say(line)
 
     def export():
-        path = export_plans(state)
-        para(tr("Saved to {path}").format(path=path) if path else
-             tr("Could not save that on this computer."))
+        para(exported(export_plans(state)))
+
+    def due():
+        days = due_choices(today())
+        pick([(long_date(when), lambda when=when: para(v.set_due(when.isoformat())))
+              for when in days] + [(tr("No due date"), lambda: para(v.set_due(None)))])
 
     def forget_previous():
         if ask_choice(tr("Forget the earlier plan? {text}").format(
@@ -2177,13 +2226,19 @@ def more_settings(state, can_save):
         entries += [
             (tr("This week..."), week),
             (tr("My numbers..."), numbers),
-            (tr("Save my plans to a file"), export),
+            (tr("Save my plans to a file"), export)]
+        if os.path.exists(export_file()) or os.path.exists(export_file(".csv")):
+            entries.append((tr("Delete the plans file I saved"),
+                            lambda: para(delete_export())))
+        entries.append(
             (marked(tr("Keep a longer history"), state.get("long_history")), flip(
                 "long_history",
                 tr("Done. Finished plans are kept for 90 days instead of 14."),
-                tr("Done. Finished plans are kept for 14 days, as usual.")))]
+                tr("Done. Finished plans are kept for 14 days, as usual."))))
         if state.get("previous"):
             entries.append((tr("Forget the earlier plan"), forget_previous))
+        if state["intent"]:
+            entries.append((tr("Due date for my plan..."), due))
     pick(entries)
 
 
@@ -2531,8 +2586,9 @@ def week_text(state, d):
 EXPORT_DIR = None
 
 
-def export_file():
-    """Where Save my plans to a file writes, in the person's Documents."""
+def export_file(ext=".md"):
+    """Where Save my plans to a file writes, in the person's Documents: the
+    Markdown file, or with ext=".csv" its copy for spreadsheets."""
     # The Known Folder API follows OneDrive and redirected Documents folders.
     folder = (EXPORT_DIR or known_folder("FDD39AD0-238F-46AF-ADB4-6C85480369C7")
               or os.path.join(os.path.expanduser("~"), "Documents"))
@@ -2540,12 +2596,28 @@ def export_file():
     name = tr("hello-world plans")
     if not name.strip(" .") or any(c in name for c in '<>:"/\\|?*'):
         name = "hello-world plans"
-    return os.path.join(folder, name + ".md")
+    return os.path.join(folder, name + ext)
+
+
+def list_separator():
+    """The separator Excel expects in a .csv on this computer, which is ;
+    where the decimal mark is a comma, as in Brazil or Spain."""
+    try:
+        import ctypes
+        buffer = ctypes.create_unicode_buffer(4)
+        # LOCALE_SLIST of the user's default locale.
+        if ctypes.windll.kernel32.GetLocaleInfoEx(None, 0x0C, buffer, 4):
+            if len(buffer.value) == 1:
+                return buffer.value
+    except (AttributeError, OSError):
+        pass
+    return ","
 
 
 def export_plans(state):
     """Write the current and finished plans to a Markdown file in the
-    person's Documents folder. Returns the path, or None."""
+    person's Documents folder, and the same as a .csv for spreadsheets.
+    Returns the Markdown file's path, or None."""
     path = export_file()
     lines = ["# hello-world", ""]
     if state["intent"]:
@@ -2558,9 +2630,38 @@ def export_plans(state):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             f.write("\n".join(lines).rstrip() + "\n")
+        # The byte order mark makes Excel read the file as UTF-8.
+        with open(export_file(".csv"), "w", encoding="utf-8-sig", newline="") as f:
+            rows = csv.writer(f, delimiter=list_separator())
+            rows.writerow([tr("Date"), tr("Plan"), tr("Due"), tr("Finished")])
+            if state["intent"]:
+                rows.writerows([state["intent"]["date"], part,
+                                state["intent"].get("due", ""), ""]
+                               for part in plan_parts(state["intent"]["text"]))
+            rows.writerows([i["date"], i["text"], "", tr("yes")]
+                           for i in reversed(state.get("finished", [])))
         return path
     except OSError:
         return None
+
+
+def delete_export():
+    """Delete the files Save my plans to a file wrote. Returns the message."""
+    try:
+        for path in (export_file(), export_file(".csv")):
+            if os.path.exists(path):
+                os.remove(path)
+    except OSError:
+        return tr("Could not delete the plans file. Close it if it is open, "
+                  "then try again.")
+    return tr("Done. The plans file you saved is deleted.")
+
+
+def exported(path):
+    """What to say after Save my plans to a file."""
+    return (tr("Saved to {path}").format(path=path) + " " + tr(
+        "A copy for spreadsheets is next to it, ending in .csv.")) if path else tr(
+        "Could not save that on this computer.")
 
 
 def launcher_value():
@@ -2641,11 +2742,11 @@ def answer_plan(state, can_save, d, choice, text, parts=None):
     if choice == "yes":
         rest = finish_plan(state, text, datetime.date.fromisoformat(intent["date"]), parts)
         state["intent"] = rest and {"text": rest, "date": d.isoformat(),
-                                    "since": intent.get("since", intent["date"])}
+                                    "since": intent.get("since", intent["date"]), **carried_due(intent)}
         state["intent"] = state["intent"] or None
     elif choice == "no":
         state["intent"] = {"text": text, "date": d.isoformat(),
-                           "since": intent.get("since", intent["date"])}
+                           "since": intent.get("since", intent["date"]), **carried_due(intent)}
     else:
         state["intent"] = dict(intent, skips=intent.get("skips", 0) + 1)
     if not commit(state, base, can_save):
@@ -2707,9 +2808,8 @@ def daily(startup):
         para(" ".join(welcome))
         say()
     elif not seen_today:
-        last = datetime.date.fromisoformat(state["visits"][-1])
         row = in_a_row(state["visits"], d)
-        if (d - last).days > 7:
+        if missed_a_workday(state["visits"][-1], d):
             say(tr("Welcome back. Glad you are here."))
             show_finished(state, SHOWN_AFTER_DONE)
             say()
@@ -2727,6 +2827,8 @@ def daily(startup):
         if (intent and intent["date"] < iso and intent.get("skips", 0) < 2
                 and not plans_off()):
             parts = plan_parts(intent["text"])
+            if note := due_note(intent, d):
+                say(note)
             if len(parts) == 1:
                 say(wrapped(tr("Last time you planned: "), intent["text"]))
                 answer = ask_choice(
@@ -2743,7 +2845,7 @@ def daily(startup):
                 rest = finish_plan(state, intent["text"], when, some)
                 state["intent"] = rest and {
                     "text": rest, "date": iso,
-                    "since": intent.get("since", intent["date"])} or None
+                    "since": intent.get("since", intent["date"]), **carried_due(intent)} or None
                 if commit(state, base, can_save):
                     base = copy.deepcopy(state)
                     intent = state["intent"]
@@ -2772,7 +2874,7 @@ def daily(startup):
                     say(tr("Cleared. Type same at a plan prompt if you want it back."))
                 else:
                     intent = {"text": intent["text"], "date": iso,
-                              "since": intent.get("since", intent["date"])}
+                              "since": intent.get("since", intent["date"]), **carried_due(intent)}
                     say(tr("Kept for today."))
             elif answer is None and person:
                 say(tr("That was not understood. Your plan is left as it was."))
@@ -2793,6 +2895,8 @@ def daily(startup):
 
         if intent and intent["date"] == iso:
             say(wrapped(tr("Your plan for today: "), intent["text"]))
+            if note := due_note(intent, d):
+                say(note)
             say()
         elif intent:
             # Not answered, or skipped twice; it must not vanish.
@@ -2971,8 +3075,7 @@ def run(argv):
             say(numbers_text(state))
         else:
             path = export_plans(state)
-            say(tr("Saved to {path}").format(path=path) if path else
-                tr("Could not save that on this computer."))
+            say(exported(path))
             return 0 if path else 1
         return 0
     if argv in (["--version"], ["-v"]):
@@ -3397,7 +3500,8 @@ def sign_in():
         return 0
     base = copy.deepcopy(state)
     state["notified"] = d.isoformat()
-    shown = (show_reminder(text, state["intent"]["date"], state.get("private_reminder"))
+    shown = (show_reminder(text, state["intent"]["date"], state.get("private_reminder"),
+                           due_note(state["intent"], d))
              if text else show_nudge())
     # Unsaved, it would come again at the next sign-in today. A window opens
     # in a process of its own, outside the scheduled task's time limit.
@@ -3437,7 +3541,7 @@ def plan_key(text, date):
     return date + "-" + hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
 
 
-def show_reminder(text, date=None, private=False):
+def show_reminder(text, date=None, private=False, due=""):
     """Show a Windows notification with the plan and three answers. False when
     Windows would not show it, such as where PowerShell is locked down.
     `private` leaves the plan's words out, for a shared screen."""
@@ -3453,6 +3557,7 @@ def show_reminder(text, date=None, private=False):
            '<visual><binding template="ToastGeneric">'
            f'<text>{escape(shown)}</text>'
            + ("" if private else f'<text>{escape(ask)}</text>')
+           + (f'<text>{escape(due)}</text>' if due else "")
            + '</binding></visual>'
            '<actions>'
            f'<action content="{escape(first[0].replace("&", ""))}" '
@@ -3565,7 +3670,7 @@ class Visit:
                                 "tasks."))
         elif not seen:
             row = in_a_row(state["visits"], d)
-            if (d - datetime.date.fromisoformat(state["visits"][-1])).days > 7:
+            if missed_a_workday(state["visits"][-1], d):
                 notes.append(tr("Welcome back. Glad you are here."))
             elif (state["streak"] and not policy("HideDaysInARow")
                   and (row in (3, 7, 14) or row % 30 == 0)):
@@ -3769,6 +3874,23 @@ class Visit:
                    "plan to ask about.") if on else
                 tr("Done. The sign-in reminder is off."))
 
+    def set_due(self, due):
+        """Give today's plan a due date (ISO), or none. Returns the message."""
+        quietly(refresh, self.state, self.can_save)
+        intent = self.state["intent"]
+        if not intent:
+            return tr("There is no plan to give a due date. Type a plan first.")
+        base = copy.deepcopy(self.state)
+        self.state["intent"] = {k: v for k, v in intent.items() if k != "due"}
+        if due:
+            self.state["intent"]["due"] = due
+        saved, said = quietly(commit, self.state, base, self.can_save)
+        if not saved:
+            undo(self.state, base)
+            return said or tr("Could not save that on this computer. Nothing changed.")
+        return (tr("Done. {note}").format(note=due_note(self.state["intent"], self.d)) if due
+                else tr("Done. The plan has no due date."))
+
     def setting(self, key, value):
         """Save one setting; None removes it. Returns False when it could not
         be saved."""
@@ -3969,7 +4091,8 @@ class Window:
             if len(today_parts) > 1:
                 para(self.ASK, tr("Tick the ones you finish, then click Done."), 2)
                 ticks(today_parts)
-        add(static, self.STATUS, "" if plans_off() else tr(
+        due = due_note(v.state["intent"], v.d) if v.plan() and not v.followup else ""
+        add(static, self.STATUS, "" if plans_off() else due or tr(
             "A few things? Put ; between them."), text_style, m, 2 * line)
         y += 2 * line + 6
         add(button, self.OPTIONS, tr("&Options"), tab, m, 16, 64)
@@ -4502,9 +4625,13 @@ class Window:
         v, checked = self.visit, 0x8
         entries = [(0, 12, tr("This week...")),
                    (0, 13, tr("My numbers...")),
-                   (0, 14, tr("Save my plans to a file")),
-                   (checked if v.state.get("long_history") else 0, 15,
-                    tr("Keep a longer history"))]
+                   (0, 14, tr("Save my plans to a file"))]
+        if v.plan():
+            entries.insert(0, (0, 16, tr("Due date for my plan...")))
+        if os.path.exists(export_file()) or os.path.exists(export_file(".csv")):
+            entries.append((0, 11, tr("Delete the plans file I saved")))
+        entries.append((checked if v.state.get("long_history") else 0, 15,
+                        tr("Keep a longer history")))
         if v.state.get("finished"):
             entries.append((0, 18, tr("Forget a finished plan...")))
         choice = self.popup(entries)
@@ -4520,9 +4647,20 @@ class Window:
                     return
             self.inform(numbers_text(v.state))
         elif choice == 14:
-            path = export_plans(v.state)
-            self.set_text(self.STATUS, tr("Saved to {path}").format(path=path)
-                          if path else tr("Could not save that on this computer."))
+            self.set_text(self.STATUS, exported(export_plans(v.state)))
+        elif choice == 16:
+            days = due_choices(v.d)
+            due = v.state["intent"].get("due") if v.state["intent"] else None
+            when = self.popup([(0x8 if due == d.isoformat() else 0, 300 + n, long_date(d))
+                               for n, d in enumerate(days)]
+                              + [(0x8 if not due else 0, 299, tr("No due date"))])
+            if when:
+                self.set_text(self.STATUS, v.set_due(
+                    None if when == 299 else days[when - 300].isoformat()))
+                self.set_text(self.PLAN_LABEL, self.plan_label())
+        elif choice == 11:
+            if self.confirm(tr("Delete the plans file you saved?")):
+                self.set_text(self.STATUS, delete_export())
         elif choice == 15:
             self.set_text(self.STATUS, v.switch(
                 "long_history",

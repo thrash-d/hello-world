@@ -8,17 +8,7 @@ opt-in setting or policy with the safe default kept.
 
 ## Building next
 
-1. A due date for a plan, with the reminder on that day, for work run by
-   deadlines such as invoices (Rafael, round 66 pilot).
-2. Save my plans to a file as a spreadsheet file too, which opens in Excel
-   (Rafael).
-3. A short "welcome back" line when the window opens after missed workdays,
-   with nothing that counts what was missed (Priya).
-4. A button that deletes the exported plans file, next to the note in Delete
-   everything that it is still there (Mónica).
-5. Check the pilot tool's text menu with the same stand-ins as its window
-   before the next pilot: the round 66 run of it reached the real Task
-   Scheduler, the user's `HKCU\Software\Classes` and Documents folder.
+Nothing queued. The next pilot and review fill this.
 
 ## Needs the deploying organization
 

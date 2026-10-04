@@ -224,7 +224,14 @@
   "There is no plan to mark as done. Type a plan in the box to set one.": "Não há nenhum plano para marcar como feito. Escreva um plano na caixa para definir um.",
   "They count from the day you turned them on, and stay on this computer. Nobody else gets them.": "Contam a partir do dia em que os ativou e ficam neste computador. Mais ninguém os recebe.",
   "Tick the ones you finish, then click Done.": "Assinale as que concluir e clique em Feito.",
-  "A run goes on over a gap of up to three days, such as a weekend.": "A sua sequência não se perde com pausas até três dias, como um fim de semana."
+  "A run goes on over a gap of up to three days, such as a weekend.": "A sua sequência não se perde com pausas até três dias, como um fim de semana.",
+  "A copy for spreadsheets is next to it, ending in .csv.": "Ao lado está uma cópia para folhas de cálculo, em .csv.",
+  "Could not delete the plans file. Close it if it is open, then try again.": "Não foi possível eliminar o ficheiro de planos. Feche-o e repita.",
+  "Delete the plans file I saved": "Eliminar o ficheiro de planos que guardei",
+  "To delete it, choose Delete the plans file I saved.": "Para eliminar, escolha Eliminar o ficheiro de planos que guardei.",
+  "Delete the plans file you saved?": "Eliminar o ficheiro de planos que guardou?",
+  "Done. The plans file you saved is deleted.": "Pronto. O ficheiro de planos que guardou foi eliminado.",
+  "There is no plan to give a due date. Type a plan first.": "Não há plano ao qual dar prazo. Escreva um plano primeiro."
  },
  "thoughts": {
   "0": "Abrir aquele documento que tem andado a adiar e ler só o primeiro parágrafo.",

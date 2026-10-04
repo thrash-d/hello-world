@@ -3262,3 +3262,46 @@ def test_old_no_weekends_scripts_still_work():
     assert p.returncode == 0 and notes(p.home).get("weekends") is True
     p = run(args=["--set", "no_weekends", "on"], home=p.home)
     assert p.returncode == 0 and "weekends" not in notes(p.home)
+
+
+def test_welcome_back_comes_after_a_missed_workday_not_a_weekend():
+    hello = _load_hello()
+    friday, monday = "2026-10-02", hello.datetime.date(2026, 10, 5)
+    assert not hello.missed_a_workday(friday, monday)
+    assert hello.missed_a_workday("2026-10-05", hello.datetime.date(2026, 10, 7))
+    assert not hello.missed_a_workday("2026-10-05", hello.datetime.date(2026, 10, 6))
+    first = run(text="\n", day="2026-10-05")
+    assert "Welcome back" in run(text="\n", day="2026-10-07", home=first.home).stdout
+
+
+def test_a_due_date_is_shown_and_carried_with_the_plan():
+    first = run(text="Send the invoice\n\n")
+    hello = _window_hello(day="2026-10-01", home=first.home)
+    visit = hello.Visit()
+    assert visit.set_due("2026-10-05") == "Done. Due Monday, 5 October 2026."
+    hello = _window_hello(day="2026-10-02", home=first.home)
+    visit = hello.Visit()
+    assert visit.answer("no") == "Kept for today."
+    assert notes(first.home)["intent"]["due"] == "2026-10-05"
+    hello.SHOWN = []
+    hello.show_reminder("Send the invoice", "2026-10-02", due=hello.due_note(
+        visit.state["intent"], hello.datetime.date(2026, 10, 5)))
+    assert "Due today." in hello.SHOWN[0]
+    p = run(text="\n", day="2026-10-06", home=first.home)
+    assert "It was due Monday, 5 October 2026." in p.stdout
+    assert visit.set_due(None) == "Done. The plan has no due date."
+    assert "due" not in notes(first.home)["intent"]
+
+
+def test_the_export_has_a_spreadsheet_copy_and_can_be_deleted():
+    first = run(text="Call Ana; send it\n\n")
+    hello = _window_hello(day="2026-10-01", home=first.home)
+    hello.EXPORT_DIR = mkdtemp()
+    hello.list_separator = lambda: ";"
+    visit = hello.Visit()
+    assert "ending in .csv" in hello.exported(hello.export_plans(visit.state))
+    with open(hello.export_file(".csv"), encoding="utf-8-sig") as f:
+        assert f.read().splitlines()[:2] == ["Date;Plan;Due;Finished",
+                                             "2026-10-01;Call Ana;;"]
+    assert hello.delete_export() == "Done. The plans file you saved is deleted."
+    assert not os.listdir(hello.EXPORT_DIR)
