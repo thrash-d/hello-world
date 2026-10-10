@@ -1,5 +1,31 @@
 # Changelog
 
+## 2026-10-10: a phone reminder that arrives, and the phone catches up
+
+Version 1.56.0. The pessimist round's one ask, from all eight: the reminder
+is the habit, and it has to reach the phone, free. Four reviewers changed
+the design first.
+
+- A counts server started with `--remind` sends phone reminders by Web Push
+  with no content. The phone sends only a random token, its push address and
+  up to two times in UTC (Noor: no time zone, nothing to profile); the
+  phone decides what to show from what it keeps. The server signs with its
+  own P-256 key (ES256, standard library only, checked against Node's
+  crypto in the tests), calls only the browser makers' push services, and
+  forgets an address when the reminder is turned off, the push service says
+  it's gone, or after a year.
+- The phone now has the day start, "The day went sideways", plans set aside
+  and brought back with one tap, the scam line in its sync settings and
+  **Change code** for a new code from the PC.
+- **Every day**: a daily repeat with its own time, labeled a reminder and
+  not a medical device; its words never leave the phone.
+- **Family**: **Draft text to** and **Call** buttons that only open the
+  phone's own screens, with "I'm okay today." filled in. Nothing is sent
+  unless the person presses send (the reviewers: never automatic).
+- **Print a big page** for the fridge, saying anyone in the room can read it,
+  and never the sync code. **Save my plans to a file** saves plain text.
+- Changing the day start keeps today's plan on today.
+
 ## 2026-10-10: a scam shield, your own day start, and a day that went sideways
 
 Version 1.55.0. From three more rounds of simulated people (Gen Z, Gen Z

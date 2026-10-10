@@ -31,7 +31,20 @@
   details summary { cursor: pointer; color: var(--accent); font-weight: 600; min-height: 44px; display: flex; align-items: center; }
   label { display: block; margin: .6rem 0 .3rem; }
   select { font: inherit; padding: 10px; border-radius: 10px; border: 2px solid var(--line); background: var(--bg); color: var(--fg); width: 100%; }
+  .wide { width: 100%; margin-top: 10px; }
+  .picks { display: grid; gap: 10px; }
+  a.button { display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 700; min-height: 64px; border-radius: 12px; border: 2px solid var(--accent); color: var(--accent); text-decoration: none; padding: 8px; }
+  #fridge { display: none; }
   [hidden] { display: none !important; }
+  /* The fridge page: only the day, the plan and the daily repeat, big. */
+  @media print {
+    main > *:not(#fridge) { display: none !important; }
+    body { background: #fff; color: #000; }
+    #fridge { display: block !important; border: 0; }
+    #fridge h2 { font-size: 28pt; }
+    #fridge .big { font-size: 40pt; font-weight: 700; margin: 0 0 24pt; overflow-wrap: anywhere; }
+    #fridge .note { font-size: 12pt; color: #000; }
+  }
 </style>
 </head>
 <body>
@@ -48,6 +61,7 @@
       <button id="no"></button>
       <button id="skip"></button>
     </div>
+    <button class="wide" id="sideways"></button>
   </section>
 
   <section id="today">
@@ -61,6 +75,18 @@
       <input type="text" id="plan-input" maxlength="200" autocomplete="off" enterkeyhint="done">
       <button class="primary" id="save" type="submit"></button>
     </form>
+    <div id="picks" hidden>
+      <p class="note" id="picks-label"></p>
+      <div class="picks" id="picks-list"></div>
+    </div>
+    <p class="note" id="repeat-today" hidden></p>
+  </section>
+
+  <section id="family-buttons" hidden>
+    <div class="row">
+      <a class="button" id="draft" href="#"></a>
+      <a class="button" id="call" href="#"></a>
+    </div>
   </section>
 
   <section>
@@ -78,14 +104,45 @@
       <label for="remind" id="remind-label"></label>
       <select id="remind"></select>
       <p class="note" id="remind-note"></p>
+      <label for="day-start" id="day-start-label"></label>
+      <select id="day-start"></select>
+      <p class="note" id="day-start-note"></p>
+      <h2 id="repeat-label" style="margin-top:1rem"></h2>
+      <form id="repeat-form">
+        <input type="text" id="repeat-text" maxlength="200" autocomplete="off">
+        <label for="repeat-at" id="repeat-at-label"></label>
+        <select id="repeat-at"></select>
+        <p><button id="repeat-save" type="submit"></button></p>
+      </form>
+      <p class="note" id="repeat-note"></p>
+      <h2 id="family-label" style="margin-top:1rem"></h2>
+      <form id="family-form">
+        <label for="family-name" id="family-name-label"></label>
+        <input type="text" id="family-name" maxlength="40" autocomplete="off">
+        <label for="family-number" id="family-number-label"></label>
+        <input type="text" id="family-number" inputmode="tel" maxlength="25" autocomplete="off">
+        <p><button id="family-save" type="submit"></button></p>
+      </form>
+      <p class="note" id="family-note"></p>
+      <p><button id="print"></button></p>
+      <p class="note" id="print-note"></p>
+      <p><button id="export"></button></p>
       <h2 id="sync-label" style="margin-top:1rem"></h2>
+      <p class="note" id="sync-scam"></p>
       <label for="sync-code" id="sync-code-label"></label>
       <input type="text" id="sync-code" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="xxxxx-xxxxx-xxxxx-xxxxx-xxxxx">
-      <p><button id="sync-save"></button></p>
+      <p><button id="sync-save"></button> <button id="sync-change" hidden></button></p>
       <p class="note" id="sync-note"></p>
       <p><button id="forget"></button></p>
     </details>
     <p class="note" id="privacy"></p>
+  </section>
+
+  <section id="fridge">
+    <h2 id="fridge-title"></h2>
+    <p class="big" id="fridge-plan"></p>
+    <p class="big" id="fridge-repeat"></p>
+    <p class="note" id="fridge-note"></p>
   </section>
 </main>
 <script src="content.js"></script>
