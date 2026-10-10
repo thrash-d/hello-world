@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-10-10: Pro, and a household key
+
+Version 1.59.0. Pro, built in round 80 and held for the owner's go-ahead,
+reshaped by four rounds of memos since.
+
+- Pro is $5 once: a second check-in at a time from 15:00 to 21:00 on days
+  with an open plan (the evening bell from the pre-2000 round), and window
+  colours. A key is checked on the device with the owner's public key; there
+  is no account and nothing is sent. Until the owner puts the public key in
+  `hello.py`, no key works.
+- A household key ($8 once) is Pro on everyone's devices and will open the
+  shared household list. `tools/pro_keys.py issue ... --family` makes one.
+- History is free: a year with **Keep a longer history**, and the **This
+  year** page is in the free menus.
+- Wherever a key is pasted: keys come only from the official store, and
+  hello-world never calls, texts or emails to sell or check one (Ponzi).
+- `docs/PRO.md` says how the owner makes and sells keys.
+
 ## 2026-10-10: what the red team found
 
 Version 1.58.0. Eight of history's worst, run as a red team, and the

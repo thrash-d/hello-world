@@ -338,7 +338,8 @@
   "Every day...": "Todos os dias...",
   "Something to do every day, such as taking pills, with its own reminder. A reminder only, not a medical device.": "Algo para fazer todos os dias, como tomar comprimidos, com o seu próprio lembrete. Só um lembrete, não um dispositivo médico.",
   "If you didn't make it, choose Change my sync code.": "Se não foi você, escolha Mudar o meu código de sincronização.",
-  "Try this today, from your organization:": "Experimente isto hoje, da sua organização:"
+  "Try this today, from your organization:": "Experimente isto hoje, da sua organização:",
+  "Could not set the second check-in on this computer.": "Não foi possível definir o segundo aviso neste computador."
  },
  "thoughts": {
   "0": "Abrir aquele documento que tem andado a adiar e ler só o primeiro parágrafo.",
