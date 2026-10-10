@@ -1,6 +1,7 @@
-// Keeps the app working with no signal: every file is cached on first open,
-// and the cached copy is used first. Nothing else is fetched or sent.
-const CACHE = "hello-world-phone-v1";
+// Keeps the app working with no signal: every file is cached on first open.
+// With a signal the newest files are fetched and cached, so updates arrive;
+// without one, the cached copy is used. Sync requests are never cached.
+const CACHE = "hello-world-phone-v2";
 const FILES = ["./", "./index.html", "./app.js", "./content.js", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -13,8 +14,15 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
-  event.respondWith(caches.match(event.request).then((hit) => hit || fetch(event.request)));
+  const url = new URL(event.request.url);
+  if (event.request.method !== "GET" || url.pathname.includes("/v1/")) return;
+  event.respondWith(fetch(event.request).then((answer) => {
+    if (answer.ok) {
+      const copy = answer.clone();
+      caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+    }
+    return answer;
+  }).catch(() => caches.match(event.request)));
 });
 
 self.addEventListener("notificationclick", (event) => {

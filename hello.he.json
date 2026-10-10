@@ -741,7 +741,21 @@
   "The tray icon is off.": "הסמל באזור ההודעות כבוי.",
   "The tray icon is on. It shows a dot while yesterday's plan waits for an answer, and starts again each time you sign in.": "הסמל באזור ההודעות פועל. הוא מציג נקודה כל עוד התוכנית של אתמול מחכה לתשובה, ועולה מחדש בכל כניסה.",
   "hello-world: did you do it? {text}": "hello-world: עשית את זה? {text}",
-  "hello-world: today's plan: {text}": "hello-world: התוכנית להיום: {text}"
+  "hello-world: today's plan: {text}": "hello-world: התוכנית להיום: {text}",
+  "Sync is off, and the copy on the server is deleted.": "הסנכרון כבוי, והעותק בשרת נמחק.",
+  "Sync is off. Turn it on with: hello sync on": "הסנכרון כבוי. אפשר להפעיל עם: hello sync on",
+  "Sync is on. On your phone, open hello-world, choose Sync, and type this code: {code}. With sync on, your plan and done list leave this computer, encrypted with that code.": "הסנכרון פועל. בטלפון, פתחו את hello-world, בחרו סנכרון והקלידו את הקוד הזה: {code}. כשהסנכרון פועל, התוכנית ורשימת מה שבוצע יוצאות מהמחשב הזה מוצפנות בקוד הזה.",
+  "Sync isn't available on this computer.": "הסנכרון לא זמין במחשב הזה.",
+  "Sync keeps your plan and done list the same on this computer and your phone. They leave this computer encrypted with a code only your devices have, and the server keeps only the encrypted copy. This encryption has not had an outside audit.": "הסנכרון שומר על אותה תוכנית ואותה רשימת דברים שבוצעו במחשב הזה ובטלפון. הן יוצאות מהמחשב מוצפנות בקוד שיש רק למכשירים שלך, והשרת שומר רק את העותק המוצפן. ההצפנה הזו לא עברה ביקורת חיצונית.",
+  "Sync with my phone": "סנכרון עם הטלפון שלי",
+  "Synced.": "סונכרן.",
+  "The server can't be reached just now.": "אי אפשר להגיע לשרת כרגע.",
+  "Turn off sync and delete the server's copy?": "לכבות את הסנכרון ולמחוק את העותק בשרת?",
+  "Turn off sync and delete the server's copy? (y or n) > ": "לכבות את הסנכרון ולמחוק את העותק בשרת? (y או n) > ",
+  "Turn on sync?": "להפעיל סנכרון?",
+  "Turn on sync? (y or n) > ": "להפעיל סנכרון? (y או n) > ",
+  "Use: hello sync on, off, now or code": "שימוש: hello sync on, off, now או code",
+  "Your sync code: {code}": "קוד הסנכרון שלך: {code}"
  },
  "tips_floor": [
   "לבדוק שהמעבר פנוי לפני המשימה הראשונה במשמרת.",

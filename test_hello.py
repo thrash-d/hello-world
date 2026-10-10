@@ -4263,3 +4263,86 @@ def test_the_counts_server_can_serve_the_phone_app():
                 assert e.code == 404, bad
     finally:
         server.shutdown()
+
+
+def test_sync_is_encrypted_the_same_way_on_the_pc_and_the_phone():
+    import base64 as b64
+    hello = _load_hello()
+    code = "k7mqa-2p9xb-tz4wc-8hcdd-r3vne"
+    label, enc, mac = hello.sync_keys(code)
+    data = {"intent": {"text": "Call Ana; ¿mañana?", "date": "2026-10-05"},
+            "finished": [{"text": "Water plants", "date": "2026-10-04"}], "updated": "2026-10-05T08:00:00"}
+    sealed = hello.seal_sync(enc, mac, data)
+    assert b"Call Ana" not in sealed and hello.open_sync(enc, mac, sealed) == data
+    tampered = sealed[:30] + bytes([sealed[30] ^ 1]) + sealed[31:]
+    assert hello.open_sync(enc, mac, tampered) is None
+    assert hello.open_sync(*hello.sync_keys("aaaaa-aaaaa-aaaaa-aaaaa-aaaaa")[1:], sealed) is None
+    got = _node("""
+        const app = require("./app.js");
+        (async () => {
+          const k = await app.syncKeys(%s);
+          const opened = await app.openSync(k, Buffer.from(%s, "base64"));
+          const sealed = await app.sealSync(k, %s);
+          console.log(JSON.stringify({label: k.label, opened, sealed: Buffer.from(sealed).toString("base64")}));
+        })();""" % (json.dumps(code.upper().replace("-", " ")), json.dumps(b64.b64encode(sealed).decode()),
+                    json.dumps(data)))
+    assert got["label"] == label and got["opened"] == data
+    assert hello.open_sync(enc, mac, b64.b64decode(got["sealed"])) == data
+
+
+def test_sync_merges_done_lists_and_takes_the_newer_plan():
+    hello = _load_hello()
+    import datetime
+    d = datetime.date(2026, 10, 6)
+    state = {"intent": {"text": "PC plan", "date": "2026-10-06"}, "sync_updated": "2026-10-06T08:00:00",
+             "finished": [{"text": "A", "date": "2026-10-05"}]}
+    other = {"intent": {"text": "Phone plan", "date": "2026-10-06"}, "updated": "2026-10-06T09:00:00",
+             "finished": [{"text": "A", "date": "2026-10-05"}, {"text": "B", "date": "2026-10-06"},
+                          {"text": "future", "date": "2027-01-01"}, "junk"]}
+    assert hello.merge_sync(state, other, d)
+    assert state["intent"] == {"text": "Phone plan", "date": "2026-10-06"}
+    assert [i["text"] for i in state["finished"]] == ["A", "B"]
+    older = {"intent": None, "updated": "2026-10-06T07:00:00", "finished": []}
+    assert not hello.merge_sync(state, older, d) and state["intent"]["text"] == "Phone plan"
+    got = _node("""const app = require("./app.js");
+        const s = {intent: {text: "Phone", date: "2026-10-06"}, updated: "2026-10-06T08:00:00",
+                   finished: [{text: "B", date: "2026-10-06"}]};
+        app.mergeSync(s, {intent: {text: "PC", date: "2026-10-06"}, updated: "2026-10-06T10:00:00",
+                          finished: [{text: "A", date: "2026-10-05"}]}, "2026-10-06");
+        console.log(JSON.stringify(s));""")
+    assert got["intent"]["text"] == "PC" and [f["text"] for f in got["finished"]] == ["A", "B"]
+
+
+def test_sync_round_trips_through_the_server_and_off_deletes_it():
+    server, url, folder = _counts_server()
+    try:
+        first = run(text="n\nCall Ana\n\n", policy={"SharedCountsServer": url})
+        hello = _window_hello(home=first.home)
+        hello.POLICY = {"SharedCountsServer": url}
+        state, can_save = hello.load()
+        said = hello.set_sync(state, can_save, True)
+        code = notes(first.home)["sync"]
+        assert code in said and "encrypted with that code" in said
+        label, enc, mac = hello.sync_keys(code)
+        with open(os.path.join(folder, "sync", label), "rb") as f:
+            stored = f.read()
+        assert b"Call Ana" not in stored
+        assert hello.open_sync(enc, mac, stored)["intent"]["text"] == "Call Ana"
+        # The phone finishes something and changes the plan; the PC picks it up.
+        phone = {"intent": {"text": "From the phone", "date": hello.today().isoformat()},
+                 "finished": [{"text": "Bought milk", "date": hello.today().isoformat()}],
+                 "updated": "2999-01-01T00:00:00"}
+        with open(os.path.join(folder, "sync", label), "wb") as f:
+            f.write(hello.seal_sync(enc, mac, phone))
+        hello.SYNCING = False
+        assert hello.sync_now(state, can_save)
+        saved = notes(first.home)
+        assert saved["intent"]["text"] == "From the phone"
+        assert any(i["text"] == "Bought milk" for i in saved["finished"])
+        assert hello.set_sync(state, can_save, False).startswith("Sync is off")
+        assert not os.path.exists(os.path.join(folder, "sync", label)) and "sync" not in notes(first.home)
+        # An organization can turn it off.
+        hello.POLICY = {"SharedCountsServer": url, "TurnOffSync": 1}
+        assert hello.set_sync(state, can_save, True) == "Sync isn't available on this computer."
+    finally:
+        server.shutdown()

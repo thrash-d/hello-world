@@ -742,7 +742,21 @@
   "The tray icon is off.": "L'icône de notification est désactivée.",
   "The tray icon is on. It shows a dot while yesterday's plan waits for an answer, and starts again each time you sign in.": "L'icône de notification est activée. Elle montre un point tant que le plan d'hier attend une réponse, et revient à chaque connexion.",
   "hello-world: did you do it? {text}": "hello-world : l'avez-vous fait ? {text}",
-  "hello-world: today's plan: {text}": "hello-world : plan du jour : {text}"
+  "hello-world: today's plan: {text}": "hello-world : plan du jour : {text}",
+  "Sync is off, and the copy on the server is deleted.": "La synchronisation est désactivée, et la copie sur le serveur est supprimée.",
+  "Sync is off. Turn it on with: hello sync on": "La synchronisation est désactivée. Activez-la avec : hello sync on",
+  "Sync is on. On your phone, open hello-world, choose Sync, and type this code: {code}. With sync on, your plan and done list leave this computer, encrypted with that code.": "La synchronisation est activée. Sur votre téléphone, ouvrez hello-world, choisissez Synchroniser et tapez ce code : {code}. Synchronisation activée, votre plan et votre liste de choses faites quittent cet ordinateur, chiffrés avec ce code.",
+  "Sync isn't available on this computer.": "La synchronisation n'est pas disponible sur cet ordinateur.",
+  "Sync keeps your plan and done list the same on this computer and your phone. They leave this computer encrypted with a code only your devices have, and the server keeps only the encrypted copy. This encryption has not had an outside audit.": "La synchronisation garde le même plan et la même liste de choses faites sur cet ordinateur et sur votre téléphone. Ils quittent cet ordinateur chiffrés avec un code que seuls vos appareils ont, et le serveur ne garde que la copie chiffrée. Ce chiffrement n'a pas fait l'objet d'un audit externe.",
+  "Sync with my phone": "Synchroniser avec mon téléphone",
+  "Synced.": "Synchronisé.",
+  "The server can't be reached just now.": "Le serveur est injoignable pour le moment.",
+  "Turn off sync and delete the server's copy?": "Désactiver la synchronisation et supprimer la copie du serveur ?",
+  "Turn off sync and delete the server's copy? (y or n) > ": "Désactiver la synchronisation et supprimer la copie du serveur ? (o ou n) > ",
+  "Turn on sync?": "Activer la synchronisation ?",
+  "Turn on sync? (y or n) > ": "Activer la synchronisation ? (o ou n) > ",
+  "Use: hello sync on, off, now or code": "Utilisation : hello sync on, off, now ou code",
+  "Your sync code: {code}": "Votre code de synchronisation : {code}"
  },
  "tips_floor": [
   "Vérifiez que votre allée est dégagée avant la première tâche du poste.",

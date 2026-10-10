@@ -123,6 +123,11 @@ Wenn deaktiviert oder nicht konfiguriert, öffnet sich hello-world bei der Anmel
       <string id="HandoffSignNames_Help">Wenn aktiviert, endet jede neue Übergabenotiz mit dem Vornamen der schreibenden Person aus Windows, und das Feld sagt das vor dem Tippen. Notizen von vor dem Einschalten werden nie unterschrieben. Ohne Wirkung zusammen mit Übergabe bei gemeinsamer Anmeldung.
 
 Wenn deaktiviert oder nicht konfiguriert, werden Notizen nicht unterschrieben; der Bildschirm schlägt vor zu unterschreiben, falls die nächste Schicht nachfragen muss.</string>
+      <string id="SUPPORTED_1_54">hello-world 1.54.0 oder neuer</string>
+      <string id="TurnOffSync">Synchronisierung mit dem Telefon ausschalten</string>
+      <string id="TurnOffSync_Help">Wenn aktiviert, kann hello-world Pläne nicht mit einem Telefon synchronisieren, und die Option wird nicht angeboten. Die Synchronisierung ist aus, bis eine Person sie einschaltet; dann verlassen Plan und Erledigt-Liste den PC verschlüsselt mit einem Code, den nur ihre Geräte haben, und liegen auf dem Server für gemeinsame Zählungen.
+
+Wenn deaktiviert oder nicht konfiguriert, kann jede Person sie dort einschalten, wo ein Server für gemeinsame Zählungen festgelegt ist.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">

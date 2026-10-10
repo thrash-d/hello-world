@@ -742,7 +742,21 @@
   "The tray icon is off.": "O ícone da bandeja está desligado.",
   "The tray icon is on. It shows a dot while yesterday's plan waits for an answer, and starts again each time you sign in.": "O ícone da bandeja está ligado. Ele mostra um ponto enquanto o plano de ontem espera resposta, e volta sempre que você entra.",
   "hello-world: did you do it? {text}": "hello-world: você fez? {text}",
-  "hello-world: today's plan: {text}": "hello-world: plano de hoje: {text}"
+  "hello-world: today's plan: {text}": "hello-world: plano de hoje: {text}",
+  "Sync is off, and the copy on the server is deleted.": "A sincronização está desligada, e a cópia no servidor foi apagada.",
+  "Sync is off. Turn it on with: hello sync on": "A sincronização está desligada. Ligue com: hello sync on",
+  "Sync is on. On your phone, open hello-world, choose Sync, and type this code: {code}. With sync on, your plan and done list leave this computer, encrypted with that code.": "A sincronização está ligada. No telefone, abra o hello-world, escolha Sincronizar e digite este código: {code}. Com a sincronização ligada, seu plano e sua lista de concluídos saem deste computador, criptografados com esse código.",
+  "Sync isn't available on this computer.": "A sincronização não está disponível neste computador.",
+  "Sync keeps your plan and done list the same on this computer and your phone. They leave this computer encrypted with a code only your devices have, and the server keeps only the encrypted copy. This encryption has not had an outside audit.": "A sincronização mantém seu plano e sua lista de concluídos iguais neste computador e no telefone. Eles saem deste computador criptografados com um código que só seus aparelhos têm, e o servidor guarda só a cópia criptografada. Essa criptografia não passou por auditoria externa.",
+  "Sync with my phone": "Sincronizar com meu telefone",
+  "Synced.": "Sincronizado.",
+  "The server can't be reached just now.": "Não é possível chegar ao servidor agora.",
+  "Turn off sync and delete the server's copy?": "Desligar a sincronização e apagar a cópia do servidor?",
+  "Turn off sync and delete the server's copy? (y or n) > ": "Desligar a sincronização e apagar a cópia do servidor? (s ou n) > ",
+  "Turn on sync?": "Ligar a sincronização?",
+  "Turn on sync? (y or n) > ": "Ligar a sincronização? (s ou n) > ",
+  "Use: hello sync on, off, now or code": "Uso: hello sync on, off, now ou code",
+  "Your sync code: {code}": "Seu código de sincronização: {code}"
  },
  "tips_floor": [
   "Confira se o corredor está livre antes da primeira tarefa do turno.",

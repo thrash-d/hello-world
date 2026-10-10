@@ -123,6 +123,11 @@ When disabled or not configured, hello-world opens at sign-in only when there is
       <string id="HandoffSignNames_Help">When enabled, each new handoff note ends with the writer's first name from Windows, and the box says so before anyone types. Notes left before the policy was turned on are never signed. Has no effect with Handoff on a shared login.
 
 When disabled or not configured, notes are not signed; the screen suggests signing one if the next shift may need to ask.</string>
+      <string id="SUPPORTED_1_54">hello-world 1.54.0 or later</string>
+      <string id="TurnOffSync">Turn off sync with a phone</string>
+      <string id="TurnOffSync_Help">When enabled, hello-world can't sync plans with a phone, and the setting isn't offered. Sync is off unless a person turns it on; when on, the plan and done list leave the PC encrypted with a code only that person's devices have, stored on the shared counts server.
+
+When disabled or not configured, people can turn sync on for themselves where a shared counts server is set.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">

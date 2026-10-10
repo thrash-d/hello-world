@@ -22,6 +22,14 @@ restart or at midnight UTC.
                                          "defeated": "2026-10-08"}
     GET  /health                        {"ok": true}
 
+    GET    /v1/sync/<64 hex>   one device's encrypted copy, for sync
+    PUT    /v1/sync/<64 hex>   replace it (at most 64 kB)
+    DELETE /v1/sync/<64 hex>   remove it
+
+Sync copies are encrypted on the PC or phone before they're sent, with a
+key this server never sees; the label is made from the same secret. Each is
+one file in the sync folder; a copy untouched for a year is removed.
+
 With --phone FOLDER it also serves the phone app (the repository's phone
 folder) at /phone/, so one https address does both. The phone app keeps its
 plans on the phone and asks this server for nothing.
@@ -45,9 +53,13 @@ import os
 import re
 import secrets
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 REACTIONS = ("love", "ha", "dead", "eyeroll")
+SYNC_PATH = re.compile(r"^/v1/sync/([0-9a-f]{64})$")
+MAX_SYNC = 64_000
+SYNC_DAYS = 366
 WEEK_PATH = re.compile(r"^/v1/week/(\d{4}-\d{2}-\d{2})$")
 BOSS_FLOOR = 20
 DAY_PATH = re.compile(r"^/v1/day/(\d{4}-\d{2}-\d{2})(/tip|/react/(?:%s))?$" % "|".join(REACTIONS))
@@ -190,6 +202,22 @@ def handler(counts, phone=None):
                 self.end_headers()
                 self.wfile.write(raw)
                 return
+            if SYNC_PATH.match(self.path):
+                path = self.sync_file()
+                try:
+                    if time.time() - os.path.getmtime(path) > SYNC_DAYS * 86400:
+                        os.remove(path)
+                    with open(path, "rb") as f:
+                        raw = f.read(MAX_SYNC)
+                except OSError:
+                    return self.reply(404, {"error": "not found"})
+                self.send_response(200)
+                self.send_header("Content-Type", "application/octet-stream")
+                self.send_header("Content-Length", str(len(raw)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(raw)
+                return
             if week := WEEK_PATH.match(self.path):
                 if not this_week(week.group(1)):
                     return self.reply(404, {"error": "not found"})
@@ -198,6 +226,46 @@ def handler(counts, phone=None):
             if day is None or add:
                 return self.reply(404, {"error": "not found"})
             self.reply(200, counts.read(day))
+
+        def body(self):
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                return None
+            if not 0 <= length <= MAX_SYNC:
+                return None
+            return self.rfile.read(length)
+
+        def sync_file(self):
+            match = SYNC_PATH.match(self.path)
+            if not match:
+                return None
+            folder = os.path.join(counts.folder, "sync")
+            os.makedirs(folder, exist_ok=True)
+            return os.path.join(folder, match.group(1))
+
+        def do_PUT(self):
+            path = self.sync_file()
+            if path is None:
+                return self.reply(404, {"error": "not found"})
+            raw = self.body()
+            if not raw:
+                return self.reply(413, {"error": "too large or empty"})
+            tmp = path + ".tmp"
+            with open(tmp, "wb") as f:
+                f.write(raw)
+            os.replace(tmp, path)
+            self.reply(200, {"ok": True})
+
+        def do_DELETE(self):
+            path = self.sync_file()
+            if path is None:
+                return self.reply(404, {"error": "not found"})
+            try:
+                os.remove(path)
+            except FileNotFoundError:
+                pass
+            self.reply(200, {"ok": True})
 
         def do_POST(self):
             # Bodies are ignored, and refused when large, so nothing else

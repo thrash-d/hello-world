@@ -123,6 +123,11 @@
       <string id="HandoffSignNames_Help">启用后，每条新的交接留言末尾会加上作者在 Windows 中的名字，输入前输入框会说明这一点。启用策略之前的留言不会署名。与“共享登录的交接”同时使用时无效。
 
 禁用或未配置时，留言不署名；如果下一班可能需要询问，屏幕会建议署名。</string>
+      <string id="SUPPORTED_1_54">hello-world 1.54.0 或更高版本</string>
+      <string id="TurnOffSync">关闭与手机同步</string>
+      <string id="TurnOffSync_Help">启用后，hello-world 无法与手机同步计划，也不会显示该设置。同步默认关闭，除非本人打开；打开后，计划和已完成列表会先用只有本人设备才有的代码加密，再离开电脑，保存在共享计数服务器上。
+
+禁用或未配置时，只要设置了共享计数服务器，每个人都可以自行打开。</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">

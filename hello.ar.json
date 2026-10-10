@@ -741,7 +741,21 @@
   "The tray icon is off.": "أيقونة منطقة الإعلام متوقفة.",
   "The tray icon is on. It shows a dot while yesterday's plan waits for an answer, and starts again each time you sign in.": "أيقونة منطقة الإعلام تعمل. تُظهر نقطة ما دامت خطة الأمس تنتظر إجابة، وتعود مع كل تسجيل دخول.",
   "hello-world: did you do it? {text}": "hello-world: هل فعلتها؟ {text}",
-  "hello-world: today's plan: {text}": "hello-world: خطة اليوم: {text}"
+  "hello-world: today's plan: {text}": "hello-world: خطة اليوم: {text}",
+  "Sync is off, and the copy on the server is deleted.": "المزامنة متوقفة، وحُذفت النسخة على الخادم.",
+  "Sync is off. Turn it on with: hello sync on": "المزامنة متوقفة. شغّلها بالأمر: hello sync on",
+  "Sync is on. On your phone, open hello-world, choose Sync, and type this code: {code}. With sync on, your plan and done list leave this computer, encrypted with that code.": "المزامنة تعمل. على هاتفك، افتح hello-world واختر المزامنة واكتب هذا الرمز: {code}. مع تشغيل المزامنة تغادر خطتك وقائمة ما أنجزته هذا الكمبيوتر مشفّرة بذلك الرمز.",
+  "Sync isn't available on this computer.": "المزامنة غير متاحة على هذا الكمبيوتر.",
+  "Sync keeps your plan and done list the same on this computer and your phone. They leave this computer encrypted with a code only your devices have, and the server keeps only the encrypted copy. This encryption has not had an outside audit.": "تُبقي المزامنة خطتك وقائمة ما أنجزته متطابقة على هذا الكمبيوتر وهاتفك. تغادر هذا الكمبيوتر مشفّرة برمز لا تملكه إلا أجهزتك، ولا يحتفظ الخادم إلا بالنسخة المشفّرة. لم يخضع هذا التشفير لتدقيق خارجي.",
+  "Sync with my phone": "المزامنة مع هاتفي",
+  "Synced.": "تمت المزامنة.",
+  "The server can't be reached just now.": "لا يمكن الوصول إلى الخادم الآن.",
+  "Turn off sync and delete the server's copy?": "إيقاف المزامنة وحذف نسخة الخادم؟",
+  "Turn off sync and delete the server's copy? (y or n) > ": "إيقاف المزامنة وحذف نسخة الخادم؟ (y أو n) > ",
+  "Turn on sync?": "تشغيل المزامنة؟",
+  "Turn on sync? (y or n) > ": "تشغيل المزامنة؟ (y أو n) > ",
+  "Use: hello sync on, off, now or code": "الاستخدام: hello sync on أو off أو now أو code",
+  "Your sync code: {code}": "رمز المزامنة: {code}"
  },
  "tips_floor": [
   "التأكد من خلو الممر قبل أول مهمة في الوردية.",

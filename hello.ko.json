@@ -741,7 +741,21 @@
   "The tray icon is off.": "알림 영역 아이콘을 껐어요.",
   "The tray icon is on. It shows a dot while yesterday's plan waits for an answer, and starts again each time you sign in.": "알림 영역 아이콘을 켰어요. 어제 계획에 답을 기다리는 동안 점이 보이고, 로그인할 때마다 다시 시작해요.",
   "hello-world: did you do it? {text}": "hello-world: 했나요? {text}",
-  "hello-world: today's plan: {text}": "hello-world: 오늘 계획: {text}"
+  "hello-world: today's plan: {text}": "hello-world: 오늘 계획: {text}",
+  "Sync is off, and the copy on the server is deleted.": "동기화를 껐고 서버의 사본을 삭제했어요.",
+  "Sync is off. Turn it on with: hello sync on": "동기화가 꺼져 있어요. 켜려면: hello sync on",
+  "Sync is on. On your phone, open hello-world, choose Sync, and type this code: {code}. With sync on, your plan and done list leave this computer, encrypted with that code.": "동기화를 켰어요. 휴대폰에서 hello-world를 열고 동기화를 고른 다음 이 코드를 입력하세요: {code}. 동기화를 켜면 계획과 완료 목록이 이 코드로 암호화되어 이 컴퓨터를 떠납니다.",
+  "Sync isn't available on this computer.": "이 컴퓨터에서는 동기화를 쓸 수 없어요.",
+  "Sync keeps your plan and done list the same on this computer and your phone. They leave this computer encrypted with a code only your devices have, and the server keeps only the encrypted copy. This encryption has not had an outside audit.": "동기화하면 이 컴퓨터와 휴대폰의 계획과 완료 목록이 같아집니다. 내 기기만 가진 코드로 암호화되어 이 컴퓨터를 떠나며, 서버에는 암호화된 사본만 저장됩니다. 이 암호화는 외부 감사를 받지 않았어요.",
+  "Sync with my phone": "내 휴대폰과 동기화",
+  "Synced.": "동기화했어요.",
+  "The server can't be reached just now.": "지금은 서버에 연결할 수 없어요.",
+  "Turn off sync and delete the server's copy?": "동기화를 끄고 서버의 사본을 삭제할까요?",
+  "Turn off sync and delete the server's copy? (y or n) > ": "동기화를 끄고 서버의 사본을 삭제할까요? (y 또는 n) > ",
+  "Turn on sync?": "동기화를 켤까요?",
+  "Turn on sync? (y or n) > ": "동기화를 켤까요? (y 또는 n) > ",
+  "Use: hello sync on, off, now or code": "사용법: hello sync on, off, now 또는 code",
+  "Your sync code: {code}": "동기화 코드: {code}"
  },
  "tips_floor": [
   "첫 작업 전에 다니는 통로에 걸리는 게 없는지 확인하세요.",

@@ -16,6 +16,8 @@ import contextlib
 import copy
 import csv
 import datetime
+import hashlib
+import hmac
 import io
 import json
 import os
@@ -515,7 +517,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.53.0"
+VERSION = "1.54.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -782,6 +784,204 @@ def net(path, send=False):
     except (OSError, ValueError):
         return None
     return data if isinstance(data, dict) else None
+
+
+# Sync between a PC and a phone, off unless the person turns it on. Plans
+# leave the device only encrypted, with a key made from a random code shown on
+# the PC and typed once on the phone. The counts server keeps the encrypted
+# bytes under a label made from the same code and can't read them. It is
+# built from what both Python's standard library and a browser's WebCrypto
+# have: PBKDF2, then HMAC-SHA256 as a counter-mode stream with an HMAC tag
+# over the result (encrypt-then-MAC). It has had no outside audit, which the
+# README says.
+SYNC_SALT = b"hello-world sync v1"
+SYNC_ROUNDS = 200_000
+SYNC_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"  # no 0, 1, i, l or o
+MAX_SYNC = 64_000
+
+
+def sync_code():
+    """A new random code: 25 characters in five groups, about 123 bits."""
+    import secrets
+    raw = "".join(secrets.choice(SYNC_ALPHABET) for _ in range(25))
+    return "-".join(raw[i:i + 5] for i in range(0, 25, 5))
+
+
+def sync_keys(code):
+    """(label, encryption key, tag key) from a code, as the phone makes them."""
+    code = "".join(c for c in code.lower() if c in SYNC_ALPHABET)
+    raw = hashlib.pbkdf2_hmac("sha256", code.encode(), SYNC_SALT, SYNC_ROUNDS, 96)
+    return raw[:32].hex(), raw[32:64], raw[64:]
+
+
+def _stream(key, nonce, size):
+    out = bytearray()
+    counter = 0
+    while len(out) < size:
+        out += hmac.new(key, nonce + counter.to_bytes(4, "big"), hashlib.sha256).digest()
+        counter += 1
+    return bytes(out[:size])
+
+
+def seal_sync(enc, mac, data, nonce=None):
+    """Encrypt then tag: b"v1" + nonce + ciphertext + tag."""
+    nonce = nonce or os.urandom(16)
+    plain = json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode()
+    cipher = bytes(a ^ b for a, b in zip(plain, _stream(enc, nonce, len(plain))))
+    tag = hmac.new(mac, b"v1" + nonce + cipher, hashlib.sha256).digest()
+    return b"v1" + nonce + cipher + tag
+
+
+def open_sync(enc, mac, blob):
+    """The data in a sealed blob, or None when it was changed or isn't ours."""
+    if len(blob) < 50 or blob[:2] != b"v1":
+        return None
+    nonce, cipher, tag = blob[2:18], blob[18:-32], blob[-32:]
+    if not hmac.compare_digest(tag, hmac.new(mac, b"v1" + nonce + cipher, hashlib.sha256).digest()):
+        return None
+    try:
+        data = json.loads(bytes(a ^ b for a, b in zip(cipher, _stream(enc, nonce, len(cipher)))))
+    except ValueError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def sync_form(state):
+    """What is synced: the plan and the finished list, nothing else."""
+    return {"intent": state["intent"], "finished": state.get("finished", []),
+            "updated": state.get("sync_updated", "")}
+
+
+def merge_sync(state, other, d):
+    """Fold the other device's copy in: finished things from both, and the
+    plan from whichever side changed it last. Returns True when it changed
+    anything here."""
+    changed = False
+    have = {(i["text"], i["date"]) for i in state.get("finished", [])}
+    for item in other.get("finished") or []:
+        try:
+            if (isinstance(item, dict) and isinstance(item.get("text"), str)
+                    and (clean(item["text"]), day(item.get("date"))) not in have
+                    and day(item["date"]) <= d.isoformat()):
+                state["finished"] = state.get("finished", []) + [
+                    {"text": clean(item["text"]), "date": day(item["date"])}]
+                have.add((clean(item["text"]), day(item["date"])))
+                changed = True
+        except ValueError:
+            continue
+    if state.get("finished"):
+        state["finished"] = sorted(state["finished"], key=lambda i: i["date"])[-finished_cap(state):]
+    theirs = other.get("updated") if isinstance(other.get("updated"), str) else ""
+    if theirs > state.get("sync_updated", ""):
+        intent = other.get("intent")
+        try:
+            new = ({"text": clean(intent["text"]), "date": day(intent["date"])}
+                   if isinstance(intent, dict) and isinstance(intent.get("text"), str)
+                   and clean(intent["text"]) else None)
+        except ValueError:
+            new = state["intent"]
+        if new != state["intent"]:
+            state["intent"] = new
+            changed = True
+        state["sync_updated"] = theirs
+    return changed
+
+
+def sync_on(state):
+    return bool(state.get("sync")) and not policy("TurnOffSync") and bool(counts_server())
+
+
+def sync_now(state, can_save):
+    """Pull the other device's copy, merge it in, and push the result.
+    Quiet: returns True when it worked, and does nothing without a server."""
+    if not sync_on(state):
+        return False
+    label, enc, mac = sync_keys(state["sync"])
+    blob = net_bytes(f"/v1/sync/{label}")
+    refresh(state, can_save)
+    base = copy.deepcopy(state)
+    if blob:
+        other = open_sync(enc, mac, blob)
+        if other is not None:
+            merge_sync(state, other, today())
+    global SYNCING
+    was, SYNCING = SYNCING, True
+    try:
+        if state != base and not commit(state, base, can_save):
+            undo(state, base)
+            return False
+    finally:
+        SYNCING = was
+    return net_bytes(f"/v1/sync/{label}", seal_sync(enc, mac, sync_form(state))) is not None
+
+
+SYNCING = False
+
+
+def sync_in_background(can_save):
+    """Push a change to the other device without making anyone wait. Not a
+    daemon thread, so it finishes, within the server timeout, before exit."""
+    import threading
+
+    def run():
+        global SYNCING
+        SYNCING = True
+        try:
+            state, ok = load(repair=False)
+            if ok:
+                sync_now(state, can_save)
+        except Exception as e:
+            log_error(e)
+        finally:
+            SYNCING = False
+    threading.Thread(target=run).start()
+
+
+def mark_synced_change(state):
+    """Stamp a change to the plan, so the newer side wins a merge."""
+    if state.get("sync"):
+        state["sync_updated"] = now().isoformat(timespec="seconds")
+
+
+def set_sync(state, can_save, on):
+    """Turn sync on with a new code, or off, deleting the server's copy.
+    Returns what to say."""
+    if on and (policy("TurnOffSync") or not counts_server()):
+        return tr("Sync isn't available on this computer.")
+    refresh(state, can_save)
+    old = state.get("sync")
+    base = copy.deepcopy(state)
+    if on:
+        state["sync"] = old or sync_code()
+        mark_synced_change(state)
+    else:
+        state.pop("sync", None)
+        state.pop("sync_updated", None)
+    if not commit(state, base, can_save):
+        undo(state, base)
+        return tr("Could not save that choice on this computer.")
+    if not on:
+        if old:
+            net_bytes(f"/v1/sync/{sync_keys(old)[0]}", b"", method="DELETE")
+        return tr("Sync is off, and the copy on the server is deleted.")
+    sync_now(state, can_save)
+    return tr("Sync is on. On your phone, open hello-world, choose Sync, and type this "
+              "code: {code}. With sync on, your plan and done list leave this computer, "
+              "encrypted with that code.").format(code=state["sync"])
+
+
+def net_bytes(path, body=None, method=None):
+    """GET, PUT or DELETE raw bytes at the counts server. None on failure."""
+    import urllib.request
+    request = urllib.request.Request(
+        counts_server() + path, data=body,
+        method=method or ("PUT" if body is not None else "GET"),
+        headers={"Content-Type": "application/octet-stream", "User-Agent": "hello-world"})
+    try:
+        with urllib.request.urlopen(request, timeout=COUNTS_TIMEOUT) as answer:
+            return answer.read(MAX_SYNC + 1)
+    except OSError:
+        return None
 
 
 # Reactions to the day's thought, from Skye's review: honest ones, so the
@@ -1656,6 +1856,12 @@ def load(repair=True):
         pass
     if raw.get("remind_at") in REMINDER_TIMES:
         state["remind_at"] = raw["remind_at"]
+    code = raw.get("sync")
+    if isinstance(code, str) and re.fullmatch(r"([%s]{5}-){4}[%s]{5}" % (SYNC_ALPHABET, SYNC_ALPHABET), code):
+        state["sync"] = code
+        updated = raw.get("sync_updated")
+        if isinstance(updated, str) and re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d", updated):
+            state["sync_updated"] = updated
     seen = raw.get("handoff_seen")
     if isinstance(seen, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}", seen):
         state["handoff_seen"] = seen
@@ -2241,6 +2447,9 @@ def reset(state):
 
 def delete_everything(state):
     """The body of reset() once confirmed, run while holding the lock."""
+    if state.get("sync") and counts_server():
+        # The encrypted copy on the server goes too.
+        net_bytes(f"/v1/sync/{sync_keys(state['sync'])[0]}", b"", method="DELETE")
     leftovers = [data_file()]
     failed = []
     listing_failed = False
@@ -2380,8 +2589,13 @@ def commit(state, base, can_save, soft=()):
             state["previous_date"] = today().isoformat()
         else:
             state.pop("previous_date", None)
+    if state.get("intent") != base.get("intent"):
+        mark_synced_change(state)
     with file_lock():
-        return merge_and_save(state, base, soft)
+        saved = merge_and_save(state, base, soft)
+    if saved and not SYNCING and sync_on(state):
+        sync_in_background(can_save)
+    return saved
 
 
 def merge_and_save(state, base, soft):
@@ -2947,11 +3161,32 @@ def more_settings(state, can_save):
                                    state.get("farewells")), flip(
                 "farewells", tr("Plans put aside get a funny farewell."),
                 tr("Plans put aside are listed plainly."))))
+    if counts_server() and not policy("TurnOffSync") and not plans_off():
+        entries.append((marked(tr("Sync with my phone"), state.get("sync")), lambda: sync_prompt(state, can_save)))
     if os.name == "nt" or TRAY_STARTS is not None:
         entries.append((marked(tr("Keep hello-world in the tray"), state.get("tray")),
                         lambda: para(set_tray(state, can_save, not state.get("tray")))))
 
     pick(entries)
+
+
+def sync_prompt(state, can_save):
+    """Turn sync on and show the code, show it again, or turn it off."""
+    if not state.get("sync"):
+        para(tr("Sync keeps your plan and done list the same on this computer and "
+                "your phone. They leave this computer encrypted with a code only "
+                "your devices have, and the server keeps only the encrypted copy. "
+                "This encryption has not had an outside audit."))
+        if ask_choice(tr("Turn on sync? (y or n) > "), strict_yes(), NO_THANKS,
+                      tr("Type y or n.")) == "yes":
+            para(set_sync(state, can_save, True))
+        else:
+            say(tr("Nothing changed."))
+        return
+    para(tr("Your sync code: {code}").format(code=state["sync"]))
+    if ask_choice(tr("Turn off sync and delete the server's copy? (y or n) > "),
+                  strict_yes(), NO_WORDS, tr("Type y or n.")) == "yes":
+        para(set_sync(state, can_save, False))
 
 
 def pet_prompt(state, can_save):
@@ -3855,6 +4090,9 @@ def daily(startup):
     answered = False
     if startup and seen_today:
         return
+    if sync_on(state):
+        # The phone's done list and plan, before anything is shown.
+        quietly(sync_now, state, can_save)
     tidy_launcher()
     policy_reminder(state)
     if not seen_today:
@@ -4596,7 +4834,7 @@ def check_content(path, local=False):
 # The command line Priyanka asked for: hello plan, add, done, import,
 # standup and export, with no prompts unless at a terminal, plain output,
 # --json for scripts, and exit codes 0 worked, 1 failed, 2 bad usage.
-COMMANDS = ("plan", "add", "done", "import", "standup", "export")
+COMMANDS = ("plan", "add", "done", "import", "standup", "export", "sync")
 MAX_STANDUP = 20
 MAX_PATH = 260
 # The commits git prints, at most, for one repository.
@@ -4622,6 +4860,8 @@ def command(name, args):
         return import_command(args)
     if name == "standup":
         return standup_command(args)
+    if name == "sync":
+        return sync_command([a.lower() for a in args])
     return export_command()
 
 
@@ -4939,6 +5179,29 @@ def standup_command(args):
     if note := due_note(intent, d):
         say(note)
     return 0
+
+
+def sync_command(args):
+    """hello sync on, off, now, or code."""
+    state, can_save = load()
+    if args == ["on"]:
+        message = set_sync(state, can_save, True)
+        para(message)
+        return 0 if state.get("sync") else 1
+    if args == ["off"]:
+        para(set_sync(state, can_save, False))
+        return 0
+    if not state.get("sync"):
+        para(tr("Sync is off. Turn it on with: hello sync on"))
+        return 1
+    if args == ["code"]:
+        say(state["sync"])
+        return 0
+    if args in ([], ["now"]):
+        ok = sync_now(state, can_save)
+        para(tr("Synced.") if ok else tr("The server can't be reached just now."))
+        return 0 if ok else 1
+    return usage(tr("Use: hello sync on, off, now or code"))
 
 
 def export_command():
@@ -5650,6 +5913,8 @@ class Visit:
         self.d = today()
         self.iso = self.d.isoformat()
         (self.state, self.can_save), said = quietly(load)
+        if sync_on(self.state):
+            quietly(sync_now, self.state, self.can_save)
         state, d = self.state, self.d
         base = copy.deepcopy(state)
         seen = self.iso in state["visits"]
@@ -6945,10 +7210,24 @@ class Window:
     def saved_menu(self):
         v = self.visit
         entries = [(0, 5, tr("Show what is saved on this computer"))]
+        if counts_server() and not policy("TurnOffSync") and not plans_off():
+            entries.append((0x8 if v.state.get("sync") else 0, 30, tr("Sync with my phone")))
         if v.state.get("previous"):
             entries.append((0, 19, tr("Forget the earlier plan")))
         entries.append((0, 6, tr("Delete everything saved")))
         choice = self.popup(entries)
+        if choice == 30:
+            if not v.state.get("sync"):
+                if self.confirm(tr("Sync keeps your plan and done list the same on this computer and "
+                                   "your phone. They leave this computer encrypted with a code only "
+                                   "your devices have, and the server keeps only the encrypted copy. "
+                                   "This encryption has not had an outside audit.") + "\n\n"
+                                + tr("Turn on sync?")):
+                    self.inform(set_sync(v.state, v.can_save, True))
+            elif self.confirm(tr("Your sync code: {code}").format(code=v.state["sync"]) + "\n\n"
+                              + tr("Turn off sync and delete the server's copy?")):
+                self.set_text(self.STATUS, set_sync(v.state, v.can_save, False))
+            return
         if choice == 19:
             if self.confirm(tr("Forget the earlier plan? {text}").format(
                     text=v.state["previous"])):

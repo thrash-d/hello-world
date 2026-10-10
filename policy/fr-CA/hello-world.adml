@@ -123,6 +123,11 @@ Si désactivé ou non configuré, hello-world s'ouvre à la connexion seulement 
       <string id="HandoffSignNames_Help">Si activé, chaque nouvelle note de relève se termine par le prénom de son auteur, pris dans Windows, et la zone le dit avant la saisie. Les notes laissées avant l'activation ne sont jamais signées. Sans effet avec Relève sur une session partagée.
 
 Si désactivé ou non configuré, les notes ne sont pas signées; l'écran suggère de signer si l'équipe suivante peut avoir besoin de demander.</string>
+      <string id="SUPPORTED_1_54">hello-world 1.54.0 ou ultérieur</string>
+      <string id="TurnOffSync">Désactiver la synchronisation avec un téléphone</string>
+      <string id="TurnOffSync_Help">Si activé, hello-world ne peut pas synchroniser les plans avec un téléphone et l'option n'est pas proposée. La synchronisation est désactivée tant que la personne ne l'active pas; activée, le plan et la liste des choses faites quittent le PC chiffrés avec un code que seuls ses appareils ont, et sont gardés sur le serveur de comptes partagés.
+
+Si désactivé ou non configuré, chacun peut l'activer là où un serveur de comptes partagés est défini.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
