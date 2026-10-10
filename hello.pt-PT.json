@@ -245,7 +245,6 @@
   "Everyone who uses this PC sees handoff notes. No patient or customer details. Not a safety or defect record.": "Todos os que usam este computador veem as notas da passagem. Sem dados de doentes ou clientes. Não é registo de segurança nem de avarias.",
   "Keep it until someone clears it? (y or n, Enter for no) > ": "Manter até alguém apagar? (s ou n, Enter para não) > ",
   "Kept until cleared. ": "Mantida até alguém a apagar. ",
-  "Left for the next shift.": "Deixada para o turno seguinte.",
   "No handoff notes in the last {n} hours.": "Nenhuma nota da passagem nas últimas {n} horas.",
   "Shift handoff on this PC (turned on by your organization):": "Passagem de turno neste computador (ativada pela sua organização):",
   "Sign it if the next shift may need to ask you.": "Assine-a se o turno seguinte puder precisar de lhe perguntar algo.",
@@ -288,7 +287,11 @@
   "nothing noted": "nada registado",
   "{text} (done)": "{text} (feito)",
   "{text} (not sure)": "{text} (sem certeza)",
-  "{text} (still open)": "{text} (ainda em aberto)"
+  "{text} (still open)": "{text} (ainda em aberto)",
+  "Counting...": "A contar...",
+  "React to the thought: type love, ha, dead or eyeroll at the end. The counts show after.": "Reaja ao pensamento: escreva love, ha, dead ou eyeroll no fim. Os números aparecem depois.",
+  "Your first name will be shown with your note.": "O seu primeiro nome vai aparecer com a sua nota.",
+  "Note left for the next shift, {time}.": "Nota deixada para o turno seguinte, {time}."
  },
  "thoughts": {
   "0": "Abrir aquele documento que tem andado a adiar e ler só o primeiro parágrafo.",

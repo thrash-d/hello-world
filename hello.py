@@ -507,7 +507,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.47.0"
+VERSION = "1.48.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -747,6 +747,81 @@ def net(path, send=False):
     except (OSError, ValueError):
         return None
     return data if isinstance(data, dict) else None
+
+
+# Reactions to the day's thought, from Skye's review: honest ones, so the
+# counts mean something, and hidden until you react. Words for the text
+# screen, where emoji may not draw.
+REACTIONS = ("love", "ha", "dead", "eyeroll")
+REACTION_EMOJI = {"love": "\u2764\ufe0f", "ha": "\U0001F602", "dead": "\U0001F480",
+                  "eyeroll": "\U0001F644"}
+REACT_WORDS = {"love": ("love", "\u2764\ufe0f", "\u2764"), "ha": ("ha", "haha", "\U0001F602"),
+               "dead": ("dead", "\U0001F480"),
+               "eyeroll": ("eyeroll", "eye-roll", "roll", "\U0001F644")}
+
+
+def day_counts(d):
+    """The day's shared numbers, {"tip": n, "react": {reaction: n}}, or
+    None when the server can't say."""
+    data = net(f"/v1/day/{d.isoformat()}")
+    return counts_of(data)
+
+
+def counts_of(data):
+    if not isinstance(data, dict):
+        return None
+    tip = data.get("tip")
+    react = data.get("react") if isinstance(data.get("react"), dict) else {}
+    return {"tip": tip if isinstance(tip, int) and not isinstance(tip, bool) and tip >= 0 else None,
+            "react": {r: n for r in REACTIONS
+                      if isinstance(n := react.get(r, 0), int) and not isinstance(n, bool) and n >= 0}}
+
+
+def top_reaction(counts):
+    """The reaction most people gave, or None when nobody reacted."""
+    react = (counts or {}).get("react") or {}
+    best = max(REACTIONS, key=lambda r: react.get(r, 0))
+    return best if react.get(best, 0) else None
+
+
+def reaction_line(react, emoji=False):
+    """"love 4, ha 2, dead 1, eyeroll 7", with emoji in the window."""
+    return ", ".join(f"{REACTION_EMOJI[r] if emoji else r} {react.get(r, 0)}" for r in REACTIONS)
+
+
+def shared_lines(state, d, counts, thought=True):
+    """The text screen's shared lines: the thought's reactions, hidden until
+    this PC reacts, yesterday's top one, and the tip's count."""
+    lines = []
+    iso = d.isoformat()
+    if thought:
+        if state.get("react_day") == iso:
+            lines.append(tr("Reactions so far: {list}").format(list=reaction_line(counts["react"])))
+        else:
+            lines.append(tr("React to the thought: type love, ha, dead or eyeroll "
+                            "at the end. The counts show after."))
+        if top := top_reaction(day_counts(d - datetime.timedelta(days=1))):
+            lines.append(tr("Yesterday's top reaction: {name}").format(name=top))
+    if counts["tip"] is not None:
+        lines.append(tr("People who did today's tip so far: {n}").format(n=counts["tip"]))
+        if state.get("tip_day") != iso:
+            lines.append(tr("Type tip at the end once you have done it."))
+    return lines
+
+
+def react(state, can_save, d, kind):
+    """This PC's one reaction to the day's thought; a second moves it. The
+    server counts each PC once a day by a hash with a key made fresh each
+    day, never an ID. Returns (what to say, the counts or None)."""
+    counts = counts_of(net(f"/v1/day/{d.isoformat()}/react/{kind}", send=True))
+    if counts is None:
+        return tr("The shared count can't be reached just now."), None
+    refresh(state, can_save)
+    base = copy.deepcopy(state)
+    state["react_day"], state["react"] = d.isoformat(), kind
+    if not commit(state, base, can_save):
+        undo(state, base)
+    return tr("Reactions so far: {list}").format(list=reaction_line(counts["react"])), counts
 
 
 def tip_count(d, add=False):
@@ -1260,6 +1335,14 @@ def load(repair=True):
         pass
     if raw.get("remind_at") in REMINDER_TIMES:
         state["remind_at"] = raw["remind_at"]
+    seen = raw.get("handoff_seen")
+    if isinstance(seen, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}", seen):
+        state["handoff_seen"] = seen
+    try:
+        if day(raw.get("react_day")) <= today().isoformat() and raw.get("react") in REACTIONS:
+            state["react_day"], state["react"] = day(raw["react_day"]), raw["react"]
+    except ValueError:
+        pass
     try:
         if day(raw.get("tip_day")) <= today().isoformat():
             state["tip_day"] = day(raw["tip_day"])
@@ -3279,6 +3362,8 @@ def daily(startup):
             say(wrapped("", line))
         say(tr("Type handoff at the end to leave a note or clear one."))
         say()
+        if person:
+            mark_handoff_seen(state, can_save)
 
     if first:
         para(tr("Press Enter at each question to skip it, and once more to "
@@ -3390,10 +3475,9 @@ def daily(startup):
             say(indent(tip))
             if person and not seen_today:
                 offer_shared(state)
-            if shared_on(state) and (n := tip_count(d)) is not None:
-                say(indent(tr("People who did today's tip so far: {n}").format(n=n)))
-                if state.get("tip_day") != iso:
-                    say(indent(tr("Type tip at the end once you have done it.")))
+            if shared_on(state) and (counts := day_counts(d)) is not None:
+                for line in shared_lines(state, d, counts, not state.get("hide_thought")):
+                    say(indent(line))
             say()
 
         if intent and intent["date"] == iso:
@@ -3658,6 +3742,43 @@ def age(at):
     return tr("{n} d ago").format(n=minutes // (24 * 60))
 
 
+def shared_login():
+    """The HandoffSharedLogin policy: one Windows login for the whole shift,
+    such as DOCK3, so "unseen" means nothing and a name would be wrong."""
+    return policy("HandoffSharedLogin")
+
+
+def new_handoff(state):
+    """True when a handoff note shows that this account hasn't seen: none of
+    its own, and on a shared login any shown note at all."""
+    if not handoff_on():
+        return False
+    notes = shown_handoff()
+    if shared_login():
+        return bool(notes)
+    seen = state.get("handoff_seen", "")
+    return any(n["at"] > seen for n in notes)
+
+
+def mark_handoff_seen(state, can_save):
+    """Remember the newest note shown, so it doesn't open hello-world again."""
+    notes = shown_handoff()
+    newest = max((n["at"] for n in notes), default="")
+    if not newest or newest <= state.get("handoff_seen", ""):
+        return
+    refresh(state, can_save)
+    base = copy.deepcopy(state)
+    state["handoff_seen"] = newest
+    if not commit(state, base, can_save):
+        undo(state, base)
+
+
+def signing():
+    """The HandoffSignNames policy: notes end with the writer's first name.
+    Never on a shared login, where the name would be the login's."""
+    return policy("HandoffSignNames") and not shared_login() and bool(first_name())
+
+
 def handoff_lines():
     """The handoff block for the screen, as lines."""
     notes = handoff_order(shown_handoff())
@@ -3670,11 +3791,14 @@ def handoff_lines():
     return lines
 
 
-def leave_handoff(text, keep=False):
-    """Add a note. Returns what to say."""
+def leave_handoff(text, keep=False, state=None, can_save=True):
+    """Add a note. Returns what to say. A name is added only at the moment of
+    writing, so turning the policy on never signs older notes (Rick)."""
     text = clean(text)
     if not text:
         return tr("Nothing changed.")
+    if signing():
+        text = clean(tr("{text} ({name})").format(text=text, name=first_name()))
     with file_lock(handoff_dir(), "handoff.lock") if os.path.isdir(handoff_dir()) else contextlib.nullcontext():
         notes = read_handoff()
         notes.append({"text": text, "at": now().isoformat(timespec="minutes"), "keep": keep})
@@ -3683,7 +3807,10 @@ def leave_handoff(text, keep=False):
         if not write_handoff(sorted(kept + rest, key=lambda n: n["at"])):
             return tr("Could not save the handoff note on this PC.")
     report_usage("handoff note left")
-    return tr("Left for the next shift.")
+    if state is not None:
+        # Your own note never counts as new for you.
+        mark_handoff_seen(state, can_save)
+    return tr("Note left for the next shift, {time}.").format(time=now().strftime("%H:%M"))
 
 
 def clear_handoff(number):
@@ -3699,11 +3826,12 @@ def clear_handoff(number):
     return tr("Cleared.")
 
 
-def handoff_prompt():
+def handoff_prompt(state=None, can_save=True):
     """The text screen's handoff: leave a note, or clear one."""
     para(tr("Everyone who uses this PC sees handoff notes. No patient or "
             "customer details. Not a safety or defect record."))
-    para(tr("Sign it if the next shift may need to ask you."))
+    para(tr("Your first name will be shown with your note.") if signing()
+         else tr("Sign it if the next shift may need to ask you."))
     typed = ask(tr("Type a note for the next shift, clear to remove one, or "
                    "Enter to go back > "))
     word = (typed or "").lower().strip(TRIM)
@@ -3722,7 +3850,7 @@ def handoff_prompt():
     keep = ask_choice(tr("Keep it until someone clears it? (y or n, Enter for "
                          "no) > "), strict_yes(), NO_WORDS,
                       tr("Type y or n, or press Enter for no.")) == "yes"
-    para(leave_handoff(typed, keep))
+    para(leave_handoff(typed, keep, state, can_save))
 
 
 def last_prompt(state, can_save, intent, person, d, iso, open_menu=False):
@@ -3762,8 +3890,12 @@ def last_prompt(state, can_save, intent, person, d, iso, open_menu=False):
         elif answer in TIP_WORDS and shared_on(state):
             say(did_tip(state, can_save, d))
             continue
+        elif shared_on(state) and (kind := next((k for k, words in REACT_WORDS.items()
+                                                 if answer in words), None)):
+            para(react(state, can_save, d, kind)[0])
+            continue
         elif answer in HANDOFF_WORDS and handoff_on():
-            handoff_prompt()
+            handoff_prompt(state, can_save)
             continue
         elif answer in GENTLE_WORDS and person:
             para(set_gentle(state, can_save, True))
@@ -4248,6 +4380,15 @@ def sign_in():
     if policy("DisableSignInLauncher"):
         quietly(tidy_launcher)
         return 0
+    if new_handoff(state):
+        # Notes nobody goes looking for go unread (Rick), so a handoff PC
+        # opens hello-world at sign-in when there is one this person hasn't
+        # seen. Seen is saved when the screen shows them.
+        if text_screen(state):
+            open_console("--startup")
+        else:
+            open_window()
+        return 0
     if text_screen(state):
         if not (holiday(d) or not state.get("weekends") and d.weekday() >= 5):
             open_console("--startup")
@@ -4442,12 +4583,32 @@ class Visit:
             notes.append(said or tr("Your notes could not be saved on this "
                                     "computer. This screen still works."))
         self.note = " ".join(notes)
+        if handoff_on():
+            # The window shows every note, so they're all seen now.
+            quietly(mark_handoff_seen, state, self.can_save)
         intent = state["intent"]
         self.followup = (intent["text"] if asks_followup(intent, d) and not gentle(state)
                          else None)
         self.pair = (todays_pair(d) if state.get("tips", True)
                      and not policy("HideThoughtAndTip") else None)
-        self.tip_people = tip_count(d) if self.pair and shared_on(state) else None
+        # The shared numbers come from the network, so they are fetched in
+        # the background and the window opens without waiting for them.
+        self.counts = None
+        self.yesterday_top = None
+        self.counts_thread = None
+        if self.pair and shared_on(state):
+            import threading
+            self.counts_thread = threading.Thread(target=self.fetch_counts, daemon=True)
+            self.counts_thread.start()
+
+    def fetch_counts(self):
+        self.counts = day_counts(self.d)
+        if self.counts and not self.state.get("hide_thought"):
+            self.yesterday_top = top_reaction(day_counts(self.d - datetime.timedelta(days=1)))
+
+    @property
+    def tip_people(self):
+        return (self.counts or {}).get("tip")
 
     def plan(self):
         """Today's plan, or "" when there is none for today."""
@@ -4716,8 +4877,17 @@ class Visit:
     def did_tip(self):
         """Count this person for the day's tip. Returns what to say."""
         message, _ = quietly(did_tip, self.state, self.can_save, self.d)
-        self.tip_people = tip_count(self.d)
+        self.counts = day_counts(self.d) or self.counts
         return message
+
+    def react(self, kind):
+        """This PC's reaction to the day's thought. Returns what to say."""
+        (message, counts), _ = quietly(react, self.state, self.can_save, self.d, kind)
+        self.counts = counts or self.counts
+        return message
+
+    def reacted(self):
+        return self.state.get("react_day") == self.iso
 
     def shared_switch(self):
         """Turn the shared count on or off. Returns what to say."""
@@ -4784,6 +4954,7 @@ class Window:
     TITLE, DATE, NOTE, PLANNED, ASK, DONE, NOT_YET, SKIP = range(100, 108)
     UNSURE = 108
     THOUGHT_LABEL, THOUGHT, TIP_LABEL, TIP, TIP_COUNT, TIP_DONE = range(110, 116)
+    REACT, REACT_NOTE = 150, 154  # REACT to REACT + 3, one button a reaction
     PLAN_LABEL, PLAN, STATUS, OPTIONS, DID_IT = range(120, 125)
     TICK = 130  # to 139, one tick box for each thing in the plan
     HANDOFF_LABEL, HANDOFF, HANDOFF_EDIT, HANDOFF_KEEP, HANDOFF_LEAVE, HANDOFF_RULES = range(140, 146)
@@ -4801,6 +4972,29 @@ class Window:
         self.fonts = []
         self.finished = False  # a plan was finished in this window
         self.asking = bool(visit.followup)
+
+    def react_label(self, kind):
+        """A reaction's button: its count once this PC has reacted, so the
+        counts stay hidden until then (Skye)."""
+        counts = (self.visit.counts or {}).get("react") or {}
+        if self.visit.reacted() and self.visit.counts:
+            mark = "\u2713 " if self.visit.state.get("react") == kind else ""
+            return f"{mark}{REACTION_EMOJI[kind]} {counts.get(kind, 0)}"
+        return f"{REACTION_EMOJI[kind]} {kind}"
+
+    def show_counts(self):
+        """Put the fetched numbers on screen."""
+        v = self.visit
+        if not self.item(self.TIP_COUNT):
+            return
+        self.set_text(self.TIP_COUNT, "" if v.tip_people is None else
+                      tr("People who did today's tip so far: {n}").format(n=v.tip_people))
+        if self.item(self.REACT):
+            for n, kind in enumerate(REACTIONS):
+                self.set_text(self.REACT + n, self.react_label(kind).replace("&", "&&"))
+            self.set_text(self.REACT_NOTE, tr("Yesterday's top reaction: {name}").format(
+                name=REACTION_EMOJI[v.yesterday_top] + " " + v.yesterday_top)
+                if v.yesterday_top else "")
 
     def lines(self, text):
         per_line = int(self.WIDTH / 4.2)
@@ -4837,7 +5031,8 @@ class Window:
             para(self.HANDOFF_RULES, tr("Everyone who uses this PC sees handoff "
                                         "notes. No patient or customer details. "
                                         "Not a safety or defect record.") + " "
-                 + tr("Sign it if the next shift may need to ask you."), 2)
+                 + (tr("Your first name will be shown with your note.") if signing()
+                    else tr("Sign it if the next shift may need to ask you.")), 2)
             add(edit, self.HANDOFF_EDIT, "", tab | 0x800000 | 0x80, m, 15)
             y += 18
             add(button, self.HANDOFF_KEEP, tr("&Keep until cleared"), tab | 0x3, m, 14, 120)
@@ -4875,12 +5070,17 @@ class Window:
         if v.pair and not v.state.get("hide_thought"):
             para(self.THOUGHT_LABEL, tr("Thought for today:"), 1)
             para(self.THOUGHT, v.pair[0], 6)
+            if v.counts_thread:
+                for n, kind in enumerate(REACTIONS):
+                    add(button, self.REACT + n, self.react_label(kind), tab, m + n * 75, 16, 70)
+                y += 20
+                add(static, self.REACT_NOTE, "", text_style, m, line)
+                y += line + 6
         if v.pair:
             para(self.TIP_LABEL, tr("Try this today:"), 1)
             para(self.TIP, v.pair[1], 8)
-            if v.tip_people is not None:
-                para(self.TIP_COUNT, tr("People who did today's tip so far: {n}")
-                     .format(n=v.tip_people), 2)
+            if v.counts_thread:
+                para(self.TIP_COUNT, tr("Counting..."), 2)
                 if v.state.get("tip_day") != v.iso:
                     add(button, self.TIP_DONE, tr("I did this &tip"), tab, m, 16, 100)
                     y += 22
@@ -4967,6 +5167,8 @@ class Window:
                 ("GetSysColorBrush", [ctypes.c_int], wt.HBRUSH),
                 ("SetTimer", [wt.HWND, ctypes.c_size_t, wt.UINT, ctypes.c_void_p],
                  ctypes.c_size_t),
+                ("KillTimer", [wt.HWND, ctypes.c_size_t], wt.BOOL),
+                ("GetFocus", [], wt.HWND),
                 ("DialogBoxIndirectParamW", [wt.HINSTANCE, ctypes.c_void_p, wt.HWND,
                                              ctypes.c_void_p, wt.LPARAM], lresult)):
             getattr(user, fn).argtypes, getattr(user, fn).restype = args, res
@@ -5054,6 +5256,11 @@ class Window:
             self.gdi.SetTextColor(wparam, user.GetSysColor(8))
             self.gdi.SetBkColor(wparam, user.GetSysColor(5))
             return user.GetSysColorBrush(5)
+        if msg == 0x113 and wparam == 2:  # WM_TIMER: are the counts in yet?
+            if not (self.visit.counts_thread and self.visit.counts_thread.is_alive()):
+                user.KillTimer(hwnd, 2)
+                self.show_counts()
+            return 1
         if msg == 0x113:  # WM_TIMER, from CLOSE_WINDOW_AFTER
             user.EndDialog(hwnd, 2)
             return 1
@@ -5107,6 +5314,8 @@ class Window:
                     user.SendMessageW(self.item(self.TICK + n), 0xF1, 1, 0)  # BM_SETCHECK
         if CLOSE_WINDOW_AFTER:
             user.SetTimer(self.hwnd, 1, CLOSE_WINDOW_AFTER, None)
+        if self.visit.counts_thread:
+            user.SetTimer(self.hwnd, 2, 150, None)
 
     def ticked(self):
         """The indexes of the ticked things."""
@@ -5152,16 +5361,17 @@ class Window:
             buffer = ctypes.create_unicode_buffer(MAX_PLAN + 2)
             self.user.GetWindowTextW(self.item(self.HANDOFF_EDIT), buffer, MAX_PLAN + 2)
             keep = bool(self.user.SendMessageW(self.item(self.HANDOFF_KEEP), 0xF0, 0, 0))
-            message = leave_handoff(buffer.value, keep)
+            message = leave_handoff(buffer.value, keep, v.state, v.can_save)
             self.fresh = True
             self.reopen(message)
         elif cid == self.TIP_DONE:
             self.set_text(self.STATUS, v.did_tip())
-            if v.tip_people is not None:
-                self.set_text(self.TIP_COUNT, tr("People who did today's tip so far: {n}")
-                              .format(n=v.tip_people))
+            self.show_counts()
             self.show(self.TIP_DONE, False)
             self.focus_plan()
+        elif self.REACT <= cid < self.REACT + len(REACTIONS):
+            self.set_text(self.STATUS, v.react(REACTIONS[cid - self.REACT]))
+            self.show_counts()
         elif cid == self.DID_IT:
             if self.parts and clean(self.typed()) in ("", v.plan()):
                 names = [self.parts[n] for n in self.ticked()]
@@ -5175,6 +5385,11 @@ class Window:
             self.finished = not v.plan()
             self.refresh_plan()
             self.focus_plan()
+        elif cid == self.SAVE and self.item(self.HANDOFF_EDIT) and (
+                self.user.GetFocus() in (self.item(self.HANDOFF_EDIT),
+                                         self.item(self.HANDOFF_KEEP))):
+            # Enter in the handoff box leaves the note, never saves the plan.
+            self.command(self.HANDOFF_LEAVE)
         elif cid == self.SAVE:
             if not self.typed().strip() and v.plan():
                 # An emptied box is a plan to drop, which asks first.

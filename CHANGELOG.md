@@ -1,5 +1,37 @@
 # Changelog
 
+## 2026-10-10: reactions, and handoff that finds you
+
+Version 1.48.0. Skye asked for more on the shared count and Rick and Denise
+for handoff follow-ups; the design went back to them first, and they changed
+it.
+
+From Skye:
+- **Reactions to the thought**: love, ha, dead or eyeroll, typed at the last
+  prompt (the emoji work too) or clicked under the thought in the window.
+  The counts stay hidden until this PC reacts, so nobody is nudged towards
+  the popular answer, and the screen shows yesterday's top reaction. One
+  reaction a PC a day; choosing another moves it.
+- The reference server counts each PC once by a hash made with a key that
+  changes every day, never an ID, and keeps only numbers on disk.
+- The window no longer waits for the server: it opens at once, shows
+  "Counting...", and fills the numbers in from a background thread.
+- README: how to run the public counts server for the individual package.
+  Running one is the owner's step.
+
+From Rick and Denise:
+- hello-world opens by itself at sign-in on a handoff PC when there is a
+  note this Windows account hasn't seen. Its own notes never count.
+- **Handoff on a shared login** (`HandoffSharedLogin`), for PCs where the
+  whole shift is one login such as DOCK3: it opens whenever there are notes,
+  and never signs them.
+- **Sign handoff notes with a first name** (`HandoffSignNames`), off by
+  default as Rick asked; Denise's units can turn it on. The box says the name
+  will show before anyone types, and notes written before it was turned on
+  are never signed.
+- Enter in the window's handoff box leaves the note, which says "Note left
+  for the next shift, 22:40." in both screens.
+
 ## 2026-10-10: remembering, and asking less
 
 Version 1.47.0. Harold (79, mild memory slips) and Sam (in a low period)

@@ -114,6 +114,15 @@
       <string id="SupportLine_Help">このポリシー設定を有効にすると、このテキスト (従業員支援プログラムの電話番号など) が「つらいときの相談先」として、テキスト メニューの選択肢の最後と、ウィンドウの［オプション］の項目に表示されます。いつも同じ場所にあります。勝手に表示されることも、入力内容に反応することもなく、誰が見たかも記録されません。
 
 無効にするか構成しない場合、相談窓口は表示されません。</string>
+      <string id="SUPPORTED_1_48">hello-world 1.48.0 以降</string>
+      <string id="HandoffSharedLogin">共有ログインでの引き継ぎ</string>
+      <string id="HandoffSharedLogin_Help">有効にすると、DOCK3 のようにシフト全員が 1 つの Windows ログインを使う PC 向けに、引き継ぎメモがあればサインイン時に必ず hello-world が開きます。誰が読んだか区別できないためです。メモに名前が付くことはありません。
+
+無効または未構成の場合、この Windows アカウントがまだ見ていないメモがあるときだけサインイン時に開き、自分のメモでは開きません。</string>
+      <string id="HandoffSignNames">引き継ぎメモに名前を付ける</string>
+      <string id="HandoffSignNames_Help">有効にすると、新しい引き継ぎメモの末尾に書いた人の Windows の名前が付き、入力前に欄でそう伝えます。ポリシーを有効にする前のメモには付きません。共有ログインでの引き継ぎと一緒では効果がありません。
+
+無効または未構成の場合、メモに名前は付きません。次のシフトが質問しそうなら署名するよう画面が勧めます。</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">

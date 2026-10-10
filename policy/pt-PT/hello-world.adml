@@ -114,6 +114,15 @@ Quando desativada ou não configurada, as notas aparecem durante 72 horas.</stri
       <string id="SupportLine_Help">Quando ativada, este texto, como o número do programa de apoio ao colaborador, aparece em "Se as coisas pesarem, alguém com quem falar": no fim das opções do menu de texto e como uma entrada nas Opções da janela. Está sempre no mesmo sítio. Nunca aparece sozinho, nunca reage ao que é escrito, e nada regista que alguém o viu.
 
 Quando desativada ou não configurada, não há linha de apoio.</string>
+      <string id="SUPPORTED_1_48">hello-world 1.48.0 ou posterior</string>
+      <string id="HandoffSharedLogin">Passagem de turno com início de sessão partilhado</string>
+      <string id="HandoffSharedLogin_Help">Quando ativada, para PCs em que todo o turno inicia sessão com uma única conta do Windows, como DOCK3: o hello-world abre ao iniciar sessão sempre que houver notas de passagem, porque não sabe quem já as leu, e as notas nunca são assinadas com um nome.
+
+Quando desativada ou não configurada, o hello-world abre ao iniciar sessão só quando há uma nota que esta conta do Windows não viu, e nunca pelas próprias notas.</string>
+      <string id="HandoffSignNames">Assinar as notas de passagem com o primeiro nome</string>
+      <string id="HandoffSignNames_Help">Quando ativada, cada nova nota de passagem termina com o primeiro nome de quem a escreveu, vindo do Windows, e a caixa avisa antes de escrever. Notas deixadas antes de ativar a política nunca são assinadas. Não tem efeito com Passagem de turno com início de sessão partilhado.
+
+Quando desativada ou não configurada, as notas não são assinadas; o ecrã sugere assinar se o turno seguinte puder precisar de perguntar.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">

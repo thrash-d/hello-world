@@ -114,6 +114,15 @@ Quando desabilitada ou não configurada, as notas aparecem por 72 horas.</string
       <string id="SupportLine_Help">Quando habilitada, este texto, como o número do programa de assistência ao empregado, aparece em "Se as coisas pesarem, alguém para conversar": no fim das opções do menu de texto e como um item em Opções da janela. Fica sempre no mesmo lugar. Nunca aparece sozinho, nunca reage ao que é digitado, e nada registra que alguém o viu.
 
 Quando desabilitada ou não configurada, não há linha de apoio.</string>
+      <string id="SUPPORTED_1_48">hello-world 1.48.0 ou posterior</string>
+      <string id="HandoffSharedLogin">Passagem de turno com login compartilhado</string>
+      <string id="HandoffSharedLogin_Help">Quando habilitada, para PCs em que todo o turno entra com um único login do Windows, como DOCK3: o hello-world abre ao entrar sempre que houver notas de passagem, porque não sabe quem já as leu, e as notas nunca são assinadas com um nome.
+
+Quando desabilitada ou não configurada, o hello-world abre ao entrar só quando há uma nota que esta conta do Windows não viu, e nunca pelas próprias notas.</string>
+      <string id="HandoffSignNames">Assinar as notas de passagem com o primeiro nome</string>
+      <string id="HandoffSignNames_Help">Quando habilitada, cada nova nota de passagem termina com o primeiro nome de quem escreveu, vindo do Windows, e a caixa avisa antes de digitar. Notas deixadas antes de ligar a política nunca são assinadas. Não tem efeito com Passagem de turno com login compartilhado.
+
+Quando desabilitada ou não configurada, as notas não são assinadas; a tela sugere assinar se o próximo turno puder precisar perguntar.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">

@@ -576,7 +576,6 @@
   "Everyone who uses this PC sees handoff notes. No patient or customer details. Not a safety or defect record.": "Toutes les personnes qui utilisent ce PC voient les notes de relève. Aucune information sur les patients ou les clients. Ce n'est pas un registre de sécurité ou de défauts.",
   "Keep it until someone clears it? (y or n, Enter for no) > ": "La garder jusqu'à ce que quelqu'un l'efface ? (o ou n, Entrée pour non) > ",
   "Kept until cleared. ": "Gardée jusqu'à effacement. ",
-  "Left for the next shift.": "Laissée pour l'équipe suivante.",
   "No handoff notes in the last {n} hours.": "Aucune note de relève depuis {n} heures.",
   "Shift handoff on this PC (turned on by your organization):": "Relève d'équipe sur ce PC (activée par votre organisation) :",
   "Sign it if the next shift may need to ask you.": "Signez-la si l'équipe suivante peut avoir besoin de vous joindre.",
@@ -619,7 +618,14 @@
   "nothing noted": "rien de noté",
   "{text} (done)": "{text} (fait)",
   "{text} (not sure)": "{text} (pas sûr)",
-  "{text} (still open)": "{text} (encore ouvert)"
+  "{text} (still open)": "{text} (encore ouvert)",
+  "Counting...": "Comptage...",
+  "Note left for the next shift, {time}.": "Note laissée pour l’équipe suivante, {time}.",
+  "React to the thought: type love, ha, dead or eyeroll at the end. The counts show after.": "Réagissez à la pensée : tapez love, ha, dead ou eyeroll à la fin. Les chiffres s’affichent après.",
+  "Reactions so far: {list}": "Réactions jusqu’ici : {list}",
+  "Yesterday's top reaction: {name}": "Réaction la plus donnée hier : {name}",
+  "Your first name will be shown with your note.": "Votre prénom sera affiché avec votre note.",
+  "{text} ({name})": "{text} ({name})"
  },
  "tips_floor": [
   "Vérifiez que votre allée est dégagée avant la première tâche du poste.",

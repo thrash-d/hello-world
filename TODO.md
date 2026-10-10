@@ -14,19 +14,13 @@ Maximizer memo, one round each. 1.44.0 locked notes to the person's Windows
 account; 1.45.0 added the shared tip count and its reference server;
 1.46.0 added shift handoff notes; 1.47.0 added "I'm not sure", dated
 questions, What I did, large text, no follow-up questions, the support line
-and a plan-free reminder by default. The reminder was already offered on the
-first day, right after the first plan.
+and a plan-free reminder by default; 1.48.0 added reactions to the thought,
+a window that doesn't wait for the server, and handoff that opens by itself,
+with policies for shared logins and signed notes. The reminder was already
+offered on the first day, right after the first plan. Running a public
+counts server for the individual package is the owner's step; the README says
+how.
 
-1. Emoji reactions to the thought on the same server, the count shown in
-   the window without waiting for the server (a background thread), and a
-   public counts server for the individual package. Running that server is
-   the owner's step.
-2. Shift handoff follow-ups from the design review: open hello-world by
-   itself at sign-in on handoff PCs when there are new notes (Rick: "nobody
-   reads notes they have to go looking for"), Enter in the window's handoff
-   box leaving the note instead of saving the plan, and a policy to sign
-   notes with the first name for units that want it (Denise; Rick wants the
-   opposite, so it stays off by default).
 6. Fun: a desk pet that sleeps and never dies, a plan graveyard with kind
    eulogies, a company boss fight on the shared counts (Jaylen, Skye).
 7. For engineers: a command-line `hello plan`/`hello done`, todo.txt import,

@@ -3459,17 +3459,23 @@ def test_the_counts_server_counts_each_pc_once_a_day_and_keeps_only_numbers():
                                              method="POST" if post else "GET")
             with urllib.request.urlopen(request, timeout=5) as r:
                 return json.loads(r.read())
-        assert call(f"/v1/day/{day}") == {"tip": 0}
-        assert call(f"/v1/day/{day}/tip", post=True) == {"tip": 1}
-        assert call(f"/v1/day/{day}/tip", post=True) == {"tip": 1}
-        for bad in ("/v1/day/2020-01-01", "/v1/day/nonsense", "/v1/day/../../etc"):
+        none = {"love": 0, "ha": 0, "dead": 0, "eyeroll": 0}
+        assert call(f"/v1/day/{day}") == {"tip": 0, "react": none}
+        assert call(f"/v1/day/{day}/tip", post=True) == {"tip": 1, "react": none}
+        assert call(f"/v1/day/{day}/tip", post=True)["tip"] == 1
+        # One reaction a PC a day: a second one moves it, the same one is kept.
+        assert call(f"/v1/day/{day}/react/love", post=True)["react"] == dict(none, love=1)
+        assert call(f"/v1/day/{day}/react/ha", post=True)["react"] == dict(none, ha=1)
+        assert call(f"/v1/day/{day}/react/ha", post=True)["react"] == dict(none, ha=1)
+        for bad in ("/v1/day/2020-01-01", "/v1/day/nonsense", "/v1/day/../../etc",
+                    f"/v1/day/{day}/react/hate"):
             try:
                 call(bad)
                 raise AssertionError(bad)
             except urllib.error.HTTPError as e:
                 assert e.code == 404, bad
         with open(os.path.join(folder, f"{day}.json"), encoding="utf-8") as f:
-            assert json.load(f) == {"tip": 1}
+            assert json.load(f) == {"tip": 1, "react": dict(none, ha=1)}
         assert os.listdir(folder) == [f"{day}.json"]
     finally:
         server.shutdown()
@@ -3535,11 +3541,65 @@ def test_the_window_counts_the_tip():
         hello = _window_hello(day=day, home=first.home)
         hello.POLICY = {"SharedCountsServer": url}
         visit = hello.Visit()
+        # The numbers come in the background; the window doesn't wait.
+        assert visit.counts_thread is not None
+        items, _ = hello.Window(visit).layout()
+        texts = {cid: text for _, cid, text, *_ in items}
+        assert texts[hello.Window.TIP_COUNT] == "Counting..."
+        visit.counts_thread.join(5)
         assert visit.tip_people == 0
         assert visit.did_tip() == "Counted. People who did today's tip so far: 1"
         assert visit.tip_people == 1
         assert visit.shared_switch() == "Done. Nothing is sent, and no count shows."
         assert "shared" not in notes(first.home)
+    finally:
+        server.shutdown()
+
+
+def test_reactions_stay_hidden_until_this_pc_reacts():
+    server, url, _ = _counts_server()
+    day = _utc_today()
+    policy = {"SharedCountsServer": url}
+    try:
+        first = run(text="y\n\n\n", day=day, policy=policy)
+        out = " ".join(first.stdout.split())
+        assert "React to the thought: type love, ha, dead or eyeroll" in out
+        assert "Reactions so far" not in out
+        p = run(text="\U0001F480\n\n", day=day, policy=policy, home=first.home)
+        out = " ".join(p.stdout.split())
+        assert "Reactions so far: love 0, ha 0, dead 1, eyeroll 0" in out
+        saved = notes(p.home)
+        assert saved["react_day"] == day and saved["react"] == "dead"
+        # Changing it moves the one reaction, and the counts now show.
+        again = run(text="love\n\n", day=day, policy=policy, home=first.home)
+        out = " ".join(again.stdout.split())
+        assert out.count("Reactions so far: love 0, ha 0, dead 1, eyeroll 0") == 1
+        assert "Reactions so far: love 1, ha 0, dead 0, eyeroll 0" in out
+    finally:
+        server.shutdown()
+
+
+def test_yesterdays_top_reaction_shows_and_the_window_reacts():
+    import datetime
+    server, url, folder = _counts_server()
+    day = _utc_today()
+    yesterday = (datetime.date.fromisoformat(day) - datetime.timedelta(days=1)).isoformat()
+    with open(os.path.join(folder, f"{yesterday}.json"), "w", encoding="utf-8") as f:
+        json.dump({"tip": 3, "react": {"love": 2, "ha": 5}}, f)
+    try:
+        first = run(text="y\n\n\n", day=day, policy={"SharedCountsServer": url})
+        assert "Yesterday's top reaction: ha" in " ".join(first.stdout.split())
+        hello = _window_hello(day=day, home=first.home)
+        hello.POLICY = {"SharedCountsServer": url}
+        visit = hello.Visit()
+        visit.counts_thread.join(5)
+        assert visit.yesterday_top == "ha"
+        window = hello.Window(visit)
+        assert window.react_label("love") == "\u2764\ufe0f love"
+        assert visit.react("love") == "Reactions so far: love 1, ha 0, dead 0, eyeroll 0"
+        assert visit.reacted()
+        assert window.react_label("love") == "\u2713 \u2764\ufe0f 1"
+        assert window.react_label("ha") == "\U0001F602 0"
     finally:
         server.shutdown()
 
@@ -3564,7 +3624,7 @@ def test_a_handoff_note_is_shown_to_the_next_person_with_its_age():
     assert "No handoff notes in the last 72 hours." in out
     assert "Everyone who uses this PC sees handoff notes." in out
     assert "Not a safety or defect record." in out
-    assert "Left for the next shift." in out
+    assert "Note left for the next shift, 22:40." in out
     # Someone else, with their own notes, on the same PC the next morning.
     later = _handoff("\n\n", "2026-10-07T06:55", folder)
     assert "1. 8 h ago: Forklift 2 pulling left; Dave out Thu" in later.stdout
@@ -3606,6 +3666,49 @@ def test_a_unit_folder_shares_plain_notes_between_pcs():
     assert "Bladder scanner in 22" in other_pc.stdout
 
 
+def test_a_new_handoff_note_opens_hello_world_but_your_own_does_not():
+    folder = mkdtemp()
+    hello = _window_hello(day="2026-10-02")
+    hello.POLICY, hello.NOW, hello.HANDOFF_DIR = {"ShiftHandoff": 1}, "2026-10-02T07:00", folder
+    state, can_save = hello.load()
+    assert not hello.new_handoff(state)
+    hello.leave_handoff("Mine", state=state, can_save=can_save)
+    assert not hello.new_handoff(state)
+    # Someone else's note, from another Windows login.
+    hello.NOW = "2026-10-02T07:30"
+    hello.leave_handoff("Theirs")
+    state, _ = hello.load()
+    assert hello.new_handoff(state)
+    # Showing the window counts as seeing them, and that is saved.
+    hello.Visit()
+    state, _ = hello.load()
+    assert state["handoff_seen"] == "2026-10-02T07:30"
+    assert not hello.new_handoff(state)
+    # On a shared login nobody can be told apart, so any note opens it.
+    hello.POLICY["HandoffSharedLogin"] = 1
+    assert hello.new_handoff(state)
+
+
+def test_signing_adds_the_first_name_only_to_new_notes():
+    folder = mkdtemp()
+    hello = _window_hello(day="2026-10-02")
+    hello.POLICY, hello.NOW, hello.HANDOFF_DIR = {"ShiftHandoff": 1}, "2026-10-02T07:00", folder
+    hello.first_name = lambda: "Ana"
+    hello.leave_handoff("Before the policy")
+    hello.POLICY["HandoffSignNames"] = 1
+    hello.leave_handoff("Dock door sticks")
+    texts = [n["text"] for n in hello.read_handoff()]
+    assert texts == ["Before the policy", "Dock door sticks (Ana)"]
+    items, _ = hello.Window(hello.Visit()).layout()
+    rules = {cid: text for _, cid, text, *_ in items}[hello.Window.HANDOFF_RULES]
+    assert "Your first name will be shown with your note." in rules
+    # Never on a shared login, where the name would be the login's.
+    hello.POLICY["HandoffSharedLogin"] = 1
+    assert not hello.signing()
+    hello.leave_handoff("Scanner in 22")
+    assert hello.read_handoff()[-1]["text"] == "Scanner in 22"
+
+
 def test_the_window_shows_handoff_notes():
     folder = mkdtemp()
     _handoff("\nhandoff\nPump recall done\nn\n\n", "2026-10-02T06:00", folder)
@@ -3615,7 +3718,7 @@ def test_the_window_shows_handoff_notes():
     texts = {cid: text for _, cid, text, *_ in items}
     assert "1 h ago: Pump recall done" in texts[hello.Window.HANDOFF]
     assert hello.Window.HANDOFF_LEAVE in texts
-    assert hello.leave_handoff("Scanner in 22", keep=True) == "Left for the next shift."
+    assert hello.leave_handoff("Scanner in 22", keep=True) == "Note left for the next shift, 07:00."
     assert hello.clear_handoff(9) == "Nothing changed."
 
 def test_a_new_plan_is_never_overdue_the_moment_it_is_saved():

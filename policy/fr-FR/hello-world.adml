@@ -114,6 +114,15 @@ Si vous désactivez ce paramètre ou ne le configurez pas, les notes s'affichent
       <string id="SupportLine_Help">Si vous activez ce paramètre, ce texte, par exemple le numéro de votre programme d'aide aux employés, s'affiche sous « Si c'est lourd, quelqu'un à qui parler » : à la fin des options du menu texte et comme entrée dans les Options de la fenêtre. Il est toujours au même endroit. Il n'apparaît jamais de lui-même, ne réagit jamais à ce qui est tapé, et rien n'enregistre que quelqu'un l'a consulté.
 
 Si vous désactivez ce paramètre ou ne le configurez pas, il n'y a pas de ligne de soutien.</string>
+      <string id="SUPPORTED_1_48">hello-world 1.48.0 ou ultérieur</string>
+      <string id="HandoffSharedLogin">Relève sur une session partagée</string>
+      <string id="HandoffSharedLogin_Help">Si activé, pour les PC où toute l'équipe ouvre la même session Windows, comme DOCK3 : hello-world s'ouvre à la connexion dès qu'il y a des notes de relève, car il ne peut pas savoir qui les a lues, et les notes ne sont jamais signées d'un nom.
+
+Si désactivé ou non configuré, hello-world s'ouvre à la connexion seulement s'il y a une note que ce compte Windows n'a pas vue, et jamais pour ses propres notes.</string>
+      <string id="HandoffSignNames">Signer les notes de relève avec le prénom</string>
+      <string id="HandoffSignNames_Help">Si activé, chaque nouvelle note de relève se termine par le prénom de son auteur, pris dans Windows, et la zone le dit avant la saisie. Les notes laissées avant l'activation ne sont jamais signées. Sans effet avec Relève sur une session partagée.
+
+Si désactivé ou non configuré, les notes ne sont pas signées ; l'écran suggère de signer si l'équipe suivante peut avoir besoin de demander.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">

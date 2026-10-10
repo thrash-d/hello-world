@@ -575,7 +575,6 @@
   "Everyone who uses this PC sees handoff notes. No patient or customer details. Not a safety or defect record.": "この PC を使う人は全員、引き継ぎメモを見られます。患者や顧客の情報は書かないでください。安全記録や不具合記録ではありません。",
   "Keep it until someone clears it? (y or n, Enter for no) > ": "誰かが消すまで残しますか？（y または n、Enter でいいえ）> ",
   "Kept until cleared. ": "消すまで残す: ",
-  "Left for the next shift.": "次のシフトに残しました。",
   "No handoff notes in the last {n} hours.": "過去 {n} 時間の引き継ぎメモはありません。",
   "Shift handoff on this PC (turned on by your organization):": "この PC のシフト引き継ぎ（組織が有効にしています）:",
   "Sign it if the next shift may need to ask you.": "次のシフトから質問されそうなら、名前を書いてください。",
@@ -618,7 +617,14 @@
   "nothing noted": "記録なし",
   "{text} (done)": "{text}（完了）",
   "{text} (not sure)": "{text}（わからない）",
-  "{text} (still open)": "{text}（未完了）"
+  "{text} (still open)": "{text}（未完了）",
+  "Counting...": "集計中...",
+  "Note left for the next shift, {time}.": "次のシフトへのメモを残しました（{time}）。",
+  "React to the thought: type love, ha, dead or eyeroll at the end. The counts show after.": "今日の言葉に反応するには、最後に love、ha、dead、eyeroll のどれかを入力します。数はそのあと表示されます。",
+  "Reactions so far: {list}": "これまでの反応: {list}",
+  "Yesterday's top reaction: {name}": "昨日いちばん多かった反応: {name}",
+  "Your first name will be shown with your note.": "メモにはあなたの名前が表示されます。",
+  "{text} ({name})": "{text}（{name}）"
  },
  "tips_floor": [
   "シフト最初の作業の前に、通路に物が置かれていないか確認しましょう。",

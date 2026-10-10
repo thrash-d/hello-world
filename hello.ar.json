@@ -575,7 +575,6 @@
   "Everyone who uses this PC sees handoff notes. No patient or customer details. Not a safety or defect record.": "كل من يستخدم هذا الكمبيوتر يرى ملاحظات التسليم. لا بيانات مرضى أو عملاء. هذا ليس سجل سلامة أو أعطال.",
   "Keep it until someone clears it? (y or n, Enter for no) > ": "هل تُبقيها حتى يمسحها أحد؟ (y أو n، Enter للرفض) > ",
   "Kept until cleared. ": "تبقى حتى المسح. ",
-  "Left for the next shift.": "تُركت للمناوبة التالية.",
   "No handoff notes in the last {n} hours.": "لا توجد ملاحظات تسليم في آخر {n} ساعة.",
   "Shift handoff on this PC (turned on by your organization):": "تسليم المناوبة على هذا الكمبيوتر (شغّلته مؤسستك):",
   "Sign it if the next shift may need to ask you.": "وقّعها إن كانت المناوبة التالية قد تحتاج إلى سؤالك.",
@@ -618,7 +617,14 @@
   "nothing noted": "لا شيء مسجّل",
   "{text} (done)": "{text} (تم)",
   "{text} (not sure)": "{text} (غير متأكد)",
-  "{text} (still open)": "{text} (لا تزال مفتوحة)"
+  "{text} (still open)": "{text} (لا تزال مفتوحة)",
+  "Counting...": "جارٍ العدّ...",
+  "Note left for the next shift, {time}.": "تُركت ملاحظة للوردية التالية، {time}.",
+  "React to the thought: type love, ha, dead or eyeroll at the end. The counts show after.": "تفاعل مع الفكرة: اكتب love أو ha أو dead أو eyeroll في النهاية. تظهر الأعداد بعد ذلك.",
+  "Reactions so far: {list}": "التفاعلات حتى الآن: {list}",
+  "Yesterday's top reaction: {name}": "أكثر تفاعل أمس: {name}",
+  "Your first name will be shown with your note.": "سيظهر اسمك الأول مع ملاحظتك.",
+  "{text} ({name})": "{text} ({name})"
  },
  "tips_floor": [
   "التأكد من خلو الممر قبل أول مهمة في الوردية.",

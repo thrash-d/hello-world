@@ -576,7 +576,6 @@
   "Everyone who uses this PC sees handoff notes. No patient or customer details. Not a safety or defect record.": "Todos que usam este computador veem as notas da passagem. Sem dados de pacientes ou clientes. Não é registro de segurança nem de defeitos.",
   "Keep it until someone clears it? (y or n, Enter for no) > ": "Manter até alguém apagar? (s ou n, Enter para não) > ",
   "Kept until cleared. ": "Mantida até alguém apagar. ",
-  "Left for the next shift.": "Deixada para o próximo turno.",
   "No handoff notes in the last {n} hours.": "Nenhuma nota da passagem nas últimas {n} horas.",
   "Shift handoff on this PC (turned on by your organization):": "Passagem de turno neste computador (ativada pela sua organização):",
   "Sign it if the next shift may need to ask you.": "Assine se o próximo turno puder precisar falar com você.",
@@ -619,7 +618,14 @@
   "nothing noted": "nada anotado",
   "{text} (done)": "{text} (feito)",
   "{text} (not sure)": "{text} (sem certeza)",
-  "{text} (still open)": "{text} (ainda em aberto)"
+  "{text} (still open)": "{text} (ainda em aberto)",
+  "Counting...": "Contando...",
+  "Note left for the next shift, {time}.": "Nota deixada para o próximo turno, {time}.",
+  "React to the thought: type love, ha, dead or eyeroll at the end. The counts show after.": "Reaja ao pensamento: digite love, ha, dead ou eyeroll no final. Os números aparecem depois.",
+  "Reactions so far: {list}": "Reações até agora: {list}",
+  "Yesterday's top reaction: {name}": "A reação mais dada ontem: {name}",
+  "Your first name will be shown with your note.": "Seu primeiro nome vai aparecer com a sua nota.",
+  "{text} ({name})": "{text} ({name})"
  },
  "tips_floor": [
   "Confira se o corredor está livre antes da primeira tarefa do turno.",

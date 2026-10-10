@@ -575,7 +575,6 @@
   "Everyone who uses this PC sees handoff notes. No patient or customer details. Not a safety or defect record.": "이 PC를 쓰는 사람은 모두 인계 메모를 볼 수 있어요. 환자나 고객 정보는 적지 마세요. 안전 기록이나 결함 기록이 아니에요.",
   "Keep it until someone clears it? (y or n, Enter for no) > ": "누군가 지울 때까지 남길까요? (y 또는 n, Enter는 아니요) > ",
   "Kept until cleared. ": "지울 때까지 남김. ",
-  "Left for the next shift.": "다음 교대조에게 남겼어요.",
   "No handoff notes in the last {n} hours.": "지난 {n}시간 동안 인계 메모가 없어요.",
   "Shift handoff on this PC (turned on by your organization):": "이 PC의 교대 인계 (조직에서 켰어요):",
   "Sign it if the next shift may need to ask you.": "다음 교대조가 물어볼 수도 있으면 이름을 적어 두세요.",
@@ -618,7 +617,14 @@
   "nothing noted": "기록 없음",
   "{text} (done)": "{text} (완료)",
   "{text} (not sure)": "{text} (잘 모르겠음)",
-  "{text} (still open)": "{text} (아직 진행 중)"
+  "{text} (still open)": "{text} (아직 진행 중)",
+  "Counting...": "세는 중...",
+  "Note left for the next shift, {time}.": "다음 근무조에 메모를 남겼습니다, {time}.",
+  "React to the thought: type love, ha, dead or eyeroll at the end. The counts show after.": "오늘의 생각에 반응하려면 마지막에 love, ha, dead, eyeroll 중 하나를 입력하세요. 숫자는 그다음에 보입니다.",
+  "Reactions so far: {list}": "지금까지의 반응: {list}",
+  "Yesterday's top reaction: {name}": "어제 가장 많았던 반응: {name}",
+  "Your first name will be shown with your note.": "메모에 이름이 함께 표시됩니다.",
+  "{text} ({name})": "{text} ({name})"
  },
  "tips_floor": [
   "첫 작업 전에 다니는 통로에 걸리는 게 없는지 확인하세요.",

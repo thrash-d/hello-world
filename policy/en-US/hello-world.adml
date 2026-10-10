@@ -114,6 +114,15 @@ When disabled or not configured, notes show for 72 hours.</string>
       <string id="SupportLine_Help">When enabled, this text, such as your employee assistance programme's number, shows under "If things feel heavy, someone to talk to": at the end of the text menu's options and as an entry in the window's Options. It is always in the same place. It never appears by itself and never reacts to anything typed, and nothing records that anyone looked at it.
 
 When disabled or not configured, there is no support line.</string>
+      <string id="SUPPORTED_1_48">hello-world 1.48.0 or later</string>
+      <string id="HandoffSharedLogin">Handoff on a shared login</string>
+      <string id="HandoffSharedLogin_Help">When enabled, for PCs where the whole shift signs in to one Windows login, such as DOCK3: hello-world opens at sign-in whenever there are handoff notes, because it can't tell who has read them, and notes are never signed with a name.
+
+When disabled or not configured, hello-world opens at sign-in only when there is a note this Windows account hasn't seen, and never for a person's own notes.</string>
+      <string id="HandoffSignNames">Sign handoff notes with a first name</string>
+      <string id="HandoffSignNames_Help">When enabled, each new handoff note ends with the writer's first name from Windows, and the box says so before anyone types. Notes left before the policy was turned on are never signed. Has no effect with Handoff on a shared login.
+
+When disabled or not configured, notes are not signed; the screen suggests signing one if the next shift may need to ask.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
