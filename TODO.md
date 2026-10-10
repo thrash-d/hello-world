@@ -22,7 +22,8 @@ aside and the weekly boss; 1.51.0 finished the polish list; 1.52.0 added the
 tray icon and the portable zip; 1.53.0 added the phone web app; 1.54.0 added opt-in encrypted sync; 1.55.0 added the scam shield, a
 day start of your own and "the day went sideways"; 1.56.0 brought the
 phone a reminder that arrives, the family buttons, a daily repeat and a
-fridge page. The reminder was already
+fridge page; 1.57.0 brought the daily repeat and the fridge page to
+Windows. The reminder was already
 offered on the first day, right after the first plan. Running a public
 counts server for the individual package is the owner's step; the README says
 how.
@@ -31,8 +32,7 @@ how.
    the owner's go-ahead to commit; selling it is the owner's step.
 2. An outside review of the sync encryption, and of the push signing,
    before they're promoted widely.
-3. Round 85, Windows: the daily repeat and the fridge page.
-4. Pro-only ideas from the memos (Discord and calendar reminders, presets for
+3. Pro-only ideas from the memos (Discord and calendar reminders, presets for
    night shift, drive days, job hunts, shifts and rent, quarterly targets, a
    gift key card) wait for Pro itself (item 1). A family key waits for a
    decision on children's privacy law.

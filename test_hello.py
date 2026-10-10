@@ -3123,8 +3123,9 @@ def test_menu_option_12_has_the_windows_other_settings():
     assert "The greeting uses your first name." in p.stdout
     assert "Finished plans are kept for a year instead of 14 days." in p.stdout
     assert "Days you opened hello-world: 1" in p.stdout
-    # Windows also lists Keep hello-world in the tray; My day starts at is last.
-    entries = 14 if os.name == "nt" else 13
+    # Windows also lists Keep hello-world in the tray; Every day, the fridge
+    # page and My day starts at come last.
+    entries = 16 if os.name == "nt" else 15
     assert f'Type a number from 1 to {entries}, or press Enter to go back.' in p.stdout
     saved = notes(p.home)
     assert saved["name"] is True and saved["long_history"] is True
@@ -4575,3 +4576,70 @@ def test_es256_matches_node():
                             Buffer.from("{sig.hex()}", "hex"));
         console.log(JSON.stringify(ok));""")
     assert got is True
+
+
+def test_a_daily_repeat_has_its_own_task_and_leaves_its_words_out_by_default():
+    first = run(text="Call Ana\n\n")
+    hello = _window_hello(home=first.home)
+    hello.TASKS, hello.SHOWN = [], []
+    state, can_save = hello.load()
+    said = hello.set_repeat(state, can_save, "Take my pills", "08:00")
+    assert "not a medical device" in said and "leaves the words out" in said
+    assert hello.TASKS == ["repeat 08:00"] and hello.task_on(hello.REPEAT_TASK_NAME)
+    assert not hello.task_on()
+    assert notes(first.home)["repeat"] == {"text": "Take my pills", "at": "08:00"}
+    assert hello.REPEAT_TASK_NAME.startswith("hello-world reminder repeat ")
+    hello.show_repeat()
+    assert "Your daily reminder from hello-world." in hello.SHOWN[-1]
+    assert "pills" not in hello.SHOWN[-1]
+    state["plan_in_reminder"] = True
+    assert hello.save(state)
+    hello.show_repeat()
+    assert "Take my pills" in hello.SHOWN[-1]
+    # An hour that isn't offered changes nothing; off removes the task.
+    assert hello.set_repeat(state, can_save, "x", "07:13") == "Nothing changed."
+    assert hello.set_repeat(state, can_save, None) == "The daily reminder is off."
+    assert hello.TASKS[-1] == "repeat None" and "repeat" not in notes(first.home)
+    # Delete everything takes the repeat and its task with it.
+    hello.set_repeat(state, can_save, "Water the plants", "18:00")
+    hello.FORCE_INTERACTIVE = True
+    hello.delete_everything(state)
+    assert hello.TASKS[-1] == "repeat None" and "repeat" not in notes(first.home)
+
+
+def test_the_text_menu_sets_a_daily_repeat():
+    first = run(text="Call Ana\n\n")
+    hello = _window_hello(home=first.home)
+    hello.TASKS = []
+    state, can_save = hello.load()
+    labels = []
+    hello.say = lambda text="": labels.append(text)
+    n = None
+
+    def ask(prompt):
+        nonlocal n
+        if n is None:
+            n = next(i for i, line in enumerate(labels, 1) if "Every day..." in line)
+            return str(n)
+        if prompt.startswith("Type it"):
+            return "Take my pills"
+        return "1"
+    hello.ask = ask
+    hello.more_settings(state, can_save)
+    assert notes(first.home)["repeat"] == {"text": "Take my pills", "at": "08:00"}
+
+
+def test_the_fridge_page_is_big_print_and_never_has_the_sync_code():
+    first = run(text="Call Ana; buy milk\n\n")
+    hello = _window_hello(home=first.home)
+    hello.STARTED = []
+    state, can_save = hello.load()
+    state["sync"] = "abcde-fghjk-mnpqr-stuvw-xyz23"
+    state["repeat"] = {"text": "Take my <pills>", "at": "08:00"}
+    said = hello.fridge_page(state, hello.today())
+    page = hello.STARTED[-1]
+    assert "Print it from there" in said
+    assert '<p class="big">Call Ana</p>' in page and '<p class="big">buy milk</p>' in page
+    assert "Take my &lt;pills&gt;" in page and "<pills>" not in page
+    assert "Anyone in the room can read" in page and "abcde" not in page
+    assert "onload=\"print()\"" in page

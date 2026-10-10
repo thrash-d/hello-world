@@ -83,7 +83,14 @@ instead of sign-in, opens
 the window after you answer, and comes on weekends only if you choose **Also
 on weekends**. The same menu also has **My day starts at**: midnight, 4:00,
 12:00 or 18:00, when "today" turns into tomorrow; 18:00 keeps a night shift
-from 22:00 to 6:00 on one day. Days your organization
+from 22:00 to 6:00 on one day. **Every day at...** adds a daily repeat, such
+as taking pills, with its own reminder at one of those times (type the words
+in the plan box first; in the text screen it's **Every day...**). It's a
+reminder only, not a medical device, and its notification leaves the words
+out unless **Show my plan in the reminder** is on. **My plans > Print a big
+page for the fridge** opens today's plan and the daily repeat in big print in
+the browser, to print; it says anyone in the room can read it, and never has
+the sync code. Days your organization
 lists as holidays are quiet too. **Options > Greet me by name** puts your
 first name at the top. Turning off **What the window shows > Also show the
 thought** hides the thought and keeps the tip.
@@ -486,7 +493,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.56.0'
+$tag = 'v1.57.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
