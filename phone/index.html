@@ -35,6 +35,9 @@
   .picks { display: grid; gap: 10px; }
   a.button { display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 700; min-height: 64px; border-radius: 12px; border: 2px solid var(--accent); color: var(--accent); text-decoration: none; padding: 8px; }
   #fridge { display: none; }
+  body.large { font-size: 24px; }
+  body.large button, body.large a.button { min-height: 80px; }
+  .small-button { min-height: 44px; font-size: .95rem; }
   [hidden] { display: none !important; }
   /* The fridge page: only the day, the plan and the daily repeat, big. */
   @media print {
@@ -51,6 +54,7 @@
 <main>
   <h1 id="hello">Hello, world!</h1>
   <p class="date" id="date"></p>
+  <p><button class="small-button" id="large"></button></p>
   <p class="status" id="status" role="status" aria-live="polite"></p>
 
   <section id="ask" hidden>
@@ -62,6 +66,20 @@
       <button id="skip"></button>
     </div>
     <button class="wide" id="sideways"></button>
+    <div class="row" id="fork" hidden style="margin-top:10px">
+      <button class="primary" id="carry-it"></button>
+      <button id="aside-it"></button>
+    </div>
+  </section>
+
+  <section id="smaller-offer" hidden>
+    <h2 id="coming-back"></h2>
+    <input type="text" id="smaller-input" maxlength="200" autocomplete="off">
+    <div class="buttons">
+      <button class="primary" id="make-smaller"></button>
+      <button id="aside-smaller"></button>
+      <button id="keep-it"></button>
+    </div>
   </section>
 
   <section id="today">
@@ -71,6 +89,7 @@
       <button class="done" id="did"></button>
       <button id="clear"></button>
     </div>
+    <p class="note" id="smaller-nudge" hidden></p>
     <form id="plan-form">
       <input type="text" id="plan-input" maxlength="200" autocomplete="off" enterkeyhint="done">
       <button class="primary" id="save" type="submit"></button>
@@ -80,6 +99,11 @@
       <div class="picks" id="picks-list"></div>
     </div>
     <p class="note" id="repeat-today" hidden></p>
+    <button class="wide" id="end-day" hidden></button>
+    <div id="end-panel" hidden>
+      <div id="end-list"></div>
+      <button class="primary wide" id="end-close"></button>
+    </div>
   </section>
 
   <section id="family-buttons" hidden>
