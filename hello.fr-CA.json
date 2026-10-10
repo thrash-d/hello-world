@@ -30,7 +30,13 @@
   "Put aside, ready to bring back:": "Mis de côté, prêts à reprendre:",
   "The old code no longer works. Type the new code on your phone: choose Sync there, then Change code.": "L'ancien code ne fonctionne plus. Tapez le nouveau sur votre téléphone: choisissez Synchroniser, puis Changer le code.",
   "Then the code stays hidden. Hang up: hello-world never calls, and nobody needs your code to help you.": "Alors le code reste caché. Raccrochez: hello-world n'appelle jamais, et personne n'a besoin de votre code pour vous aider.",
-  "Use: hello sync on, off, now, code or new": "Utilisation: hello sync on, off, now, code ou new"
+  "Use: hello sync on, off, now, code or new": "Utilisation: hello sync on, off, now, code ou new",
+  "Every day at {at}: what's typed in the plan box": "Chaque jour à {at}: ce qui est tapé dans la case du plan",
+  "Every day at {at}: {text}": "Chaque jour à {at}: {text}",
+  "Every day at {at}: {text}. A reminder only, not a medical device.": "Chaque jour à {at}: {text}. Un simple rappel, pas un dispositif médical.",
+  "Stop the daily reminder: {text}": "Arrêter le rappel quotidien: {text}",
+  "Today: {date}": "Aujourd'hui: {date}",
+  "The notification leaves the words out, for a shared screen; Show my plan in the reminder puts them in.": "La notification n'affiche pas les mots, pour un écran partagé; Afficher mon plan dans le rappel les affiche."
  },
  "thoughts": {
   "13": "Si la matinée n'a rien donné, choisissez une tâche après le dîner et commencez-la avant de consulter vos messages.",

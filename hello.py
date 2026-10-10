@@ -517,7 +517,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.56.0"
+VERSION = "1.57.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -1886,6 +1886,10 @@ def load(repair=True):
     DAY_START = state.get("day_start", 0)
     if raw.get("remind_at") in REMINDER_TIMES:
         state["remind_at"] = raw["remind_at"]
+    every = raw.get("repeat")
+    if (isinstance(every, dict) and isinstance(every.get("text"), str)
+            and every.get("at") in REMINDER_TIMES and clean(every["text"])):
+        state["repeat"] = {"text": clean(every["text"]), "at": every["at"]}
     code = raw.get("sync")
     if isinstance(code, str) and re.fullmatch(r"([%s]{5}-){4}[%s]{5}" % (SYNC_ALPHABET, SYNC_ALPHABET), code):
         state["sync"] = code
@@ -2511,6 +2515,8 @@ def delete_everything(state):
             say(tr("Could not list the folder, so backup copies may remain:"))
             say("  " + data_dir())
         return False
+    if state.get("repeat"):
+        reminder_task(None, repeat=True)
     settings = {k: state[k] for k in SETTINGS if k in state}
     state.clear()
     state.update(new_state())
@@ -3137,6 +3143,24 @@ def more_settings(state, can_save):
             later.append((tr("Take back a Done..."), take_back_one))
         pick(later)
 
+    def every_day():
+        if every := state.get("repeat"):
+            para(tr("Every day at {at}: {text}").format(at=every["at"].lstrip("0"),
+                                                       text=every["text"]))
+        para(tr("Something to do every day, such as taking pills, with its own "
+                "reminder. A reminder only, not a medical device."))
+        typed = ask(tr("Type it, off to stop it, or Enter to go back > "))
+        word = (typed or "").strip(TRIM).lower()
+        if word in QUIT_WORDS:
+            raise Quit
+        if not word:
+            return
+        if word in ("off",) + NO_WORDS:
+            para(set_repeat(state, can_save, None))
+            return
+        pick([(tr("At {at}").format(at=t.lstrip("0")),
+               lambda t=t: para(set_repeat(state, can_save, typed, t))) for t in REMINDER_TIMES])
+
     def take_back_one():
         rows = newest_first(state["finished"])[:20]
         pick([(f"{long_date(datetime.date.fromisoformat(r['date']))}: {r['text']}",
@@ -3199,6 +3223,9 @@ def more_settings(state, can_save):
         entries.append((marked(tr("Keep hello-world in the tray"), state.get("tray")),
                         lambda: para(set_tray(state, can_save, not state.get("tray")))))
     if not plans_off():
+        entries.append((tr("Every day..."), every_day))
+        entries.append((tr("Print a big page for the fridge"),
+                        lambda: para(fridge_page(state, today()))))
         entries.append((tr("My day starts at..."), lambda: pick([
             (marked(day_start_label(h), state.get("day_start", 0) == h),
              lambda h=h: para(set_day_start(state, can_save, h))) for h in DAY_STARTS])))
@@ -3280,6 +3307,83 @@ def set_day_start(state, can_save, hour):
         return tr("Could not save that choice on this computer.")
     DAY_START = hour
     return tr("Your day now starts at {at}.").format(at=f"{hour}:00")
+
+
+def set_repeat(state, can_save, text, at=None):
+    """Something to do every day at a set time, with its own reminder (Ron's
+    pills), or none for text None. Returns what to say."""
+    refresh(state, can_save)
+    text = clean(text or "")
+    if text and at not in REMINDER_TIMES:
+        return tr("Nothing changed.")
+    if not reminder_task(at if text else None, repeat=True) and text:
+        return tr("Could not set up the reminder.")
+    base = copy.deepcopy(state)
+    if text:
+        state["repeat"] = {"text": text, "at": at}
+    else:
+        state.pop("repeat", None)
+    if not commit(state, base, can_save):
+        undo(state, base)
+        return tr("Could not save that choice on this computer.")
+    if not text:
+        return tr("The daily reminder is off.")
+    return (tr("Every day at {at}: {text}. A reminder only, not a medical device.")
+            .format(at=at.lstrip("0"), text=text) + " " + (
+        tr("The notification shows these words.") if state.get("plan_in_reminder") else
+        tr("The notification leaves the words out, for a shared screen; Show my plan "
+           "in the reminder puts them in.")))
+
+
+def show_repeat():
+    """The daily repeat's notification, from its task."""
+    state, _ = load()
+    every = state.get("repeat")
+    if not every:
+        return 0
+    shown = (every["text"] if state.get("plan_in_reminder")
+             else tr("Your daily reminder from hello-world."))
+    notify('<toast activationType="protocol" launch="hello-world:open">'
+           '<visual><binding template="ToastGeneric">'
+           f'<text>{xml_text(shown)}</text>'
+           '</binding></visual></toast>')
+    return 0
+
+
+def fridge_page(state, d):
+    """A big-print page for the fridge (Walt, Dolores): the day, the plan and
+    the daily repeat, opened in the browser to print. Never the sync code.
+    Returns what to say."""
+    import html
+    import tempfile
+    intent = state.get("intent")
+    lines = [(tr("Today: {date}").format(date=long_date(d)), "h")]
+    if intent and not plans_off():
+        lines += [(p, "big") for p in plan_parts(intent["text"])]
+    if every := state.get("repeat"):
+        lines.append((tr("Every day at {at}: {text}").format(
+            at=every["at"].lstrip("0"), text=every["text"]), "big"))
+    lines.append((tr("Anyone in the room can read a printed page. The sync code is "
+                     "never on it."), "note"))
+    rtl = language() in RIGHT_TO_LEFT
+    page = ('<!doctype html><meta charset="utf-8"><title>hello-world</title>'
+            '<style>body{font-family:Segoe UI,sans-serif;margin:2cm}'
+            'h1{font-size:28pt}.big{font-size:40pt;font-weight:700;margin:0 0 18pt}'
+            '.note{font-size:12pt}</style>'
+            f'<body dir="{"rtl" if rtl else "ltr"}" onload="print()">'
+            + "".join(f"<h1>{html.escape(t)}</h1>" if k == "h" else
+                      f'<p class="{k}">{html.escape(t)}</p>' for t, k in lines))
+    if STARTED is not None:
+        STARTED.append(page)
+        return tr("The page opened in your browser. Print it from there.")
+    try:
+        with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False,
+                                         encoding="utf-8") as f:
+            f.write(page)
+        os.startfile(f.name)
+    except (OSError, AttributeError):
+        return tr("Could not print just now.")
+    return tr("The page opened in your browser. Print it from there.")
 
 
 def sync_prompt(state, can_save):
@@ -5406,7 +5510,7 @@ def main():
             pass
     args = [a.lower() for a in sys.argv[1:]]
     # pythonw.exe has no stdout, so the window and the sign-in run start here.
-    if (args in (["--window"], ["--tray"]) or args[:1] == ["--answer"] and len(args) == 2
+    if (args in (["--window"], ["--tray"], ["--repeat"]) or args[:1] == ["--answer"] and len(args) == 2
             or args == ["--startup"] and sys.stdout is None):
         try:
             return gui(args)
@@ -5501,6 +5605,8 @@ def gui(args):
             return sign_in()
         if args == ["--tray"]:
             return run_tray()
+        if args == ["--repeat"]:
+            return show_repeat()
         return show_window()
 
 
@@ -5558,6 +5664,9 @@ TASKS = None
 # carries their user name.
 TASK_NAME = "hello-world reminder " + "-".join(
     filter(None, (os.environ.get("USERDOMAIN"), os.environ.get("USERNAME") or "user")))
+# The daily repeat's own task. "hello-world reminder" first, so the
+# all-users uninstall finds it with the others.
+REPEAT_TASK_NAME = TASK_NAME.replace("reminder ", "reminder repeat ", 1)
 # Before 1.37.0 the task carried only the user name.
 OLD_TASK_NAME = "hello-world reminder " + (os.environ.get("USERNAME") or "user")
 REMINDER_TIMES = ("08:00", "09:00", "10:00", "13:00", "15:00", "18:00", "22:00")
@@ -5601,11 +5710,13 @@ def move_old_task():
         reminder_task(at)
 
 
-def reminder_task(at):
-    """Create the daily reminder task at "HH:MM", or remove it for None.
-    It runs as this user, so it needs no administrator. True when it worked."""
+def reminder_task(at, repeat=False):
+    """Create the daily reminder task at "HH:MM", or remove it for None; with
+    repeat, the daily repeat's task. It runs as this user, so it needs no
+    administrator. True when it worked."""
+    name, arg = (REPEAT_TASK_NAME, "--repeat") if repeat else (TASK_NAME, "--startup")
     if TASKS is not None:
-        TASKS.append(at)
+        TASKS.append(f"repeat {at}" if repeat else at)
         return True
     if os.name != "nt":
         return False
@@ -5614,9 +5725,9 @@ def reminder_task(at):
     from xml.sax.saxutils import escape
     flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     if not at:
-        r = subprocess.run(["schtasks", "/Delete", "/F", "/TN", TASK_NAME],
+        r = subprocess.run(["schtasks", "/Delete", "/F", "/TN", name],
                            capture_output=True, creationflags=flags)
-        return r.returncode == 0 or not task_on()
+        return r.returncode == 0 or not task_on(name)
     # StartWhenAvailable runs it at the next sign-in when the PC was off at
     # the time, which schtasks /Create can only set from XML.
     xml = ('<?xml version="1.0" encoding="UTF-16"?>'
@@ -5631,13 +5742,13 @@ def reminder_task(at):
            '<MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>'
            '</Settings><Actions><Exec>'
            f'<Command>{escape(window_python())}</Command>'
-           f'<Arguments>-I "{escape(os.path.abspath(__file__))}" --startup</Arguments>'
+           f'<Arguments>-I "{escape(os.path.abspath(__file__))}" {arg}</Arguments>'
            '</Exec></Actions></Task>')
     fd, path = tempfile.mkstemp(suffix=".xml")
     try:
         with os.fdopen(fd, "w", encoding="utf-16") as f:
             f.write(xml)
-        r = subprocess.run(["schtasks", "/Create", "/F", "/TN", TASK_NAME,
+        r = subprocess.run(["schtasks", "/Create", "/F", "/TN", name,
                             "/XML", path], capture_output=True, creationflags=flags)
         return r.returncode == 0
     except OSError:
@@ -5649,13 +5760,16 @@ def reminder_task(at):
             pass
 
 
-def task_on():
+def task_on(name=None):
+    name = name or TASK_NAME
     if TASKS is not None:
-        return bool(TASKS and TASKS[-1])
+        repeat = name == REPEAT_TASK_NAME
+        mine = [t for t in TASKS if str(t).startswith("repeat ") == repeat]
+        return bool(mine and mine[-1] and mine[-1] != "repeat None")
     if os.name != "nt":
         return False
     import subprocess
-    return subprocess.run(["schtasks", "/Query", "/TN", TASK_NAME],
+    return subprocess.run(["schtasks", "/Query", "/TN", name],
                           capture_output=True,
                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)
                           ).returncode == 0
@@ -7127,6 +7241,15 @@ class Window:
                          tr("My day starts at {at}").format(at=day_start_label(h)))
                         for n, h in enumerate(DAY_STARTS)]
             entries.append((0x800, 0, None))
+            every = v.state.get("repeat")
+            entries += [(checked if every and every["at"] == t else 0, 50 + n,
+                         tr("Every day at {at}: what's typed in the plan box").format(
+                             at=t.lstrip("0")))
+                        for n, t in enumerate(REMINDER_TIMES)]
+            if every:
+                entries.append((0, 49, tr("Stop the daily reminder: {text}").format(
+                    text=every["text"])))
+            entries.append((0x800, 0, None))
         switches = reminder_switches()
         for n, (key, label, _, _) in enumerate(switches):
             entries.append((checked if v.state.get(key) else 0, 20 + n, label))
@@ -7140,6 +7263,19 @@ class Window:
         elif 20 <= choice < 20 + len(switches):
             key, _, on_text, off_text = switches[choice - 20]
             self.set_text(self.STATUS, v.switch(key, on_text, off_text))
+        elif 50 <= choice < 50 + len(REMINDER_TIMES):
+            # The words come from the plan box, as a pet's name comes from
+            # the text screen: the window has no other box to type in.
+            typed = clean(self.typed())
+            if not typed:
+                self.inform(tr("Type what to do every day in the plan box, then choose "
+                               "the time again."))
+                return
+            self.set_text(self.PLAN, v.plan())
+            self.set_text(self.STATUS, set_repeat(v.state, v.can_save, typed,
+                                                  REMINDER_TIMES[choice - 50]))
+        elif choice == 49:
+            self.set_text(self.STATUS, set_repeat(v.state, v.can_save, None))
         elif 40 <= choice < 40 + len(DAY_STARTS):
             self.set_text(self.STATUS, set_day_start(v.state, v.can_save,
                                                      DAY_STARTS[choice - 40]))
@@ -7328,7 +7464,11 @@ class Window:
         if not gentle(v.state):
             entries.append((checked if v.state.get("farewells") else 0, 22,
                             tr("Funny farewells for plans put aside")))
+        entries.append((0, 23, tr("Print a big page for the fridge")))
         choice = self.popup(entries)
+        if choice == 23:
+            self.set_text(self.STATUS, fridge_page(v.state, v.d))
+            return
         if choice == 21:
             picked_row = self.popup([(0, 500 + n, line[:90]) for n, line in enumerate(lines)])
             if picked_row:

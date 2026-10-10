@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-10-10: a daily repeat and a fridge page on Windows
+
+Version 1.57.0. What the trusting boomers asked for, on the PC too.
+
+- **Every day at...**: something to do every day, such as Ron's pills, with
+  its own reminder task at a time from the reminder list. It's labeled a
+  reminder, not a medical device, and the notification leaves the words out
+  unless **Show my plan in the reminder** is on. Turning it off, or Delete
+  everything, removes the task; uninstalling removes it too.
+- **Print a big page for the fridge** (Walt, Dolores): today's plan and the
+  daily repeat in big print, opened in the browser to print, saying anyone in
+  the room can read it. The sync code is never on it.
+
 ## 2026-10-10: a phone reminder that arrives, and the phone catches up
 
 Version 1.56.0. The pessimist round's one ask, from all eight: the reminder
