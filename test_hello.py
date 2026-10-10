@@ -3941,8 +3941,16 @@ def test_the_bash_shim_is_written_the_same_by_both_installers():
         shims.append([line.strip().rstrip(",")[1:-1].replace("''", "'")
                       for line in block.splitlines()])
     assert shims[0] == shims[1] and shims[0][0] == "#!/usr/bin/env bash"
-    check = subprocess.run(["bash", "-n"], input="\n".join(shims[0]) + "\n", text=True)
-    assert check.returncode == 0
+    bash = shutil.which("bash")
+    if os.name == "nt":
+        # bash on PATH there is WSL's launcher, which needs a distribution;
+        # Git for Windows has a real one next to git.
+        git = shutil.which("git")
+        found = [os.path.join(os.path.dirname(os.path.dirname(git)), "bin", "bash.exe")] if git else []
+        bash = next((b for b in found if os.path.isfile(b)), None)
+    if bash:
+        check = subprocess.run([bash, "-n"], input="\n".join(shims[0]) + "\n", text=True)
+        assert check.returncode == 0
 
 
 def test_the_desk_pet_is_opt_in_gets_things_and_never_dies():
