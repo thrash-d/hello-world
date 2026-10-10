@@ -3823,3 +3823,123 @@ def test_the_reminder_leaves_the_plan_out_unless_it_is_turned_on():
     assert hello.sign_in() == 0
     texts = [t.text for t in ET.fromstring(hello.SHOWN[0]).iter("text")]
     assert texts == ["Yesterday you planned: Report & slides", "Did you do it?"]
+
+
+def test_the_command_line_sets_shows_and_finishes_a_plan():
+    p = run(["plan", "Fix flaky test; review PR 88 by Friday"], day="2026-10-05")
+    assert p.returncode == 0 and "Saved. Due Friday, 9 October 2026." in p.stdout
+    shown = run(["plan"], day="2026-10-05", home=p.home)
+    assert shown.stdout.splitlines()[:2] == ["1  Fix flaky test", "2  review PR 88 by Friday"]
+    data = json.loads(run(["plan", "--json"], day="2026-10-05", home=p.home).stdout)
+    assert data == {"date": "2026-10-05", "due": "2026-10-09",
+                    "things": ["Fix flaky test", "review PR 88 by Friday"]}
+    assert run(["add", "ship 1.2"], day="2026-10-05", home=p.home).returncode == 0
+    again = run(["add", "Ship 1.2"], day="2026-10-05", home=p.home)
+    assert "already on the plan" in again.stdout
+    # A bare done on several things refuses, so a standup never overstates.
+    bare = run(["done"], day="2026-10-05", home=p.home)
+    assert bare.returncode == 2 and "done all" in bare.stdout
+    assert run(["done", "7"], day="2026-10-05", home=p.home).returncode == 2
+    two = run(["done", "2"], day="2026-10-05", home=p.home)
+    assert two.stdout.strip() == "Done: review PR 88 by Friday. The rest is kept for today."
+    assert notes(p.home)["intent"]["text"] == "Fix flaky test; ship 1.2"
+    assert run(["done", "all"], day="2026-10-05", home=p.home).returncode == 0
+    assert notes(p.home)["intent"] is None
+    assert run(["done"], day="2026-10-05", home=p.home).returncode == 1
+    assert run(["plan"], day="2026-10-05", home=p.home).stdout.strip() == "No plan for today."
+
+
+def test_the_command_line_respects_plans_turned_off():
+    p = run(["plan", "Anything"], policy={"DisablePlans": 1})
+    assert p.returncode == 1 and "Plans are turned off by your organization." in p.stdout
+
+
+def test_todo_txt_import_reads_open_tasks_and_never_duplicates():
+    folder = mkdtemp()
+    path = os.path.join(folder, "todo.txt")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("(A) 2026-10-01 Call Ana +hiring @phone due:2026-10-08\n"
+                "x 2026-10-02 Done already\n\n"
+                "Review PR 88; carefully +core\n"
+                "Write the RFC due:2026-10-20\n")
+    listed = run(["import", path], day="2026-10-05")
+    assert listed.returncode == 2
+    assert "1  Call Ana +hiring @phone (due:2026-10-08)" in listed.stdout
+    assert "Done already" not in listed.stdout
+    p = run(["import", path, "--pick", "1", "2"], day="2026-10-05", home=listed.home)
+    assert p.returncode == 0 and "Due Thursday, 8 October 2026." in p.stdout
+    saved = notes(p.home)["intent"]
+    assert saved["text"] == "Call Ana +hiring @phone; Review PR 88, carefully +core"
+    assert saved["due"] == "2026-10-08"
+    # Running it again adds only what isn't there yet.
+    again = run(["import", path, "--pick", "1-3"], day="2026-10-05", home=p.home)
+    assert notes(again.home)["intent"]["text"].count("Call Ana") == 1
+    assert notes(again.home)["intent"]["text"].endswith("; Write the RFC")
+    with open(path, encoding="utf-8") as f:
+        assert "x 2026-10-02 Done already" in f.read()
+    typed = run(["import", path], text="3\n", day="2026-10-05")
+    assert notes(typed.home)["intent"]["text"] == "Write the RFC"
+    assert run(["import", os.path.join(folder, "missing.txt")]).returncode == 1
+
+
+def _git(folder, *args, when=None, email="pri@example.com"):
+    env = dict(os.environ, GIT_AUTHOR_NAME="P", GIT_COMMITTER_NAME="P",
+               GIT_AUTHOR_EMAIL=email, GIT_COMMITTER_EMAIL=email)
+    if when:
+        env.update(GIT_AUTHOR_DATE=when, GIT_COMMITTER_DATE=when)
+    subprocess.run(["git", "-C", folder, *args], check=True, env=env,
+                   capture_output=True)
+
+
+def test_standup_covers_since_the_last_workday_with_commits_from_several_repos():
+    if not shutil.which("git"):
+        raise unittest.SkipTest("needs git")
+    root = mkdtemp()
+    for name in ("api", "web"):
+        repo = os.path.join(root, name)
+        os.makedirs(repo)
+        _git(repo, "init", "-q")
+        _git(repo, "config", "user.email", "pri@example.com")
+        _git(repo, "commit", "-q", "--allow-empty", "-m", f"old {name}",
+             when="2026-09-30T10:00:00")
+        _git(repo, "commit", "-q", "--allow-empty", "-m", f"fix {name} flake",
+             when="2026-10-02T10:00:00")
+        _git(repo, "commit", "-q", "--allow-empty", "-m", "someone else",
+             when="2026-10-02T11:00:00", email="other@example.com")
+    # Friday's plan, finished Friday; Monday's standup covers Friday.
+    p = run(["plan", "Fix flaky test; review PR 88"], day="2026-10-02")
+    run(["done", "1"], day="2026-10-02", home=p.home)
+    up = run(["standup", "--git", "--repos", os.path.join(root, "*")],
+             day="2026-10-05", home=p.home)
+    assert up.returncode == 0
+    assert up.stdout.splitlines() == [
+        "Since Friday, 2 October 2026:", "- Fix flaky test", "Commits:",
+        "- api: fix api flake", "- web: fix web flake", "Today:", "- review PR 88"]
+    # Remembered, a plain standup uses the same repos, and --author adds more.
+    run(["standup", "--repos", os.path.join(root, "*"), "--author", "pri@example.com",
+         "other@example.com", "--remember"], day="2026-10-05", home=p.home)
+    assert notes(p.home)["standup"]["git"] is True
+    data = json.loads(run(["standup", "--json"], day="2026-10-05", home=p.home).stdout)
+    assert data["since"] == "2026-10-02" and len(data["commits"]) == 4
+    off = run(["standup", "--no-git"], day="2026-10-05", home=p.home)
+    assert "Commits:" not in off.stdout
+    assert run(["standup", "--bogus"], day="2026-10-05", home=p.home).returncode == 2
+
+
+def test_export_prints_plain_text_to_grep():
+    p = run(["plan", "Fix flaky test; review PR 88"], day="2026-10-05")
+    run(["done", "1"], day="2026-10-05", home=p.home)
+    out = run(["export"], day="2026-10-06", home=p.home).stdout.splitlines()
+    assert out == ["2026-10-05\tdone\tFix flaky test", "2026-10-05\topen\treview PR 88"]
+
+
+def test_the_bash_shim_is_written_the_same_by_both_installers():
+    shims = []
+    for name in ("install.ps1", "install-user.ps1"):
+        with open(os.path.join(os.path.dirname(__file__), name), encoding="utf-8") as f:
+            block = re.search(r"\$shim = @\(\r?\n(.*?)\r?\n\s*\)", f.read(), re.S).group(1)
+        shims.append([line.strip().rstrip(",")[1:-1].replace("''", "'")
+                      for line in block.splitlines()])
+    assert shims[0] == shims[1] and shims[0][0] == "#!/usr/bin/env bash"
+    check = subprocess.run(["bash", "-n"], input="\n".join(shims[0]) + "\n", text=True)
+    assert check.returncode == 0

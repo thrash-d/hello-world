@@ -127,7 +127,9 @@ the pull request named.
 | Design review, round 74 | "Not in" for days Harold wasn't at work | Harold | Not possible without keeping every visit date, which is off by default for privacy; shown as "nothing noted" |
 | Design review, round 74 | A family member seeing the history | Harold | Not built: it would send plans off the PC |
 | Personas, 1.43.0 | Desk pet, plan graveyard, boss fight | Jaylen, Skye | Queued |
-| Personas, 1.43.0 | Command line, todo.txt, standup | Priyanka | Queued |
+| Personas, 1.43.0 | Command line, todo.txt, standup | Priyanka | Built in 1.49.0 (round 76) after a design review |
+| Design review, round 76 | WSL and Git Bash decide it; commits from several repos and emails; `--git` opt-in with a remembered default; bare `done` refuses several things; last workday spelled out; import safe to run twice; plain-text export to grep | Priyanka | Built in 1.49.0 |
+| Design review, round 76 | `hello` with no words printing only the plan | Priyanka | Not built: it would change the daily screen for everyone; `hello plan` does it |
 | Personas, 1.43.0 | Formulas run in the spreadsheet export | Skye, confirmed in code | Fixed in 1.46.1 |
 | Personas, 1.43.0 | Forklift horns, bakery orders, badge login, a supply locator, an email "lie detector" | Rick, Harold, Denise | Not buildable here: they need hardware or outside services |
 

@@ -316,11 +316,21 @@ You can also run hello.cmd with one of these:
                   Check an organization content file
   --help          Show this text
 
+Or with one of these words, for scripts and engineers (in WSL or
+Git Bash the command is hello):
+  plan TEXT       Set today's plan; plan alone shows it, --json too
+  add TEXT        Add one thing to today's plan
+  done 2          Finish thing 2; done 1-3, or done all
+  import FILE     Put tasks from a todo.txt file on the plan
+  standup         What you finished since the last workday and
+                  today's plan; --git adds your commits
+  export          Print every saved plan as plain text
+
 Exit codes: 0 when it worked, 1 when a command failed or the screen
 could not be written, 2 for an unknown option.
 
-Saved notes stay on this computer, in your user folder. Nothing is sent
-anywhere. IT staff who can read this computer's files could read them."""
+Saved notes stay on this computer, locked to your Windows account.
+Nothing is sent anywhere unless you turn on the shared count."""
 
 MENU_HELP = """Words you can type at the last prompt:
   done  marks today's plan finished, then asks for the next one
@@ -507,7 +517,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.48.0"
+VERSION = "1.49.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -973,7 +983,7 @@ SWITCHES = ("nudge", "open_after", "weekends", "name", "no_startup_visits",
             "private_reminder", "hide_thought", "shared", "shared_asked",
             "plan_in_reminder", "gentle", "gentle_offered", "large_text")
 SETTINGS = ("streak", "tips", "text", "offered", "offer_skips", "lang",
-            "remind_at") + SWITCHES
+            "remind_at", "standup") + SWITCHES
 
 
 def new_state():
@@ -1438,6 +1448,13 @@ def load(repair=True):
             pass
     if unsure:
         state["unsure"] = unsure[-MAX_UNSURE:]
+    if isinstance(raw.get("standup"), dict):
+        saved = raw["standup"]
+        lists = {key: [tidy(v)[:MAX_PATH] for v in saved.get(key, [])
+                       if isinstance(v, str) and tidy(v)][:MAX_STANDUP]
+                 for key in ("repos", "authors") if isinstance(saved.get(key), list)}
+        state["standup"] = {"git": saved.get("git") is True,
+                            **{k: v for k, v in lists.items() if v}}
     if (state.get("expire_same") and state.get("previous")
             and state.get("previous_date", "9999")
             < (today() - datetime.timedelta(days=30)).isoformat()):
@@ -3918,6 +3935,8 @@ def run(argv):
         return check_content(argv[1])
     if len(argv) == 3 and argv[0].lower() == "--check-content" and argv[2].lower() == "--local":
         return check_content(argv[1], local=True)
+    if argv and argv[0].lower() in COMMANDS:
+        return command(argv[0].lower(), argv[1:])
     argv = [a.lower() for a in argv]
     if argv[:1] == ["--console"]:
         # The window opens the text screens with this, in a console of their own.
@@ -4053,6 +4072,348 @@ def check_content(path, local=False):
         return 1
     say(t("OK: {thoughts} thoughts and {tips} tips.").format(
         thoughts=len(data["thoughts"]), tips=len(data["tips"])))
+    return 0
+
+
+# The command line Priyanka asked for: hello plan, add, done, import,
+# standup and export, with no prompts unless at a terminal, plain output,
+# --json for scripts, and exit codes 0 worked, 1 failed, 2 bad usage.
+COMMANDS = ("plan", "add", "done", "import", "standup", "export")
+MAX_STANDUP = 20
+MAX_PATH = 260
+# The commits git prints, at most, for one repository.
+MAX_COMMITS = 30
+
+
+STANDUP_USAGE = ("hello standup [--git] [--repos FOLDER ...] [--author EMAIL ...] "
+                 "[--remember] [--json]")
+
+
+def command(name, args):
+    flags = {a.lower() for a in args if a.startswith("--")}
+    if plans_off() and name != "export":
+        say(tr("Plans are turned off by your organization."))
+        return 1
+    if name == "plan":
+        return plan_command([a for a in args if a.lower() != "--json"], "--json" in flags)
+    if name == "add":
+        return add_command(args)
+    if name == "done":
+        return done_command(args)
+    if name == "import":
+        return import_command(args)
+    if name == "standup":
+        return standup_command(args)
+    return export_command()
+
+
+def usage(text):
+    para(text)
+    return 2
+
+
+def show_json(data):
+    say(json.dumps(data, ensure_ascii=False, indent=1))
+
+
+def plan_command(args, as_json=False):
+    """hello plan TEXT sets today's plan as the window's box does; hello plan
+    alone prints it, numbered."""
+    visit = Visit.using(*load(repair=bool(args)))
+    if args:
+        return save_typed(visit, " ".join(args))
+    intent = visit.state["intent"]
+    if as_json:
+        show_json({"date": intent["date"], "things": plan_parts(intent["text"]),
+                   "due": intent.get("due")} if intent else None)
+        return 0
+    if not intent:
+        say(tr("No plan for today."))
+        return 0
+    for n, part in enumerate(plan_parts(intent["text"]), 1):
+        say(str(n) + "  " + part)
+    if note := due_note(intent, visit.d):
+        say(note)
+    return 0
+
+
+def save_typed(visit, typed):
+    """Save a plan from the command line. Returns the exit code."""
+    close, message, saved = visit.save(typed)
+    say(message or tr("Nothing changed."))
+    return 0 if saved or (close and not message) else 1
+
+
+def add_command(args):
+    """hello add TEXT: one more thing on the plan."""
+    if not args:
+        return usage(tr("Type the thing to add, such as: hello add review PR 88"))
+    visit = Visit.using(*load())
+    intent = visit.state["intent"]
+    new = tidy(" ".join(args))
+    if intent and new.casefold() in {p.casefold() for p in plan_parts(intent["text"])}:
+        say(tr("That's already on the plan. Nothing changed."))
+        return 0
+    return save_typed(visit, f"{intent['text']}; {new}" if intent else new)
+
+
+def done_command(args):
+    """hello done all, or hello done 2 or 1-3. A bare done finishes a plan of
+    one thing, and refuses a plan of several, so a standup never says more
+    was done than was (Priyanka)."""
+    state, can_save = load()
+    intent = state["intent"]
+    if not intent:
+        para(tr("There is no plan to mark as done. Type plan to set one."))
+        return 1
+    every = plan_parts(intent["text"])
+    words = [w for a in args for w in a.lower().replace(",", " ").split()]
+    if words in (["all"], ["y"]) or not words and len(every) == 1:
+        chosen = None
+    elif not words:
+        return usage(tr("This plan has {n} things. Type done all, or the numbers, "
+                        "such as done 2 or done 1-3.").format(n=len(every)))
+    elif (chosen := picked(words, len(every))) is None:
+        return usage(tr("Type numbers from 1 to {n}, such as 1 3 or 1-3.").format(n=len(every)))
+    d = today()
+    base = copy.deepcopy(state)
+    rest = finish_plan(state, intent["text"], d, chosen)
+    state["intent"] = dict(intent, text=rest) if rest else None
+    if not commit(state, base, can_save):
+        undo(state, base)
+        say(tr("Could not save that on this computer. The plan is still open."))
+        return 1
+    names = [every[i] for i in chosen] if chosen else every
+    say(tr("Done: {things}.").format(things="; ".join(names)) + (
+        " " + tr("The rest is kept for today.") if rest else ""))
+    return 0
+
+
+TODO_DUE = re.compile(r"(?:^|\s)due:(\d{4}-\d{2}-\d{2})(?=\s|$)")
+
+
+def todo_items(text):
+    """The open tasks in a todo.txt file, as (text, due or None): done lines
+    (x first) are skipped, and the priority and dates at the start go."""
+    items = []
+    for line in text.splitlines():
+        line = tidy(line)
+        if not line or re.match(r"x\s", line):
+            continue
+        line = re.sub(r"^\([A-Z]\)\s+", "", line)
+        line = re.sub(r"^(\d{4}-\d{2}-\d{2}\s+){1,2}", "", line)
+        due = None
+        if found := TODO_DUE.search(line):
+            try:
+                due = datetime.date.fromisoformat(found.group(1)).isoformat()
+            except ValueError:
+                pass
+        line = tidy(TODO_DUE.sub(" ", line).replace(";", ","))
+        if line:
+            items.append((line, due))
+    return items
+
+
+def import_command(args):
+    """hello import todo.txt [--pick 1 3]: put some open tasks from a
+    todo.txt on today's plan. The file is only read. Things already on the
+    plan aren't added again, so running it twice is safe."""
+    pick = [a for a in args if a.lower() != "--pick"]
+    path = pick.pop(0) if pick and not pick[0][:1].isdecimal() else None
+    if not path:
+        return usage(tr("Name the file, such as: hello import todo.txt --pick 1 3"))
+    try:
+        with open(path, encoding="utf-8-sig", errors="replace") as f:
+            items = todo_items(f.read(200_001))
+    except OSError as e:
+        say(tr("Can't read {path}: {error}").format(path=tidy(path), error=e.strerror))
+        return 1
+    if not items:
+        say(tr("No open tasks in that file. Nothing changed."))
+        return 0
+    words = [w for a in pick for w in a.replace(",", " ").split()]
+    if not words:
+        for n, (text, due) in enumerate(items, 1):
+            say(wrapped(f"  {n}  ", text + (f" (due:{due})" if due else "")))
+        if not interactive():
+            return usage(tr("Add --pick and the numbers, such as --pick 1 3."))
+        typed = ask(tr("Which ones for today? Type numbers such as 1 3 or 1-3, "
+                       "or Enter to go back > "))
+        words = (typed or "").replace(",", " ").split()
+        if not words:
+            say(tr("Nothing changed."))
+            return 0
+    if (chosen := picked(words, len(items))) is None:
+        return usage(tr("Type numbers from 1 to {n}, such as 1 3 or 1-3.").format(n=len(items)))
+    visit = Visit.using(*load())
+    intent = visit.state["intent"]
+    have = plan_parts(intent["text"]) if intent else []
+    new = [items[i] for i in chosen
+           if items[i][0].casefold() not in {p.casefold() for p in have}]
+    if not new:
+        say(tr("That's already on the plan. Nothing changed."))
+        return 0
+    code = save_typed(visit, "; ".join(have + [text for text, _ in new]))
+    dues = sorted(due for _, due in new if due and due >= visit.iso)
+    if code == 0 and dues:
+        set_due(visit, dues[0])
+    return code
+
+
+def set_due(visit, due):
+    """The earliest due date from todo.txt, unless the plan has an earlier one."""
+    state = visit.state
+    quietly(refresh, state, visit.can_save)
+    intent = state["intent"]
+    if not intent or intent.get("due") and intent["due"] <= due:
+        return
+    base = copy.deepcopy(state)
+    state["intent"] = dict(intent, due=due)
+    if quietly(commit, state, base, visit.can_save)[0]:
+        say(due_note(state["intent"], visit.d))
+    else:
+        undo(state, base)
+
+
+def last_workday(state, d):
+    """The workday before d: Friday on a Monday, skipping weekends unless
+    the person works them, and the organization's holidays. A week back at
+    most."""
+    when = d - datetime.timedelta(days=1)
+    for _ in range(6):
+        if (when.weekday() < 5 or state.get("weekends")) and not holiday(when):
+            break
+        when -= datetime.timedelta(days=1)
+    return when
+
+
+def git_commits(repos, authors, since):
+    """The subjects of the person's commits since that day, from local
+    repositories only. Returns (lines, problem or "")."""
+    import glob
+    import shutil
+    import subprocess
+    git = shutil.which("git")
+    if not git:
+        return [], tr("git wasn't found, so no commits are listed.")
+    folders = []
+    for repo in repos or [os.environ.get("HELLO_CWD") or "."]:
+        found = sorted(glob.glob(os.path.expanduser(repo))) or [repo]
+        folders += [f for f in found if os.path.isdir(f)]
+    lines, many = [], len(folders) > 1
+
+    def out(folder, *args):
+        try:
+            done = subprocess.run([git, "-C", folder, *args], capture_output=True,
+                                  text=True, encoding="utf-8", errors="replace",
+                                  timeout=10, stdin=subprocess.DEVNULL)
+        except (OSError, subprocess.SubprocessError):
+            return None
+        return done.stdout if done.returncode == 0 else None
+
+    for folder in folders[:MAX_STANDUP]:
+        if out(folder, "rev-parse", "--git-dir") is None:
+            continue
+        who = authors or [e.strip() for e in [out(folder, "config", "user.email") or ""] if e.strip()]
+        if not who:
+            continue
+        log = out(folder, "log", "--all", "--no-merges", f"--since={since.isoformat()} 00:00",
+                  "--format=%s", f"-{MAX_COMMITS}",
+                  *[f"--author={re.escape(a)}" for a in who])
+        name = os.path.basename(os.path.abspath(folder))
+        for subject in (log or "").splitlines():
+            if subject := tidy(subject):
+                lines.append(f"{name}: {subject}" if many else subject)
+    return lines, ""
+
+
+def standup_command(args):
+    """hello standup: what was finished since the last workday, today's
+    plan, and with --git the person's own commit subjects. Plain text to
+    paste, or --json. --remember keeps --git, --repos and --author."""
+    flags, repos, authors, target = set(), [], [], None
+    for arg in args:
+        low = arg.lower()
+        if low in ("--repos", "--author"):
+            target = repos if low == "--repos" else authors
+        elif low in ("--git", "--no-git", "--json", "--remember"):
+            flags.add(low)
+            target = None
+        elif target is not None and not arg.startswith("--"):
+            target.append(arg)
+        else:
+            say(tr("Unknown option: {option}. Here are the options.")
+                .format(option=tidy(arg)[:60]))
+            return usage(STANDUP_USAGE)
+    state, can_save = load()
+    saved = state.get("standup") or {}
+    if "--remember" in flags:
+        base = copy.deepcopy(state)
+        state["standup"] = {"git": "--git" in flags or bool(repos or authors),
+                            **({"repos": repos[:MAX_STANDUP]} if repos else {}),
+                            **({"authors": authors[:MAX_STANDUP]} if authors else {})}
+        if not commit(state, base, can_save):
+            undo(state, base)
+            say(tr("Could not save that choice on this computer."))
+            return 1
+        saved = state["standup"]
+    use_git = "--no-git" not in flags and ("--git" in flags or bool(repos or authors)
+                                           or saved.get("git"))
+    d = today()
+    since = last_workday(state, d)
+    window = [since + datetime.timedelta(days=n) for n in range((d - since).days)]
+    days = {w.isoformat() for w in window}
+    finished = [i["text"] for i in state.get("finished", []) if i["date"] in days]
+    unsure = [i["text"] for i in state.get("unsure", []) if i["date"] in days]
+    done_today = [i["text"] for i in state.get("finished", []) if i["date"] == d.isoformat()]
+    intent = state["intent"]
+    today_parts = plan_parts(intent["text"]) if intent else []
+    commits, problem = (git_commits(repos or saved.get("repos"),
+                                    authors or saved.get("authors"), since)
+                        if use_git else ([], ""))
+    if "--json" in flags:
+        show_json({"since": since.isoformat(), "finished": finished, "not_sure": unsure,
+                   "done_today": done_today, "today": today_parts,
+                   "due": intent.get("due") if intent else None, "commits": commits})
+        return 0
+    say(tr("Since {date}:").format(date=long_date(since)))
+    for text in finished:
+        say("- " + text)
+    for text in unsure:
+        say("- " + tr("{text} (not sure)").format(text=text))
+    if not finished and not unsure:
+        say("- " + tr("nothing noted"))
+    if use_git:
+        say(tr("Commits:"))
+        for line in commits:
+            say("- " + line)
+        if problem or not commits:
+            say("- " + (problem or tr("nothing noted")))
+    say(tr("Today:"))
+    for text in done_today:
+        say("- " + tr("{text} (done)").format(text=text))
+    for text in today_parts:
+        say("- " + text)
+    if not done_today and not today_parts:
+        say("- " + tr("nothing noted"))
+    if note := due_note(intent, d):
+        say(note)
+    return 0
+
+
+def export_command():
+    """hello export: everything saved about plans as plain tab-separated
+    text on the screen, to grep or pipe, since the file itself is locked."""
+    state, readable = load(repair=False)
+    if not readable:
+        say(tr("The saved file can't be read right now, or it is damaged."))
+        return 1
+    rows = [(i["date"], "done", i["text"]) for i in state.get("finished", [])]
+    rows += [(i["date"], "not sure", i["text"]) for i in state.get("unsure", [])]
+    if intent := state["intent"]:
+        rows += [(intent["date"], "open", p) for p in plan_parts(intent["text"])]
+    for when, status, text in sorted(rows, key=lambda r: r[0]):
+        say("\t".join((when, status, text)))
     return 0
 
 

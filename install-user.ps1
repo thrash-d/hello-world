@@ -76,6 +76,22 @@ foreach ($pattern in '_sqlite3.pyd', 'sqlite3.dll') {
 }
 foreach ($f in $files) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $f) -Destination $new }
 Set-Content -LiteralPath (Join-Path $new 'hello.cmd') -Value '@"%~dp0python\python.exe" -I "%~dp0hello.py" %*' -Encoding ascii
+# hello for WSL and Git Bash (Priyanka), with Unix line ends.
+$shim = @(
+    '#!/usr/bin/env bash',
+    '# hello-world from WSL or Git Bash: runs hello.cmd, so it reads the same notes.',
+    'd=$(cd "$(dirname "$0")" && pwd)',
+    'if command -v wslpath >/dev/null 2>&1; then',
+    '  a=()',
+    '  for x in "$@"; do if [ -e "$x" ]; then a+=("$(wslpath -w "$x")"); else a+=("$x"); fi; done',
+    '  # The folder you are in, for hello standup --git; cmd.exe starts from C:.',
+    '  HELLO_CWD=$(wslpath -w "$PWD" 2>/dev/null) && export HELLO_CWD WSLENV="HELLO_CWD${WSLENV:+:$WSLENV}"',
+    '  cd /mnt/c 2>/dev/null',
+    '  exec cmd.exe /d /c "$(wslpath -w "$d/hello.cmd")" --utf8 "${a[@]}"',
+    'fi',
+    'exec "$d/hello.cmd" --utf8 "$@"'
+)
+[IO.File]::WriteAllText((Join-Path $new 'hello'), ($shim -join "`n") + "`n")
 $out = & (Join-Path $new 'python\python.exe') -I (Join-Path $new 'hello.py') --plain
 if ($LASTEXITCODE -or "$out" -ne 'Hello, world!') { throw "Test run failed with exit $LASTEXITCODE`: $out" }
 if (Test-Path -LiteralPath $dir) { Rename-Item -LiteralPath $dir -NewName (Split-Path $old -Leaf) }
