@@ -3121,7 +3121,9 @@ def test_menu_option_12_has_the_windows_other_settings():
     assert "The greeting uses your first name." in p.stdout
     assert "Finished plans are kept for 90 days instead of 14." in p.stdout
     assert "Days you opened hello-world: 1" in p.stdout
-    assert 'Type a number from 1 to 12, or press Enter to go back.' in p.stdout
+    # Windows also lists Keep hello-world in the tray.
+    entries = 13 if os.name == "nt" else 12
+    assert f'Type a number from 1 to {entries}, or press Enter to go back.' in p.stdout
     saved = notes(p.home)
     assert saved["name"] is True and saved["long_history"] is True
     assert saved["numbers"] is True
