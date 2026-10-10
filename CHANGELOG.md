@@ -1,5 +1,41 @@
 # Changelog
 
+## 2026-10-10: the last polish items
+
+Version 1.51.0. The rest of the October list, from the round 68 pilot (Priya,
+Dana, Tom, Mónica) and its translation review. Harold and Priyanka reviewed
+the design and changed it.
+
+- **A due date belongs to its thing**: "call the bank by Friday; water
+  plants" puts Friday on the bank call only, and the screen names it: "Due
+  Friday, 9 October 2026: call the bank by Friday". Finishing that thing
+  drops its date (before, `done 2` left the whole plan due). todo.txt `due:`
+  dates go on their own things. The menu's due date asks before it replaces
+  dates on single things (Priyanka).
+- `hello plan --json` is version 2: `{"version": 2, "things": [{"n", "text",
+  "due", "done"}]}`, with `due` an ISO date or null and today's finished
+  things after the open ones (Priyanka). This changes the 1.49.0 shape.
+- **Delete everything** names the settings it kept ("language, large text")
+  and where to change them, with no second question while deleting (Mónica
+  asked to be offered a reset; Harold asked not to be asked anything more).
+- **Back after months**: someone whose visit dates have aged out is welcomed
+  back and shown what's open, not greeted as new (Harold's wording).
+- **Quieter screens**: a one-line first welcome, and a shorter Options menu:
+  the reminder's on, off and times are one **Reminder...** entry and the text
+  screen's two are one **Text screen...** entry. **Large text** moves to the
+  top, where Harold looks for it, and Language stays there.
+- **Plainer confirmations**: none start with "Done." any more, since Done is
+  also a button. The done lines lose "Well done. Take a short break..." and
+  "That is done...", which read as filler; Harold kept "Good, that one is off
+  your list".
+- Things finished together list in plan order (Tom).
+- "By Friday" in Chinese, Japanese and Korean: 金曜まで, 금요일까지, 周五前,
+  明日まで and the like become due dates in every screen language, since the
+  text screen shows English for those scripts. 金 alone stays money.
+
+Not changed: "by Friday" stays in the thing's text after it's read, since
+the words are the person's own (Priyanka asked to strip it).
+
 ## 2026-10-10: a desk pet, plans put aside, and a weekly boss
 
 Version 1.50.0. Jaylen and Skye asked for these; the design went to them and

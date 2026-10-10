@@ -385,7 +385,7 @@ match `PythonVersion` in the Apps entry.
 | An upgrade or uninstall failed with 1618 | A file in `%ProgramFiles%\hello-world` was in use, often by antivirus. Retry later; nothing changed. |
 | A `hello-world.old` folder is left | A window was open during an upgrade. The next install removes it. |
 | Stop the sign-in reminder | Options in the window, menu option 2 in the text screen, or the Group Policy setting. |
-| Someone wants the old text screen | Options > Use the text screen in the window, or the `UseTextScreen` policy. Menu option 9 switches back. |
+| Someone wants the old text screen | Options > Text screen... > Use the text screen in the window, or the `UseTextScreen` policy. Menu option 9 switches back. |
 | The window doesn't open | `hello.cmd` still runs the text screen. A PC where the window can't be drawn gets the text screen in a console instead. |
 | Remove someone's data | They choose menu option 4, or delete `%LOCALAPPDATA%\hello-world`. |
 | Install logs | `%WINDIR%\Logs\hello-world`, and the Application event log, source `hello-world`. |
