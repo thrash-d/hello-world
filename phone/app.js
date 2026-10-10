@@ -1,73 +1,135 @@
-// hello-world on a phone. Everything is kept in this phone's browser storage
-// and nothing is sent anywhere. The logic is plain functions so the tests can
-// run them without a browser.
+// hello-world on a phone. Plans are kept in this phone's browser storage.
+// They leave it only with sync turned on, encrypted; a reminder turned on
+// sends the server a random token, the browser's push address and the times,
+// never the plan. The logic is plain functions so the tests can run them
+// without a browser.
 "use strict";
 
+const SCAM_EN = "hello-world has no phone line and no support staff. We never call, email or text. Nobody real will ever ask for your sync code. If someone asks, hang up.";
 const UI = {
   en: {
     hello: "Hello, world!", ask: "Did you do it?", yesterday: "Yesterday you planned:",
     on: "On {date} you planned:", yes: "Done", no: "Not yet", skip: "Skip",
-    todayAsk: "What do you want to get done today?", todayHave: "Your plan for today:",
-    did: "Done", clear: "Clear", save: "Save", placeholder: "One thing, or a few with ;",
+    sideways: "The day went sideways", sidewaysSaid: "That's okay. It's set aside, and tomorrow is new.",
+    todayAsk: "Anything for today? Small is fine.", todayHave: "Your plan for today:",
+    picks: "Put aside, tap one to bring it back:", back: "Back on today's plan.",
+    did: "Done", clear: "Set aside", save: "Save", placeholder: "One thing, or a few with ;",
     thought: "Thought for today:", tip: "Try this today:", settings: "Settings",
     language: "Language", remind: "Reminder", remindOff: "No reminder",
-    remindNote: "Phones only let a web page remind you while it is still open in the background, so a reminder can be missed.",
+    remindNote: "The reminder comes through the server this app came from, with nothing in it: the server keeps only a random number, your browser's push address and the time. On an iPhone, add hello-world to the Home Screen first.",
+    remindLocal: "This server doesn't send reminders, so one comes only while this page is still open in the background, and can be missed.",
+    remindShown: "Check-in time.", remindFail: "The reminder couldn't be set up on this phone.",
+    dayStart: "My day starts at", midnight: "Midnight",
+    dayStartNote: "18:00 keeps a night shift from 22:00 to 6:00 on one day; midnight splits it.",
+    repeat: "Every day", repeatPlaceholder: "Something to do every day", repeatAt: "At",
+    repeatNote: "A reminder only, not a medical device. Its words stay on this phone.",
+    repeatOff: "Off", repeatSaved: "The daily reminder is saved.",
+    family: "Family", familyName: "Their name", familyNumber: "Their phone number",
+    familyNote: "Kept only on this phone. The buttons open your phone's own text or call screen; nothing is sent unless you press send there.",
+    familySave: "Save", draft: "Draft text to {name}", call: "Call {name}", okayText: "I'm okay today.",
+    print: "Print a big page", printNote: "Anyone in the room can read a printed page. The sync code is never on it.",
+    printTitle: "Today", printRepeat: "Every day at {at}:",
+    export: "Save my plans to a file", exported: "Saved to a file.",
     forget: "Delete everything on this phone", forgetAsk: "Delete your plans and settings from this phone?",
     forgotten: "Everything on this phone was deleted.",
-    privacy: "Your plans stay on this phone, in this browser. Nothing is sent anywhere.",
+    privacy: "Your plans stay on this phone, in this browser. They leave it only if you turn on sync.",
     good: "Good. That one is off your list.", kept: "Kept for today.", skipped: "Skipped. It asks again next time.",
-    saved: "Saved.", cleared: "Cleared.", nothing: "Type a word or two first.",
-    remindText: "One thing to get done today? Open hello-world.",
+    saved: "Saved.", cleared: "Set aside. Tap it below to bring it back.", nothing: "Type a word or two first.",
     sync: "Sync with a PC", syncCode: "Code from the PC (Sync with my phone, in the PC's menu)", syncSave: "Turn on sync", syncOff: "Turn off sync",
+    syncChange: "Change code", syncChangeNote: "Type the new code the PC shows.",
     syncNote: "With sync on, your plan and done list leave this phone, encrypted with that code. The server keeps only the encrypted copy.",
     syncOn: "Sync is on.", syncOffDone: "Sync is off on this phone.", syncBad: "That code doesn't look right. Check it on the PC.", syncFail: "The PC's copy can't be reached just now.",
+    scam: SCAM_EN,
   },
   es: {
     hello: "¡Hola, mundo!", ask: "¿Lo hiciste?", yesterday: "Ayer planeaste:",
     on: "El {date} planeaste:", yes: "Hecho", no: "Todavía no", skip: "Saltar",
-    todayAsk: "¿Qué quieres hacer hoy?", todayHave: "Tu plan para hoy:",
-    did: "Hecho", clear: "Borrar", save: "Guardar", placeholder: "Una cosa, o varias con ;",
+    sideways: "El día salió de lado", sidewaysSaid: "No pasa nada. Queda apartado, y mañana es un día nuevo.",
+    todayAsk: "¿Algo para hoy? Algo pequeño está bien.", todayHave: "Tu plan para hoy:",
+    picks: "Apartados, toca uno para recuperarlo:", back: "De nuevo en el plan de hoy.",
+    did: "Hecho", clear: "Apartar", save: "Guardar", placeholder: "Una cosa, o varias con ;",
     thought: "Idea del día:", tip: "Prueba esto hoy:", settings: "Ajustes",
     language: "Idioma", remind: "Recordatorio", remindOff: "Sin recordatorio",
-    remindNote: "Los teléfonos solo dejan que una página web te recuerde algo mientras sigue abierta en segundo plano, así que un recordatorio se puede perder.",
+    remindNote: "El recordatorio llega a través del servidor del que vino esta app, sin nada dentro: el servidor solo guarda un número al azar, la dirección de notificaciones de tu navegador y la hora. En un iPhone, añade hello-world a la pantalla de inicio primero.",
+    remindLocal: "Este servidor no envía recordatorios, así que uno solo llega mientras esta página sigue abierta en segundo plano, y se puede perder.",
+    remindShown: "Hora de revisar.", remindFail: "No se pudo activar el recordatorio en este teléfono.",
+    dayStart: "Mi día empieza a las", midnight: "Medianoche",
+    dayStartNote: "18:00 deja un turno de noche de 22:00 a 6:00 en un solo día; medianoche lo parte.",
+    repeat: "Cada día", repeatPlaceholder: "Algo que hacer cada día", repeatAt: "A las",
+    repeatNote: "Solo un recordatorio, no un dispositivo médico. Sus palabras se quedan en este teléfono.",
+    repeatOff: "Apagado", repeatSaved: "El recordatorio diario está guardado.",
+    family: "Familia", familyName: "Su nombre", familyNumber: "Su número de teléfono",
+    familyNote: "Se guarda solo en este teléfono. Los botones abren la pantalla de mensajes o llamadas de tu teléfono; no se envía nada si no pulsas enviar allí.",
+    familySave: "Guardar", draft: "Escribir mensaje a {name}", call: "Llamar a {name}", okayText: "Hoy estoy bien.",
+    print: "Imprimir una página grande", printNote: "Cualquiera en la habitación puede leer una página impresa. El código de sincronización nunca aparece en ella.",
+    printTitle: "Hoy", printRepeat: "Cada día a las {at}:",
+    export: "Guardar mis planes en un archivo", exported: "Guardado en un archivo.",
     forget: "Borrar todo en este teléfono", forgetAsk: "¿Borrar tus planes y ajustes de este teléfono?",
     forgotten: "Se borró todo en este teléfono.",
-    privacy: "Tus planes se quedan en este teléfono, en este navegador. No se envía nada a ningún sitio.",
+    privacy: "Tus planes se quedan en este teléfono, en este navegador. Solo salen de él si activas la sincronización.",
     good: "Bien. Una cosa menos en tu lista.", kept: "Se queda para hoy.", skipped: "Saltado. Volverá a preguntar la próxima vez.",
-    saved: "Guardado.", cleared: "Borrado.", nothing: "Escribe una o dos palabras primero.",
-    remindText: "¿Algo que hacer hoy? Abre hello-world.",
+    saved: "Guardado.", cleared: "Apartado. Tócalo abajo para recuperarlo.", nothing: "Escribe una o dos palabras primero.",
     sync: "Sincronizar con un PC", syncCode: "Código del PC (Sincronizar con mi teléfono, en el menú del PC)", syncSave: "Activar sincronización", syncOff: "Desactivar sincronización",
+    syncChange: "Cambiar código", syncChangeNote: "Escribe el código nuevo que muestra el PC.",
     syncNote: "Con la sincronización activada, tu plan y tu lista de hechos salen de este teléfono, cifrados con ese código. El servidor solo guarda la copia cifrada.",
     syncOn: "La sincronización está activada.", syncOffDone: "La sincronización está desactivada en este teléfono.", syncBad: "Ese código no parece correcto. Revísalo en el PC.", syncFail: "Ahora no se puede llegar a la copia del PC.",
+    scam: "hello-world no tiene línea telefónica ni personal de soporte. Nunca llamamos, ni enviamos correos ni mensajes. Nadie de verdad te pedirá nunca tu código de sincronización. Si alguien lo pide, cuelga.",
   },
   ar: {
     hello: "مرحبًا بالعالم!", ask: "هل فعلتها؟", yesterday: "خططت أمس:",
     on: "خططت يوم {date}:", yes: "تم", no: "ليس بعد", skip: "تخطَّ",
-    todayAsk: "ماذا تريد أن تنجز اليوم؟", todayHave: "خطتك لليوم:",
-    did: "تم", clear: "امسح", save: "احفظ", placeholder: "شيء واحد، أو عدة أشياء بينها ;",
+    sideways: "اليوم لم يسر كما يجب", sidewaysSaid: "لا بأس. أُجّلت، والغد يوم جديد.",
+    todayAsk: "أي شيء لليوم؟ الصغير يكفي.", todayHave: "خطتك لليوم:",
+    picks: "خطط مؤجلة، المس واحدة لإعادتها:", back: "عادت إلى خطة اليوم.",
+    did: "تم", clear: "أجّل", save: "احفظ", placeholder: "شيء واحد، أو عدة أشياء بينها ;",
     thought: "فكرة اليوم:", tip: "جرّب هذا اليوم:", settings: "الإعدادات",
     language: "اللغة", remind: "التذكير", remindOff: "بلا تذكير",
-    remindNote: "لا تسمح الهواتف لصفحة ويب بالتذكير إلا وهي مفتوحة في الخلفية، لذا قد يفوتك التذكير.",
+    remindNote: "يصل التذكير عبر الخادم الذي جاء منه هذا التطبيق، دون أي محتوى: لا يحتفظ الخادم إلا برقم عشوائي وعنوان الإشعارات في متصفحك والوقت. على iPhone، أضف hello-world إلى الشاشة الرئيسية أولًا.",
+    remindLocal: "هذا الخادم لا يرسل تذكيرات، لذا لا يصل التذكير إلا والصفحة مفتوحة في الخلفية، وقد يفوتك.",
+    remindShown: "وقت المراجعة.", remindFail: "تعذّر إعداد التذكير على هذا الهاتف.",
+    dayStart: "يبدأ يومي في", midnight: "منتصف الليل",
+    dayStartNote: "18:00 تُبقي المناوبة الليلية من 22:00 إلى 6:00 يومًا واحدًا؛ منتصف الليل يقسمها.",
+    repeat: "كل يوم", repeatPlaceholder: "شيء تفعله كل يوم", repeatAt: "في",
+    repeatNote: "تذكير فقط، وليس جهازًا طبيًا. تبقى كلماته على هذا الهاتف.",
+    repeatOff: "متوقف", repeatSaved: "حُفظ التذكير اليومي.",
+    family: "العائلة", familyName: "الاسم", familyNumber: "رقم الهاتف",
+    familyNote: "يُحفظ على هذا الهاتف فقط. تفتح الأزرار شاشة الرسائل أو الاتصال في هاتفك؛ لا يُرسل شيء ما لم تضغط إرسال هناك.",
+    familySave: "احفظ", draft: "اكتب رسالة إلى {name}", call: "اتصل بـ{name}", okayText: "أنا بخير اليوم.",
+    print: "اطبع صفحة كبيرة", printNote: "يستطيع أي شخص في الغرفة قراءة الصفحة المطبوعة. رمز المزامنة لا يظهر عليها أبدًا.",
+    printTitle: "اليوم", printRepeat: "كل يوم في {at}:",
+    export: "احفظ خططي في ملف", exported: "حُفظت في ملف.",
     forget: "احذف كل شيء على هذا الهاتف", forgetAsk: "حذف خططك وإعداداتك من هذا الهاتف؟",
     forgotten: "حُذف كل شيء على هذا الهاتف.",
-    privacy: "تبقى خططك على هذا الهاتف، في هذا المتصفح. لا يُرسل شيء إلى أي مكان.",
+    privacy: "تبقى خططك على هذا الهاتف، في هذا المتصفح. لا تغادره إلا إذا شغّلت المزامنة.",
     good: "جيد. شيء أقل في قائمتك.", kept: "تبقى لليوم.", skipped: "تم التخطي. سيسأل مرة أخرى في المرة القادمة.",
-    saved: "تم الحفظ.", cleared: "تم المسح.", nothing: "اكتب كلمة أو كلمتين أولًا.",
-    remindText: "شيء تنجزه اليوم؟ افتح hello-world.",
+    saved: "تم الحفظ.", cleared: "أُجّلت. المسها في الأسفل لإعادتها.", nothing: "اكتب كلمة أو كلمتين أولًا.",
     sync: "المزامنة مع كمبيوتر", syncCode: "الرمز من الكمبيوتر (المزامنة مع هاتفي، في قائمة الكمبيوتر)", syncSave: "شغّل المزامنة", syncOff: "أوقف المزامنة",
+    syncChange: "غيّر الرمز", syncChangeNote: "اكتب الرمز الجديد الذي يظهره الكمبيوتر.",
     syncNote: "مع تشغيل المزامنة تغادر خطتك وقائمة ما أنجزته هذا الهاتف مشفّرة بذلك الرمز. لا يحتفظ الخادم إلا بالنسخة المشفّرة.",
     syncOn: "المزامنة تعمل.", syncOffDone: "المزامنة متوقفة على هذا الهاتف.", syncBad: "لا يبدو هذا الرمز صحيحًا. تحقق منه على الكمبيوتر.", syncFail: "لا يمكن الوصول إلى نسخة الكمبيوتر الآن.",
+    scam: "ليس لدى hello-world خط هاتف ولا فريق دعم. لا نتصل ولا نرسل بريدًا أو رسائل أبدًا. لن يطلب منك أي شخص حقيقي رمز المزامنة. إن طلبه أحد، أغلق الخط.",
   },
 };
 const LANG_NAMES = { en: "English", es: "Español", ar: "العربية" };
-// The cart vendor asked for 6:15, before the lunch rush.
-const REMIND_TIMES = ["06:15", "07:00", "08:00", "09:00", "12:00", "18:00"];
+// The cart vendor asked for 6:15, before the lunch rush; 13:00 to 22:00 for
+// late sleepers and night shifts.
+const REMIND_TIMES = ["06:15", "07:00", "08:00", "09:00", "12:00", "13:00", "15:00", "18:00", "22:00"];
+const DAY_STARTS = [0, 4, 12, 18];
 const KEY = "hello-world";
 const MAX_PLAN = 200;
+const MAX_ASIDE = 20;
+const MAX_PICKS = 3;
 
 function iso(d) {
   const pad = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+// Today in the person's own day: with a day start of 18, 2:00 on Tuesday is
+// still Monday (Marisol's night shift).
+function todayOf(state, now) {
+  now = now || new Date();
+  return iso(new Date(now.getTime() - (state.dayStart || 0) * 3600000));
 }
 
 // Python's date.toordinal(), so the phone picks the same pair as the PC.
@@ -96,21 +158,38 @@ function clean(text) {
 }
 
 function blank() {
-  return { intent: null, finished: [], lang: null, remind: null };
+  return { intent: null, finished: [], lang: null, remind: null, dayStart: 0, aside: [],
+           repeat: null, family: null };
 }
+
+const isDate = (v) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
 
 function parse(raw) {
   try {
     const data = JSON.parse(raw);
     const state = blank();
-    if (data && data.intent && typeof data.intent.text === "string" && /^\d{4}-\d{2}-\d{2}$/.test(data.intent.date)) {
+    if (data && data.intent && typeof data.intent.text === "string" && isDate(data.intent.date)) {
       state.intent = { text: clean(data.intent.text), date: data.intent.date, skips: Number(data.intent.skips) || 0 };
     }
     if (Array.isArray(data.finished)) {
       state.finished = data.finished.filter((f) => f && typeof f.text === "string").slice(-100);
     }
+    if (Array.isArray(data.aside)) {
+      state.aside = data.aside.filter((a) => a && typeof a.text === "string" && clean(a.text) && isDate(a.date))
+        .map((a) => ({ text: clean(a.text), date: a.date })).slice(-MAX_ASIDE);
+    }
     if (UI[data.lang]) state.lang = data.lang;
     if (REMIND_TIMES.includes(data.remind)) state.remind = data.remind;
+    if (DAY_STARTS.includes(data.dayStart)) state.dayStart = data.dayStart;
+    if (data.repeat && typeof data.repeat.text === "string" && clean(data.repeat.text)
+        && REMIND_TIMES.includes(data.repeat.at)) {
+      state.repeat = { text: clean(data.repeat.text), at: data.repeat.at };
+    }
+    if (data.family && typeof data.family.name === "string" && typeof data.family.number === "string") {
+      const number = phoneNumber(data.family.number);
+      if (number) state.family = { name: data.family.name.trim().slice(0, 40), number };
+    }
+    if (typeof data.pushToken === "string" && /^[0-9a-f]{32}$/.test(data.pushToken)) state.pushToken = data.pushToken;
     if (typeof data.updated === "string" && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d$/.test(data.updated)) state.updated = data.updated;
     return state;
   } catch (e) {
@@ -121,6 +200,10 @@ function parse(raw) {
 function asks(state, today) {
   const intent = state.intent;
   return Boolean(intent && intent.date < today && (intent.skips || 0) < 2);
+}
+
+function putAside(state, text, today) {
+  state.aside = state.aside.filter((a) => a.text !== text).concat([{ text, date: today }]).slice(-MAX_ASIDE);
 }
 
 function answer(state, choice, today) {
@@ -135,6 +218,12 @@ function answer(state, choice, today) {
     state.intent = { text: intent.text, date: today, skips: 0 };
     return "kept";
   }
+  if (choice === "sideways") {
+    // Set aside with nothing marked; no follow-up.
+    putAside(state, intent.text, today);
+    state.intent = null;
+    return "sidewaysSaid";
+  }
   intent.skips = (intent.skips || 0) + 1;
   return "skipped";
 }
@@ -143,6 +232,7 @@ function setPlan(state, text, today) {
   const plan = clean(text);
   if (!plan) return "nothing";
   state.intent = { text: plan, date: today, skips: 0 };
+  state.aside = state.aside.filter((a) => a.text !== plan);
   return "saved";
 }
 
@@ -153,6 +243,84 @@ function finishToday(state, today) {
   return "good";
 }
 
+function clearToday(state, today) {
+  if (!state.intent) return "";
+  putAside(state, state.intent.text, today);
+  state.intent = null;
+  return "cleared";
+}
+
+// A new day start can move "today" back a day; today's plan stays today's.
+function setDayStart(state, hours, now) {
+  state.dayStart = DAY_STARTS.includes(hours) ? hours : 0;
+  const day = todayOf(state, now);
+  if (state.intent && state.intent.date > day) state.intent.date = day;
+  return "saved";
+}
+
+// The newest plans put aside, offered as buttons when there's no plan.
+function picks(state) {
+  return state.aside.slice(-MAX_PICKS).reverse();
+}
+
+function bringBack(state, text, today) {
+  if (!state.aside.some((a) => a.text === text)) return "";
+  setPlan(state, text, today);
+  return "back";
+}
+
+// Digits, spaces and + ( ) - only, so a link can only dial or text.
+function phoneNumber(text) {
+  const raw = String(text || "").trim();
+  if (!/^\+?[0-9 ()-]{3,25}$/.test(raw)) return "";
+  return raw.replace(/[ ()-]/g, "");
+}
+
+// The phone's own text screen with the words filled in; the person presses
+// send. iPhones read &body, others ?body.
+function smsLink(number, text, apple) {
+  return `sms:${number}${apple ? "&" : "?"}body=${encodeURIComponent(text)}`;
+}
+
+// A local time today as the UTC time the server should send at. Sent again
+// each time the app opens, so a clock change moves it.
+function utcTime(at, now) {
+  now = now || new Date();
+  const [h, m] = at.split(":").map(Number);
+  const when = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${pad(when.getUTCHours())}:${pad(when.getUTCMinutes())}`;
+}
+
+// What a push shows, chosen on the phone: the daily repeat's own words at its
+// time, otherwise the check-in. The server's push carries nothing.
+function pushText(prefs, now) {
+  now = now || new Date();
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  const near = (at) => {
+    const [h, m] = at.split(":").map(Number);
+    return Math.abs(h * 60 + m - minutes) <= 10;
+  };
+  if (prefs && prefs.repeat && near(prefs.repeat.at)) return prefs.repeat.text;
+  return (prefs && prefs.checkin) || UI.en.remindShown;
+}
+
+// Everything kept, as plain text to save as a file (Noor: never locked in).
+function exportText(state) {
+  const lines = ["hello-world"];
+  if (state.intent) lines.push("", "Plan: " + state.intent.text + " (" + state.intent.date + ")");
+  if (state.repeat) lines.push("", "Every day at " + state.repeat.at + ": " + state.repeat.text);
+  if (state.finished.length) {
+    lines.push("", "Done:");
+    state.finished.forEach((f) => lines.push(f.date + "  " + f.text));
+  }
+  if (state.aside.length) {
+    lines.push("", "Put aside:");
+    state.aside.forEach((a) => lines.push(a.date + "  " + a.text));
+  }
+  return lines.join("\n") + "\n";
+}
+
 function language(state, navigatorLanguages) {
   if (state.lang) return state.lang;
   for (const tag of navigatorLanguages || []) {
@@ -161,7 +329,6 @@ function language(state, navigatorLanguages) {
   }
   return "en";
 }
-
 
 // Sync, the same scheme as hello.py: PBKDF2-SHA256 makes a label and two
 // keys from the code; HMAC-SHA256 in counter mode encrypts, and an HMAC tag
@@ -265,77 +432,178 @@ function stamp(state) {
 
 if (typeof module !== "undefined") {
   module.exports = { UI, ordinal, todaysPair, clean, parse, asks, answer, setPlan, finishToday, language, blank,
-    syncKeys, sealSync, openSync, mergeSync, syncForm, normalCode };
+    syncKeys, sealSync, openSync, mergeSync, syncForm, normalCode, todayOf, clearToday, picks, bringBack,
+    phoneNumber, smsLink, utcTime, pushText, exportText, setDayStart, REMIND_TIMES, DAY_STARTS };
 }
 
 if (typeof document !== "undefined") {
   const $ = (id) => document.getElementById(id);
   let state = parse(localStorage.getItem(KEY) || "{}");
   let timer = null;
+  const t = () => UI[language(state, navigator.languages)];
+  const today = () => todayOf(state);
+  const say = (key) => { $("status").textContent = key ? t()[key] : ""; };
+
+  // What the service worker shows for a push, kept where it can read it.
+  // It stays on this phone.
+  async function savePrefs() {
+    if (typeof caches === "undefined") return;
+    try {
+      const cache = await caches.open("hello-world-prefs");
+      await cache.put("prefs", new Response(JSON.stringify({ checkin: t().remindShown, repeat: state.repeat })));
+    } catch (e) { /* storage refused */ }
+  }
   const save = () => {
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* private mode */ }
+    savePrefs();
   };
-  const t = () => UI[language(state, navigator.languages)];
-  const say = (key) => { $("status").textContent = key ? t()[key] : ""; };
 
   function longDate(isoDate, lang) {
     const [y, m, d] = isoDate.split("-").map(Number);
     return new Date(y, m - 1, d).toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   }
 
-  function schedule() {
-    clearTimeout(timer);
-    if (!state.remind || typeof Notification === "undefined" || Notification.permission !== "granted") return;
-    const now = new Date();
-    const [h, m] = state.remind.split(":").map(Number);
-    const at = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
-    if (at <= now) at.setDate(at.getDate() + 1);
-    timer = setTimeout(async () => {
+  const times = () => [state.remind, state.repeat && state.repeat.at].filter(Boolean);
+
+  // A reminder through the server, by Web Push with no content, when the
+  // server offers it; otherwise a timer while the page is open.
+  let pushOk = false;
+  async function registerPush() {
+    const wanted = times();
+    const url = (token) => `${location.origin}/v1/push/${token}`;
+    try {
       const reg = navigator.serviceWorker && await navigator.serviceWorker.ready;
-      if (reg) reg.showNotification("hello-world", { body: t().remindText, icon: "icon.svg" });
-      schedule();
-    }, at - now);
+      if (!reg || !reg.pushManager) return false;
+      if (!wanted.length) {
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) await sub.unsubscribe();
+        if (state.pushToken) await fetch(url(state.pushToken), { method: "DELETE" });
+        delete state.pushToken; save();
+        return true;
+      }
+      const got = await fetch(`${location.origin}/v1/push/key`, { cache: "no-store" });
+      if (!got.ok) return false;
+      const key = (await got.json()).key.replace(/-/g, "+").replace(/_/g, "/");
+      const raw = Uint8Array.from(atob(key + "===".slice((key.length + 3) % 4)), (c) => c.charCodeAt(0));
+      const sub = await reg.pushManager.getSubscription()
+        || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: raw });
+      if (!state.pushToken) {
+        state.pushToken = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
+        save();
+      }
+      const put = await fetch(url(state.pushToken), { method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint: sub.endpoint, times: wanted.map((at) => utcTime(at)) }) });
+      return put.ok;
+    } catch (e) {
+      return false;
+    }
   }
 
+  function schedule() {
+    clearTimeout(timer);
+    if (pushOk || !times().length || typeof Notification === "undefined" || Notification.permission !== "granted") return;
+    const now = new Date();
+    const next = times().map((at) => {
+      const [h, m] = at.split(":").map(Number);
+      const when = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
+      if (when <= now) when.setDate(when.getDate() + 1);
+      return when;
+    }).sort((a, b) => a - b)[0];
+    timer = setTimeout(async () => {
+      const reg = navigator.serviceWorker && await navigator.serviceWorker.ready;
+      if (reg) reg.showNotification("hello-world", { body: pushText({ checkin: t().remindShown, repeat: state.repeat }), icon: "icon.svg" });
+      schedule();
+    }, next - now);
+  }
+
+  async function reminders() {
+    pushOk = await registerPush();
+    $("remind-note").textContent = pushOk || !times().length ? t().remindNote : t().remindLocal;
+    schedule();
+  }
+
+  const options = (select, items, chosen) =>
+    select.replaceChildren(...items.map(([label, value]) => new Option(label, value, false, value === chosen)));
+
   function draw() {
-    const lang = language(state, navigator.languages), s = UI[lang], today = iso(new Date());
+    const lang = language(state, navigator.languages), s = UI[lang], day = today();
     document.documentElement.lang = lang;
     document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
     $("hello").textContent = s.hello;
-    $("date").textContent = longDate(today, lang);
-    const asking = asks(state, today);
+    $("date").textContent = longDate(day, lang);
+    const asking = asks(state, day);
     $("ask").hidden = !asking;
     if (asking) {
-      const yesterday = iso(new Date(Date.now() - 86400000));
+      const [y, m, d] = day.split("-").map(Number);
+      const yesterday = iso(new Date(y, m - 1, d - 1));
       $("ask-label").textContent = s.ask + " " + (state.intent.date === yesterday ? s.yesterday : s.on.replace("{date}", longDate(state.intent.date, lang)));
       $("ask-plan").textContent = state.intent.text;
     }
-    ["yes", "no", "skip", "did", "clear", "save"].forEach((id) => { $(id).textContent = s[id]; });
-    const planned = state.intent && state.intent.date === today;
+    ["yes", "no", "skip", "sideways", "did", "clear", "save"].forEach((id) => { $(id).textContent = s[id]; });
+    const planned = state.intent && state.intent.date === day;
     $("today-label").textContent = planned ? s.todayHave : s.todayAsk;
     $("today-plan").hidden = $("today-buttons").hidden = !planned;
     $("today-plan").textContent = planned ? state.intent.text : "";
     $("plan-form").hidden = planned || asking;
     $("plan-input").placeholder = s.placeholder;
-    const [thought, tip] = todaysPair(lang, today, CONTENT);
+    const offered = planned || asking ? [] : picks(state);
+    $("picks").hidden = !offered.length;
+    $("picks-label").textContent = s.picks;
+    $("picks-list").replaceChildren(...offered.map((a) => {
+      const b = document.createElement("button");
+      b.textContent = a.text;
+      b.addEventListener("click", act(() => bringBack(state, a.text, today())));
+      return b;
+    }));
+    $("repeat-today").hidden = !state.repeat;
+    $("repeat-today").textContent = state.repeat ? s.printRepeat.replace("{at}", state.repeat.at) + " " + state.repeat.text : "";
+    $("family-buttons").hidden = !state.family;
+    if (state.family) {
+      $("draft").textContent = s.draft.replace("{name}", state.family.name);
+      $("call").textContent = s.call.replace("{name}", state.family.name);
+      const apple = /iPhone|iPad/.test(navigator.userAgent);
+      $("draft").href = smsLink(state.family.number, s.okayText, apple);
+      $("call").href = "tel:" + state.family.number;
+    }
+    const [thought, tip] = todaysPair(lang, day, CONTENT);
     $("thought-label").textContent = s.thought;
     $("thought").textContent = thought;
     $("tip-label").textContent = s.tip;
     $("tip").textContent = tip;
-    $("settings-label").textContent = s.settings;
-    $("language-label").textContent = s.language;
-    $("remind-label").textContent = s.remind;
-    $("remind-note").textContent = s.remindNote;
+    ["settings", "language", "remind", "dayStart", "repeat", "family", "familyName", "familyNumber"].forEach((k) => {
+      $(k.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase()) + "-label").textContent = s[k];
+    });
+    $("repeat-at-label").textContent = s.repeatAt;
+    $("day-start-note").textContent = s.dayStartNote;
+    $("repeat-note").textContent = s.repeatNote;
+    $("family-note").textContent = s.familyNote;
+    $("repeat-text").placeholder = s.repeatPlaceholder;
+    $("repeat-save").textContent = $("family-save").textContent = s.familySave;
+    $("print").textContent = s.print;
+    $("print-note").textContent = s.printNote;
+    $("export").textContent = s.export;
     $("forget").textContent = s.forget;
     $("privacy").textContent = s.privacy;
-    $("language").replaceChildren(...Object.keys(UI).map((code) => new Option(LANG_NAMES[code], code, false, code === lang)));
-    if (typeof drawSync === "function") drawSync();
-    $("remind").replaceChildren(new Option(s.remindOff, "", false, !state.remind),
-      ...REMIND_TIMES.map((at) => new Option(at, at, false, at === state.remind)));
+    options($("language"), Object.keys(UI).map((code) => [LANG_NAMES[code], code]), lang);
+    options($("remind"), [[s.remindOff, ""], ...REMIND_TIMES.map((at) => [at, at])], state.remind || "");
+    options($("day-start"), DAY_STARTS.map((h) => [h ? `${h}:00` : s.midnight, String(h)]), String(state.dayStart || 0));
+    options($("repeat-at"), [[s.repeatOff, ""], ...REMIND_TIMES.map((at) => [at, at])], state.repeat ? state.repeat.at : "");
+    if (state.repeat && !$("repeat-text").value) $("repeat-text").value = state.repeat.text;
+    if (state.family && !$("family-name").value) {
+      $("family-name").value = state.family.name;
+      $("family-number").value = state.family.number;
+    }
+    // The fridge page: only what's printed, in big type.
+    $("fridge-title").textContent = s.printTitle + ": " + longDate(day, lang);
+    $("fridge-plan").textContent = planned ? state.intent.text : "";
+    $("fridge-repeat").textContent = state.repeat ? s.printRepeat.replace("{at}", state.repeat.at) + " " + state.repeat.text : "";
+    $("fridge-note").textContent = s.printNote;
+    drawSync();
   }
 
   const SYNC_KEY = "hello-world-sync";
   let keys = null;
+  let changing = false;
   try { keys = JSON.parse(localStorage.getItem(SYNC_KEY) || "null"); } catch (e) { keys = null; }
   const asBytes = (k) => k && { label: k.label, enc: Uint8Array.from(k.enc), mac: Uint8Array.from(k.mac) };
 
@@ -347,7 +615,7 @@ if (typeof document !== "undefined") {
       const got = await fetch(url, { cache: "no-store" });
       if (got.ok) {
         const other = await openSync(k, await got.arrayBuffer());
-        if (other) { mergeSync(state, other, iso(new Date())); save(); draw(); }
+        if (other) { mergeSync(state, other, today()); save(); draw(); }
       }
       await fetch(url, { method: "PUT", body: await sealSync(k, syncForm(state)),
                          headers: { "Content-Type": "application/octet-stream" } });
@@ -360,15 +628,24 @@ if (typeof document !== "undefined") {
   function drawSync() {
     const s = t();
     $("sync-label").textContent = s.sync;
-    $("sync-code-label").textContent = s.syncCode;
-    $("sync-save").textContent = keys ? s.syncOff : s.syncSave;
-    $("sync-code").hidden = $("sync-code-label").hidden = Boolean(keys);
+    $("sync-scam").textContent = s.scam;
+    $("sync-code-label").textContent = changing ? s.syncChangeNote : s.syncCode;
+    $("sync-save").textContent = keys && !changing ? s.syncOff : s.syncSave;
+    $("sync-change").textContent = s.syncChange;
+    $("sync-change").hidden = !keys || changing;
+    $("sync-code").hidden = $("sync-code-label").hidden = Boolean(keys) && !changing;
     $("sync-note").textContent = s.syncNote;
   }
 
+  $("sync-change").addEventListener("click", (event) => {
+    event.preventDefault();
+    changing = true;
+    drawSync();
+  });
+
   $("sync-save").addEventListener("click", async (event) => {
     event.preventDefault();
-    if (keys) {
+    if (keys && !changing) {
       keys = null;
       try { localStorage.removeItem(SYNC_KEY); } catch (e) { /* nothing saved */ }
       drawSync(); say("syncOffDone");
@@ -377,52 +654,88 @@ if (typeof document !== "undefined") {
     if (normalCode($("sync-code").value).length !== 25) { say("syncBad"); return; }
     const k = await syncKeys($("sync-code").value);
     keys = { label: k.label, enc: Array.from(k.enc), mac: Array.from(k.mac) };
+    changing = false;
     try { localStorage.setItem(SYNC_KEY, JSON.stringify(keys)); } catch (e) { /* private mode */ }
     $("sync-code").value = "";
     drawSync();
     await sync(true);
   });
 
-  const act = (fn) => (event) => {
-    if (event) event.preventDefault();
-    const before = JSON.stringify(state.intent && { text: state.intent.text, date: state.intent.date });
-    const said = fn();
-    if (JSON.stringify(state.intent && { text: state.intent.text, date: state.intent.date }) !== before) stamp(state);
-    save(); draw(); say(said);
-    sync(false);
-  };
-  $("yes").addEventListener("click", act(() => answer(state, "yes", iso(new Date()))));
-  $("no").addEventListener("click", act(() => answer(state, "no", iso(new Date()))));
-  $("skip").addEventListener("click", act(() => answer(state, "skip", iso(new Date()))));
-  $("did").addEventListener("click", act(() => finishToday(state, iso(new Date()))));
-  $("clear").addEventListener("click", act(() => { state.intent = null; return "cleared"; }));
+  function act(fn) {
+    return (event) => {
+      if (event) event.preventDefault();
+      const before = JSON.stringify(state.intent && { text: state.intent.text, date: state.intent.date });
+      const said = fn();
+      if (JSON.stringify(state.intent && { text: state.intent.text, date: state.intent.date }) !== before) stamp(state);
+      save(); draw(); say(said);
+      sync(false);
+    };
+  }
+  $("yes").addEventListener("click", act(() => answer(state, "yes", today())));
+  $("no").addEventListener("click", act(() => answer(state, "no", today())));
+  $("skip").addEventListener("click", act(() => answer(state, "skip", today())));
+  $("sideways").addEventListener("click", act(() => answer(state, "sideways", today())));
+  $("did").addEventListener("click", act(() => finishToday(state, today())));
+  $("clear").addEventListener("click", act(() => clearToday(state, today())));
   $("plan-form").addEventListener("submit", act(() => {
-    const said = setPlan(state, $("plan-input").value, iso(new Date()));
+    const said = setPlan(state, $("plan-input").value, today());
     if (said === "saved") $("plan-input").value = "";
     return said;
   }));
   $("language").addEventListener("change", act(() => { state.lang = $("language").value; return ""; }));
-  $("remind").addEventListener("change", async () => {
-    state.remind = $("remind").value || null;
+  $("day-start").addEventListener("change", act(() => setDayStart(state, Number($("day-start").value) || 0)));
+  async function askPermission() {
     // Asked only when someone picks a time; no reminder unless asked (the rider).
-    if (state.remind && typeof Notification !== "undefined" && Notification.permission === "default") {
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
       await Notification.requestPermission();
     }
-    save(); schedule();
+  }
+  $("remind").addEventListener("change", async () => {
+    state.remind = $("remind").value || null;
+    if (state.remind) await askPermission();
+    save(); reminders();
   });
-  $("forget").addEventListener("click", () => {
+  $("repeat-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const text = clean($("repeat-text").value), at = $("repeat-at").value;
+    state.repeat = text && at ? { text, at } : null;
+    if (!state.repeat) $("repeat-text").value = "";
+    if (state.repeat) await askPermission();
+    save(); draw(); say(state.repeat ? "repeatSaved" : "saved");
+    reminders();
+  });
+  $("family-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const number = phoneNumber($("family-number").value), name = $("family-name").value.trim().slice(0, 40);
+    state.family = number && name ? { name, number } : null;
+    save(); draw(); say("saved");
+  });
+  $("print").addEventListener("click", () => window.print());
+  $("export").addEventListener("click", () => {
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([exportText(state)], { type: "text/plain" }));
+    link.download = "hello-world-plans.txt";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    say("exported");
+  });
+  $("forget").addEventListener("click", async () => {
     if (!confirm(t().forgetAsk)) return;
     const lang = state.lang;
+    state.remind = null; state.repeat = null;
+    await registerPush();
     try { localStorage.removeItem(KEY); localStorage.removeItem(SYNC_KEY); } catch (e) { /* nothing saved */ }
     keys = null;
-    drawSync();
     state = blank();
     state.lang = lang;
-    draw(); say("forgotten"); schedule();
+    $("repeat-text").value = $("family-name").value = $("family-number").value = "";
+    save(); draw(); say("forgotten"); schedule();
   });
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
   draw();
-  drawSync();
-  schedule();
+  savePrefs();
+  reminders();
   sync(false);
+  // A page left open past the day's start shows the new day.
+  setInterval(() => { if ($("date").textContent !== longDate(today(), language(state, navigator.languages))) draw(); }, 60000);
 }

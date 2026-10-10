@@ -30,6 +30,19 @@ Sync copies are encrypted on the PC or phone before they're sent, with a
 key this server never sees; the label is made from the same secret. Each is
 one file in the sync folder; a copy untouched for a year is removed.
 
+    GET    /v1/push/key            the server's public key for Web Push
+    PUT    /v1/push/<32 hex>       {"endpoint": "https://...", "times": ["07:00"]}
+    DELETE /v1/push/<32 hex>       stop and forget it
+
+A phone that turns on its reminder sends a random token of its own, its
+browser's push address and up to two times of day in UTC, and nothing else:
+no plan, no language, no time zone. At each time the server sends a push
+with no content at all; the phone itself decides what to show from what it
+keeps on the phone. Push addresses are only accepted at the browser makers'
+push services, so the server can't be used to call anywhere else. A push
+service that says the address is gone, turning the reminder off, or a year
+untouched removes the file.
+
 With --phone FOLDER it also serves the phone app (the repository's phone
 folder) at /phone/, so one https address does both. The phone app keeps its
 plans on the phone and asks this server for nothing.
@@ -46,6 +59,7 @@ and nobody can fill the disk with old dates.
 """
 
 import argparse
+import base64
 import datetime
 import hashlib
 import json
@@ -54,12 +68,23 @@ import re
 import secrets
 import threading
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 REACTIONS = ("love", "ha", "dead", "eyeroll")
 SYNC_PATH = re.compile(r"^/v1/sync/([0-9a-f]{64})$")
 MAX_SYNC = 64_000
 SYNC_DAYS = 366
+PUSH_PATH = re.compile(r"^/v1/push/([0-9a-f]{32})$")
+PUSH_TIME = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+MAX_PUSH_TIMES = 2
+# The browser makers' push services; nothing else is ever called.
+PUSH_HOSTS = ("fcm.googleapis.com", "push.services.mozilla.com", "push.apple.com",
+              "notify.windows.com")
+# Who runs this server, for the push services (the VAPID "sub" claim).
+PUSH_CONTACT = "https://github.com/thrash-d/hello-world"
 WEEK_PATH = re.compile(r"^/v1/week/(\d{4}-\d{2}-\d{2})$")
 BOSS_FLOOR = 20
 DAY_PATH = re.compile(r"^/v1/day/(\d{4}-\d{2}-\d{2})(/tip|/react/(?:%s))?$" % "|".join(REACTIONS))
@@ -136,6 +161,213 @@ class Counts:
             return data
 
 
+# ECDSA on P-256 with SHA-256 (ES256), for the Web Push VAPID signature,
+# with only the standard library.
+P256_P = 2**256 - 2**224 + 2**192 + 2**96 - 1
+P256_N = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551
+P256_B = 0x5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2604b
+P256_G = (0x6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296,
+          0x4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5)
+
+
+def _add(a, b):
+    if a is None:
+        return b
+    if b is None:
+        return a
+    p = P256_P
+    if a[0] == b[0] and (a[1] + b[1]) % p == 0:
+        return None
+    if a == b:
+        m = (3 * a[0] * a[0] - 3) * pow(2 * a[1], -1, p) % p
+    else:
+        m = (b[1] - a[1]) * pow(b[0] - a[0], -1, p) % p
+    x = (m * m - a[0] - b[0]) % p
+    return x, (m * (a[0] - x) - a[1]) % p
+
+
+def _mul(k, point):
+    out = None
+    while k:
+        if k & 1:
+            out = _add(out, point)
+        point = _add(point, point)
+        k >>= 1
+    return out
+
+
+def on_curve(point):
+    x, y = point
+    return (y * y - (x ** 3 - 3 * x + P256_B)) % P256_P == 0
+
+
+def p256_public(d):
+    """The uncompressed public point, 65 bytes."""
+    x, y = _mul(d, P256_G)
+    return b"\x04" + x.to_bytes(32, "big") + y.to_bytes(32, "big")
+
+
+def es256_sign(d, message):
+    """r || s, 64 bytes, as JWS wants."""
+    e = int.from_bytes(hashlib.sha256(message).digest(), "big")
+    while True:
+        k = secrets.randbelow(P256_N - 1) + 1
+        r = _mul(k, P256_G)[0] % P256_N
+        s = pow(k, -1, P256_N) * (e + r * d) % P256_N
+        if r and s:
+            return r.to_bytes(32, "big") + s.to_bytes(32, "big")
+
+
+def es256_verify(public, message, signature):
+    if len(public) != 65 or public[0] != 4 or len(signature) != 64:
+        return False
+    q = (int.from_bytes(public[1:33], "big"), int.from_bytes(public[33:], "big"))
+    r, s = int.from_bytes(signature[:32], "big"), int.from_bytes(signature[32:], "big")
+    if not (on_curve(q) and 0 < r < P256_N and 0 < s < P256_N):
+        return False
+    e = int.from_bytes(hashlib.sha256(message).digest(), "big")
+    w = pow(s, -1, P256_N)
+    point = _add(_mul(e * w % P256_N, P256_G), _mul(r * w % P256_N, q))
+    return point is not None and point[0] % P256_N == r
+
+
+def b64url(raw):
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+
+
+def push_address_ok(endpoint):
+    """An https address at a browser maker's push service, and nothing else."""
+    try:
+        url = urllib.parse.urlsplit(endpoint)
+        port = url.port
+    except (ValueError, TypeError):
+        return False
+    host = (url.hostname or "").lower()
+    return (url.scheme == "https" and len(endpoint) <= 1000 and not url.username
+            and port in (None, 443)
+            and any(host == h or host.endswith("." + h) for h in PUSH_HOSTS))
+
+
+class Push:
+    """Reminders for phones: a file per random token with the push address
+    and up to two UTC times, and a key pair for the VAPID signature."""
+
+    def __init__(self, folder):
+        self.folder = os.path.join(folder, "push")
+        os.makedirs(self.folder, exist_ok=True)
+        self.lock = threading.Lock()
+        key = os.path.join(folder, "vapid.json")
+        try:
+            with open(key, encoding="utf-8") as f:
+                self.d = int(json.load(f)["d"], 16)
+        except (OSError, ValueError, KeyError, TypeError):
+            self.d = secrets.randbelow(P256_N - 1) + 1
+            tmp = key + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump({"d": format(self.d, "064x")}, f)
+            os.replace(tmp, key)
+        self.public = p256_public(self.d)
+
+    def path(self, token):
+        return os.path.join(self.folder, token)
+
+    def save(self, token, data):
+        """Keep a phone's push address and times. False when they aren't
+        acceptable."""
+        if not isinstance(data, dict) or not push_address_ok(data.get("endpoint", "")):
+            return False
+        times = data.get("times")
+        if (not isinstance(times, list) or not 1 <= len(times) <= MAX_PUSH_TIMES
+                or not all(isinstance(t, str) and PUSH_TIME.match(t) for t in times)):
+            return False
+        with self.lock:
+            tmp = self.path(token) + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump({"endpoint": data["endpoint"], "times": sorted(set(times))}, f)
+            os.replace(tmp, self.path(token))
+        return True
+
+    def forget(self, token):
+        with self.lock:
+            try:
+                os.remove(self.path(token))
+            except FileNotFoundError:
+                pass
+
+    def header(self, endpoint, now):
+        """The Authorization header for one push service."""
+        url = urllib.parse.urlsplit(endpoint)
+        head = b64url(json.dumps({"typ": "JWT", "alg": "ES256"}).encode())
+        claims = b64url(json.dumps({"aud": f"{url.scheme}://{url.netloc}",
+                                    "exp": int(now) + 12 * 3600,
+                                    "sub": PUSH_CONTACT}).encode())
+        signed = f"{head}.{claims}".encode()
+        jwt = f"{head}.{claims}.{b64url(es256_sign(self.d, signed))}"
+        return f"vapid t={jwt}, k={b64url(self.public)}"
+
+    def send(self, endpoint, now):
+        """One push with no content. The push service's status, or 0."""
+        request = urllib.request.Request(endpoint, data=b"", method="POST", headers={
+            "TTL": "3600", "Urgency": "normal", "Content-Length": "0",
+            "Authorization": self.header(endpoint, now)})
+        try:
+            with urllib.request.urlopen(request, timeout=10) as answer:
+                return answer.status
+        except urllib.error.HTTPError as e:
+            return e.code
+        except (OSError, ValueError):
+            return 0
+
+    def due(self, when, send=None):
+        """Send every reminder set for the UTC minute `when`, once each.
+        Returns how many were sent."""
+        send = send or self.send
+        minute = when.strftime("%H:%M")
+        stamp = when.strftime("%Y-%m-%dT%H:%M")
+        sent = 0
+        for token in os.listdir(self.folder):
+            if not re.fullmatch(r"[0-9a-f]{32}", token):
+                continue
+            path = self.path(token)
+            try:
+                if time.time() - os.path.getmtime(path) > SYNC_DAYS * 86400:
+                    self.forget(token)
+                    continue
+                with open(path, encoding="utf-8") as f:
+                    data = json.load(f)
+            except (OSError, ValueError):
+                continue
+            if minute not in data.get("times", []) or data.get("sent") == stamp:
+                continue
+            status = send(data["endpoint"], when.timestamp())
+            if status in (404, 410):
+                # The phone unsubscribed or the browser dropped it.
+                self.forget(token)
+                continue
+            sent += 1
+            data["sent"] = stamp
+            with self.lock:
+                if os.path.exists(path):
+                    tmp = path + ".tmp"
+                    with open(tmp, "w", encoding="utf-8") as f:
+                        json.dump(data, f)
+                    # The file's time stays the phone's last visit.
+                    stat = os.stat(path)
+                    os.replace(tmp, path)
+                    os.utime(path, (stat.st_atime, stat.st_mtime))
+        return sent
+
+    def run(self):
+        """Check each minute, in a thread for as long as the server runs."""
+        while True:
+            now = datetime.datetime.now(datetime.timezone.utc).replace(second=0, microsecond=0)
+            try:
+                self.due(now)
+            except OSError:
+                pass
+            time.sleep(60 - datetime.datetime.now().second + 1)
+
+
 def this_week(monday):
     """A Monday whose week holds today or a day either side, in UTC."""
     try:
@@ -161,7 +393,7 @@ PHONE_FILES = {"index.html": "text/html; charset=utf-8", "app.js": "text/javascr
                "manifest.webmanifest": "application/manifest+json", "icon.svg": "image/svg+xml"}
 
 
-def handler(counts, phone=None):
+def handler(counts, phone=None, push=None):
     class Handler(BaseHTTPRequestHandler):
         server_version = "hello-world-counts"
         sys_version = ""
@@ -202,6 +434,8 @@ def handler(counts, phone=None):
                 self.end_headers()
                 self.wfile.write(raw)
                 return
+            if self.path == "/v1/push/key" and push:
+                return self.reply(200, {"key": b64url(push.public)})
             if SYNC_PATH.match(self.path):
                 path = self.sync_file()
                 try:
@@ -245,6 +479,15 @@ def handler(counts, phone=None):
             return os.path.join(folder, match.group(1))
 
         def do_PUT(self):
+            if (match := PUSH_PATH.match(self.path)) and push:
+                raw = self.body()
+                try:
+                    data = json.loads(raw or b"")
+                except ValueError:
+                    data = None
+                if not push.save(match.group(1), data):
+                    return self.reply(400, {"error": "not a push address and times"})
+                return self.reply(200, {"ok": True})
             path = self.sync_file()
             if path is None:
                 return self.reply(404, {"error": "not found"})
@@ -258,6 +501,9 @@ def handler(counts, phone=None):
             self.reply(200, {"ok": True})
 
         def do_DELETE(self):
+            if (match := PUSH_PATH.match(self.path)) and push:
+                push.forget(match.group(1))
+                return self.reply(200, {"ok": True})
             path = self.sync_file()
             if path is None:
                 return self.reply(404, {"error": "not found"})
@@ -295,9 +541,13 @@ def handler(counts, phone=None):
     return Handler
 
 
-def serve(port=8080, folder="counts", host="0.0.0.0", trust_proxy=False, boss_hp=None, phone=None):
-    server = ThreadingHTTPServer((host, port), handler(Counts(folder, boss_hp), phone))
+def serve(port=8080, folder="counts", host="0.0.0.0", trust_proxy=False, boss_hp=None, phone=None,
+          remind=False):
+    """The server. With remind, phones' reminders are kept and sent too."""
+    push = Push(folder) if remind else None
+    server = ThreadingHTTPServer((host, port), handler(Counts(folder, boss_hp), phone, push))
     server.trust_proxy = trust_proxy
+    server.push = push
     return server
 
 
@@ -312,8 +562,13 @@ def main(argv=None):
                         help="fixed hit points for the weekly boss, instead of 70%% of last week")
     parser.add_argument("--phone", default=None,
                         help="the phone app's folder, served at /phone/")
+    parser.add_argument("--remind", action="store_true",
+                        help="keep and send phones' reminders, by Web Push with no content")
     args = parser.parse_args(argv)
-    server = serve(args.port, args.data, args.host, args.trust_proxy, args.boss_hp, args.phone)
+    server = serve(args.port, args.data, args.host, args.trust_proxy, args.boss_hp, args.phone,
+                   args.remind)
+    if server.push:
+        threading.Thread(target=server.push.run, daemon=True).start()
     print(f"hello-world counts on {args.host}:{server.server_address[1]}, data in {args.data}")
     server.serve_forever()
 

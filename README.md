@@ -412,11 +412,33 @@ the all-users install is the one to use wherever IT can.
 home screen. It works with no signal, opens in English, Spanish or Arabic by
 the phone's language, and has one screen: "Did you do it?" with big Done, Not
 yet and Skip buttons, a box for today's plan, and the same thought and tip as
-the PC that day. Plans stay in that phone's browser and nothing is sent
-anywhere. A reminder only comes if you pick a time, and phones only let a web
-page remind you while it's still open in the background, which the settings
-say. Host the folder on any https address (GitHub Pages works), or run the
-counts server with `--phone phone` to serve it at `/phone/`.
+the PC that day. Plans stay in that phone's browser and leave it only with
+sync on. **The day went sideways** sets a plan aside with nothing marked;
+plans set aside come back with one tap when there's no plan.
+
+A reminder only comes if you pick a time. Served by a counts server started
+with `--remind`, it arrives even with the page closed: the phone sends the
+server a random token, its browser's push address and the time in UTC, and
+nothing else, and the server sends a push with nothing in it at that time;
+the phone shows "Check-in time" from what it keeps itself. The server only
+calls the browser makers' push services, and forgets the address when the
+reminder is turned off, the push service says it's gone, or a year passes.
+On an iPhone, add hello-world to the Home Screen first. Without `--remind`,
+phones only let a web page remind you while it's still open in the
+background, and the settings say so.
+
+The settings also have **My day starts at** (as on the PC), **Every day**, a
+daily repeat such as "Take my pills" at a time you pick, which is a reminder
+and not a medical device and whose words stay on the phone, **Family**, a
+name and number kept on the phone that adds **Draft text to** and **Call**
+buttons, which only open the phone's own text and call screens with "I'm
+okay today." filled in, **Print a big page** for the fridge (it says anyone
+in the room can read it, and the sync code is never on it), and **Save my
+plans to a file**, a plain-text copy of everything.
+
+Host the folder on any https address (GitHub Pages works; reminders then
+work only while the page is open), or run the counts server with
+`--phone phone --remind` to serve it at `/phone/` with reminders.
 `python tools/build_phone.py` refreshes its thoughts and tips from `hello.py`.
 
 ### Sync between a PC and a phone
@@ -464,7 +486,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.55.0'
+$tag = 'v1.56.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

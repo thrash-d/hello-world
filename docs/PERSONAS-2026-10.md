@@ -194,7 +194,10 @@ the pull request named.
 | Gen Z, 1.54.0 | Own day start; a check-in that lands when awake | Night-shift CNA, streamer, Profit Maximizer | Built in 1.55.0: day start at 0, 4, 12 or 18; reminders at 15, 18, 22 |
 | Gen Z, 1.54.0 | Offer yesterday's leftovers instead of a blank box | TikTok creator | Built in 1.55.0: up to three plans put aside, by number |
 | Gen Z, 1.54.0 | History is worth more free, with an export | Deinfluencer, Profit Maximizer | Built in 1.55.0: a year of history free; export already free |
-| Pessimists, 1.54.0 | The reminder must reach the phone, free | Seven of eight | Queued: round 84 (phone reminder) |
+| Pessimists, 1.54.0 | The reminder must reach the phone, free | Seven of eight | Built in 1.56.0: Web Push with no content, free, when the server runs with `--remind` |
+| Boomers, 1.54.0 | Pill reminders; a printout for the fridge; letting family know they're okay | Ron, Walt, Carol, Dolores | Built in 1.56.0 on the phone: a daily repeat, a big printed page, draft-a-text and call buttons |
+| Boomers, 1.54.0 | Phone the daughter automatically after sitting too long | Dolores | Not built: automatic alerts would be a watch view; the buttons are always the person's own tap |
+| Design review, round 84 | A random token, no time zone, delete on opt-out; "Draft text" so nothing feels automatic; a generic repeat label; the print page warns | Noor, Dolores, Kai | Built in 1.56.0 |
 | Boomers, 1.54.0 | Fake "support" asking for the sync code | All eight | Built in 1.55.0: scam line, on-the-phone question, a wait, Change my sync code |
 | Boomers, 1.54.0 | A guessable sync code ("password123") | Hank | Already impossible: the app makes every code; confirmed in the code |
 | Boomers, 1.54.0 | Signed builds and checksums | Dolores, Walt, Barbara | Checksums already published (SHA256SUMS); Authenticode and a Store listing are owner steps |

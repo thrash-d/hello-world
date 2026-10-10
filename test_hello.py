@@ -1,4 +1,5 @@
 import atexit
+import base64
 import csv
 import json
 import os
@@ -3434,7 +3435,7 @@ def test_windows_locks_notes_to_the_account():
     assert hello.lock_kind() == "plain"
 
 
-def _counts_server():
+def _counts_server(remind=False):
     """The reference counts server on a free local port, in a thread."""
     import importlib.util
     import threading
@@ -3443,7 +3444,8 @@ def _counts_server():
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     folder = mkdtemp()
-    server = mod.serve(0, folder, "127.0.0.1")
+    server = mod.serve(0, folder, "127.0.0.1", remind=remind)
+    server.mod = mod
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return server, f"http://127.0.0.1:{server.server_address[1]}", folder
 
@@ -4443,3 +4445,133 @@ def test_the_day_went_sideways_sets_the_plan_aside_with_nothing_marked():
 def test_a_longer_history_keeps_a_year():
     hello = _load_hello()
     assert hello.keep_days({"long_history": True}) == 365 and hello.keep_days({}) == 14
+
+
+def test_the_phone_keeps_its_own_day_start_puts_plans_aside_and_offers_them_back():
+    got = _node("""
+        const app = require("./app.js");
+        const s = app.blank(), out = [];
+        s.dayStart = 18;
+        out.push(app.todayOf(s, new Date(2026, 9, 6, 2, 0)), app.todayOf(s, new Date(2026, 9, 6, 19, 0)),
+                 app.todayOf(app.blank(), new Date(2026, 9, 6, 2, 0)));
+        app.setPlan(s, "Write the report", "2026-10-05");
+        out.push(app.answer(s, "sideways", "2026-10-06"), s.intent, s.finished.length, app.picks(s).map((a) => a.text));
+        app.setPlan(s, "Call Ana", "2026-10-06");
+        out.push(app.clearToday(s, "2026-10-06"), app.picks(s).map((a) => a.text));
+        out.push(app.bringBack(s, "Write the report", "2026-10-06"), s.intent.text, app.picks(s).map((a) => a.text));
+        out.push(app.bringBack(s, "Never set aside", "2026-10-06"));
+        const back = app.parse(JSON.stringify(Object.assign({}, s, {dayStart: 7, repeat: {text: "Pills", at: "08:00"},
+            family: {name: "Ana", number: "+1 (555) 010-2000"}})));
+        out.push(back.dayStart, back.repeat, back.family, back.aside.length);
+        out.push(app.parse(JSON.stringify({family: {name: "x", number: "javascript:alert(1)"}})).family);
+        const night = app.blank();
+        app.setPlan(night, "Chart notes", "2026-10-06");
+        out.push(app.setDayStart(night, 18, new Date(2026, 9, 6, 2, 0)), night.intent.date);
+        console.log(JSON.stringify(out));""")
+    assert got[-2:] == ["saved", "2026-10-05"]
+    got = got[:-2]
+    assert got == ["2026-10-05", "2026-10-06", "2026-10-06",
+                   "sidewaysSaid", None, 0, ["Write the report"],
+                   "cleared", ["Call Ana", "Write the report"],
+                   "back", "Write the report", ["Call Ana"], "",
+                   0, {"text": "Pills", "at": "08:00"}, {"name": "Ana", "number": "+15550102000"}, 1,
+                   None]
+
+
+def test_the_phone_family_buttons_only_open_the_phones_own_screens():
+    got = _node("""
+        const app = require("./app.js");
+        console.log(JSON.stringify([app.smsLink("+15550102000", "I'm okay today.", false),
+            app.smsLink("+15550102000", "I'm okay today.", true), app.phoneNumber("555 0102"),
+            app.phoneNumber("tel:555"), app.phoneNumber("555;body=x")]));""")
+    assert got == ["sms:+15550102000?body=I'm%20okay%20today.", "sms:+15550102000&body=I'm%20okay%20today.",
+                   "5550102", "", ""]
+
+
+def test_the_phone_push_shows_words_kept_on_the_phone_and_exports_plain_text():
+    got = _node("""
+        const app = require("./app.js");
+        const prefs = {checkin: "Check-in time.", repeat: {text: "Take my pills", at: "08:00"}};
+        const s = app.blank();
+        app.setPlan(s, "Call Ana", "2026-10-06");
+        s.finished.push({text: "Fix the gutter", date: "2026-10-05"});
+        console.log(JSON.stringify([app.pushText(prefs, new Date(2026, 9, 6, 8, 2)),
+            app.pushText(prefs, new Date(2026, 9, 6, 13, 0)), app.pushText(null, new Date()),
+            app.utcTime("08:00", new Date(2026, 9, 6)) === new Date(2026, 9, 6, 8, 0).toISOString().slice(11, 16),
+            app.exportText(s)]));""")
+    assert got[:4] == ["Take my pills", "Check-in time.", "Check-in time.", True]
+    assert "Plan: Call Ana (2026-10-06)" in got[4] and "2026-10-05  Fix the gutter" in got[4]
+
+
+def test_the_counts_server_sends_contentless_pushes_only_to_push_services():
+    import datetime
+    import urllib.error
+    import urllib.request
+    server, url, folder = _counts_server(remind=True)
+    mod, push = server.mod, server.push
+    try:
+        with urllib.request.urlopen(url + "/v1/push/key", timeout=5) as r:
+            key = json.loads(r.read())["key"]
+        assert base64.urlsafe_b64decode(key + "=")[0] == 4
+        token = "ab" * 16
+
+        def put(body):
+            request = urllib.request.Request(url + "/v1/push/" + token, data=json.dumps(body).encode(),
+                                             method="PUT")
+            try:
+                with urllib.request.urlopen(request, timeout=5) as r:
+                    return r.status
+            except urllib.error.HTTPError as e:
+                return e.code
+        # Only a browser maker's push service, so the server calls nowhere else.
+        for bad in ("http://127.0.0.1/x", "https://evil.example/x", "https://fcm.googleapis.com.evil.example/x",
+                    "https://user@fcm.googleapis.com/x", "https://fcm.googleapis.com:8443/x"):
+            assert put({"endpoint": bad, "times": ["07:00"]}) == 400, bad
+        assert put({"endpoint": "https://fcm.googleapis.com/fcm/send/abc", "times": ["07:00", "8:00"]}) == 400
+        assert put({"endpoint": "https://fcm.googleapis.com/fcm/send/abc", "times": ["07:00", "19:30"]}) == 200
+        with open(os.path.join(folder, "push", token)) as f:
+            stored = json.load(f)
+        assert set(stored) == {"endpoint", "times"}
+        calls = []
+        when = datetime.datetime(2026, 10, 6, 7, 0, tzinfo=datetime.timezone.utc)
+        assert push.due(when, send=lambda endpoint, now: calls.append(endpoint) or 201) == 1
+        assert push.due(when, send=lambda endpoint, now: calls.append(endpoint) or 201) == 0
+        assert push.due(when.replace(hour=8), send=lambda e, n: calls.append(e) or 201) == 0
+        assert calls == ["https://fcm.googleapis.com/fcm/send/abc"]
+        # The signature checks out against the published key, and has no content.
+        header = push.header("https://fcm.googleapis.com/fcm/send/abc", when.timestamp())
+        jwt = header.split("t=")[1].split(",")[0]
+        head, claims, sig = jwt.split(".")
+        pad = lambda t: base64.urlsafe_b64decode(t + "=" * (-len(t) % 4))
+        assert mod.es256_verify(pad(key), f"{head}.{claims}".encode(), pad(sig))
+        assert json.loads(pad(claims))["aud"] == "https://fcm.googleapis.com"
+        # A push service that says it's gone removes the file; so does a DELETE.
+        assert push.due(when.replace(hour=19, minute=30), send=lambda e, n: 410) == 0
+        assert not os.path.exists(os.path.join(folder, "push", token))
+        assert put({"endpoint": "https://web.push.apple.com/abc", "times": ["07:00"]}) == 200
+        urllib.request.urlopen(urllib.request.Request(url + "/v1/push/" + token, method="DELETE"), timeout=5)
+        assert not os.path.exists(os.path.join(folder, "push", token))
+    finally:
+        server.shutdown()
+    # Off unless the server's owner turns it on.
+    plain = mod.serve(0, mkdtemp(), "127.0.0.1")
+    assert plain.push is None
+    plain.server_close()
+
+
+def test_es256_matches_node():
+    hello_server = _counts_server()
+    server, mod = hello_server[0], hello_server[0].mod
+    server.shutdown()
+    d = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+    public = mod.p256_public(d)
+    sig = mod.es256_sign(d, b"hello")
+    x, y = public[1:33], public[33:]
+    b = lambda raw: base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+    got = _node(f"""
+        const c = require("crypto");
+        const key = c.createPublicKey({{key: {{kty: "EC", crv: "P-256", x: "{b(x)}", y: "{b(y)}"}}, format: "jwk"}});
+        const ok = c.verify("sha256", Buffer.from("hello"), {{key, dsaEncoding: "ieee-p1363"}},
+                            Buffer.from("{sig.hex()}", "hex"));
+        console.log(JSON.stringify(ok));""")
+    assert got is True
