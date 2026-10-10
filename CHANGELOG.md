@@ -1,5 +1,54 @@
 # Changelog
 
+## 2026-10-10: fixes from a code review
+
+Version 1.62.1. A full review of 1.58.0 to 1.62.0, for features, the screens
+and security, found 30 problems. All are fixed here.
+
+- **The household list checks everything it reads.** Anyone with the code can
+  write to the list. Each device now drops ids, names, times and history
+  entries that aren't well formed, and tidies text so it can't move the
+  cursor or write to the clipboard. On the phone, nothing read can reach the
+  page's built-in objects. A bad entry used to stop the phone page and crash
+  the PC's list.
+- **Who joined is worked out from the members**, so a join given an old time
+  is still announced. A device can't be told by someone else that it left.
+  A thing still on the list can't be erased. Times are UTC to the second,
+  and each entry has its own id, so every device sorts them the same way.
+- **Two devices changing the list at once both keep their change.** The
+  server takes a version (If-Match), and a device that lost the race merges
+  and tries again. The phone makes one change at a time.
+- **Leaving and making a new code need the server.** Offline, nothing
+  changes and the screen says so. A new code is made only from the newest
+  copy, so two people doing it at once don't split the household onto two
+  codes. Saying yes once covers everyone who left. Delete everything no
+  longer puts an old copy back under a dead code.
+- **Size limits**: 20 people, 100 things of up to 120 characters, the last
+  6 history entries per thing, and removed things go first when the list
+  nears the server's limit.
+- **The phone keeps the household code only as keys**, like the sync code,
+  and its household codes are now evenly random.
+- **Sync**: a copy claiming a change far in the future no longer wins every
+  later change. A bad time or device date can't crash the sync screen.
+  Device names are tidied. The phone forgets the old device list when the
+  code changes.
+- **The counts server** reads the address a proxy added (the last one), not
+  one the sender wrote. It checks a body before counting the write. It counts
+  copies as they come and go instead of listing the folder, and gives push
+  addresses their own quota. The weekly boss shows 0 hits below the minimum
+  group, and the day it fell agrees with the rounded hits.
+- **End the day** no longer lets a plan typed the same day replace what was
+  carried; it joins tomorrow's plan. The phone shows "The day is closed".
+- **The phone's letters** no longer delete the wrong letter after one is
+  removed while another is open. An empty "Make it smaller" no longer hides
+  the offer for good.
+- **Pro keys** for long names, or pasted with + and /, are saved in one form
+  that still works after a restart. Each key is checked once a run.
+- **The window's household list** asks for your name (type it in the plan
+  box) instead of using the Windows account name.
+- **Mail links** take plain addresses only, so a # or % can't send a letter
+  somewhere else.
+
 ## 2026-10-10: letters to family, and the devices syncing
 
 Version 1.62.0. The last two things from the review rounds. Mary, Noor,

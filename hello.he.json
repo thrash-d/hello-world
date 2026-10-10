@@ -921,7 +921,12 @@
   "Your mail program could not be opened.": "לא ניתן היה לפתוח את תוכנת הדואר.",
   "no one yet": "אף אחד עדיין",
   "s to send it with your own mail, d to delete it, or Enter to go back > ": "s לשליחה בדואר שלך, d למחיקה, או Enter לחזרה > ",
-  "this computer": "המחשב הזה"
+  "this computer": "המחשב הזה",
+  "That household list is full.": "רשימת הבית הזאת מלאה.",
+  "The household list can't be reached just now, so you haven't left yet. Try again when you're online.": "אי אפשר להגיע לרשימת הבית כרגע, אז עוד לא יצאת. נסה שוב כשתהיה מחובר.",
+  "The household list can't be reached just now, or someone already made a new code. Nothing changed.": "אי אפשר להגיע לרשימת הבית כרגע, או שמישהו כבר יצר קוד חדש. שום דבר לא השתנה.",
+  "Type your name, as the others will see it, in the plan box first, then choose this again.": "הקלד קודם את שמך, כפי שהאחרים יראו, בתיבת התוכנית, ואז בחר בזה שוב.",
+  "Added to tomorrow's plan, with what you carried.": "נוסף לתוכנית של מחר, יחד עם מה שהעברת."
  },
  "tips_floor": [
   "לבדוק שהמעבר פנוי לפני המשימה הראשונה במשמרת.",

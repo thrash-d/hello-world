@@ -922,7 +922,12 @@
   "Your mail program could not be opened.": "Não foi possível abrir seu programa de e-mail.",
   "no one yet": "ninguém ainda",
   "s to send it with your own mail, d to delete it, or Enter to go back > ": "s para mandar com seu e-mail, d para apagar, ou Enter para voltar > ",
-  "this computer": "este computador"
+  "this computer": "este computador",
+  "That household list is full.": "Essa lista da casa está cheia.",
+  "The household list can't be reached just now, so you haven't left yet. Try again when you're online.": "Não dá para chegar à lista da casa agora, então você ainda não saiu. Tente de novo quando estiver online.",
+  "The household list can't be reached just now, or someone already made a new code. Nothing changed.": "Não dá para chegar à lista da casa agora, ou alguém já fez um código novo. Nada mudou.",
+  "Type your name, as the others will see it, in the plan box first, then choose this again.": "Digite primeiro seu nome, como os outros vão ver, na caixa do plano, e depois escolha isto de novo.",
+  "Added to tomorrow's plan, with what you carried.": "Adicionado ao plano de amanhã, com o que você levou."
  },
  "tips_floor": [
   "Confira se o corredor está livre antes da primeira tarefa do turno.",

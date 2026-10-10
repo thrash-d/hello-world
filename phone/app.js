@@ -37,6 +37,8 @@ const UI = {
     joinedNote: "{name} joined the household list.", leftNote: "{name} left the household list.",
     rekeyAsk: "{name} left. Make a new household code so the old one stops working? They keep whatever was already on their device.",
     rekeyYes: "Make a new code", rekeyNo: "Not now", newCodeSaid: "The new household code: {code}. Give it to each adult in person; hello-world never puts it in a message.",
+    houseFull: "That household list is full.", rekeyFail: "The household list can't be reached just now, or someone already made a new code. Nothing changed.", houseLeaveOffline: "The household list can't be reached just now, so you haven't left yet. Try again when you're online.",
+    dayClosed: "The day is closed. Tomorrow's plan:", addedTomorrow: "Added to tomorrow's plan, with what you carried.",
     h_added: "added by {name}, {when}", h_ticked: "ticked by {name}, {when}", h_unticked: "unticked by {name}, {when}",
     h_removed: "removed by {name}, {when}", h_restored: "restored by {name}, {when}",
     todayAsk: "Anything for today? Small is fine.", todayHave: "Your plan for today:",
@@ -101,6 +103,8 @@ const UI = {
     joinedNote: "{name} se unió a la lista del hogar.", leftNote: "{name} salió de la lista del hogar.",
     rekeyAsk: "{name} salió. ¿Hacer un código nuevo para que el anterior deje de funcionar? Se queda con lo que ya tenía en su dispositivo.",
     rekeyYes: "Hacer un código nuevo", rekeyNo: "Ahora no", newCodeSaid: "El nuevo código del hogar: {code}. Dáselo a cada adulto en persona; hello-world nunca lo pone en un mensaje.",
+    houseFull: "Esa lista del hogar está llena.", rekeyFail: "Ahora no se puede llegar a la lista del hogar, o alguien ya hizo un código nuevo. No cambió nada.", houseLeaveOffline: "Ahora no se puede llegar a la lista del hogar, así que aún no saliste. Inténtalo de nuevo cuando tengas conexión.",
+    dayClosed: "El día está cerrado. El plan de mañana:", addedTomorrow: "Añadido al plan de mañana, con lo que llevaste.",
     h_added: "añadido por {name}, {when}", h_ticked: "marcado por {name}, {when}", h_unticked: "desmarcado por {name}, {when}",
     h_removed: "quitado por {name}, {when}", h_restored: "recuperado por {name}, {when}",
     todayAsk: "¿Algo para hoy? Algo pequeño está bien.", todayHave: "Tu plan para hoy:",
@@ -165,6 +169,8 @@ const UI = {
     joinedNote: "انضم {name} إلى قائمة الأسرة.", leftNote: "غادر {name} قائمة الأسرة.",
     rekeyAsk: "غادر {name}. إنشاء رمز جديد حتى يتوقف القديم عن العمل؟ يبقى لديه ما كان على جهازه.",
     rekeyYes: "أنشئ رمزًا جديدًا", rekeyNo: "ليس الآن", newCodeSaid: "رمز الأسرة الجديد: {code}. أعطه لكل بالغ شخصيًا؛ hello-world لا يضعه في رسالة أبدًا.",
+    houseFull: "قائمة الأسرة هذه ممتلئة.", rekeyFail: "لا يمكن الوصول إلى قائمة الأسرة الآن، أو أن شخصًا أنشأ رمزًا جديدًا بالفعل. لم يتغير شيء.", houseLeaveOffline: "لا يمكن الوصول إلى قائمة الأسرة الآن، لذا لم تغادر بعد. حاول مرة أخرى عندما تكون متصلًا.",
+    dayClosed: "اليوم مُغلق. خطة الغد:", addedTomorrow: "أُضيف إلى خطة الغد، مع ما نقلته.",
     h_added: "أضافه {name}، {when}", h_ticked: "علّمه {name}، {when}", h_unticked: "ألغى تعليمه {name}، {when}",
     h_removed: "حذفه {name}، {when}", h_restored: "استعاده {name}، {when}",
     todayAsk: "أي شيء لليوم؟ الصغير يكفي.", todayHave: "خطتك لليوم:",
@@ -284,11 +290,15 @@ function parse(raw) {
     if (typeof data.smallerAsked === "string") state.smallerAsked = data.smallerAsked.slice(0, MAX_PLAN);
     if (data.large === true) state.large = true;
     if (data.intent && isDate(data.intent.since) && state.intent) state.intent.since = data.intent.since;
-    if (data.house && typeof data.house.code === "string" && normalCode(data.house.code).length === 25
-        && /^[0-9a-f]{12}$/.test(data.house.me)) {
-      state.house = { code: data.house.code, me: data.house.me, seen: Number(data.house.seen) || 0,
-                      asked: Array.isArray(data.house.asked) ? data.house.asked.filter((x) => typeof x === "string") : [] };
-      if (data.houseList && typeof data.houseList === "object") state.houseList = houseMerge(data.houseList, {});
+    // The household code itself is never kept, only the keys made from it.
+    const hk = data.house && data.house.keys;
+    if (hk && /^[0-9a-f]{64}$/.test(hk.label) && [hk.enc, hk.mac].every((k) => Array.isArray(k) && k.length === 32
+        && k.every((b) => Number.isInteger(b) && b >= 0 && b < 256)) && HOUSE_ID.test(data.house.me)) {
+      const seen = {};
+      entries(data.house.seen).forEach(([id, v]) => { if (HOUSE_ID.test(id) && (v === "in" || v === "left")) seen[id] = v; });
+      state.house = { keys: { label: hk.label, enc: hk.enc.slice(), mac: hk.mac.slice() }, me: data.house.me, seen,
+                      asked: Array.isArray(data.house.asked) ? data.house.asked.filter((x) => HOUSE_ID.test(x)) : [] };
+      if (data.houseList && typeof data.houseList === "object") state.houseList = houseMerge(data.houseList, {}, data.house.me);
     }
     if (/^[0-9a-f]{12}$/.test(data.deviceId)) state.deviceId = data.deviceId;
     if (typeof data.deviceName === "string" && data.deviceName.trim()) state.deviceName = data.deviceName.trim().slice(0, 40);
@@ -298,7 +308,7 @@ function parse(raw) {
         .map((l) => ({ to: String(l.to || "").slice(0, 100), text: l.text.slice(0, 4000), date: l.date })).slice(-20);
     }
     if (typeof data.pushToken === "string" && /^[0-9a-f]{32}$/.test(data.pushToken)) state.pushToken = data.pushToken;
-    if (typeof data.updated === "string" && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d$/.test(data.updated)) state.updated = data.updated;
+    if (syncTime(data.updated)) state.updated = data.updated;
     return state;
   } catch (e) {
     return blank();
@@ -343,8 +353,10 @@ function comingBack(state, today) {
 // set aside.
 function smaller(state, text, today) {
   const plan = clean(text);
-  state.smallerAsked = state.intent ? state.intent.text : null;
+  // An empty box keeps the offer: it only counts as answered once there is
+  // something smaller.
   if (!plan || !state.intent) return "";
+  state.smallerAsked = state.intent.text;
   putAside(state, state.intent.text, today);
   state.intent = { text: plan, date: today, skips: 0 };
   return "smallerSaid";
@@ -395,6 +407,13 @@ function answer(state, choice, today) {
 function setPlan(state, text, today) {
   const plan = clean(text);
   if (!plan) return "nothing";
+  // After End the day, what was carried is tomorrow's plan: a plan typed
+  // the same day joins it rather than replacing it.
+  if (state.intent && state.intent.date > today) {
+    const parts = state.intent.text.split(";").map((p) => p.trim());
+    if (!parts.includes(plan)) state.intent.text = clean(state.intent.text + "; " + plan);
+    return "addedTomorrow";
+  }
   state.intent = { text: plan, date: today, skips: 0 };
   state.aside = state.aside.filter((a) => a.text !== plan);
   return "saved";
@@ -564,20 +583,45 @@ async function openSync(keys, blob) {
 // The household list, the same as hello.py's house_* functions: each adult
 // joins from their own device, everyone sees who joined or left, each thing
 // keeps its own history (the day, not the minute), no counts per person,
-// and removed things can be restored for 30 days.
+// and removed things can be restored for 30 days. Everything read from the
+// server was written by someone holding the code, so it is checked first,
+// and kept in objects with no prototype, so no id can reach Object.prototype.
 const HOUSE_SALT = "hello-world household v1";
+const HOUSE = { keepDays: 30, goneDays: 366, items: 100, kept: 150, members: 20, name: 40, text: 120,
+                history: 6, gone: 200, budget: 60000 };
+const HOUSE_WHATS = ["added", "ticked", "unticked", "removed", "restored"];
+const HOUSE_ID = /^[0-9a-f]{12}$/, HOUSE_ENTRY = /^[0-9a-f]{8}$/;
+const HOUSE_STAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 const houseKeys = (code) => syncKeys(code, HOUSE_SALT);
 const randomHex = (n) => hex(globalThis.crypto.getRandomValues(new Uint8Array(n)));
+const bare = () => Object.create(null);
+const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+const entries = (o) => (o && typeof o === "object" && !Array.isArray(o) ? Object.entries(o) : []);
 
+// Every letter equally likely: bytes past the last whole run of the
+// alphabet are thrown away.
 function newCode() {
-  const raw = Array.from(globalThis.crypto.getRandomValues(new Uint8Array(25)),
-    (b) => SYNC_ALPHABET[b % SYNC_ALPHABET.length]).join("");
-  return raw.match(/.{5}/g).join("-");
+  const n = SYNC_ALPHABET.length, top = 256 - (256 % n), out = [];
+  while (out.length < 25) {
+    for (const b of globalThis.crypto.getRandomValues(new Uint8Array(32))) {
+      if (b < top && out.length < 25) out.push(SYNC_ALPHABET[b % n]);
+    }
+  }
+  return out.join("").match(/.{5}/g).join("-");
 }
+
+const houseStamp = (d) => (d || new Date()).toISOString().slice(0, 19) + "Z";
+const houseTime = (v, latest) => (typeof v === "string" && HOUSE_STAMP.test(v) && v <= latest ? v : null);
+function houseText(v, n) {
+  if (typeof v !== "string") return "";
+  return v.replace(/[‌-‏]|[\p{Cc}\p{Cf}\p{Co}\p{Cs}\p{Zl}\p{Zp}]/gu, (c) => (/[‌-‏]/.test(c) ? c : " "))
+    .replace(/\s+/g, " ").trim().slice(0, n).trim();
+}
+const houseOrder = (a, b) => (a[2] < b[2] ? -1 : a[2] > b[2] ? 1 : a[3] < b[3] ? -1 : a[3] > b[3] ? 1 : 0);
 
 function houseItem(item) {
   let done = null, removed = null;
-  item.history.slice().sort((a, b) => (a[2] < b[2] ? -1 : a[2] > b[2] ? 1 : 0)).forEach(([what, , at]) => {
+  item.history.slice().sort(houseOrder).forEach(([what, , at]) => {
     if (what === "ticked" || what === "unticked") done = what === "ticked";
     else if (what === "removed" || what === "restored") removed = what === "removed" ? at : null;
   });
@@ -586,101 +630,184 @@ function houseItem(item) {
   return item;
 }
 
+// The newest entries, always keeping the newest tick and the newest
+// removal, so trimming never changes whether a thing is done or removed.
+function houseTrim(history, size) {
+  const sorted = history.slice().sort(houseOrder), keep = [];
+  [["ticked", "unticked"], ["removed", "restored"]].forEach((group) => {
+    const last = sorted.filter((h) => group.includes(h[0])).slice(-1);
+    keep.push(...last);
+  });
+  for (const h of sorted.slice().reverse()) {
+    if (keep.length >= size) break;
+    if (!keep.includes(h)) keep.push(h);
+  }
+  return keep.sort(houseOrder);
+}
+
 function houseNew(me, name, at) {
-  return { members: { [me]: { name: name.slice(0, 40), joined: at } }, items: {}, events: [["joined", me, at]], gone: [] };
+  const doc = { members: bare(), items: bare(), gone: bare() };
+  doc.members[me] = { name: houseText(name, HOUSE.name), joined: at || houseStamp() };
+  return doc;
 }
 
 function houseJoin(doc, me, name, at) {
-  if (doc.members[me] && !doc.members[me].left) return doc;
-  doc.members[me] = { name: name.slice(0, 40), joined: at };
-  doc.events.push(["joined", me, at]);
+  if (own(doc.members, me) && !doc.members[me].left) return doc;
+  if (Object.keys(doc.members).length >= HOUSE.members) return doc;
+  doc.members[me] = { name: houseText(name, HOUSE.name), joined: at || houseStamp() };
   return doc;
 }
 
 function houseLeave(doc, me, at) {
-  if (doc.members[me]) { doc.members[me].left = at; doc.events.push(["left", me, at]); }
+  if (own(doc.members, me)) doc.members[me].left = at || houseStamp();
   return doc;
 }
 
 function houseChange(doc, me, what, id, text, at) {
-  const m = doc.members[me];
-  if (!m || m.left) return null;
+  const m = own(doc.members, me) ? doc.members[me] : null;
+  if (!m || m.left || !HOUSE_WHATS.includes(what)) return null;
   if (what === "added") {
-    if (!clean(text)) return null;
+    text = houseText(text, HOUSE.text);
+    const live = Object.values(doc.items).filter((i) => !i.removed).length;
+    if (!text || live >= HOUSE.items) return null;
     id = randomHex(6);
-    doc.items[id] = { text: clean(text), history: [] };
+    doc.items[id] = { text, history: [] };
   }
-  const item = doc.items[id];
+  const item = own(doc.items, id) ? doc.items[id] : null;
   if (!item) return null;
-  item.history.push([what, me, at]);
+  at = at || houseStamp();
+  // Never before what this device already has, so a quick tick and untick
+  // keep their order everywhere.
+  const last = item.history.reduce((m, h) => (h[2] > m ? h[2] : m), "");
+  if (at <= last) at = houseStamp(new Date(Date.parse(last) + 1000));
+  item.history.push([what, me, at, randomHex(4)]);
+  item.history = houseTrim(item.history, HOUSE.history);
   houseItem(item);
   return id;
 }
 
-const sameEntry = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
-
-function houseMerge(doc, other) {
-  const out = { members: {}, items: {}, events: [], gone: [] };
-  const gone = new Set();
-  [doc, other].forEach((side) => ((side || {}).gone || []).forEach((g) => { if (typeof g === "string") gone.add(g); }));
-  out.gone = Array.from(gone).sort();
-  [doc, other].forEach((side) => {
-    Object.entries((side || {}).members || {}).forEach(([id, m]) => {
-      if (!m || typeof m.name !== "string") return;
-      const mine = out.members[id] || (out.members[id] = { name: m.name.slice(0, 40), joined: String(m.joined || "") });
-      if (m.left && String(m.left) > (mine.left || "")) mine.left = String(m.left);
+// `doc` is this device's own copy and `me` this device's member: whether
+// it left is only ever decided here.
+function houseMerge(doc, other, me) {
+  const latest = houseStamp(new Date(Date.now() + 86400000));
+  const sides = [doc, other].map((s) => (s && typeof s === "object" ? s : {}));
+  const out = { members: bare(), items: bare(), gone: bare() };
+  sides.forEach((side, n) => entries(side.members).forEach(([id, m]) => {
+    if (!HOUSE_ID.test(id) || !m || typeof m !== "object") return;
+    const name = houseText(m.name, HOUSE.name), joined = houseTime(m.joined, latest);
+    if (!name || !joined) return;
+    if (!own(out.members, id) && Object.keys(out.members).length >= HOUSE.members) return;
+    if (!own(out.members, id)) out.members[id] = { name, joined };
+    const left = houseTime(m.left, latest);
+    if (left && !(id === me && n === 1) && left > (out.members[id].left || "")) out.members[id].left = left;
+  }));
+  sides.forEach((side) => entries(side.items).forEach(([id, item]) => {
+    if (!HOUSE_ID.test(id) || !item || typeof item !== "object") return;
+    const text = houseText(item.text, HOUSE.text);
+    if (!text) return;
+    if (!own(out.items, id) && Object.keys(out.items).length >= HOUSE.kept) return;
+    if (!own(out.items, id)) out.items[id] = { text, history: [] };
+    const mine = out.items[id], seen = new Set(mine.history.map((h) => h[3]));
+    (Array.isArray(item.history) ? item.history.slice(0, HOUSE.history * 4) : []).forEach((h) => {
+      if (Array.isArray(h) && h.length === 4 && HOUSE_WHATS.includes(h[0]) && typeof h[1] === "string"
+          && HOUSE_ID.test(h[1]) && houseTime(h[2], latest) && typeof h[3] === "string"
+          && HOUSE_ENTRY.test(h[3]) && !seen.has(h[3])) {
+        mine.history.push(h.slice());
+        seen.add(h[3]);
+      }
     });
-    Object.entries((side || {}).items || {}).forEach(([id, item]) => {
-      if (!item || typeof item.text !== "string" || gone.has(id)) return;
-      const mine = out.items[id] || (out.items[id] = { text: clean(item.text), history: [] });
-      (item.history || []).forEach((h) => {
-        if (Array.isArray(h) && h.length === 3 && h.every((x) => typeof x === "string")
-            && !mine.history.some((e) => sameEntry(e, h))) mine.history.push(h);
-      });
-    });
-    ((side || {}).events || []).forEach((e) => {
-      if (Array.isArray(e) && e.length === 3 && !out.events.some((x) => sameEntry(x, e))) out.events.push(e);
-    });
+  }));
+  Object.keys(out.items).forEach((id) => {
+    const item = out.items[id];
+    if (!item.history.length) { delete out.items[id]; return; }
+    item.history = houseTrim(item.history, HOUSE.history);
+    houseItem(item);
   });
-  const by = (a, b) => (a[2] < b[2] ? -1 : a[2] > b[2] ? 1 : 0);
-  out.events.sort(by);
-  Object.values(out.items).forEach((item) => { item.history.sort(by); houseItem(item); });
+  // A thing gone for good stays gone, so an old copy can't bring it back;
+  // but only one removed over 30 days ago, and not added or restored since,
+  // so nobody can erase a thing still on the list.
+  const cutoff = houseStamp(new Date(Date.now() - HOUSE.keepDays * 86400000));
+  sides.forEach((side) => entries(side.gone).forEach(([id, at]) => {
+    at = houseTime(at, latest);
+    if (!HOUSE_ID.test(id) || !at) return;
+    if (own(out.items, id) && !out.items[id].removed) {
+      const lives = out.items[id].history.filter((h) => h[0] === "added" || h[0] === "restored").map((h) => h[2]);
+      if (at > cutoff || lives.some((l) => l >= at)) return;
+    }
+    if (at > (out.gone[id] || "")) out.gone[id] = at;
+    delete out.items[id];
+  }));
   return out;
 }
 
 function houseTidy(doc, now) {
-  const cutoff = new Date(now.getTime() - 30 * 86400000);
-  const stamp = `${iso(cutoff)}T${String(cutoff.getHours()).padStart(2, "0")}:${String(cutoff.getMinutes()).padStart(2, "0")}`;
-  const old = Object.keys(doc.items).filter((k) => doc.items[k].removed && doc.items[k].removed < stamp);
-  doc.gone = Array.from(new Set((doc.gone || []).concat(old))).sort();
-  old.forEach((k) => delete doc.items[k]);
+  const cutoff = houseStamp(new Date(now.getTime() - HOUSE.keepDays * 86400000));
+  const removed = Object.keys(doc.items).filter((k) => doc.items[k].removed)
+    .sort((a, b) => (doc.items[a].removed < doc.items[b].removed ? -1 : 1));
+  const extra = Math.max(0, Object.keys(doc.items).length - HOUSE.kept);
+  removed.forEach((k, n) => {
+    if (doc.items[k].removed < cutoff || n < extra) { doc.gone[k] = doc.items[k].removed; delete doc.items[k]; }
+  });
+  const forget = houseStamp(new Date(now.getTime() - HOUSE.goneDays * 86400000));
+  const kept = Object.keys(doc.gone).filter((k) => doc.gone[k] >= forget)
+    .sort((a, b) => (doc.gone[a] > doc.gone[b] ? -1 : 1)).slice(0, HOUSE.gone);
+  const gone = bare();
+  kept.forEach((k) => { gone[k] = doc.gone[k]; });
+  doc.gone = gone;
+  return doc;
+}
+
+const houseSize = (doc) => enc8(JSON.stringify(doc)).length;
+
+// Small enough for the server however busy the household is.
+function houseFit(doc) {
+  const removed = Object.keys(doc.items).filter((k) => doc.items[k].removed)
+    .sort((a, b) => (doc.items[a].removed < doc.items[b].removed ? -1 : 1));
+  while (houseSize(doc) > HOUSE.budget && removed.length) {
+    const k = removed.shift();
+    doc.gone[k] = doc.items[k].removed;
+    delete doc.items[k];
+  }
+  for (const size of [3, 2]) {
+    if (houseSize(doc) <= HOUSE.budget) break;
+    Object.values(doc.items).forEach((item) => { item.history = houseTrim(item.history, size); });
+  }
+  for (const k of Object.keys(doc.gone).sort((a, b) => (doc.gone[a] < doc.gone[b] ? -1 : 1))) {
+    if (houseSize(doc) <= HOUSE.budget) break;
+    delete doc.gone[k];
+  }
   return doc;
 }
 
 // The list padded to whole kilobytes, as hello.py's house_seal does.
 function houseBody(doc) {
-  const body = Object.assign({}, doc, { pad: "" });
+  const body = Object.assign({}, houseFit(doc), { pad: "" });
   const size = enc8(JSON.stringify(body)).length;
   body.pad = " ".repeat((1024 - (size % 1024)) % 1024);
   return body;
 }
 
-const who = (doc, id) => (doc.members[id] || {}).name || "?";
+const who = (doc, id) => (own(doc.members, id) ? doc.members[id].name : "") || "?";
 
 function houseHistory(doc, item, lang) {
   const words = UI[lang] || UI.en;
   return item.history.slice(-4).map(([what, by, at]) => {
-    const [y, m, d] = at.slice(0, 10).split("-").map(Number);
-    const day = new Date(y, m - 1, d).toLocaleDateString(lang, { weekday: "long" });
-    return words["h_" + what].replace("{name}", who(doc, by)).replace("{when}", day);
+    const day = new Date(at).toLocaleDateString(lang, { weekday: "long" });
+    return (words["h_" + what] || UI.en["h_" + what]).replace("{name}", who(doc, by)).replace("{when}", day);
   }).join("; ");
 }
 
+// Worked out from the members themselves, so a join can't be hidden by
+// giving it an old time.
 function houseNews(doc, me, seen, lang) {
-  const words = UI[lang] || UI.en;
-  const lines = doc.events.slice(seen || 0).filter(([, by]) => by !== me)
-    .map(([what, by]) => (what === "joined" ? words.joinedNote : words.leftNote).replace("{name}", who(doc, by)));
-  return [lines, doc.events.length];
+  const words = UI[lang] || UI.en, was = seen && typeof seen === "object" ? seen : {}, now = {}, lines = [];
+  Object.entries(doc.members).forEach(([id, m]) => {
+    now[id] = m.left ? "left" : "in";
+    if (id === me || was[id] === now[id]) return;
+    if (!own(was, id)) lines.push(words.joinedNote.replace("{name}", who(doc, id)));
+    if (m.left) lines.push(words.leftNote.replace("{name}", who(doc, id)));
+  });
+  return [lines, now];
 }
 
 function houseLeftUnasked(doc, me, asked) {
@@ -696,9 +823,12 @@ function syncForm(state) {
 // for each, as hello.py's merge_devices does.
 function mergeDevices(mine, theirs) {
   const out = {};
-  [mine, theirs].forEach((side) => Object.entries(side || {}).forEach(([id, d]) => {
-    if (/^[0-9a-f]{12}$/.test(id) && d && typeof d.name === "string" && typeof d.seen === "string"
-        && (!out[id] || d.seen > out[id].seen)) out[id] = { name: d.name.slice(0, 40), seen: d.seen.slice(0, 10) };
+  [mine, theirs].forEach((side) => entries(side).forEach(([id, d]) => {
+    // Written by whoever holds the code, so checked: a real date, and a name
+    // that is plain text.
+    const name = d ? houseText(d.name, 40) : "";
+    if (/^[0-9a-f]{12}$/.test(id) && name && isDate(d.seen) && !Number.isNaN(Date.parse(d.seen))
+        && (!out[id] || d.seen > out[id].seen)) out[id] = { name, seen: d.seen };
   }));
   return Object.fromEntries(Object.entries(out).sort((a, b) => (a[1].seen < b[1].seen ? -1 : 1)).slice(-20));
 }
@@ -713,8 +843,16 @@ function noteDevice(state, others, today) {
 function letterLink(letter, how, apple) {
   const to = String(letter.to || "").trim();
   if (how === "sms") return smsLink(phoneNumber(to), letter.text, apple);
-  const mail = /^[^@\s<>?&]+@[^@\s<>?&]+\.[^@\s<>?&]+$/.test(to) ? to : "";
+  // Plain addresses only: anything that means something in a link (#, %,
+  // ?, &, a comma) would send the letter somewhere else, or nowhere.
+  const mail = /^[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/.test(to) ? to : "";
   return `mailto:${mail}?body=${encodeURIComponent(letter.text)}`;
+}
+
+function syncTime(v) {
+  if (typeof v !== "string" || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d$/.test(v)) return "";
+  const at = Date.parse(v);
+  return !Number.isNaN(at) && at <= Date.now() + 86400000 ? v : "";
 }
 
 // Finished things from both sides, and the plan from whichever side changed
@@ -731,7 +869,9 @@ function mergeSync(state, other, today) {
   state.devices = mergeDevices(state.devices, other.devices);
   state.finished.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   state.finished = state.finished.slice(-100);
-  const theirs = typeof other.updated === "string" ? other.updated : "";
+  // A real time no more than a day ahead: one far ahead would win every
+  // later change.
+  const theirs = syncTime(other.updated);
   if (theirs > (state.updated || "")) {
     const i = other.intent;
     state.intent = i && typeof i.text === "string" && clean(i.text) && /^\d{4}-\d{2}-\d{2}$/.test(i.date)
@@ -752,7 +892,7 @@ if (typeof module !== "undefined") {
     phoneNumber, smsLink, utcTime, pushText, exportText, setDayStart, REMIND_TIMES, DAY_STARTS,
     fresh, smallerDue, comingBack, smaller, endDay, noteSideways, mergeDevices, noteDevice, letterLink,
     houseKeys, houseNew, houseJoin, houseLeave, houseChange, houseMerge, houseTidy, houseBody, houseHistory,
-    houseNews, houseLeftUnasked, newCode };
+    houseNews, houseLeftUnasked, newCode, houseFit, houseStamp, HOUSE };
 }
 
 if (typeof document !== "undefined") {
@@ -879,17 +1019,21 @@ if (typeof document !== "undefined") {
     $("aside-smaller").textContent = s.asideIt;
     $("keep-it").textContent = s.keepIt;
     const planned = state.intent && state.intent.date === day;
-    $("today-label").textContent = planned ? s.todayHave : s.todayAsk;
-    $("today-plan").hidden = $("today-buttons").hidden = !planned;
-    $("today-plan").textContent = planned ? state.intent.text : "";
-    $("plan-form").hidden = planned || asking;
+    // The day was closed: what was carried shows as tomorrow's plan, and
+    // nothing typed today can replace it.
+    const closed = Boolean(state.intent && state.intent.date > day);
+    $("today-label").textContent = closed ? s.dayClosed : planned ? s.todayHave : s.todayAsk;
+    $("today-plan").hidden = !planned && !closed;
+    $("today-buttons").hidden = !planned;
+    $("today-plan").textContent = planned || closed ? state.intent.text : "";
+    $("plan-form").hidden = planned || closed || asking;
     // Once a week at most: noted the first time it shows, and shown for
     // the rest of that visit.
     if (nudging === null) {
-      nudging = !planned && !asking && smallerDue(state, day);
+      nudging = !planned && !closed && !asking && smallerDue(state, day);
       if (nudging) { state.smallerOffered = day; save(); }
     }
-    $("smaller-nudge").hidden = planned || asking || !nudging;
+    $("smaller-nudge").hidden = planned || closed || asking || !nudging;
     $("smaller-nudge").textContent = s.smallerNudge;
     $("end-day").hidden = !planned || ending;
     $("end-day").textContent = s.endDay;
@@ -1042,23 +1186,29 @@ if (typeof document !== "undefined") {
     $("letter-keep-label").textContent = s.letterKeep;
     $("letters-clear").textContent = s.lettersClear;
     $("letters-clear").hidden = !(state.letters || []).length;
-    $("letter-list").replaceChildren(...(state.letters || []).map((letter, i) => {
+    $("letter-list").replaceChildren(...(state.letters || []).map((letter) => {
       const div = document.createElement("div");
       const open = Object.assign(document.createElement("button"), { textContent: s.letterOpen, className: "small-button" });
-      open.addEventListener("click", () => { $("letter-to").value = letter.to; $("letter-text").value = letter.text; editing = i; });
+      open.addEventListener("click", () => { $("letter-to").value = letter.to; $("letter-text").value = letter.text; editing = letter; });
       const del = Object.assign(document.createElement("button"), { textContent: s.letterDelete, className: "small-button" });
-      del.addEventListener("click", () => { state.letters.splice(i, 1); save(); drawLetters(); });
+      del.addEventListener("click", () => {
+        state.letters = state.letters.filter((l) => l !== letter);
+        if (editing === letter) editing = null;
+        save(); drawLetters();
+      });
       div.append(Object.assign(document.createElement("p"), { textContent: (letter.to || "…") + ": " + letter.text.slice(0, 60) }), open, del);
       return div;
     }));
   }
-  let editing = -1;
+  // The letter open for editing itself, not its place in the list, which
+  // moves when another one is deleted.
+  let editing = null;
   const currentLetter = () => ({ to: $("letter-to").value.trim().slice(0, 100), text: $("letter-text").value.trim().slice(0, 4000), date: today() });
   function keepLetter(letter) {
-    state.letters = (state.letters || []).filter((_, i) => i !== editing);
+    state.letters = (state.letters || []).filter((l) => l !== editing);
     if (letter) state.letters.push(letter);
     state.letters = state.letters.slice(-20);
-    editing = -1;
+    editing = null;
     save(); drawLetters();
   }
   $("letter-save").addEventListener("click", (event) => {
@@ -1077,7 +1227,7 @@ if (typeof document !== "undefined") {
   }));
   $("letters-clear").addEventListener("click", () => {
     if (!confirm(t().lettersClearAsk)) return;
-    state.letters = []; editing = -1; save(); drawLetters(); say("lettersCleared");
+    state.letters = []; editing = null; save(); drawLetters(); say("lettersCleared");
   });
   drawLetters();
 
@@ -1092,6 +1242,9 @@ if (typeof document !== "undefined") {
     if (keys && !changing) {
       keys = null;
       try { localStorage.removeItem(SYNC_KEY); } catch (e) { /* nothing saved */ }
+      // The devices belong to the old code; a stranger among them must not
+      // follow to the next one.
+      delete state.devices; save();
       drawSync(); say("syncOffDone");
       return;
     }
@@ -1099,6 +1252,7 @@ if (typeof document !== "undefined") {
     const k = await syncKeys($("sync-code").value);
     keys = { label: k.label, enc: Array.from(k.enc), mac: Array.from(k.mac) };
     changing = false;
+    delete state.devices; save();
     try { localStorage.setItem(SYNC_KEY, JSON.stringify(keys)); } catch (e) { /* private mode */ }
     $("sync-code").value = "";
     drawSync();
@@ -1132,10 +1286,11 @@ if (typeof document !== "undefined") {
   $("carry-it").addEventListener("click", act(() => afterCarry(answer(state, "carry", today()))));
   $("aside-it").addEventListener("click", act(() => { forking = false; return answer(state, "sideways", today()); }));
   $("make-smaller").addEventListener("click", act(() => {
-    state.offerSmaller = false;
     const said = smaller(state, $("smaller-input").value, today());
+    if (!said) return "nothing";
+    state.offerSmaller = false;
     $("smaller-input").value = "";
-    return said || "nothing";
+    return said;
   }));
   $("aside-smaller").addEventListener("click", act(() => {
     state.offerSmaller = false;
@@ -1216,32 +1371,53 @@ if (typeof document !== "undefined") {
   });
   // The household list. Nothing in it is ever sent in someone else's name,
   // and the code is never put in a message.
-  const stampNow = () => { const d = new Date(); return `${iso(d)}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
-  let houseReached = true, houseNote = "";
-  async function houseFetch(code) {
-    const k = await houseKeys(code);
+  let houseReached = true, houseNote = "", houseQueue = Promise.resolve();
+  const houseStore = (k) => ({ label: k.label, enc: Array.from(k.enc), mac: Array.from(k.mac) });
+  const houseUrl = (k) => `${location.origin}/v1/sync/${k.label}`;
+  // [the list, its version], or [null, null] when it isn't there.
+  async function houseFetch(stored) {
+    const k = asBytes(stored);
     try {
-      const got = await fetch(`${location.origin}/v1/sync/${k.label}`, { cache: "no-store" });
-      return got.ok ? await openSync(k, await got.arrayBuffer()) : null;
-    } catch (e) { return null; }
+      const got = await fetch(houseUrl(k), { cache: "no-store" });
+      if (!got.ok) return [null, null];
+      return [await openSync(k, await got.arrayBuffer()), got.headers.get("ETag")];
+    } catch (e) { return [null, null]; }
   }
-  async function housePut(code, doc) {
-    const k = await houseKeys(code);
+  // True, "changed" when someone else wrote since `tag` was read, or false.
+  async function housePut(stored, doc, tag) {
+    const k = asBytes(stored), headers = { "Content-Type": "application/octet-stream" };
+    if (tag) headers["If-Match"] = tag;
     try {
-      const put = await fetch(`${location.origin}/v1/sync/${k.label}`, { method: "PUT", body: await sealSync(k, houseBody(doc)),
-        headers: { "Content-Type": "application/octet-stream" } });
-      return put.ok;
+      const put = await fetch(houseUrl(k), { method: "PUT", body: await sealSync(k, houseBody(doc)), headers });
+      return put.ok ? true : put.status === 412 ? "changed" : false;
     } catch (e) { return false; }
   }
-  async function houseSync(change) {
-    if (!state.house) return;
-    const theirs = await houseFetch(state.house.code);
-    const doc = houseMerge(state.houseList || {}, theirs);
-    if (change) change(doc);
-    houseTidy(doc, new Date());
-    houseReached = theirs !== null && await housePut(state.house.code, doc);
-    state.houseList = doc;
-    save(); drawHouse();
+  // One at a time, so two quick taps can't each start from the same copy;
+  // again when another device wrote in between. With needServer, nothing
+  // changes here unless the server took it. Resolves to whether it did.
+  function houseSync(change, needServer) {
+    const run = async () => {
+      if (!state.house) return false;
+      const house = state.house;
+      let doc = houseMerge(state.houseList || {}, {}, house.me), reached = false;
+      for (let n = 0; n < 3; n++) {
+        const [theirs, tag] = await houseFetch(house.keys);
+        if (!theirs && needServer) break;
+        doc = houseMerge(state.houseList || {}, theirs, house.me);
+        if (change) change(doc);
+        houseFit(houseTidy(doc, new Date()));
+        if (!theirs) break;
+        const put = await housePut(house.keys, doc, tag);
+        if (put !== "changed") { reached = put === true; break; }
+      }
+      houseReached = reached;
+      if (needServer && !reached) { drawHouse(); return false; }
+      if (state.house === house) { state.houseList = doc; save(); }
+      drawHouse();
+      return reached;
+    };
+    houseQueue = houseQueue.then(run, run);
+    return houseQueue;
   }
   function drawHouse() {
     const s = t(), lang = language(state, navigator.languages);
@@ -1261,7 +1437,7 @@ if (typeof document !== "undefined") {
     $("house-offline").textContent = s.houseOffline;
     const [lines, seen] = houseNews(doc, me, state.house.seen, lang);
     $("house-news").replaceChildren(...lines.concat(houseNote ? [houseNote] : []).map((l) => Object.assign(document.createElement("p"), { textContent: l, className: "note" })));
-    if (seen !== state.house.seen) { state.house.seen = seen; save(); }
+    if (JSON.stringify(seen) !== JSON.stringify(state.house.seen)) { state.house.seen = seen; save(); }
     const ask = houseLeftUnasked(doc, me, state.house.asked)[0];
     $("house-rekey").hidden = !ask;
     if (ask) {
@@ -1274,11 +1450,11 @@ if (typeof document !== "undefined") {
     $("house-items").replaceChildren(...entries.filter(([, i]) => !i.removed).map(([id, item]) => {
       const div = document.createElement("div");
       const box = Object.assign(document.createElement("input"), { type: "checkbox", checked: item.done, id: "hi-" + id });
-      box.addEventListener("change", () => houseSync((d) => houseChange(d, me, item.done ? "unticked" : "ticked", id, null, stampNow())));
+      box.addEventListener("change", () => houseSync((d) => houseChange(d, me, box.checked ? "ticked" : "unticked", id, null)));
       const label = Object.assign(document.createElement("label"), { htmlFor: "hi-" + id, textContent: " " + item.text });
       label.style.display = "inline";
       const remove = Object.assign(document.createElement("button"), { textContent: s.houseRemove, className: "small-button" });
-      remove.addEventListener("click", () => houseSync((d) => houseChange(d, me, "removed", id, null, stampNow())));
+      remove.addEventListener("click", () => houseSync((d) => houseChange(d, me, "removed", id, null)));
       const history = Object.assign(document.createElement("p"), { className: "note", textContent: houseHistory(doc, item, lang) });
       div.append(box, label, history, remove);
       return div;
@@ -1286,21 +1462,28 @@ if (typeof document !== "undefined") {
     $("house-removed").replaceChildren(...entries.filter(([, i]) => i.removed).map(([id, item]) => {
       const div = document.createElement("div");
       const back = Object.assign(document.createElement("button"), { textContent: s.houseRestore, className: "small-button" });
-      back.addEventListener("click", () => houseSync((d) => houseChange(d, me, "restored", id, null, stampNow())));
+      back.addEventListener("click", () => houseSync((d) => houseChange(d, me, "restored", id, null)));
       div.append(Object.assign(document.createElement("p"), { textContent: item.text + " — " + houseHistory(doc, item, lang) }), back);
       return div;
     }));
   }
   $("house-join").addEventListener("submit", async (event) => {
     event.preventDefault();
-    const code = normalCode($("house-code").value), name = $("house-name").value.trim();
+    const code = normalCode($("house-code").value), name = houseText($("house-name").value, HOUSE.name);
     if (code.length !== 25 || !name) { say("houseNotFound"); return; }
-    const pretty = code.match(/.{5}/g).join("-");
-    const theirs = await houseFetch(pretty);
-    if (!theirs) { say("houseNotFound"); return; }
-    const me = randomHex(6), doc = houseJoin(houseMerge({}, theirs), me, name, stampNow());
-    if (!await housePut(pretty, doc)) { say("syncFail"); return; }
-    state.house = { code: pretty, me, seen: doc.events.length, asked: [] };
+    const stored = houseStore(await houseKeys(code.match(/.{5}/g).join("-")));
+    const me = randomHex(6);
+    let doc = null, put = false;
+    for (let n = 0; n < 3 && put !== true; n++) {
+      const [theirs, tag] = await houseFetch(stored);
+      if (!theirs) { say("houseNotFound"); return; }
+      doc = houseJoin(houseMerge({}, theirs), me, name);
+      if (!own(doc.members, me)) { say("houseFull"); return; }
+      put = await housePut(stored, doc, tag);
+      if (put === false) break;
+    }
+    if (put !== true) { say("syncFail"); return; }
+    state.house = { keys: stored, me, seen: houseNews(doc, me, {}, "en")[1], asked: [] };
     state.houseList = doc;
     $("house-code").value = "";
     save(); drawHouse(); say("houseJoined");
@@ -1309,17 +1492,26 @@ if (typeof document !== "undefined") {
     event.preventDefault();
     const text = $("house-add-text").value;
     $("house-add-text").value = "";
-    houseSync((d) => houseChange(d, state.house.me, "added", null, text, stampNow()));
+    houseSync((d) => houseChange(d, state.house.me, "added", null, text));
   });
-  $("house-rekey-yes").addEventListener("click", async () => {
-    await houseSync();
-    const old = state.house.code, code = newCode();
-    if (!await housePut(code, state.houseList)) { say("syncFail"); return; }
-    try { await fetch(`${location.origin}/v1/sync/${(await houseKeys(old)).label}`, { method: "DELETE" }); } catch (e) { /* gone anyway */ }
-    const left = Object.entries(state.houseList.members).filter(([, m]) => m.left).map(([id]) => id);
-    state.house = Object.assign({}, state.house, { code, asked: Array.from(new Set(state.house.asked.concat(left))) });
-    houseNote = t().newCodeSaid.replace("{code}", code);
-    save(); drawHouse();
+  $("house-rekey-yes").addEventListener("click", () => {
+    // Only from the newest copy on the server, so two members doing this at
+    // once don't split the household onto two codes.
+    houseQueue = houseQueue.then(async () => {
+      if (!state.house) return;
+      const [theirs] = await houseFetch(state.house.keys);
+      if (!theirs) { say("rekeyFail"); return; }
+      const doc = houseMerge(state.houseList || {}, theirs, state.house.me);
+      houseFit(houseTidy(doc, new Date()));
+      const code = newCode(), stored = houseStore(await houseKeys(code));
+      if (await housePut(stored, doc, "missing") !== true) { say("syncFail"); return; }
+      try { await fetch(houseUrl(asBytes(state.house.keys)), { method: "DELETE" }); } catch (e) { /* gone anyway */ }
+      const left = Object.entries(doc.members).filter(([, m]) => m.left).map(([id]) => id);
+      state.house = Object.assign({}, state.house, { keys: stored, asked: Array.from(new Set(state.house.asked.concat(left))) });
+      state.houseList = doc;
+      houseNote = t().newCodeSaid.replace("{code}", code);
+      save(); drawHouse();
+    });
   });
   $("house-rekey-no").addEventListener("click", () => {
     state.house.asked = state.house.asked.concat([$("house-rekey").dataset.who]);
@@ -1327,7 +1519,8 @@ if (typeof document !== "undefined") {
   });
   $("house-leave").addEventListener("click", async () => {
     if (!confirm(t().houseLeaveAsk)) return;
-    await houseSync((d) => houseLeave(d, state.house.me, stampNow()));
+    // Only once the others can be told.
+    if (!await houseSync((d) => houseLeave(d, state.house.me), true)) { say("houseLeaveOffline"); return; }
     delete state.house; delete state.houseList;
     save(); drawHouse(); say("houseLeft");
   });

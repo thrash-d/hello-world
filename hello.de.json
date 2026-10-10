@@ -921,7 +921,12 @@
   "Your mail program could not be opened.": "Ihr E-Mail-Programm konnte nicht geöffnet werden.",
   "no one yet": "noch niemand",
   "s to send it with your own mail, d to delete it, or Enter to go back > ": "s zum Senden mit Ihrem E-Mail-Programm, d zum Löschen, oder Eingabetaste zum Zurückgehen > ",
-  "this computer": "dieser Computer"
+  "this computer": "dieser Computer",
+  "That household list is full.": "Diese Haushaltsliste ist voll.",
+  "The household list can't be reached just now, so you haven't left yet. Try again when you're online.": "Die Haushaltsliste ist gerade nicht erreichbar, also haben Sie sie noch nicht verlassen. Versuchen Sie es wieder, wenn Sie online sind.",
+  "The household list can't be reached just now, or someone already made a new code. Nothing changed.": "Die Haushaltsliste ist gerade nicht erreichbar, oder jemand hat schon einen neuen Code gemacht. Nichts wurde geändert.",
+  "Type your name, as the others will see it, in the plan box first, then choose this again.": "Tippen Sie zuerst Ihren Namen, wie die anderen ihn sehen, in das Planfeld und wählen Sie dies dann noch einmal.",
+  "Added to tomorrow's plan, with what you carried.": "Zum Plan für morgen hinzugefügt, mit dem, was Sie mitgenommen haben."
  },
  "tips_floor": [
   "Prüfen Sie vor der ersten Aufgabe der Schicht, ob Ihr Laufweg frei ist.",

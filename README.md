@@ -275,6 +275,15 @@ was already on their device. The list is encrypted with its code before it
 leaves a device, padded so its size says little, and kept on the counts
 server like sync.
 
+The code is the only key. Anyone who has it can write to the list, even in
+someone else's name, which is why a leaver means a new code. Each device
+checks what it reads and drops anything malformed. It never accepts being
+told by someone else that it left. It never forgets a thing that is still on
+the list. Two devices changing the list at once both keep their change.
+Leaving, and making a new code, wait until the server can be reached, so the
+others really are told. A list holds up to 20 people and 100 things of up to
+120 characters, which keeps it under the server's size limit.
+
 hello-world collects nothing about anyone, adult or child: no account, no
 name, no age, and no plan text leaves a device unless you turn on sync,
 encrypted with a code only your devices have. That is why a household key
@@ -571,7 +580,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.62.0'
+$tag = 'v1.62.1'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
