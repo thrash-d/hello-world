@@ -150,7 +150,7 @@ def test_other_errors_are_not_reported_as_a_dead_stdout():
 def test_opening_again_the_same_day_asks_nothing_new():
     first = run(text="Send the invoice\n\n")
     second = run(text="\n", home=first.home)
-    assert "What is one thing" not in second.stdout
+    assert "Anything for today" not in second.stdout
     assert "Your plan for today: Send the invoice" in second.stdout
     assert notes(first.home)["visits"] == ["2026-10-01"]
 
@@ -167,7 +167,7 @@ def test_next_day_follow_up_done():
 def test_next_day_not_done_can_be_kept():
     first = run(text="Send the invoice\n\n")
     p = run(text="n\ny\n\n", day="2026-10-02", home=first.home)
-    assert "What is one thing" not in p.stdout
+    assert "Anything for today" not in p.stdout
     assert notes(first.home)["intent"] == {"text": "Send the invoice",
                                            "date": "2026-10-02",
                                            "since": "2026-10-01"}
@@ -1230,7 +1230,7 @@ def test_tidying_an_old_plan_does_not_overwrite_the_other_windows_plan():
     assert mod.save(state)
 
     def ask(prompt):
-        if prompt.startswith("What is one thing"):
+        if prompt.startswith("Anything for today"):
             other, _ = mod.load()
             other["intent"] = {"text": "New", "date": "2026-10-01"}
             assert mod.save(other)
@@ -1865,7 +1865,7 @@ def test_policy_turns_plans_off_and_drops_saved_plan_text():
                    "done": 3, "finished": [{"text": "done secret", "date": "2026-09-29"}]}, f)
     pol = {"DisablePlans": 1}
     p = run(text="m\n6\n\n\n", home=home, policy=pol)
-    assert "Did you do it?" not in p.stdout and "What is one thing" not in p.stdout
+    assert "Did you do it?" not in p.stdout and "Anything for today" not in p.stdout
     assert "Type menu, or Enter to close >" in p.stdout
     assert "Plans are turned off by your organization." in p.stdout
     saved = json.dumps(notes(home))
@@ -1996,7 +1996,8 @@ def _screen_keys():
     keys = [n.args[0].value for n in ast.walk(tree)
             if isinstance(n, ast.Call) and getattr(n.func, "id", "") in ("tr", "t")
             and n.args and isinstance(n.args[0], ast.Constant)]
-    keys += [hello.HELP, hello.MENU_HELP, hello.SAVED_PLAN, hello.GREETING]
+    keys += [hello.HELP, hello.MENU_HELP, hello.SAVED_PLAN, hello.GREETING,
+             hello.SCAM_LINE, hello.SHIELD_QUESTION, hello.SHIELD_STOP, hello.SIDEWAYS_SAID]
     # say() doesn't wrap, so what it prints as is must fit 72 columns, less
     # the "  2  " in front of a menu line.
     raw = {n.args[0].value: isinstance(call.args[0], ast.BinOp)
@@ -2088,7 +2089,7 @@ def test_a_spanish_day_reads_in_spanish():
     out = p.stdout
     assert out.startswith("¡Hola, mundo!\nLunes, 5 de octubre de 2026\n")
     assert "Te damos la bienvenida." in out and "Idea para hoy:" in out
-    assert "¿Qué cosa quieres terminar hoy?" in out
+    assert "¿Algo para hoy? Algo pequeño está bien." in out
     assert "Guardado. Escribe hecho" in out
     later = run(text="hecho\n\n\n", day="2026-10-06", lang="es", home=p.home)
     assert "¿Lo hiciste?" in later.stdout
@@ -2224,7 +2225,7 @@ def test_menu_at_the_plan_question_opens_the_menu_and_keeps_the_plan():
     assert "Options" in p.stdout
     assert "Show what is saved" in p.stdout
     assert notes(first.home)["intent"]["text"] == "Write the report"
-    assert p.stdout.count("What is one thing you want to get done today?") == 1
+    assert p.stdout.count("Anything for today? Small is fine.") == 1
 
 
 def test_the_last_prompt_does_not_name_q_but_q_still_closes():
@@ -3119,10 +3120,10 @@ def test_menu_option_12_has_the_windows_other_settings():
     assert "12  More settings..." in p.stdout
     assert "Greet me by name (now off)" in p.stdout
     assert "The greeting uses your first name." in p.stdout
-    assert "Finished plans are kept for 90 days instead of 14." in p.stdout
+    assert "Finished plans are kept for a year instead of 14 days." in p.stdout
     assert "Days you opened hello-world: 1" in p.stdout
-    # Windows also lists Keep hello-world in the tray.
-    entries = 13 if os.name == "nt" else 12
+    # Windows also lists Keep hello-world in the tray; My day starts at is last.
+    entries = 14 if os.name == "nt" else 13
     assert f'Type a number from 1 to {entries}, or press Enter to go back.' in p.stdout
     saved = notes(p.home)
     assert saved["name"] is True and saved["long_history"] is True
@@ -3138,7 +3139,7 @@ def test_the_text_menu_sets_a_reminder_time_and_forgets_the_earlier_plan(capsys)
     with open(os.path.join(first.home, "notes.json"), "w") as f:
         json.dump(saved, f)
     state, can_save = hello.load()
-    answers = iter(["1", "3", "1", "8", "13", "y"])
+    answers = iter(["1", "3", "1", "11", "13", "y"])
     hello.ask = lambda prompt: next(answers)
     hello.more_settings(state, can_save)
     out = capsys.readouterr().out
@@ -4349,3 +4350,96 @@ def test_sync_round_trips_through_the_server_and_off_deletes_it():
         assert hello.set_sync(state, can_save, True) == "Sync isn't available on this computer."
     finally:
         server.shutdown()
+
+
+def test_the_sync_code_stays_hidden_when_someone_is_on_the_phone():
+    server, url, folder = _counts_server()
+    try:
+        first = run(text="n\nCall Ana\n\n", policy={"SharedCountsServer": url})
+        hello = _window_hello(home=first.home)
+        hello.POLICY = {"SharedCountsServer": url}
+        hello.SHIELD_WAIT = 0
+        hello.FORCE_INTERACTIVE = True
+        state, can_save = hello.load()
+        hello.set_sync(state, can_save, True)
+        code = state["sync"]
+        for answer, shown in (("y", False), ("n", True)):
+            out, typed = [], iter(["1", answer])
+            hello.say = lambda text="": out.append(text)
+            hello.ask = lambda prompt: (out.append(prompt), next(typed))[1]
+            hello.sync_prompt(state, can_save)
+            page = " ".join(out)
+            assert "Nobody real will ever ask for your sync code" in page
+            assert (code in page) is shown, answer
+            assert ("Hang up" in page) is not shown
+        # A new code moves the copy and kills the old one.
+        old_label = hello.sync_keys(code)[0]
+        said = hello.change_sync_code(state, can_save)
+        new = notes(first.home)["sync"]
+        assert new != code and "old code no longer works" in said
+        assert not os.path.exists(os.path.join(folder, "sync", old_label))
+        assert os.path.exists(os.path.join(folder, "sync", hello.sync_keys(new)[0]))
+        # The command line prints the warning with the code.
+        p = run(["sync", "code"], home=first.home, policy={"SharedCountsServer": url})
+        assert "never call" in p.stdout and new in p.stdout
+    finally:
+        server.shutdown()
+
+
+def test_the_day_can_start_late_for_a_night_shift():
+    first = run(text="Call Ana\n\n")
+    hello = _window_hello(home=first.home)
+    hello.TODAY = None
+    state, can_save = hello.load()
+    assert hello.set_day_start(state, can_save, 18) == "Your day now starts at 18:00."
+    assert notes(first.home)["day_start"] == 18
+    hello.DAY_START = 0
+    hello.load()
+    assert hello.DAY_START == 18
+    import datetime as dt
+    assert hello.today() == (dt.datetime.now() - dt.timedelta(hours=18)).date()
+    # Back to midnight removes the setting; a made-up hour is ignored.
+    hello.set_day_start(state, can_save, 0)
+    assert "day_start" not in notes(first.home) and hello.DAY_START == 0
+    with open(os.path.join(first.home, "notes.json")) as f:
+        raw = json.load(f)
+    raw["day_start"] = 7
+    with open(os.path.join(first.home, "notes.json"), "w") as f:
+        json.dump(raw, f)
+    assert "day_start" not in hello.load()[0]
+    assert "22:00" in " ".join(hello.REMINDER_TIMES)
+
+
+def test_plans_put_aside_are_offered_by_number():
+    home = mkdtemp()
+    hello = _window_hello(day="2026-10-01", home=home)
+    state, _ = hello.load()
+    state["put_aside"] = [{"text": "Fix the gutter", "date": "2026-09-20"},
+                          {"text": "Call the bank", "date": "2026-09-25"}]
+    assert hello.save(state)
+    p = run(text="2\n\n", home=home)
+    assert "Put aside, ready to bring back:" in p.stdout
+    assert "Anything for today? Small is fine." in p.stdout
+    saved = notes(home)
+    assert saved["intent"]["text"] == "Fix the gutter"
+    assert [r["text"] for r in saved["put_aside"]] == ["Call the bank"]
+
+
+def test_the_day_went_sideways_sets_the_plan_aside_with_nothing_marked():
+    first = run(text="Write the report\n\n")
+    p = run(text="sideways\n\n\n", home=first.home, day="2026-10-02")
+    assert "That's okay. It's set aside, and tomorrow is new." in p.stdout
+    saved = notes(first.home)
+    assert not saved.get("intent") and not saved.get("finished") and not saved.get("unsure")
+    assert saved["put_aside"][-1]["text"] == "Write the report"
+    # The window's button answers the same way.
+    second = run(text="Call Ana\n\n")
+    hello = _window_hello(home=second.home)
+    visit = hello.Visit()
+    assert visit.answer("sideways") == "That's okay. It's set aside, and tomorrow is new."
+    assert notes(second.home)["put_aside"][-1]["text"] == "Call Ana"
+
+
+def test_a_longer_history_keeps_a_year():
+    hello = _load_hello()
+    assert hello.keep_days({"long_history": True}) == 365 and hello.keep_days({}) == 14

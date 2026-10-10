@@ -78,9 +78,12 @@ the ones you did. In the text screen, `done` on a plan of a few things asks
 which ones, by number. Click the notification itself
 to open the window. With no plan, it stays quiet, unless you choose
 **Options > Reminder... > Also on days with no plan**. The same menu
-moves the reminder to 8:00, 9:00, 10:00 or 13:00 instead of sign-in, opens
+moves the reminder to 8:00, 9:00, 10:00, 13:00, 15:00, 18:00 or 22:00
+instead of sign-in, opens
 the window after you answer, and comes on weekends only if you choose **Also
-on weekends**. Days your organization
+on weekends**. The same menu also has **My day starts at**: midnight, 4:00,
+12:00 or 18:00, when "today" turns into tomorrow; 18:00 keeps a night shift
+from 22:00 to 6:00 on one day. Days your organization
 lists as holidays are quiet too. **Options > Greet me by name** puts your
 first name at the top. Turning off **What the window shows > Also show the
 thought** hides the thought and keeps the tip.
@@ -90,7 +93,7 @@ week), **My
 numbers...** (days opened, your longest run and plans finished, once you turn
 on **Keep my numbers**), **Save my plans to a file** (a Markdown file in
 Documents, with a `.csv` copy that opens in a spreadsheet; **Delete the plans
-file I saved** removes both), **Keep a longer history** (finished plans kept for 90 days instead of 14), and
+file I saved** removes both), **Keep a longer history** (finished plans kept for a year instead of 14 days), and
 **Tips for floor and shift work**, a second list of 40 tips for warehouses,
 factories and shifts in place of the desk ones.
 
@@ -149,9 +152,12 @@ If you don't type `done`, the next visit asks "Did you do it?". A yes is
 counted on the spot, and `ok`, `sure`, `did it` and `finished` are yes
 too; `nah` and `not really` are "not yet". If the plan is more than a day old, it lists the days
 since and you pick one by number. "Not yet" lets you keep the plan for today, as many days as you
-need. Press Enter to skip the question; after two skips it stops asking and
+need. `sideways` (or **The day went sideways** in the window) sets the plan
+aside with nothing marked and says tomorrow is new. Press Enter to skip the question; after two skips it stops asking and
 shows the plan as still open, and `done` still works. A plan first set more
-than two weeks ago is put away, and `same` brings it back.
+than two weeks ago is put away, and `same` brings it back. With no plan, the
+question ("Anything for today? Small is fine.") lists up to three plans put
+aside, by number, so one keystroke brings one back.
 
 If a plan sounds like several things joined together, it says once that
 finishing the first part still counts.
@@ -427,7 +433,16 @@ a label made from the same code. The phone app needs to be served by that
 counts server (`--phone`). The scheme is PBKDF2-SHA256, then HMAC-SHA256 as a
 counter-mode stream with an HMAC tag, built from what both Python's standard
 library and a browser have; it has had no outside audit. `hello.cmd sync code`
-shows the code again for a new phone. Turning sync off, or deleting
+shows the code again for a new phone, and `hello.cmd sync new` (or **Change
+my sync code**) makes a new one, moves the copy and deletes the old one, so a
+code someone else saw stops working.
+
+Wherever the code shows, it says: hello-world has no phone line and no
+support staff, never calls, emails or texts, and nobody real will ever ask
+for your sync code. Before showing it, it asks whether anyone is on the phone
+with you or asking for it; a yes keeps it hidden. The text screen also waits
+ten seconds, since a scammer's script is to hurry you. The app always makes
+the code itself, so a guessable one like `password123` can't be set. Turning sync off, or deleting
 everything, deletes the server's copy. The `TurnOffSync` policy keeps it off
 on work PCs.
 
@@ -449,7 +464,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.54.0'
+$tag = 'v1.55.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

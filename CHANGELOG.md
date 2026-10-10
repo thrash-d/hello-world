@@ -1,5 +1,31 @@
 # Changelog
 
+## 2026-10-10: a scam shield, your own day start, and a day that went sideways
+
+Version 1.55.0. From three more rounds of simulated people (Gen Z, Gen Z
+pessimists, and very trusting boomers) and the Profit Maximizer's memos;
+four of them reviewed the design first and changed it.
+
+- Scam shield. Wherever the sync code shows: "hello-world has no phone line
+  and no support staff. We never call, email or text. Nobody real will ever
+  ask for your sync code. If someone asks, hang up." It asks first whether
+  anyone is on the phone or asking for the code, and a yes keeps it hidden;
+  the text screen then waits ten seconds before showing it (Dolores: a
+  coached person just answers no, and a scammer's script is to hurry).
+- **Change my sync code** (`hello.cmd sync new`): a new code, the encrypted
+  copy moved to it, the old one deleted, so a code someone else saw stops
+  working. Codes are still only ever made by the app.
+- **My day starts at** midnight, 4:00, 12:00 or 18:00, for night shifts and
+  late sleepers; 18:00 keeps a 22:00 to 6:00 shift on one day. Reminders can
+  also come at 15:00, 18:00 or 22:00.
+- "Did you do it?" takes `sideways`, and the window has **The day went
+  sideways**: the plan goes aside with nothing marked, and "That's okay. It's
+  set aside, and tomorrow is new."
+- With no plan, the question is now "Anything for today? Small is fine." and
+  lists up to three plans put aside by number, so one keystroke brings one
+  back instead of a blank box.
+- **Keep a longer history** keeps a year instead of 90 days, free.
+
 ## 2026-10-10: sync between a PC and a phone
 
 Version 1.54.0. The last of the Profit Maximizer's three builds; the bank
