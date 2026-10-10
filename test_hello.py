@@ -4184,7 +4184,8 @@ def _node(script):
     node = shutil.which("node")
     if not node:
         raise unittest.SkipTest("needs node")
-    p = subprocess.run([node, "-e", script], capture_output=True, text=True,
+    # UTF-8 both ways: Windows would otherwise read node's output as cp1252.
+    p = subprocess.run([node, "-e", script], capture_output=True, encoding="utf-8",
                        cwd=os.path.join(os.path.dirname(HELLO), "phone"))
     assert p.returncode == 0, p.stderr
     return json.loads(p.stdout)
