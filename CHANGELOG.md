@@ -1,5 +1,33 @@
 # Changelog
 
+## 2026-10-10: a command line for engineers
+
+Version 1.49.0. Priyanka asked for this in the persona review and changed the
+design before it was built.
+
+- `hello plan TEXT`, `hello plan` (numbered, or `--json`), `hello add TEXT`,
+  `hello done 2`, `done 1-3` and `done all`, with no prompts and exit codes 0,
+  1 and 2. A bare `done` refuses a plan of several things, so a standup never
+  overstates (her call).
+- `hello import todo.txt`: open tasks only, priorities and dates dropped,
+  `due:` kept as the due date, `--pick` or a question at a terminal, never
+  written back, and safe to run twice.
+- `hello standup`: what was finished since the last workday (Friday on a
+  Monday, holidays skipped), "not sure" ones marked, and today's plan.
+  `--git` adds the subjects of your own commits across several repositories
+  (`--repos`, with wildcards) and several emails (`--author`); `--remember`
+  keeps those as defaults. `--json` for scripts.
+- `hello export` prints every saved plan as tab-separated text to grep, since
+  the file is locked to the Windows account.
+- Both installers write `hello`, a bash script for WSL and Git Bash that runs
+  `hello.cmd` on Windows with Windows paths, so it reads the same notes. She
+  said this, not more features, decides whether she'd pay.
+- The help lists the new words, and no longer says IT can read the notes,
+  which stopped being true in 1.44.0.
+
+Not built: `hello` with no words printing only the plan, since everyone else
+starts the daily screen that way; `hello plan` does it instead.
+
 ## 2026-10-10: reactions, and handoff that finds you
 
 Version 1.48.0. Skye asked for more on the shared count and Rick and Denise

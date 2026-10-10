@@ -199,6 +199,35 @@ number, it is under "If things feel heavy, someone to talk to" at the end of
 the text menu's options and in the window's Options. It never appears by
 itself, never reacts to what you type, and nothing records that you looked.
 
+### From a command line, for engineers
+
+`hello.cmd` in PowerShell or cmd, or `hello` in WSL and Git Bash (it runs
+`hello.cmd` on Windows, so it reads the same notes), takes these words. None of
+them prompts unless you're at a terminal, they print plain text, and they exit
+0 when it worked, 1 when something failed and 2 for a usage mistake.
+
+```
+hello plan "fix flaky test; review PR 88 by Friday"
+hello plan                  # today's plan, numbered (--json for scripts)
+hello add "ship 1.2"
+hello done 2                # or done 1-3, or done all
+hello import todo.txt --pick 1 3
+hello standup --git --repos ~/src/* --author me@work.com me@home.net --remember
+hello export | grep PR
+```
+
+A bare `hello done` finishes a plan of one thing and refuses a plan of
+several, so a standup never says more than you did. `import` reads a todo.txt
+file and never writes to it: done (`x`) lines are skipped, priorities and dates
+are dropped, `due:` becomes the due date, and running it twice adds nothing
+twice. `standup` lists what you finished since the last workday (Friday on a
+Monday, skipping weekends unless you work them, and your organization's
+holidays), today's plan, and with `--git` the subjects of your own commits in
+local repositories. `--remember` keeps `--git`, `--repos` and `--author` for
+next time. In WSL, `--git` runs the Windows git. Tickets from Jira and the like
+would need network credentials, so they aren't read. `export` prints every
+saved plan as tab-separated text, since the file itself is locked.
+
 ### What is saved, and who can see it
 
 This is the one place that lists what is saved. `PLAN.md` and the why-doc link
@@ -347,7 +376,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.48.0'
+$tag = 'v1.49.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
