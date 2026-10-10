@@ -105,6 +105,11 @@
       <string id="HandoffHours_Help">כשההגדרה מופעלת, הערות ההעברה מוצגות במשך מספר השעות הזה, בין 1 ל-336, חוץ מהערות שנשמרות עד ניקוי. 24 מתאים למשמרות של 12 שעות; 168 מכסה סוף שבוע ארוך.
 
 כשההגדרה מושבתת או לא מוגדרת, ההערות מוצגות 72 שעות.</string>
+      <string id="SUPPORTED_1_47">hello-world 1.47.0 ואילך</string>
+      <string id="SupportLine">קו תמיכה</string>
+      <string id="SupportLine_Help">כשההגדרה מופעלת, הטקסט הזה, למשל המספר של תוכנית הסיוע לעובדים, מוצג תחת "כשקשה, מישהו לדבר איתו": בסוף האפשרויות בתפריט הטקסט וכפריט באפשרויות של החלון. הוא תמיד באותו מקום. הוא אף פעם לא מופיע מעצמו ולא מגיב לשום דבר שמוקלד, ושום דבר לא מתעד שמישהו הסתכל בו.
+
+כשההגדרה מושבתת או לא מוגדרת, אין קו תמיכה.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -121,6 +126,9 @@
       </presentation>
       <presentation id="HandoffHours">
         <decimalTextBox refId="HandoffHours" defaultValue="72">שעות:</decimalTextBox>
+      </presentation>
+      <presentation id="SupportLine">
+        <textBox refId="SupportLine"><label>טקסט:</label></textBox>
       </presentation>
     </presentationTable>
   </resources>

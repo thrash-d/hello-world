@@ -12,7 +12,10 @@ opt-in setting or policy with the safe default kept.
 The owner's plan from the October 2026 persona review and the Profit
 Maximizer memo, one round each. 1.44.0 locked notes to the person's Windows
 account; 1.45.0 added the shared tip count and its reference server;
-1.46.0 added shift handoff notes.
+1.46.0 added shift handoff notes; 1.47.0 added "I'm not sure", dated
+questions, What I did, large text, no follow-up questions, the support line
+and a plan-free reminder by default. The reminder was already offered on the
+first day, right after the first plan.
 
 1. Emoji reactions to the thought on the same server, the count shown in
    the window without waiting for the server (a background thread), and a
@@ -24,13 +27,6 @@ account; 1.45.0 added the shared tip count and its reference server;
    box leaving the note instead of saving the plan, and a policy to sign
    notes with the first name for units that want it (Denise; Rick wants the
    opposite, so it stays off by default).
-3. "I don't remember" as an answer, the day a plan was written ("On Monday you
-   planned..."), and a big-print dated history (Harold).
-4. Gentle mode: a plan with no follow-up and no due dates from words, and a
-   static support-line link set by policy, never triggered by what is typed
-   (Sam).
-5. The sign-in reminder offered on the first day, with plan text left out of
-   it on shared PCs (Jaylen, Priyanka, Rick).
 6. Fun: a desk pet that sleeps and never dies, a plan graveyard with kind
    eulogies, a company boss fight on the shared counts (Jaylen, Skye).
 7. For engineers: a command-line `hello plan`/`hello done`, todo.txt import,
@@ -39,8 +35,6 @@ account; 1.45.0 added the shared tip count and its reference server;
    this repo; noted, not buildable here.
 9. A due date for one thing in a plan instead of the whole plan (Priya,
    Dana, Tom, round 68 pilot).
-10. The notification leaves the plan out unless the person turns it on, the
-   safe default for a shared screen (Mónica).
 11. Delete everything says which settings it kept, and offers to reset them
    too (Mónica).
 12. Someone back after 60 or more days sees the first-run welcome, since only

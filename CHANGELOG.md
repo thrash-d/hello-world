@@ -1,5 +1,57 @@
 # Changelog
 
+## 2026-10-10: remembering, and asking less
+
+Version 1.47.0. Harold (79, mild memory slips) and Sam (in a low period)
+asked for these in the persona review. The design went back to both before
+it was built, and they changed it.
+
+From Harold:
+- "Did you do it?" has a fourth answer, **I'm not sure**, which keeps the
+  plan for today with no mark either way. He asked for "not sure" over "I
+  don't remember", since he often thinks he did it, and for `?` on the text
+  screen, since `r` read as "remembered".
+- The question names the day: "Yesterday you planned:" only when it was
+  yesterday, otherwise "On Friday, 2 October 2026 you planned:", with the date,
+  because "Monday" alone could be this week or last for someone in three
+  days a week. The notification says the same.
+- **What I did**: two weeks, one line a day, newest first, with "nothing
+  noted" on empty days so no gap is left to worry about, and "not sure"
+  shown as itself. It offers to print the page.
+- **Take back a Done** undoes a Done clicked by mistake, as he did twice on
+  the sign-in notification, and puts the thing back on today's plan.
+- **Large text** makes the window half as big again and stays on.
+
+From Sam:
+- **No follow-up questions** (`gentle` at the last prompt, or the menu):
+  no "Did you do it?", days and dates typed stay words instead of due
+  dates, no days-in-a-row message, and a plan left for three days folds away
+  quietly instead of sitting there "like a small gravestone". `same` brings
+  it back. Nowhere does it say a mode is on.
+- It is offered once, in one line, after a first "not yet" or "not sure",
+  and never again: "nobody should have to admit they're struggling to find
+  it, and nobody should get nagged".
+- `SupportLine` policy: one line, such as an employee assistance number,
+  under "If things feel heavy, someone to talk to", at the end of the text
+  menu's options and in the window's Options. It never appears by itself or
+  in reply to anything typed. Neither it nor no follow-up questions is
+  logged anywhere, and the README says so.
+
+From Mónica and the review: the sign-in notification leaves the plan's words
+out unless the person turns on **Show my plan in the reminder**, the safe
+default for a shared screen. The old "Leave my plan out" setting is replaced.
+The reminder was already offered on the first day, after the first plan.
+
+35 new screen strings and the policy text are translated into 11 languages,
+simulated like the earlier ones.
+
+Tests: "not sure" keeps the plan and is recorded, the gentle offer comes
+once; the dated question; no follow-up questions stopping the question, the
+due date and the streak, and folding an old plan away; What I did with done,
+not sure, still open and empty days, printing and taking back a Done; the
+window's not-sure button and large text; the support line only when set; and
+the reminder's plan text only when turned on. 305 pass.
+
 ## 2026-10-04: formulas in a plan stay text in the spreadsheet copy
 
 Version 1.46.1. The persona review of 1.43.0 found, and the code confirmed:

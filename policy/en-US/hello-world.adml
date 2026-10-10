@@ -109,6 +109,11 @@ When disabled or not configured, each PC keeps its own notes in ProgramData, loc
       <string id="HandoffHours_Help">When enabled, handoff notes show for this many hours, from 1 to 336, unless kept until cleared. 24 suits 12-hour shifts; 168 covers a long weekend.
 
 When disabled or not configured, notes show for 72 hours.</string>
+      <string id="SUPPORTED_1_47">hello-world 1.47.0 or later</string>
+      <string id="SupportLine">Support line</string>
+      <string id="SupportLine_Help">When enabled, this text, such as your employee assistance programme's number, shows under "If things feel heavy, someone to talk to": at the end of the text menu's options and as an entry in the window's Options. It is always in the same place. It never appears by itself and never reacts to anything typed, and nothing records that anyone looked at it.
+
+When disabled or not configured, there is no support line.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -125,6 +130,9 @@ When disabled or not configured, notes show for 72 hours.</string>
       </presentation>
       <presentation id="HandoffHours">
         <decimalTextBox refId="HandoffHours" defaultValue="72">Hours:</decimalTextBox>
+      </presentation>
+      <presentation id="SupportLine">
+        <textBox refId="SupportLine"><label>Text:</label></textBox>
       </presentation>
     </presentationTable>
   </resources>

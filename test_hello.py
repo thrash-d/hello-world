@@ -158,7 +158,7 @@ def test_opening_again_the_same_day_asks_nothing_new():
 def test_next_day_follow_up_done():
     first = run(text="Send the invoice\n\n")
     p = run(text="y\nCall back\n\n", day="2026-10-02", home=first.home)
-    assert "Last time you planned: Send the invoice" in p.stdout
+    assert "Yesterday you planned: Send the invoice" in p.stdout
     assert notes(first.home)["intent"]["text"] == "Call back"
     # With the days-in-a-row message off, only the latest date is kept.
     assert notes(first.home)["visits"] == ["2026-10-02"]
@@ -379,7 +379,7 @@ def test_friendly_yes_words_count():
     for word in ("yep", "Yes!", "done", "ya", "ok", "Okay.", "did it", "yup"):
         first = run(text="Book travel\n\n")
         p = run(text=word + "\n\n\n", day="2026-10-02", home=first.home)
-        assert "Last time you planned: Book travel" in p.stdout
+        assert "Yesterday you planned: Book travel" in p.stdout
         assert notes(first.home)["intent"] is None, word
 
 
@@ -391,7 +391,7 @@ def test_a_hostile_notes_file_cannot_write_controls_to_the_screen():
         json.dump(bad, f)
     p = run(text="y\n\n\n", home=home)
     assert "\x1b" not in p.stdout and "\r" not in p.stdout
-    assert "Last time you planned: [31mEVIL FAKE" in p.stdout
+    assert "Yesterday you planned: [31mEVIL FAKE" in p.stdout
     assert "\x1b" not in run(["--stats"], home=home).stdout
 
 
@@ -2257,7 +2257,7 @@ def test_the_window_asks_about_yesterdays_plan_and_answers_like_the_text_screen(
         elif choice == "no":
             assert saved["intent"] == {"text": "Write the report",
                                        "date": "2026-10-02", "since": "2026-10-01"}
-            assert visit.plan() == "Write the report" and message == "Kept for today."
+            assert visit.plan() == "Write the report" and message.startswith("Kept for today.")
         else:
             assert saved["intent"]["skips"] == 1 and visit.plan() == ""
 
@@ -2337,7 +2337,8 @@ def test_the_sign_in_reminder_asks_about_a_plan_once_a_day():
     assert hello.sign_in() == 0 and len(hello.SHOWN) == 1
     toast = ET.fromstring(hello.SHOWN[0])
     texts = [t.text for t in toast.iter("text")]
-    assert texts == ["Last time you planned: Report & slides", "Did you do it?"]
+    # The plan's words stay out of it unless the person turns them on.
+    assert texts == ["Did you do it?"]
     key = hello.plan_key("Report & slides", "2026-10-01")
     assert [a.get("arguments") for a in toast.iter("action")] == [
         f"hello-world:{w}/{key}" for w in ("done", "notyet", "skip")]
@@ -3118,7 +3119,7 @@ def test_menu_option_12_has_the_windows_other_settings():
     assert "Done. The greeting uses your first name." in p.stdout
     assert "Done. Finished plans are kept for 90 days instead of 14." in p.stdout
     assert "Days you opened hello-world: 1" in p.stdout
-    assert 'Type a number from 1 to 7, or press Enter to go back.' in p.stdout
+    assert 'Type a number from 1 to 10, or press Enter to go back.' in p.stdout
     saved = notes(p.home)
     assert saved["name"] is True and saved["long_history"] is True
     assert saved["numbers"] is True
@@ -3133,7 +3134,7 @@ def test_the_text_menu_sets_a_reminder_time_and_forgets_the_earlier_plan(capsys)
     with open(os.path.join(first.home, "notes.json"), "w") as f:
         json.dump(saved, f)
     state, can_save = hello.load()
-    answers = iter(["1", "3", "1", "8", "9", "y"])
+    answers = iter(["1", "3", "1", "8", "12", "y"])
     hello.ask = lambda prompt: next(answers)
     hello.more_settings(state, can_save)
     out = capsys.readouterr().out
@@ -3288,7 +3289,7 @@ def test_a_due_date_is_shown_and_carried_with_the_plan():
     assert visit.set_due("2026-10-05") == "Done. Due Monday, 5 October 2026."
     hello = _window_hello(day="2026-10-02", home=first.home)
     visit = hello.Visit()
-    assert visit.answer("no") == "Kept for today."
+    assert visit.answer("no").startswith("Kept for today.")
     assert notes(first.home)["intent"]["due"] == "2026-10-05"
     hello.SHOWN = []
     hello.show_reminder("Send the invoice", "2026-10-02", due=hello.due_note(
@@ -3394,7 +3395,7 @@ def test_a_plain_file_from_before_is_read_and_locked_at_the_next_save():
     first = run(text="Book travel\n\n")
     assert notes(first.home)["intent"]["text"] == "Book travel"
     later = run(text="\n\n\n", day="2026-10-02", home=first.home, lock="test")
-    assert "Last time you planned: Book travel" in later.stdout
+    assert "Yesterday you planned: Book travel" in later.stdout
     with open(os.path.join(first.home, "notes.json"), encoding="utf-8") as f:
         assert set(json.load(f)) == {"locked", "data"}
 
@@ -3621,3 +3622,101 @@ def test_a_new_plan_is_never_overdue_the_moment_it_is_saved():
     p = run(text="Pay rent 1/10\n\n\n", day="2026-10-05")
     assert "It was due" not in p.stdout
     assert "due" not in notes(p.home)["intent"]
+
+
+def test_not_sure_keeps_the_plan_without_a_mark_and_offers_quiet_once():
+    first = run(text="Call the dentist\n\n")
+    p = run(text="?\n\n\n", day="2026-10-02", home=first.home)
+    out = " ".join(p.stdout.split())
+    assert "Yesterday you planned: Call the dentist" in out
+    assert "? if you're not sure" in out
+    assert "That's fine. It's kept for today." in out
+    assert "Prefer no follow-up questions? Type gentle at the end" in out
+    saved = notes(first.home)
+    assert saved["intent"]["text"] == "Call the dentist" and "done" not in saved
+    assert saved["unsure"] == [{"text": "Call the dentist", "date": "2026-10-01"}]
+    again = run(text="n\n\n\n\n", day="2026-10-03", home=first.home)
+    assert "Prefer no follow-up questions?" not in again.stdout
+
+
+def test_the_question_names_the_day_with_its_date():
+    first = run(text="Ask Linda about the folder\n\n", day="2026-10-02")
+    p = run(text="\n\n\n", day="2026-10-05", home=first.home)
+    assert "On Friday, 2 October 2026 you planned: Ask Linda" in " ".join(p.stdout.split())
+
+
+def test_no_follow_up_questions_stops_asking_and_folds_old_plans_away():
+    first = run(text="Reply to Dana\ngentle\n\n")
+    assert "Done. It won't ask about your plans." in first.stdout
+    assert notes(first.home)["gentle"] is True
+    p = run(text="\n\n\n", day="2026-10-02", home=first.home)
+    assert "Did you do it?" not in p.stdout and "Still open since" in p.stdout
+    q = run(text="\nplan\nCall mum Sunday\n\n", day="2026-10-03", home=first.home)
+    assert "Due" not in q.stdout and "due" not in notes(first.home)["intent"]
+    r = run(text="\n\n\n", day="2026-10-07", home=first.home)
+    assert "Earlier plan: Call mum Sunday" in r.stdout and "Still open" not in r.stdout
+    assert "put away" not in r.stdout
+    assert notes(first.home)["previous"] == "Call mum Sunday"
+
+
+def test_what_i_did_shows_every_day_and_a_done_can_be_taken_back():
+    hello = _window_hello(day="2026-10-05")
+    hello.PRINTED = []
+    state = {"visits": [], "intent": {"text": "Ask Linda", "date": "2026-10-05"},
+             "streak": False, "done": 1,
+             "finished": [{"text": "Called the dentist", "date": "2026-10-02"}],
+             "unsure": [{"text": "Posted the letter", "date": "2026-10-01"}]}
+    page = hello.what_i_did(state, hello.datetime.date(2026, 10, 5))
+    assert page[0] == "What I did"
+    assert page[1] == "Monday, 5 October 2026: Ask Linda (still open)"
+    assert "Friday, 2 October 2026: Called the dentist (done)" in page
+    assert "Thursday, 1 October 2026: Posted the letter (not sure)" in page
+    assert "Saturday, 3 October 2026: nothing noted" in page and len(page) == 15
+    assert hello.print_page(page) == "Sent to the printer."
+    assert hello.PRINTED[0].startswith("What I did\n")
+    with open(os.path.join(hello.HOME, "notes.json"), "w") as f:
+        json.dump(state, f)
+    state, can_save = hello.load()
+    message = hello.take_back(state, can_save, state["finished"][0], hello.datetime.date(2026, 10, 5))
+    assert message == "Taken back. It's on today's plan again."
+    saved = notes(hello.HOME)
+    assert "finished" not in saved and saved["intent"]["text"] == "Ask Linda; Called the dentist"
+
+
+def test_the_window_has_not_sure_and_large_text():
+    first = run(text="Write the report\n\n")
+    hello = _window_hello(home=first.home)
+    visit = hello.Visit()
+    assert visit.followup == "Write the report"
+    items, _ = hello.Window(visit).layout()
+    texts = {cid: text for _, cid, text, *_ in items}
+    assert texts[hello.Window.UNSURE] == "I'm not s&ure"
+    assert texts[hello.Window.PLANNED] == "Yesterday you planned: Write the report"
+    message = visit.answer("unsure")
+    assert message.startswith("That's fine. It's kept for today.")
+    assert "Options > What the window shows" in message
+    assert notes(first.home)["unsure"][0]["text"] == "Write the report"
+    plain = hello.Window(visit).template()
+    visit.state["large_text"] = True
+    large = hello.Window(visit).template()
+    assert plain != large
+
+
+def test_the_support_line_is_in_the_menu_only_when_set():
+    p = run(text="\nm\n\n\n", policy={"SupportLine": "Employee Assistance: 0800 123 456"})
+    assert ("If things feel heavy, someone to talk to: Employee Assistance: 0800 123 456"
+            in " ".join(p.stdout.split()))
+    assert "If things feel heavy" not in run(text="\nm\n\n\n").stdout
+
+
+def test_the_reminder_leaves_the_plan_out_unless_it_is_turned_on():
+    import xml.etree.ElementTree as ET
+    first = run(text="Report & slides\n\n")
+    hello = _window_hello(home=first.home)
+    hello.SHOWN = []
+    state, _ = hello.load()
+    state["plan_in_reminder"] = True
+    hello.save(state)
+    assert hello.sign_in() == 0
+    texts = [t.text for t in ET.fromstring(hello.SHOWN[0]).iter("text")]
+    assert texts == ["Yesterday you planned: Report & slides", "Did you do it?"]

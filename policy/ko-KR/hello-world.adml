@@ -109,6 +109,11 @@
       <string id="HandoffHours_Help">이 정책 설정을 사용하면 인계 메모가 1부터 336까지 이 시간 동안 표시됩니다(지울 때까지 남기는 메모는 제외). 12시간 근무에는 24, 긴 주말에는 168이 알맞습니다.
 
 사용하지 않거나 구성하지 않으면 메모는 72시간 동안 표시됩니다.</string>
+      <string id="SUPPORTED_1_47">hello-world 1.47.0 이상</string>
+      <string id="SupportLine">상담 창구</string>
+      <string id="SupportLine_Help">이 정책 설정을 사용하면 이 텍스트(예: 직원 지원 프로그램 전화번호)가 '힘들 때 이야기할 곳' 아래에, 텍스트 메뉴 옵션의 맨 끝과 창의 옵션 항목으로 표시됩니다. 항상 같은 자리에 있습니다. 저절로 나타나거나 입력한 내용에 반응하지 않으며, 누가 봤는지도 기록하지 않습니다.
+
+사용하지 않거나 구성하지 않으면 상담 창구가 없습니다.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -125,6 +130,9 @@
       </presentation>
       <presentation id="HandoffHours">
         <decimalTextBox refId="HandoffHours" defaultValue="72">시간:</decimalTextBox>
+      </presentation>
+      <presentation id="SupportLine">
+        <textBox refId="SupportLine"><label>텍스트:</label></textBox>
       </presentation>
     </presentationTable>
   </resources>
