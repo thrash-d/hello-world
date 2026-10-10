@@ -239,6 +239,25 @@ year** page), pets, reminders and everything else stay free. Keys come only
 from the official store, and hello-world never calls, texts or emails to sell
 or check one; the screen where you paste a key says so.
 
+### Letters to family, and the devices syncing
+
+**Letters to family** (More settings or `letters` in the text screen, **My
+plans** in the window, and the phone) are written in hello-world and kept
+only on that device until you choose **Send with my own mail** (or messages
+on a phone), which opens your own mail or messages app with the words filled
+in; you press send there. hello-world never sends anything itself. A sent
+letter isn't kept unless you choose to keep a copy, and **Delete every
+letter** clears them all in one step.
+
+With sync on, each device writes a name you choose ("Kitchen tablet"; "A PC"
+or "A phone" until you do) and the day it last synced into the encrypted
+sync copy, so the server can't read them. The sync screen lists them with a
+short ID each, and says when two share a name. A name you don't know means
+the code got out: **Change my sync code** gives a new code, deletes the old
+copy on the server, and lists only this device until the others type the
+new one. The server keeps only the encrypted copy, its size and when it was
+last written.
+
 ### The household list
 
 With a household key, **My plans > Household list...** in the window (or
@@ -552,7 +571,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.61.0'
+$tag = 'v1.62.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

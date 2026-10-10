@@ -517,7 +517,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.61.0"
+VERSION = "1.62.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -1135,6 +1135,87 @@ def house_rekey(state, can_save):
     return tr("The old code no longer works.") + " " + house_code_said(code)
 
 
+# Letters to family (Mary): written here, kept only on this device, and
+# handed to the person's own mail program to send. hello-world sends nothing
+# and is not a messaging service.
+MAX_LETTERS = 20
+MAX_LETTER = 4000
+LETTER_WORDS = ("letters", "letter", "cartas", "carta", "lettres", "lettre", "briefe", "brief")
+
+
+def mail_letter(letter):
+    """Open the person's own mail program with the letter filled in. True
+    when it opened."""
+    from urllib.parse import quote
+    to = letter["to"] if re.fullmatch(r"[^@\s<>?&]+@[^@\s<>?&]+\.[^@\s<>?&]+", letter["to"]) else ""
+    link = f"mailto:{to}?body={quote(letter['text'])}"
+    if STARTED is not None:
+        STARTED.append(link)
+        return True
+    try:
+        os.startfile(link)
+        return True
+    except (AttributeError, OSError):
+        return False
+
+
+def save_letters(state, can_save, letters):
+    base = copy.deepcopy(state)
+    if letters:
+        state["letters"] = letters[-MAX_LETTERS:]
+    else:
+        state.pop("letters", None)
+    if not commit(state, base, can_save):
+        undo(state, base)
+        return False
+    return True
+
+
+def letters_prompt(state, can_save):
+    """Letters in the text screen: write, send with your own mail, delete."""
+    para(tr("Letters stay on this computer until you send one with your own mail "
+            "program. hello-world never sends anything itself."))
+    letters = list(state.get("letters", []))
+    for n, letter in enumerate(letters, 1):
+        say(wrapped(f" {n:>2}  ", tr("To {name}: {start}").format(
+            name=letter["to"] or tr("no one yet"), start=letter["text"][:40])))
+    typed = (ask(tr("Type new to write one, a number to open it, clear to delete them "
+                    "all, or Enter to go back > ")) or "").strip(TRIM)
+    low = typed.lower()
+    if low in QUIT_WORDS:
+        raise Quit
+    if low == "new":
+        to = (ask(tr("Who is it to? An email address, or a name for now > ")) or "").strip()[:100]
+        text = (ask(tr("The letter > ")) or "").strip()[:MAX_LETTER]
+        if not text:
+            say(tr("Nothing changed."))
+            return
+        letters.append({"to": to, "text": text, "date": today().isoformat()})
+        say(tr("Saved on this computer.") if save_letters(state, can_save, letters)
+            else tr("Could not save that on this computer. Nothing changed."))
+    elif low == "clear":
+        # One step to wipe them all before someone else uses the PC (Mary).
+        if ask_choice(tr("Delete every letter on this computer? (y or n) > "), strict_yes(),
+                      NO_WORDS, tr("Type y or n.")) == "yes" and save_letters(state, can_save, []):
+            say(tr("Every letter is deleted."))
+    elif low in [str(n) for n in range(1, len(letters) + 1)]:
+        letter = letters[int(low) - 1]
+        para(letter["text"])
+        what = (ask(tr("s to send it with your own mail, d to delete it, or Enter to go "
+                       "back > ")) or "").lower().strip(TRIM)
+        if what == "s":
+            if not mail_letter(letter):
+                say(tr("Your mail program could not be opened."))
+                return
+            keep = ask_choice(tr("Keep a copy here? (y or n, Enter deletes it) > "),
+                              strict_yes(), NO_WORDS, tr("Type y or n."))
+            if keep != "yes":
+                save_letters(state, can_save, [l for l in letters if l is not letter])
+        elif what == "d":
+            save_letters(state, can_save, [l for l in letters if l is not letter])
+            say(tr("Deleted."))
+
+
 HOUSE_WORDS = ("house", "household", "hogar", "maison", "foyer", "casa", "haushalt")
 
 
@@ -1228,9 +1309,59 @@ def household_prompt(state, can_save):
 
 
 def sync_form(state):
-    """What is synced: the plan and the finished list, nothing else."""
+    """What is synced: the plan, the finished list, and the names of the
+    devices syncing (inside the encryption, so only the code opens them)."""
     return {"intent": state["intent"], "finished": state.get("finished", []),
-            "updated": state.get("sync_updated", "")}
+            "updated": state.get("sync_updated", ""), "devices": state.get("devices", {})}
+
+
+MAX_DEVICES = 20
+
+
+def merge_devices(mine, theirs):
+    """Every device that synced with this code, the newest day for each, so
+    a name nobody here knows stands out (the red team's Mielke)."""
+    out = {}
+    for side in (mine, theirs):
+        for did, dev in (side or {}).items() if isinstance(side, dict) else ():
+            if (isinstance(did, str) and re.fullmatch(r"[0-9a-f]{12}", did) and isinstance(dev, dict)
+                    and isinstance(dev.get("name"), str) and isinstance(dev.get("seen"), str)):
+                if did not in out or dev["seen"] > out[did]["seen"]:
+                    out[did] = {"name": dev["name"][:MAX_HOUSE_NAME], "seen": dev["seen"][:10]}
+    newest = sorted(out.items(), key=lambda kv: kv[1]["seen"])[-MAX_DEVICES:]
+    return dict(newest)
+
+
+def note_device(state, others=None):
+    """This device's own entry, with today's date."""
+    state.setdefault("device_id", os.urandom(6).hex())
+    devices = merge_devices(state.get("devices", {}), others)
+    devices[state["device_id"]] = {"name": state.get("device_name") or tr("A PC"),
+                                   "seen": today().isoformat()}
+    state["devices"] = devices
+
+
+def devices_line(state):
+    """'Devices syncing: Kitchen tablet, Tuesday; this computer, today.'"""
+    devices = state.get("devices") or {}
+    if not devices:
+        return ""
+    data = translation()
+    names = data["days"] if data else DAYS
+    parts = []
+    for did, dev in sorted(devices.items(), key=lambda kv: kv[1]["seen"], reverse=True):
+        when = datetime.date.fromisoformat(dev["seen"])
+        day_word = tr("today") if when == today() else names[when.weekday()]
+        name = tr("this computer") if did == state.get("device_id") else dev["name"]
+        # A short ID too, so a device named like one of yours still stands
+        # out (Mielke).
+        parts.append(f"{name} ({did[:4]}), {day_word}")
+    said = tr("Devices syncing: {list}.").format(list="; ".join(parts)) + " " + tr(
+        "A name you don't know means the code got out: choose Change my sync code.")
+    names = [d["name"].casefold() for d in devices.values()]
+    if len(names) != len(set(names)):
+        said += " " + tr("Two devices have the same name; one of them may not be yours.")
+    return said
 
 
 def merge_sync(state, other, d):
@@ -1281,10 +1412,10 @@ def sync_now(state, can_save):
     blob = net_bytes(f"/v1/sync/{label}")
     refresh(state, can_save)
     base = copy.deepcopy(state)
-    if blob:
-        other = open_sync(enc, mac, blob)
-        if other is not None:
-            merge_sync(state, other, today())
+    other = open_sync(enc, mac, blob) if blob else None
+    if other is not None:
+        merge_sync(state, other, today())
+    note_device(state, (other or {}).get("devices"))
     global SYNCING
     was, SYNCING = SYNCING, True
     try:
@@ -1338,6 +1469,7 @@ def set_sync(state, can_save, on):
     else:
         state.pop("sync", None)
         state.pop("sync_updated", None)
+        state.pop("devices", None)
     if not commit(state, base, can_save):
         undo(state, base)
         return tr("Could not save that choice on this computer.")
@@ -2500,6 +2632,12 @@ def load(repair=True):
     DAY_START = state.get("day_start", 0)
     if raw.get("remind_at") in REMINDER_TIMES:
         state["remind_at"] = raw["remind_at"]
+    if isinstance(raw.get("device_id"), str) and re.fullmatch(r"[0-9a-f]{12}", raw["device_id"]):
+        state["device_id"] = raw["device_id"]
+    if isinstance(raw.get("device_name"), str) and raw["device_name"].strip():
+        state["device_name"] = raw["device_name"].strip()[:MAX_HOUSE_NAME]
+    if devices := merge_devices(raw.get("devices"), {}):
+        state["devices"] = devices
     house = raw.get("house")
     if (isinstance(house, dict) and isinstance(house.get("code"), str)
             and re.fullmatch(r"([%s]{5}-){4}[%s]{5}" % (SYNC_ALPHABET, SYNC_ALPHABET), house["code"])
@@ -2510,6 +2648,14 @@ def load(repair=True):
                           if isinstance(house.get("asked"), list) else []}
         if isinstance(raw.get("house_list"), dict):
             state["house_list"] = house_merge(raw["house_list"], {})
+    letters = raw.get("letters")
+    if isinstance(letters, list):
+        kept = [{"to": l["to"][:100], "text": l["text"][:MAX_LETTER], "date": l["date"]}
+                for l in letters if isinstance(l, dict) and isinstance(l.get("to"), str)
+                and isinstance(l.get("text"), str) and l["text"].strip()
+                and isinstance(l.get("date"), str) and re.fullmatch(r"\d{4}-\d\d-\d\d", l["date"])]
+        if kept:
+            state["letters"] = kept[-MAX_LETTERS:]
     days = raw.get("sideways")
     if isinstance(days, list):
         kept = [x for x in days if isinstance(x, str) and re.fullmatch(r"\d{4}-\d\d-\d\d", x)
@@ -3875,6 +4021,7 @@ def more_settings(state, can_save):
         entries.append((tr("End the day..."), lambda: end_day_prompt(state, can_save, today())))
         if counts_server() and not policy("TurnOffSync"):
             entries.append((tr("Household list..."), lambda: household_prompt(state, can_save)))
+        entries.append((tr("Letters to family..."), lambda: letters_prompt(state, can_save)))
         entries.append((tr("Every day..."), every_day))
         entries.append((tr("This year..."), lambda: [say(wrapped("", line)) for line in
                                                     year_page(state, today())]))
@@ -3927,6 +4074,8 @@ def change_sync_code(state, can_save):
     old = state.get("sync")
     base = copy.deepcopy(state)
     state["sync"] = sync_code()
+    # Only this device has the new code, so only it is listed.
+    state["devices"] = {}
     mark_synced_change(state)
     if not commit(state, base, can_save):
         undo(state, base)
@@ -4076,8 +4225,10 @@ def sync_prompt(state, can_save):
     para(tr(SCAM_LINE))
     if line := last_change_line(state):
         para(line)
+    if line := devices_line(state):
+        para(line)
     entries = [tr("Show my sync code"), tr("Change my sync code"),
-               tr("Turn off sync and delete the server's copy")]
+               tr("Turn off sync and delete the server's copy"), tr("Name this computer")]
     for n, label in enumerate(entries, 1):
         say(wrapped(f" {n:>2}  ", label))
     choice = (ask(tr("Type a number from 1 to {n}, or Enter to go back > ")
@@ -4088,6 +4239,13 @@ def sync_prompt(state, can_save):
         shielded_code(state)
     elif choice == "2":
         para(change_sync_code(state, can_save))
+    elif choice == "4":
+        name = (ask(tr("A name the other devices will see, such as Kitchen PC > ")) or "").strip()
+        if name and Visit.using(state, can_save).setting("device_name", name[:MAX_HOUSE_NAME]):
+            sync_now(state, can_save)
+            para(tr("This computer is listed as {name}.").format(name=name[:MAX_HOUSE_NAME]))
+        else:
+            say(tr("Nothing changed."))
     elif choice == "3":
         if ask_choice(tr("Turn off sync and delete the server's copy? (y or n) > "),
                       strict_yes(), NO_WORDS, tr("Type y or n.")) == "yes":
@@ -5788,6 +5946,9 @@ def last_prompt(state, can_save, intent, person, d, iso, open_menu=False):
         elif answer in ASIDE_WORDS and not plans_off():
             aside_prompt(state, can_save)
             intent = state["intent"]
+            continue
+        elif answer in LETTER_WORDS and person:
+            letters_prompt(state, can_save)
             continue
         elif answer in HOUSE_WORDS and person and counts_server():
             household_prompt(state, can_save)
@@ -8383,6 +8544,35 @@ class Window:
         finally:
             self.user.CloseClipboard()
 
+    def letters_menu(self):
+        """Letters: written in the plan box, sent with the person's own mail
+        program, deleted in one step."""
+        v = self.visit
+        letters = list(v.state.get("letters", []))
+        entries = [(0, 100 + n, tr("To {name}: {start}").format(
+            name=l["to"] or tr("no one yet"), start=l["text"][:40])) for n, l in enumerate(letters)]
+        entries += [(0x800, 0, None), (0, 1, tr("Write one from what's typed in the plan box"))]
+        if letters:
+            entries.append((0, 2, tr("Delete every letter")))
+        choice = self.popup(entries)
+        if choice == 1:
+            text = tidy(self.typed())
+            if not text:
+                self.inform(tr("Type the letter in the plan box first, then choose this again."))
+                return
+            letters.append({"to": "", "text": text[:MAX_LETTER], "date": v.d.isoformat()})
+            if save_letters(v.state, v.can_save, letters):
+                self.set_text(self.PLAN, v.plan())
+                self.set_text(self.STATUS, tr("Saved on this computer."))
+        elif choice == 2 and self.confirm(tr("Delete every letter on this computer?")):
+            save_letters(v.state, v.can_save, [])
+            self.set_text(self.STATUS, tr("Every letter is deleted."))
+        elif 100 <= choice < 100 + len(letters):
+            letter = letters[choice - 100]
+            if self.confirm(letter["text"] + "\n\n" + tr("Send it with your own mail program?")):
+                if mail_letter(letter) and not self.confirm(tr("Keep a copy here?")):
+                    save_letters(v.state, v.can_save, [l for l in letters if l is not letter])
+
     def household_menu(self):
         """The household list: the words come from the plan box, and the
         code from the clipboard, as with Pro."""
@@ -8527,11 +8717,15 @@ class Window:
         entries.append((0, 24, tr("This year...")))
         if counts_server() and not policy("TurnOffSync"):
             entries.append((0, 26, tr("Household list...")))
+        entries.append((0, 27, tr("Letters to family...")))
         if v.state["intent"]:
             entries.insert(0, (0, 25, tr("End the day...")))
         choice = self.popup(entries)
         if choice == 26:
             self.household_menu()
+            return
+        if choice == 27:
+            self.letters_menu()
             return
         if choice == 25:
             def choose(part):
