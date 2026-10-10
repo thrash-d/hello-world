@@ -123,6 +123,11 @@ Si se deshabilita o no se configura, hello-world se abre al iniciar sesión solo
       <string id="HandoffSignNames_Help">Si se habilita, cada nota de relevo nueva termina con el nombre de pila de quien la escribe, tomado de Windows, y el cuadro lo avisa antes de escribir. Las notas dejadas antes de activar la directiva nunca se firman. No tiene efecto con Relevo con un inicio de sesión compartido.
 
 Si se deshabilita o no se configura, las notas no se firman; la pantalla sugiere firmar si el siguiente turno puede necesitar preguntar.</string>
+      <string id="SUPPORTED_1_54">hello-world 1.54.0 o posterior</string>
+      <string id="TurnOffSync">Desactivar la sincronización con el teléfono</string>
+      <string id="TurnOffSync_Help">Si se habilita, hello-world no puede sincronizar planes con un teléfono y la opción no se ofrece. La sincronización está desactivada salvo que una persona la active; si se activa, el plan y la lista de hechos salen del equipo cifrados con un código que solo tienen los dispositivos de esa persona, y se guardan en el servidor de recuentos compartidos.
+
+Si se deshabilita o no se configura, cada persona puede activarla donde haya un servidor de recuentos compartidos.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">

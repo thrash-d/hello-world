@@ -741,7 +741,21 @@
   "The tray icon is off.": "通知領域のアイコンをオフにしました。",
   "The tray icon is on. It shows a dot while yesterday's plan waits for an answer, and starts again each time you sign in.": "通知領域のアイコンをオンにしました。昨日の予定の答えを待っている間は点が付き、サインインのたびに起動します。",
   "hello-world: did you do it? {text}": "hello-world: できましたか？ {text}",
-  "hello-world: today's plan: {text}": "hello-world: 今日の予定: {text}"
+  "hello-world: today's plan: {text}": "hello-world: 今日の予定: {text}",
+  "Sync is off, and the copy on the server is deleted.": "同期をオフにし、サーバーのコピーを削除しました。",
+  "Sync is off. Turn it on with: hello sync on": "同期はオフです。オンにするには: hello sync on",
+  "Sync is on. On your phone, open hello-world, choose Sync, and type this code: {code}. With sync on, your plan and done list leave this computer, encrypted with that code.": "同期をオンにしました。電話で hello-world を開き、「同期」を選んでこのコードを入力してください: {code}。同期中は、予定と完了リストがこのコードで暗号化されてこのコンピューターを離れます。",
+  "Sync isn't available on this computer.": "このコンピューターでは同期を使えません。",
+  "Sync keeps your plan and done list the same on this computer and your phone. They leave this computer encrypted with a code only your devices have, and the server keeps only the encrypted copy. This encryption has not had an outside audit.": "同期すると、このコンピューターと電話で予定と完了リストが同じになります。データはあなたの端末だけが持つコードで暗号化されてからこのコンピューターを離れ、サーバーには暗号化されたコピーだけが保存されます。この暗号化は外部監査を受けていません。",
+  "Sync with my phone": "電話と同期",
+  "Synced.": "同期しました。",
+  "The server can't be reached just now.": "今はサーバーに接続できません。",
+  "Turn off sync and delete the server's copy?": "同期をオフにして、サーバーのコピーを削除しますか？",
+  "Turn off sync and delete the server's copy? (y or n) > ": "同期をオフにして、サーバーのコピーを削除しますか？ (y または n) > ",
+  "Turn on sync?": "同期をオンにしますか？",
+  "Turn on sync? (y or n) > ": "同期をオンにしますか？ (y または n) > ",
+  "Use: hello sync on, off, now or code": "使い方: hello sync on、off、now、code",
+  "Your sync code: {code}": "同期コード: {code}"
  },
  "tips_floor": [
   "シフト最初の作業の前に、通路に物が置かれていないか確認しましょう。",

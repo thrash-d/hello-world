@@ -741,7 +741,21 @@
   "The tray icon is off.": "通知区域图标已关闭。",
   "The tray icon is on. It shows a dot while yesterday's plan waits for an answer, and starts again each time you sign in.": "通知区域图标已打开。昨天的计划等待回答时会显示一个点，每次登录都会重新启动。",
   "hello-world: did you do it? {text}": "hello-world：做了吗？{text}",
-  "hello-world: today's plan: {text}": "hello-world：今天的计划：{text}"
+  "hello-world: today's plan: {text}": "hello-world：今天的计划：{text}",
+  "Sync is off, and the copy on the server is deleted.": "同步已关闭，服务器上的副本已删除。",
+  "Sync is off. Turn it on with: hello sync on": "同步已关闭。打开方法：hello sync on",
+  "Sync is on. On your phone, open hello-world, choose Sync, and type this code: {code}. With sync on, your plan and done list leave this computer, encrypted with that code.": "同步已打开。在手机上打开 hello-world，选择“同步”，输入这个代码：{code}。同步打开时，你的计划和已完成列表会用这个代码加密后离开这台电脑。",
+  "Sync isn't available on this computer.": "这台电脑无法使用同步。",
+  "Sync keeps your plan and done list the same on this computer and your phone. They leave this computer encrypted with a code only your devices have, and the server keeps only the encrypted copy. This encryption has not had an outside audit.": "同步会让这台电脑和手机上的计划和已完成列表保持一致。它们用只有你的设备才有的代码加密后离开这台电脑，服务器只保存加密副本。这种加密没有经过外部审计。",
+  "Sync with my phone": "与我的手机同步",
+  "Synced.": "已同步。",
+  "The server can't be reached just now.": "现在无法连接到服务器。",
+  "Turn off sync and delete the server's copy?": "关闭同步并删除服务器上的副本？",
+  "Turn off sync and delete the server's copy? (y or n) > ": "关闭同步并删除服务器上的副本？(y 或 n) > ",
+  "Turn on sync?": "打开同步？",
+  "Turn on sync? (y or n) > ": "打开同步？(y 或 n) > ",
+  "Use: hello sync on, off, now or code": "用法：hello sync on、off、now 或 code",
+  "Your sync code: {code}": "你的同步代码：{code}"
  },
  "tips_floor": [
   "开始第一单活之前，先确认您走的通道畅通。",

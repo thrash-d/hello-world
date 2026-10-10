@@ -123,6 +123,11 @@ Quando desabilitada ou não configurada, o hello-world abre ao entrar só quando
       <string id="HandoffSignNames_Help">Quando habilitada, cada nova nota de passagem termina com o primeiro nome de quem escreveu, vindo do Windows, e a caixa avisa antes de digitar. Notas deixadas antes de ligar a política nunca são assinadas. Não tem efeito com Passagem de turno com login compartilhado.
 
 Quando desabilitada ou não configurada, as notas não são assinadas; a tela sugere assinar se o próximo turno puder precisar perguntar.</string>
+      <string id="SUPPORTED_1_54">hello-world 1.54.0 ou posterior</string>
+      <string id="TurnOffSync">Desligar a sincronização com o telefone</string>
+      <string id="TurnOffSync_Help">Quando habilitada, o hello-world não pode sincronizar planos com um telefone e a opção não aparece. A sincronização fica desligada até a pessoa ligá-la; ligada, o plano e a lista de concluídos saem do PC criptografados com um código que só os aparelhos dessa pessoa têm, guardados no servidor de contagens compartilhadas.
+
+Quando desabilitada ou não configurada, cada pessoa pode ligá-la onde houver um servidor de contagens compartilhadas.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">

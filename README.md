@@ -413,6 +413,24 @@ say. Host the folder on any https address (GitHub Pages works), or run the
 counts server with `--phone phone` to serve it at `/phone/`.
 `python tools/build_phone.py` refreshes its thoughts and tips from `hello.py`.
 
+### Sync between a PC and a phone
+
+Off unless you turn it on, under **Options > My saved notes > Sync with my
+phone**, `sync` in the text menu, or `hello.cmd sync on`. The PC shows a code
+such as `k7mqa-2p9xb-tz4wc-8hcdd-r3vne`; type it once on the phone, in the
+phone app's settings. From then on the plan and the done list are the same on
+both, the newer plan winning and both done lists kept.
+
+With sync on, your plan and done list leave the device, encrypted with that
+code before they go, and the counts server keeps only the encrypted copy under
+a label made from the same code. The phone app needs to be served by that
+counts server (`--phone`). The scheme is PBKDF2-SHA256, then HMAC-SHA256 as a
+counter-mode stream with an HMAC tag, built from what both Python's standard
+library and a browser have; it has had no outside audit. `hello.cmd sync code`
+shows the code again for a new phone. Turning sync off, or deleting
+everything, deletes the server's copy. The `TurnOffSync` policy keeps it off
+on work PCs.
+
 ### Portable, with no install
 
 For a personal PC: download `hello-world-portable-<version>.zip` from the
@@ -431,7 +449,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.53.0'
+$tag = 'v1.54.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

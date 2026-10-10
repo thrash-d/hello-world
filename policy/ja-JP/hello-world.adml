@@ -123,6 +123,11 @@
       <string id="HandoffSignNames_Help">有効にすると、新しい引き継ぎメモの末尾に書いた人の Windows の名前が付き、入力前に欄でそう伝えます。ポリシーを有効にする前のメモには付きません。共有ログインでの引き継ぎと一緒では効果がありません。
 
 無効または未構成の場合、メモに名前は付きません。次のシフトが質問しそうなら署名するよう画面が勧めます。</string>
+      <string id="SUPPORTED_1_54">hello-world 1.54.0 以降</string>
+      <string id="TurnOffSync">電話との同期をオフにする</string>
+      <string id="TurnOffSync_Help">有効にすると、hello-world は電話と予定を同期できず、設定も表示されません。同期は本人がオンにするまでオフです。オンにすると、予定と完了リストは本人の端末だけが持つコードで暗号化されてから PC を離れ、共有カウント サーバーに保存されます。
+
+無効または未構成の場合、共有カウント サーバーが設定されていれば各自がオンにできます。</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">

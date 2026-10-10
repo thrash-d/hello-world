@@ -18,6 +18,7 @@
       <definition name="SUPPORTED_1_46" displayName="$(string.SUPPORTED_1_46)" />
       <definition name="SUPPORTED_1_47" displayName="$(string.SUPPORTED_1_47)" />
       <definition name="SUPPORTED_1_48" displayName="$(string.SUPPORTED_1_48)" />
+      <definition name="SUPPORTED_1_54" displayName="$(string.SUPPORTED_1_54)" />
     </definitions>
   </supportedOn>
   <categories>
@@ -153,6 +154,12 @@
     <policy name="HandoffSignNames" class="Machine" displayName="$(string.HandoffSignNames)" explainText="$(string.HandoffSignNames_Help)" key="SOFTWARE\Policies\hello-world" valueName="HandoffSignNames">
       <parentCategory ref="HelloWorld" />
       <supportedOn ref="SUPPORTED_1_48" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+    <policy name="TurnOffSync" class="Both" displayName="$(string.TurnOffSync)" explainText="$(string.TurnOffSync_Help)" key="SOFTWARE\Policies\hello-world" valueName="TurnOffSync">
+      <parentCategory ref="HelloWorld" />
+      <supportedOn ref="SUPPORTED_1_54" />
       <enabledValue><decimal value="1" /></enabledValue>
       <disabledValue><decimal value="0" /></disabledValue>
     </policy>

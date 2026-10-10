@@ -168,6 +168,7 @@ the pull request named.
 | Street research, 1.51.0 | No-install build | Bank analyst | Built in 1.52.0 for personal PCs only, after the analyst said it would break a bank's rules on a work PC |
 | Street research, 1.51.0 | A way to pay, offline, no sign-in | Profit Maximizer, teacher, indie developer | Queued: round 80 |
 | Street research, 1.51.0 | A phone version, Spanish, big buttons, offline | Cart vendor, rider, analyst | Built in 1.53.0 as an offline web app; sync queued |
+| Design review, round 82 | Say plans leave the device; no "neither can we" without an audit; losing the code; no personal notes on a server at work | Bank analyst | Built in 1.54.0: plain wording, unaudited said, code shown again on the PC, TurnOffSync policy |
 | Design review, round 81 | No reminder by default; 6:15 for the cart; Arabic; say where phone notes live | Rider, cart vendor, analyst | Built in 1.53.0 |
 | Design review, round 80 | Charge for pets and themes (Profit Maximizer) vs. keep pets free, charge for history and reminders (indie developer) | Disagreement | Pets stay free; Pro is history, a second reminder and themes |
 | Personas, 1.43.0 | Formulas run in the spreadsheet export | Skye, confirmed in code | Fixed in 1.46.1 |

@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-10-10: sync between a PC and a phone
+
+Version 1.54.0. The last of the Profit Maximizer's three builds; the bank
+analyst reviewed the design first and changed it.
+
+- Off unless turned on (Options > My saved notes, `sync` in the text menu,
+  `hello.cmd sync on|off|now|code`, or the phone's settings). The PC makes a
+  random 25-character code to type once on the phone.
+- Plans and done lists leave the device only encrypted with a key made from
+  the code. PBKDF2-SHA256, then HMAC-SHA256 as a counter-mode stream with an
+  HMAC tag (encrypt-then-MAC), in Python's standard library and in the
+  browser's WebCrypto, with tests that each side opens what the other sealed
+  and refuses anything changed.
+- The counts server stores each encrypted copy under a label made from the
+  code (`/v1/sync/<label>`, 64 kB at most, dropped after a year untouched).
+- Merging keeps both done lists and the plan changed last.
+- From the analyst: the wording says plainly that plans leave the device
+  when sync is on, and that the scheme has had no outside audit; the PC shows
+  the code again for a new phone; turning sync off or deleting everything
+  deletes the server's copy; and a `TurnOffSync` policy keeps it off at work.
+- The phone app now fetches the newest files when it has a signal and falls
+  back to its cached copy offline; before, it would have kept the first copy
+  it saw forever.
+
 ## 2026-10-10: on a phone
 
 Version 1.53.0. For the three of five New Yorkers who couldn't use

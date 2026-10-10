@@ -18,6 +18,9 @@ const UI = {
     good: "Good. That one is off your list.", kept: "Kept for today.", skipped: "Skipped. It asks again next time.",
     saved: "Saved.", cleared: "Cleared.", nothing: "Type a word or two first.",
     remindText: "One thing to get done today? Open hello-world.",
+    sync: "Sync with a PC", syncCode: "Code from the PC (Sync with my phone, in the PC's menu)", syncSave: "Turn on sync", syncOff: "Turn off sync",
+    syncNote: "With sync on, your plan and done list leave this phone, encrypted with that code. The server keeps only the encrypted copy.",
+    syncOn: "Sync is on.", syncOffDone: "Sync is off on this phone.", syncBad: "That code doesn't look right. Check it on the PC.", syncFail: "The PC's copy can't be reached just now.",
   },
   es: {
     hello: "¡Hola, mundo!", ask: "¿Lo hiciste?", yesterday: "Ayer planeaste:",
@@ -33,6 +36,9 @@ const UI = {
     good: "Bien. Una cosa menos en tu lista.", kept: "Se queda para hoy.", skipped: "Saltado. Volverá a preguntar la próxima vez.",
     saved: "Guardado.", cleared: "Borrado.", nothing: "Escribe una o dos palabras primero.",
     remindText: "¿Algo que hacer hoy? Abre hello-world.",
+    sync: "Sincronizar con un PC", syncCode: "Código del PC (Sincronizar con mi teléfono, en el menú del PC)", syncSave: "Activar sincronización", syncOff: "Desactivar sincronización",
+    syncNote: "Con la sincronización activada, tu plan y tu lista de hechos salen de este teléfono, cifrados con ese código. El servidor solo guarda la copia cifrada.",
+    syncOn: "La sincronización está activada.", syncOffDone: "La sincronización está desactivada en este teléfono.", syncBad: "Ese código no parece correcto. Revísalo en el PC.", syncFail: "Ahora no se puede llegar a la copia del PC.",
   },
   ar: {
     hello: "مرحبًا بالعالم!", ask: "هل فعلتها؟", yesterday: "خططت أمس:",
@@ -48,6 +54,9 @@ const UI = {
     good: "جيد. شيء أقل في قائمتك.", kept: "تبقى لليوم.", skipped: "تم التخطي. سيسأل مرة أخرى في المرة القادمة.",
     saved: "تم الحفظ.", cleared: "تم المسح.", nothing: "اكتب كلمة أو كلمتين أولًا.",
     remindText: "شيء تنجزه اليوم؟ افتح hello-world.",
+    sync: "المزامنة مع كمبيوتر", syncCode: "الرمز من الكمبيوتر (المزامنة مع هاتفي، في قائمة الكمبيوتر)", syncSave: "شغّل المزامنة", syncOff: "أوقف المزامنة",
+    syncNote: "مع تشغيل المزامنة تغادر خطتك وقائمة ما أنجزته هذا الهاتف مشفّرة بذلك الرمز. لا يحتفظ الخادم إلا بالنسخة المشفّرة.",
+    syncOn: "المزامنة تعمل.", syncOffDone: "المزامنة متوقفة على هذا الهاتف.", syncBad: "لا يبدو هذا الرمز صحيحًا. تحقق منه على الكمبيوتر.", syncFail: "لا يمكن الوصول إلى نسخة الكمبيوتر الآن.",
   },
 };
 const LANG_NAMES = { en: "English", es: "Español", ar: "العربية" };
@@ -102,6 +111,7 @@ function parse(raw) {
     }
     if (UI[data.lang]) state.lang = data.lang;
     if (REMIND_TIMES.includes(data.remind)) state.remind = data.remind;
+    if (typeof data.updated === "string" && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d$/.test(data.updated)) state.updated = data.updated;
     return state;
   } catch (e) {
     return blank();
@@ -152,8 +162,110 @@ function language(state, navigatorLanguages) {
   return "en";
 }
 
+
+// Sync, the same scheme as hello.py: PBKDF2-SHA256 makes a label and two
+// keys from the code; HMAC-SHA256 in counter mode encrypts, and an HMAC tag
+// over the result catches any change.
+const SYNC_SALT = "hello-world sync v1";
+const SYNC_ROUNDS = 200000;
+const SYNC_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
+const enc8 = (text) => new TextEncoder().encode(text);
+const hex = (bytes) => Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+
+function normalCode(code) {
+  return Array.from(String(code).toLowerCase()).filter((c) => SYNC_ALPHABET.includes(c)).join("");
+}
+
+async function syncKeys(code) {
+  const subtle = globalThis.crypto.subtle;
+  const base = await subtle.importKey("raw", enc8(normalCode(code)), "PBKDF2", false, ["deriveBits"]);
+  const raw = new Uint8Array(await subtle.deriveBits(
+    { name: "PBKDF2", salt: enc8(SYNC_SALT), iterations: SYNC_ROUNDS, hash: "SHA-256" }, base, 768));
+  return { label: hex(raw.slice(0, 32)), enc: raw.slice(32, 64), mac: raw.slice(64, 96) };
+}
+
+async function hmacKey(raw) {
+  return globalThis.crypto.subtle.importKey("raw", raw, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+}
+
+async function stream(key, nonce, size) {
+  const k = await hmacKey(key), out = new Uint8Array(Math.ceil(size / 32) * 32);
+  for (let i = 0; i * 32 < size; i++) {
+    const block = new Uint8Array(nonce.length + 4);
+    block.set(nonce);
+    new DataView(block.buffer).setUint32(nonce.length, i);
+    out.set(new Uint8Array(await globalThis.crypto.subtle.sign("HMAC", k, block)), i * 32);
+  }
+  return out.slice(0, size);
+}
+
+async function sealSync(keys, data, nonce) {
+  nonce = nonce || globalThis.crypto.getRandomValues(new Uint8Array(16));
+  const plain = enc8(JSON.stringify(data));
+  const ks = await stream(keys.enc, nonce, plain.length);
+  const cipher = plain.map((b, i) => b ^ ks[i]);
+  const head = new Uint8Array(2 + 16 + cipher.length);
+  head.set(enc8("v1")); head.set(nonce, 2); head.set(cipher, 18);
+  const tag = new Uint8Array(await globalThis.crypto.subtle.sign("HMAC", await hmacKey(keys.mac), head));
+  const out = new Uint8Array(head.length + 32);
+  out.set(head); out.set(tag, head.length);
+  return out;
+}
+
+async function openSync(keys, blob) {
+  blob = new Uint8Array(blob);
+  if (blob.length < 50 || blob[0] !== 118 || blob[1] !== 49) return null;
+  const head = blob.slice(0, blob.length - 32), tag = blob.slice(blob.length - 32);
+  const expect = new Uint8Array(await globalThis.crypto.subtle.sign("HMAC", await hmacKey(keys.mac), head));
+  let diff = 0;
+  for (let i = 0; i < 32; i++) diff |= expect[i] ^ tag[i];
+  if (diff) return null;
+  const nonce = head.slice(2, 18), cipher = head.slice(18);
+  const ks = await stream(keys.enc, nonce, cipher.length);
+  try {
+    const data = JSON.parse(new TextDecoder().decode(cipher.map((b, i) => b ^ ks[i])));
+    return data && typeof data === "object" ? data : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function syncForm(state) {
+  return { intent: state.intent ? { text: state.intent.text, date: state.intent.date } : null,
+           finished: state.finished, updated: state.updated || "" };
+}
+
+// Finished things from both sides, and the plan from whichever side changed
+// it last, as hello.py's merge_sync does.
+function mergeSync(state, other, today) {
+  const have = new Set(state.finished.map((f) => f.text + "\n" + f.date));
+  for (const item of other.finished || []) {
+    if (item && typeof item.text === "string" && /^\d{4}-\d{2}-\d{2}$/.test(item.date) && item.date <= today
+        && !have.has(item.text + "\n" + item.date)) {
+      state.finished.push({ text: clean(item.text), date: item.date });
+      have.add(item.text + "\n" + item.date);
+    }
+  }
+  state.finished.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  state.finished = state.finished.slice(-100);
+  const theirs = typeof other.updated === "string" ? other.updated : "";
+  if (theirs > (state.updated || "")) {
+    const i = other.intent;
+    state.intent = i && typeof i.text === "string" && clean(i.text) && /^\d{4}-\d{2}-\d{2}$/.test(i.date)
+      ? { text: clean(i.text), date: i.date, skips: 0 } : null;
+    state.updated = theirs;
+  }
+  return state;
+}
+
+function stamp(state) {
+  const d = new Date(), pad = (n) => String(n).padStart(2, "0");
+  state.updated = `${iso(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 if (typeof module !== "undefined") {
-  module.exports = { UI, ordinal, todaysPair, clean, parse, asks, answer, setPlan, finishToday, language, blank };
+  module.exports = { UI, ordinal, todaysPair, clean, parse, asks, answer, setPlan, finishToday, language, blank,
+    syncKeys, sealSync, openSync, mergeSync, syncForm, normalCode };
 }
 
 if (typeof document !== "undefined") {
@@ -217,11 +329,68 @@ if (typeof document !== "undefined") {
     $("forget").textContent = s.forget;
     $("privacy").textContent = s.privacy;
     $("language").replaceChildren(...Object.keys(UI).map((code) => new Option(LANG_NAMES[code], code, false, code === lang)));
+    if (typeof drawSync === "function") drawSync();
     $("remind").replaceChildren(new Option(s.remindOff, "", false, !state.remind),
       ...REMIND_TIMES.map((at) => new Option(at, at, false, at === state.remind)));
   }
 
-  const act = (fn) => (event) => { if (event) event.preventDefault(); const said = fn(); save(); draw(); say(said); };
+  const SYNC_KEY = "hello-world-sync";
+  let keys = null;
+  try { keys = JSON.parse(localStorage.getItem(SYNC_KEY) || "null"); } catch (e) { keys = null; }
+  const asBytes = (k) => k && { label: k.label, enc: Uint8Array.from(k.enc), mac: Uint8Array.from(k.mac) };
+
+  // Pull, merge and push; quiet unless something goes wrong while asked.
+  async function sync(loud) {
+    if (!keys) return;
+    const k = asBytes(keys), url = `${location.origin}/v1/sync/${k.label}`;
+    try {
+      const got = await fetch(url, { cache: "no-store" });
+      if (got.ok) {
+        const other = await openSync(k, await got.arrayBuffer());
+        if (other) { mergeSync(state, other, iso(new Date())); save(); draw(); }
+      }
+      await fetch(url, { method: "PUT", body: await sealSync(k, syncForm(state)),
+                         headers: { "Content-Type": "application/octet-stream" } });
+      if (loud) say("syncOn");
+    } catch (e) {
+      if (loud) say("syncFail");
+    }
+  }
+
+  function drawSync() {
+    const s = t();
+    $("sync-label").textContent = s.sync;
+    $("sync-code-label").textContent = s.syncCode;
+    $("sync-save").textContent = keys ? s.syncOff : s.syncSave;
+    $("sync-code").hidden = $("sync-code-label").hidden = Boolean(keys);
+    $("sync-note").textContent = s.syncNote;
+  }
+
+  $("sync-save").addEventListener("click", async (event) => {
+    event.preventDefault();
+    if (keys) {
+      keys = null;
+      try { localStorage.removeItem(SYNC_KEY); } catch (e) { /* nothing saved */ }
+      drawSync(); say("syncOffDone");
+      return;
+    }
+    if (normalCode($("sync-code").value).length !== 25) { say("syncBad"); return; }
+    const k = await syncKeys($("sync-code").value);
+    keys = { label: k.label, enc: Array.from(k.enc), mac: Array.from(k.mac) };
+    try { localStorage.setItem(SYNC_KEY, JSON.stringify(keys)); } catch (e) { /* private mode */ }
+    $("sync-code").value = "";
+    drawSync();
+    await sync(true);
+  });
+
+  const act = (fn) => (event) => {
+    if (event) event.preventDefault();
+    const before = JSON.stringify(state.intent && { text: state.intent.text, date: state.intent.date });
+    const said = fn();
+    if (JSON.stringify(state.intent && { text: state.intent.text, date: state.intent.date }) !== before) stamp(state);
+    save(); draw(); say(said);
+    sync(false);
+  };
   $("yes").addEventListener("click", act(() => answer(state, "yes", iso(new Date()))));
   $("no").addEventListener("click", act(() => answer(state, "no", iso(new Date()))));
   $("skip").addEventListener("click", act(() => answer(state, "skip", iso(new Date()))));
@@ -244,12 +413,16 @@ if (typeof document !== "undefined") {
   $("forget").addEventListener("click", () => {
     if (!confirm(t().forgetAsk)) return;
     const lang = state.lang;
-    try { localStorage.removeItem(KEY); } catch (e) { /* nothing saved */ }
+    try { localStorage.removeItem(KEY); localStorage.removeItem(SYNC_KEY); } catch (e) { /* nothing saved */ }
+    keys = null;
+    drawSync();
     state = blank();
     state.lang = lang;
     draw(); say("forgotten"); schedule();
   });
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
   draw();
+  drawSync();
   schedule();
+  sync(false);
 }

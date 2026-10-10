@@ -123,6 +123,11 @@
       <string id="HandoffSignNames_Help">사용하면 새 인수인계 메모 끝에 작성자의 Windows 이름이 붙고, 입력하기 전에 입력란이 이를 알려 줍니다. 정책을 켜기 전에 남긴 메모에는 붙지 않습니다. 공유 로그인에서의 인수인계와 함께면 효과가 없습니다.
 
 사용 안 함 또는 구성되지 않음이면 메모에 이름이 붙지 않으며, 다음 근무조가 물어볼 수 있으면 서명하라고 화면이 권합니다.</string>
+      <string id="SUPPORTED_1_54">hello-world 1.54.0 이상</string>
+      <string id="TurnOffSync">휴대폰 동기화 끄기</string>
+      <string id="TurnOffSync_Help">사용하면 hello-world가 휴대폰과 계획을 동기화할 수 없고 설정도 보이지 않습니다. 동기화는 본인이 켜기 전까지 꺼져 있으며, 켜면 계획과 완료 목록이 본인 기기만 가진 코드로 암호화되어 PC를 떠나 공유 집계 서버에 저장됩니다.
+
+사용 안 함 또는 구성되지 않음이면 공유 집계 서버가 설정된 곳에서 각자 켤 수 있습니다.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
