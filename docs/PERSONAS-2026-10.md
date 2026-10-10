@@ -167,7 +167,8 @@ the pull request named.
 | Street research, 1.51.0 | Tray icon; one nudge at a chosen time, not a pop-up | Indie developer | Built in 1.52.0; the timed reminder is the nudge |
 | Street research, 1.51.0 | No-install build | Bank analyst | Built in 1.52.0 for personal PCs only, after the analyst said it would break a bank's rules on a work PC |
 | Street research, 1.51.0 | A way to pay, offline, no sign-in | Profit Maximizer, teacher, indie developer | Queued: round 80 |
-| Street research, 1.51.0 | A phone version, Spanish, big buttons, offline | Cart vendor, rider, analyst | Queued: rounds 81 and 82 |
+| Street research, 1.51.0 | A phone version, Spanish, big buttons, offline | Cart vendor, rider, analyst | Built in 1.53.0 as an offline web app; sync queued |
+| Design review, round 81 | No reminder by default; 6:15 for the cart; Arabic; say where phone notes live | Rider, cart vendor, analyst | Built in 1.53.0 |
 | Design review, round 80 | Charge for pets and themes (Profit Maximizer) vs. keep pets free, charge for history and reminders (indie developer) | Disagreement | Pets stay free; Pro is history, a second reminder and themes |
 | Personas, 1.43.0 | Formulas run in the spreadsheet export | Skye, confirmed in code | Fixed in 1.46.1 |
 | Personas, 1.43.0 | Forklift horns, bakery orders, badge login, a supply locator, an email "lie detector" | Rick, Harold, Denise | Not buildable here: they need hardware or outside services |

@@ -400,6 +400,19 @@ Start menu and Settings > Apps, where Uninstall removes it. That folder is
 in their own profile, so they, and programs running as them, can change it;
 the all-users install is the one to use wherever IT can.
 
+### On a phone
+
+`phone/` is hello-world for a phone: a web page you open once and add to the
+home screen. It works with no signal, opens in English, Spanish or Arabic by
+the phone's language, and has one screen: "Did you do it?" with big Done, Not
+yet and Skip buttons, a box for today's plan, and the same thought and tip as
+the PC that day. Plans stay in that phone's browser and nothing is sent
+anywhere. A reminder only comes if you pick a time, and phones only let a web
+page remind you while it's still open in the background, which the settings
+say. Host the folder on any https address (GitHub Pages works), or run the
+counts server with `--phone phone` to serve it at `/phone/`.
+`python tools/build_phone.py` refreshes its thoughts and tips from `hello.py`.
+
 ### Portable, with no install
 
 For a personal PC: download `hello-world-portable-<version>.zip` from the
@@ -418,7 +431,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.52.0'
+$tag = 'v1.53.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

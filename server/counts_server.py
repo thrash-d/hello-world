@@ -22,6 +22,10 @@ restart or at midnight UTC.
                                          "defeated": "2026-10-08"}
     GET  /health                        {"ok": true}
 
+With --phone FOLDER it also serves the phone app (the repository's phone
+folder) at /phone/, so one https address does both. The phone app keeps its
+plans on the phone and asks this server for nothing.
+
 The week is the boss fight: every tip anyone does that week is one hit. Its
 hit points are 70% of last week's tips, at least 20, so a small company can
 win too, or a fixed number with --boss-hp. It is worked out from the day
@@ -140,7 +144,12 @@ def allowed(day):
     return abs((when - today).days) <= 1
 
 
-def handler(counts):
+PHONE_FILES = {"index.html": "text/html; charset=utf-8", "app.js": "text/javascript; charset=utf-8",
+               "content.js": "text/javascript; charset=utf-8", "sw.js": "text/javascript; charset=utf-8",
+               "manifest.webmanifest": "application/manifest+json", "icon.svg": "image/svg+xml"}
+
+
+def handler(counts, phone=None):
     class Handler(BaseHTTPRequestHandler):
         server_version = "hello-world-counts"
         sys_version = ""
@@ -163,6 +172,24 @@ def handler(counts):
         def do_GET(self):
             if self.path == "/health":
                 return self.reply(200, {"ok": True})
+            if phone and self.path in ("/phone", "/phone/") or (
+                    phone and self.path.startswith("/phone/") and self.path[7:] in PHONE_FILES):
+                name = self.path[7:] or "index.html"
+                if self.path == "/phone":
+                    self.send_response(301)
+                    self.send_header("Location", "/phone/")
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
+                with open(os.path.join(phone, name), "rb") as f:
+                    raw = f.read()
+                self.send_response(200)
+                self.send_header("Content-Type", PHONE_FILES[name])
+                self.send_header("Content-Length", str(len(raw)))
+                self.send_header("Cache-Control", "no-cache")
+                self.end_headers()
+                self.wfile.write(raw)
+                return
             if week := WEEK_PATH.match(self.path):
                 if not this_week(week.group(1)):
                     return self.reply(404, {"error": "not found"})
@@ -200,8 +227,8 @@ def handler(counts):
     return Handler
 
 
-def serve(port=8080, folder="counts", host="0.0.0.0", trust_proxy=False, boss_hp=None):
-    server = ThreadingHTTPServer((host, port), handler(Counts(folder, boss_hp)))
+def serve(port=8080, folder="counts", host="0.0.0.0", trust_proxy=False, boss_hp=None, phone=None):
+    server = ThreadingHTTPServer((host, port), handler(Counts(folder, boss_hp), phone))
     server.trust_proxy = trust_proxy
     return server
 
@@ -215,8 +242,10 @@ def main(argv=None):
                         help="count by X-Forwarded-For, behind your own https proxy")
     parser.add_argument("--boss-hp", type=int, default=None,
                         help="fixed hit points for the weekly boss, instead of 70%% of last week")
+    parser.add_argument("--phone", default=None,
+                        help="the phone app's folder, served at /phone/")
     args = parser.parse_args(argv)
-    server = serve(args.port, args.data, args.host, args.trust_proxy, args.boss_hp)
+    server = serve(args.port, args.data, args.host, args.trust_proxy, args.boss_hp, args.phone)
     print(f"hello-world counts on {args.host}:{server.server_address[1]}, data in {args.data}")
     server.serve_forever()
 
