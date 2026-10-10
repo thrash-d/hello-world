@@ -4885,3 +4885,113 @@ def test_the_phone_carries_starts_clean_shrinks_and_ends_the_day():
                    {"done": 1, "carried": 1, "aside": 1},
                    {"text": "buy milk", "date": "2026-10-06", "skips": 0, "since": "2026-10-05"},
                    "cleanSaid", None, None, True]
+
+
+def test_the_household_list_merges_keeps_history_and_nobody_adds_anyone():
+    hello = _load_hello()
+    doc = hello.house_new("aaaaaaaaaaaa", "Okiku", "2026-10-05T07:00")
+    hello.house_join(doc, "bbbbbbbbbbbb", "Taro", "2026-10-05T07:05")
+    rice = hello.house_change(doc, "aaaaaaaaaaaa", "added", text="Buy rice", at="2026-10-05T08:00")
+    # Two devices change the same list offline; both changes survive.
+    other = hello.house_merge(doc, {})
+    hello.house_change(doc, "bbbbbbbbbbbb", "ticked", rice, at="2026-10-05T09:00")
+    tea = hello.house_change(other, "aaaaaaaaaaaa", "added", text="Tea", at="2026-10-05T09:30")
+    both = hello.house_merge(doc, other)
+    assert both["items"][rice]["done"] and tea in both["items"]
+    # An old copy can't quietly undo a tick: history only grows.
+    again = hello.house_merge(both, other)
+    assert again["items"][rice]["done"]
+    # History: who and which day, never a count or a time.
+    line = hello.house_history(both, both["items"][rice])
+    assert line == "added by Okiku, Monday; ticked by Taro, Monday"
+    # Removed things come back for 30 days, then are gone for good, and an
+    # old copy can't bring them back.
+    hello.house_change(both, "bbbbbbbbbbbb", "removed", tea, at="2026-10-05T10:00")
+    assert both["items"][tea]["removed"]
+    hello.house_change(both, "aaaaaaaaaaaa", "restored", tea, at="2026-10-05T11:00")
+    assert not both["items"][tea]["removed"]
+    hello.house_change(both, "aaaaaaaaaaaa", "removed", tea, at="2026-10-05T12:00")
+    hello.house_tidy(both, hello.datetime.datetime(2026, 11, 10))
+    assert tea not in both["items"] and tea in both["gone"]
+    assert tea not in hello.house_merge(both, other)["items"]
+    # Someone who left can't change anything; notices name who joined or left.
+    hello.house_leave(both, "bbbbbbbbbbbb", "2026-10-06T08:00")
+    assert hello.house_change(both, "bbbbbbbbbbbb", "added", text="x", at="2026-10-06T09:00") is None
+    lines, seen = hello.house_news(both, "aaaaaaaaaaaa", 1)
+    assert lines == ["Taro joined the household list.", "Taro left the household list."] and seen == 3
+    assert hello.house_left_unasked(both, "aaaaaaaaaaaa", []) == ["bbbbbbbbbbbb"]
+    # No function adds a member other than the one calling from its device.
+    assert not [n for n in dir(hello) if n.startswith("house_") and "invite" in n]
+
+
+def test_the_household_list_through_the_server_with_a_household_key():
+    pro_keys, secret, public = _pro()
+    server, url, folder = _counts_server()
+    try:
+        first = run(text="Call Ana\n\n", policy={"SharedCountsServer": url})
+        a = _window_hello(home=first.home)
+        a.POLICY = {"SharedCountsServer": url}
+        state, can_save = a.load()
+        assert "household key" in a.house_start(state, can_save, "Okiku")
+        a.PRO_PUBLIC_KEY = public
+        a.set_pro_key(state, can_save, pro_keys.issue(secret, "Okiku", family=True))
+        said = a.house_start(state, can_save, "Okiku")
+        code = state["house"]["code"]
+        assert code in said and "in person" in said and "never call" in said
+        # The server holds only a padded, encrypted copy.
+        label = a.house_keys(code)[0]
+        with open(os.path.join(folder, "sync", label), "rb") as f:
+            stored = f.read()
+        assert b"Okiku" not in stored and (len(stored) - 50) % 1024 == 0
+        # A second person joins from their own device.
+        second = run(text="Call Ana\n\n", policy={"SharedCountsServer": url})
+        b = _window_hello(home=second.home)
+        b.POLICY = {"SharedCountsServer": url}
+        bstate, bsave = b.load()
+        assert "joined" in b.house_join_with(bstate, bsave, code.upper().replace("-", " "), "Taro")
+        b.house_sync(bstate, bsave, lambda d: b.house_change(
+            d, bstate["house"]["me"], "added", text="Buy rice", at="2026-10-05T08:00"))
+        doc, reached = a.house_sync(state, can_save)
+        assert reached and [i["text"] for i in doc["items"].values()] == ["Buy rice"]
+        lines, _ = a.house_news(doc, state["house"]["me"], state["house"]["seen"])
+        assert lines == ["Taro joined the household list."]
+        # Taro leaves; Okiku makes a new code and the old one stops working.
+        assert "others are told" in b.house_leave_now(bstate, bsave) and "house" not in bstate
+        doc, _ = a.house_sync(state, can_save)
+        assert a.house_left_unasked(doc, state["house"]["me"], []) != []
+        assert "old code no longer works" in a.house_rekey(state, can_save)
+        assert state["house"]["code"] != code and not os.path.exists(os.path.join(folder, "sync", label))
+        assert "didn't find" in b.house_join_with(bstate, bsave, code, "Taro")
+    finally:
+        server.shutdown()
+
+
+def test_the_household_list_is_the_same_on_the_pc_and_the_phone():
+    import base64 as b64
+    hello = _load_hello()
+    code = "k7mqa-2p9xb-tz4wc-8hcdd-r3vne"
+    doc = hello.house_new("aaaaaaaaaaaa", "Okiku", "2026-10-05T07:00")
+    hello.house_change(doc, "aaaaaaaaaaaa", "added", text="Buy rice", at="2026-10-05T08:00")
+    sealed = hello.house_seal(code, doc)
+    got = _node("""
+        const app = require("./app.js");
+        (async () => {
+          const k = await app.houseKeys(%s);
+          const doc = app.houseMerge(await app.openSync(k, Buffer.from(%s, "base64")), {});
+          app.houseJoin(doc, "bbbbbbbbbbbb", "Taro", "2026-10-05T09:00");
+          const rice = Object.keys(doc.items)[0];
+          app.houseChange(doc, "bbbbbbbbbbbb", "ticked", rice, null, "2026-10-05T09:05");
+          app.houseChange(doc, "bbbbbbbbbbbb", "added", null, "Tea", "2026-10-05T09:06");
+          const sealed = await app.sealSync(k, app.houseBody(doc));
+          console.log(JSON.stringify({label: k.label, history: app.houseHistory(doc, doc.items[rice], "en"),
+                                      sealed: Buffer.from(sealed).toString("base64")}));
+        })();""" % (json.dumps(code), json.dumps(b64.b64encode(sealed).decode())))
+    assert got["label"] == hello.house_keys(code)[0]
+    assert got["history"] == "added by Okiku, Monday; ticked by Taro, Monday"
+    _, enc, mac = hello.house_keys(code)
+    back = hello.house_merge(doc, hello.open_sync(enc, mac, b64.b64decode(got["sealed"])))
+    assert sorted(i["text"] for i in back["items"].values()) == ["Buy rice", "Tea"]
+    assert [i["done"] for i in back["items"].values() if i["text"] == "Buy rice"] == [True]
+    assert hello.house_news(back, "aaaaaaaaaaaa", 1)[0] == ["Taro joined the household list."]
+    # A different salt from sync: the same code never opens the other.
+    assert hello.house_keys(code)[0] != hello.sync_keys(code)[0]

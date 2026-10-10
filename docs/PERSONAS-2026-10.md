@@ -205,6 +205,8 @@ the pull request named.
 | Profit Maximizer, round 3 | A "day went sideways" button and softer wording | Profit Maximizer | Built in 1.55.0 |
 | Before 2000, 1.57.0 | Carry it over or set it aside; a fresh day with no count; a smaller plan offered | Six of eight | Built in 1.60.0 after a design review (equal answers, carry the default) |
 | Before 2000, 1.57.0 | An evening go/no-go, a Compline bell | Hank, Anselm | End the day, free, in 1.60.0; the timed second check-in with Pro in 1.59.0 |
+| Before 2000, 1.57.0 | Husband and daughter tick tasks on one slab | Okiku | Built in 1.61.0 as the household list, with the red team's rules |
+| Design review, round 89 | Merge each thing, keep removed ones gone; carry this device's changes across a new code; pad the copy; the day not the minute; ask about a new code until answered | Caligula, Noor, Rasputin | Built in 1.61.0 |
 | Before 2000, 1.57.0 | Large print up front | Gordo, Neferet | Built in 1.60.0 |
 | Red team, 1.57.0 | Any number of sync copies, and no sweep: the disk can be filled | Capone, confirmed in code | Fixed in 1.58.0: quota, per-address limits, hourly sweep |
 | Red team, 1.57.0 | "1 person did the tip" in a 3-person office | Ivan IV | Fixed in 1.58.0: "a few" below 10, rounded to 5, published hourly (Noor's review) |

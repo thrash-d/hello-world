@@ -517,7 +517,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.60.0"
+VERSION = "1.61.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -828,10 +828,10 @@ def sync_code():
     return "-".join(raw[i:i + 5] for i in range(0, 25, 5))
 
 
-def sync_keys(code):
+def sync_keys(code, salt=SYNC_SALT):
     """(label, encryption key, tag key) from a code, as the phone makes them."""
     code = "".join(c for c in code.lower() if c in SYNC_ALPHABET)
-    raw = hashlib.pbkdf2_hmac("sha256", code.encode(), SYNC_SALT, SYNC_ROUNDS, 96)
+    raw = hashlib.pbkdf2_hmac("sha256", code.encode(), salt, SYNC_ROUNDS, 96)
     return raw[:32].hex(), raw[32:64], raw[64:]
 
 
@@ -865,6 +865,366 @@ def open_sync(enc, mac, blob):
     except ValueError:
         return None
     return data if isinstance(data, dict) else None
+
+
+# The household list (Okiku), with the red team's rules: each adult joins
+# from their own device and leaves when they like; everyone is told who
+# joined or left; each thing keeps its own history, seen by everyone, and no
+# totals per person; removed things can be restored for 30 days; and the
+# list is encrypted with its own code, never shown in anything drafted.
+HOUSE_SALT = b"hello-world household v1"
+HOUSE_KEEP_DAYS = 30
+MAX_HOUSE_ITEMS = 200
+MAX_HOUSE_NAME = 40
+
+
+def house_keys(code):
+    return sync_keys(code, HOUSE_SALT)
+
+
+def _house_item(item):
+    """Done and removed follow the newest entry in the thing's history."""
+    done = removed = None
+    for what, _, at in sorted(item["history"], key=lambda h: h[2]):
+        if what in ("ticked", "unticked"):
+            done = what == "ticked"
+        elif what in ("removed", "restored"):
+            removed = at if what == "removed" else None
+    item["done"], item["removed"] = bool(done), removed
+    return item
+
+
+def house_new(me, name, at):
+    """A new list with its first member."""
+    return {"members": {me: {"name": name[:MAX_HOUSE_NAME], "joined": at}},
+            "items": {}, "events": [["joined", me, at]]}
+
+
+def house_join(doc, me, name, at):
+    """Join from this device under one's own name; nobody adds anyone else."""
+    if me in doc["members"] and not doc["members"][me].get("left"):
+        return doc
+    doc["members"][me] = {"name": name[:MAX_HOUSE_NAME], "joined": at}
+    doc["events"].append(["joined", me, at])
+    return doc
+
+
+def house_leave(doc, me, at):
+    if me in doc["members"]:
+        doc["members"][me]["left"] = at
+        doc["events"].append(["left", me, at])
+    return doc
+
+
+def house_change(doc, me, what, item_id=None, text=None, at=None):
+    """Add, tick, untick, remove or restore a thing, with who and when. Only
+    a member who hasn't left can change anything. Returns the thing's id."""
+    member = doc["members"].get(me)
+    if not member or member.get("left"):
+        return None
+    if what == "added":
+        live = [i for i in doc["items"].values() if not i.get("removed")]
+        if len(live) >= MAX_HOUSE_ITEMS or not text:
+            return None
+        item_id = os.urandom(6).hex()
+        doc["items"][item_id] = {"text": text[:MAX_PLAN], "history": []}
+    item = doc["items"].get(item_id)
+    if item is None:
+        return None
+    item["history"].append([what, me, at])
+    _house_item(item)
+    return item_id
+
+
+def house_merge(doc, other):
+    """Both sides' members, things and histories, so nothing either side did
+    is lost, and nobody can quietly undo someone else's change."""
+    out = {"members": {}, "items": {}, "events": [], "gone": []}
+    # Things removed for good stay gone, so an old copy can't bring them
+    # back (Caligula).
+    gone = set()
+    for side in (doc, other):
+        gone |= {g for g in (side or {}).get("gone", []) if isinstance(g, str)}
+    out["gone"] = sorted(gone)
+    for side in (doc, other):
+        for mid, m in (side or {}).get("members", {}).items():
+            if not (isinstance(m, dict) and isinstance(m.get("name"), str)):
+                continue
+            mine = out["members"].setdefault(mid, {"name": m["name"][:MAX_HOUSE_NAME],
+                                                   "joined": str(m.get("joined", ""))})
+            if m.get("left"):
+                mine["left"] = max(str(m["left"]), mine.get("left", ""))
+        for iid, item in (side or {}).get("items", {}).items():
+            if not (isinstance(item, dict) and isinstance(item.get("text"), str)) or iid in gone:
+                continue
+            mine = out["items"].setdefault(iid, {"text": item["text"][:MAX_PLAN], "history": []})
+            for h in item.get("history", []):
+                if (isinstance(h, list) and len(h) == 3 and all(isinstance(x, str) for x in h)
+                        and h not in mine["history"]):
+                    mine["history"].append(h)
+        for e in (side or {}).get("events", []):
+            if isinstance(e, list) and len(e) == 3 and e not in out["events"]:
+                out["events"].append(e)
+    out["events"].sort(key=lambda e: e[2])
+    for item in out["items"].values():
+        item["history"].sort(key=lambda h: h[2])
+        _house_item(item)
+    return out
+
+
+def house_tidy(doc, now):
+    """Removed things go for good after 30 days."""
+    cutoff = (now - datetime.timedelta(days=HOUSE_KEEP_DAYS)).isoformat(timespec="minutes")
+    old = [k for k, v in doc["items"].items() if v.get("removed") and v["removed"] < cutoff]
+    doc["gone"] = sorted(set(doc.get("gone", [])) | set(old))
+    doc["items"] = {k: v for k, v in doc["items"].items() if k not in old}
+    return doc
+
+
+def house_seal(code, doc):
+    """The list sealed with its own code, padded to whole kilobytes so its
+    size says little about how much is in it (Noor)."""
+    _, enc, mac = house_keys(code)
+    body = dict(doc, pad="")
+    size = len(json.dumps(body, ensure_ascii=False, separators=(",", ":")).encode())
+    body["pad"] = " " * (-size % 1024)
+    return seal_sync(enc, mac, body)
+
+
+def house_who(doc, mid):
+    return (doc["members"].get(mid) or {}).get("name") or tr("someone")
+
+
+def house_history(doc, item):
+    """'added by Ana, Tuesday; ticked by Omar, Wednesday', for everyone to
+    see: the day only, not the minute (Rasputin), and never a count."""
+    words = {"added": tr("added by {name}, {when}"), "ticked": tr("ticked by {name}, {when}"),
+             "unticked": tr("unticked by {name}, {when}"), "removed": tr("removed by {name}, {when}"),
+             "restored": tr("restored by {name}, {when}")}
+    out = []
+    for what, by, at in item["history"][-4:]:
+        when = datetime.datetime.fromisoformat(at).date()
+        data = translation()
+        out.append(words[what].format(name=house_who(doc, by),
+                                      when=(data["days"] if data else DAYS)[when.weekday()]))
+    return "; ".join(out)
+
+
+def house_news(doc, me, seen):
+    """Who joined or left since this device last looked, other than itself.
+    Returns (lines, new seen)."""
+    lines = []
+    for what, by, at in doc["events"][seen:]:
+        if by == me:
+            continue
+        lines.append((tr("{name} joined the household list.") if what == "joined" else
+                      tr("{name} left the household list.")).format(name=house_who(doc, by)))
+    return lines, len(doc["events"])
+
+
+def house_left_unasked(doc, me, asked):
+    """Members who left and this device hasn't yet asked about re-keying."""
+    return [mid for mid, m in doc["members"].items()
+            if m.get("left") and mid != me and mid not in asked]
+
+
+def house_on(state):
+    return bool(state.get("house")) and counts_server() is not None and not policy("TurnOffSync")
+
+
+def _house_put(code, doc):
+    label = house_keys(code)[0]
+    return net_bytes(f"/v1/sync/{label}", house_seal(code, doc), method="PUT") is not None
+
+
+def _house_get(code):
+    label, enc, mac = house_keys(code)
+    raw = net_bytes(f"/v1/sync/{label}")
+    return open_sync(enc, mac, raw) if raw else None
+
+
+def _house_save(state, can_save, house, doc):
+    base = copy.deepcopy(state)
+    if house is None:
+        state.pop("house", None)
+        state.pop("house_list", None)
+    else:
+        state["house"], state["house_list"] = house, doc
+    if not commit(state, base, can_save):
+        undo(state, base)
+        return False
+    return True
+
+
+def house_sync(state, can_save, change=None):
+    """Fetch, merge with this device's copy, apply `change(doc)`, and put it
+    back. Returns (doc, reached): the copy held here when the server can't
+    be reached, so nothing done offline is lost."""
+    house = dict(state["house"])
+    theirs = _house_get(house["code"])
+    doc = house_merge(state.get("house_list") or {}, theirs)
+    if change:
+        change(doc)
+    house_tidy(doc, now())
+    reached = theirs is not None and _house_put(house["code"], doc)
+    _house_save(state, can_save, house, doc)
+    return doc, reached
+
+
+def house_start(state, can_save, name):
+    """Start a list: only with a household key. Returns what to say."""
+    if not family_on(state):
+        return tr("A household list comes with a household key ($8 once).")
+    if not counts_server() or policy("TurnOffSync"):
+        return tr("Sync isn't available on this computer.")
+    code, me, at = sync_code(), os.urandom(6).hex(), now().isoformat(timespec="minutes")
+    doc = house_new(me, name, at)
+    if not _house_put(code, doc):
+        return tr("The server can't be reached just now.")
+    _house_save(state, can_save, {"code": code, "me": me, "seen": 1, "asked": []}, doc)
+    return house_code_said(code)
+
+
+def house_code_said(code):
+    return (tr("The household list's code: {code}").format(code=code) + " " + tr(
+        "Give it to each adult in person; they type it on their own device, with "
+        "their own name. hello-world never puts it in a message. The list is "
+        "encrypted with it; the scheme has had no outside audit.") + " " + tr(SCAM_LINE))
+
+
+def house_join_with(state, can_save, code, name):
+    """Join from this device, under one's own name. Returns what to say."""
+    code = "".join(c for c in (code or "").lower() if c in SYNC_ALPHABET)
+    if len(code) != 25 or not name.strip():
+        return tr("That code doesn't look right. Check it with whoever started the list.")
+    code = "-".join(code[i:i + 5] for i in range(0, 25, 5))
+    theirs = _house_get(code)
+    if theirs is None:
+        return tr("That code didn't find a household list. Check it, or ask for the new one.")
+    me, at = os.urandom(6).hex(), now().isoformat(timespec="minutes")
+    doc = house_join(house_merge({}, theirs), me, name.strip(), at)
+    if not _house_put(code, doc):
+        return tr("The server can't be reached just now.")
+    _house_save(state, can_save, {"code": code, "me": me, "seen": len(doc["events"]),
+                                  "asked": []}, doc)
+    return tr("You've joined the household list. Everyone on it is told.")
+
+
+def house_leave_now(state, can_save):
+    house = state["house"]
+    doc, _ = house_sync(state, can_save, lambda d: house_leave(
+        d, house["me"], now().isoformat(timespec="minutes")))
+    _house_save(state, can_save, None, None)
+    return tr("You've left the household list, and the others are told. What was "
+              "already on this device stays here.")
+
+
+def house_rekey(state, can_save):
+    """A new code after someone left: the list, with this device's own
+    changes, moves to it and the old copy is deleted. Returns what to say."""
+    house = dict(state["house"])
+    doc, _ = house_sync(state, can_save)
+    old, code = house["code"], sync_code()
+    if not _house_put(code, doc):
+        return tr("The server can't be reached just now.")
+    net_bytes(f"/v1/sync/{house_keys(old)[0]}", b"", method="DELETE")
+    house["code"] = code
+    house["asked"] = sorted(set(house.get("asked", [])) | {
+        mid for mid, m in doc["members"].items() if m.get("left")})
+    _house_save(state, can_save, house, doc)
+    return tr("The old code no longer works.") + " " + house_code_said(code)
+
+
+HOUSE_WORDS = ("house", "household", "hogar", "maison", "foyer", "casa", "haushalt")
+
+
+def household_prompt(state, can_save):
+    """The household list in the text screen."""
+    if not state.get("house"):
+        para(tr("A household list: things anyone in the household can add and tick, "
+                "on everyone's own device. Each thing shows who added, ticked or "
+                "removed it, and nothing counts who did what."))
+        entries = [tr("Start one (needs a household key)"), tr("Join one with its code")]
+        for n, label in enumerate(entries, 1):
+            say(wrapped(f" {n:>2}  ", label))
+        choice = (ask(tr("Type a number from 1 to {n}, or Enter to go back > ").format(n=2))
+                  or "").strip(TRIM)
+        if choice.lower() in QUIT_WORDS:
+            raise Quit
+        if choice not in ("1", "2"):
+            return
+        name = (ask(tr("Your name, as the others will see it > ")) or "").strip()
+        if not name:
+            say(tr("Nothing changed."))
+            return
+        if choice == "1":
+            para(house_start(state, can_save, name))
+        else:
+            para(house_join_with(state, can_save, ask(tr("The household code > ")) or "", name))
+        return
+    while True:
+        doc, reached = house_sync(state, can_save)
+        house = state["house"]
+        if not reached:
+            para(tr("The household list can't be reached just now; this is the copy "
+                    "on this computer. If someone made a new household code, ask them "
+                    "for it."))
+        lines, seen = house_news(doc, house["me"], house.get("seen", 0))
+        for line in lines:
+            para(line)
+        if seen != house.get("seen"):
+            _house_save(state, can_save, dict(house, seen=seen), doc)
+        for mid in house_left_unasked(doc, house["me"], house.get("asked", [])):
+            # Asked until answered (the panel): Enter asks again next time.
+            answer = ask_choice(tr("{name} left. Make a new household code so the old "
+                                   "one stops working? They keep whatever was already "
+                                   "on their device. (y or n) > ").format(
+                                       name=house_who(doc, mid)),
+                                strict_yes(), NO_WORDS, tr("Type y or n."))
+            if answer == "yes":
+                para(house_rekey(state, can_save))
+                doc = state["house_list"]
+            elif answer == "no":
+                _house_save(state, can_save, dict(state["house"], asked=sorted(
+                    set(state["house"].get("asked", [])) | {mid})), doc)
+        live = [(k, v) for k, v in doc["items"].items() if not v.get("removed")]
+        say(tr("Household list"))
+        for n, (_, item) in enumerate(live, 1):
+            say(wrapped(f" {n:>2}  {'[x]' if item['done'] else '[ ]'} ", item["text"]))
+            say(indent(house_history(doc, item)))
+        typed = ask(tr("Type a new thing to add, a number to tick or untick it, r and a "
+                       "number to remove it, removed, leave, or Enter to go back > "))
+        word = (typed or "").strip(TRIM)
+        low = word.lower()
+        me, at = state["house"]["me"], now().isoformat(timespec="minutes")
+        if not word:
+            return
+        if low in QUIT_WORDS:
+            raise Quit
+        numbers = [str(n) for n in range(1, len(live) + 1)]
+        if low in numbers:
+            iid, item = live[int(low) - 1]
+            house_sync(state, can_save, lambda d: house_change(
+                d, me, "unticked" if item["done"] else "ticked", iid, at=at))
+        elif low[:1] == "r" and low[1:].strip() in numbers:
+            iid = live[int(low[1:].strip()) - 1][0]
+            house_sync(state, can_save, lambda d: house_change(d, me, "removed", iid, at=at))
+        elif low in ("removed", "recently removed"):
+            gone = [(k, v) for k, v in doc["items"].items() if v.get("removed")]
+            for n, (_, item) in enumerate(gone, 1):
+                say(wrapped(f" {n:>2}  ", item["text"]))
+                say(indent(house_history(doc, item)))
+            back = (ask(tr("Type a number to restore it, or Enter to go back > ")) or "").strip(TRIM)
+            if back in [str(n) for n in range(1, len(gone) + 1)]:
+                iid = gone[int(back) - 1][0]
+                house_sync(state, can_save, lambda d: house_change(d, me, "restored", iid, at=at))
+        elif low == "leave":
+            if ask_choice(tr("Leave the household list? (y or n) > "), strict_yes(), NO_WORDS,
+                          tr("Type y or n.")) == "yes":
+                para(house_leave_now(state, can_save))
+                return
+        elif text := typed_plan(word):
+            house_sync(state, can_save, lambda d: house_change(d, me, "added", text=text, at=at))
 
 
 def sync_form(state):
@@ -2140,6 +2500,16 @@ def load(repair=True):
     DAY_START = state.get("day_start", 0)
     if raw.get("remind_at") in REMINDER_TIMES:
         state["remind_at"] = raw["remind_at"]
+    house = raw.get("house")
+    if (isinstance(house, dict) and isinstance(house.get("code"), str)
+            and re.fullmatch(r"([%s]{5}-){4}[%s]{5}" % (SYNC_ALPHABET, SYNC_ALPHABET), house["code"])
+            and isinstance(house.get("me"), str) and re.fullmatch(r"[0-9a-f]{12}", house["me"])):
+        state["house"] = {"code": house["code"], "me": house["me"],
+                          "seen": house["seen"] if isinstance(house.get("seen"), int) else 0,
+                          "asked": [a for a in house.get("asked", []) if isinstance(a, str)]
+                          if isinstance(house.get("asked"), list) else []}
+        if isinstance(raw.get("house_list"), dict):
+            state["house_list"] = house_merge(raw["house_list"], {})
     days = raw.get("sideways")
     if isinstance(days, list):
         kept = [x for x in days if isinstance(x, str) and re.fullmatch(r"\d{4}-\d\d-\d\d", x)
@@ -2756,6 +3126,11 @@ def delete_everything(state):
     if state.get("sync") and counts_server():
         # The encrypted copy on the server goes too.
         net_bytes(f"/v1/sync/{sync_keys(state['sync'])[0]}", b"", method="DELETE")
+    if state.get("house") and counts_server():
+        # Leaving the household list, so the others are told.
+        house = state["house"]
+        doc = house_merge(state.get("house_list") or {}, _house_get(house["code"]))
+        _house_put(house["code"], house_leave(doc, house["me"], now().isoformat(timespec="minutes")))
     leftovers = [data_file()]
     failed = []
     listing_failed = False
@@ -3498,6 +3873,8 @@ def more_settings(state, can_save):
                         lambda: para(set_tray(state, can_save, not state.get("tray")))))
     if not plans_off():
         entries.append((tr("End the day..."), lambda: end_day_prompt(state, can_save, today())))
+        if counts_server() and not policy("TurnOffSync"):
+            entries.append((tr("Household list..."), lambda: household_prompt(state, can_save)))
         entries.append((tr("Every day..."), every_day))
         entries.append((tr("This year..."), lambda: [say(wrapped("", line)) for line in
                                                     year_page(state, today())]))
@@ -5411,6 +5788,9 @@ def last_prompt(state, can_save, intent, person, d, iso, open_menu=False):
         elif answer in ASIDE_WORDS and not plans_off():
             aside_prompt(state, can_save)
             intent = state["intent"]
+            continue
+        elif answer in HOUSE_WORDS and person and counts_server():
+            household_prompt(state, can_save)
             continue
         elif answer in END_WORDS and person and not plans_off():
             end_day_prompt(state, can_save, d)
@@ -8003,6 +8383,73 @@ class Window:
         finally:
             self.user.CloseClipboard()
 
+    def household_menu(self):
+        """The household list: the words come from the plan box, and the
+        code from the clipboard, as with Pro."""
+        v = self.visit
+        name = first_name() or tr("someone")
+        if not v.state.get("house"):
+            choice = self.popup([(0, 1, tr("Start one (needs a household key)")),
+                                 (0, 2, tr("Join one: copy its code first"))])
+            if choice == 1:
+                self.inform(house_start(v.state, v.can_save, name))
+            elif choice == 2:
+                self.inform(house_join_with(v.state, v.can_save, self.clipboard_text(), name))
+            return
+        doc, reached = house_sync(v.state, v.can_save)
+        house = v.state["house"]
+        lines, seen = house_news(doc, house["me"], house.get("seen", 0))
+        if lines:
+            self.inform("\n".join(lines))
+            _house_save(v.state, v.can_save, dict(house, seen=seen), doc)
+        for mid in house_left_unasked(doc, house["me"], house.get("asked", [])):
+            if self.confirm(tr("{name} left. Make a new household code so the old one stops "
+                               "working? They keep whatever was already on their device.")
+                            .format(name=house_who(doc, mid))):
+                self.inform(house_rekey(v.state, v.can_save))
+                doc = v.state["house_list"]
+            else:
+                _house_save(v.state, v.can_save, dict(v.state["house"], asked=sorted(
+                    set(v.state["house"].get("asked", [])) | {mid})), doc)
+        me, at = v.state["house"]["me"], now().isoformat(timespec="minutes")
+        live = [(k, i) for k, i in doc["items"].items() if not i.get("removed")]
+        gone = [(k, i) for k, i in doc["items"].items() if i.get("removed")]
+        entries = [] if reached else [(0x1, 0, tr("Not reached; the copy on this computer"))]
+        entries += [(0x8 if i["done"] else 0, 100 + n, i["text"]) for n, (_, i) in enumerate(live)]
+        entries += [(0x800, 0, None), (0, 1, tr("Add what's typed in the plan box"))]
+        if live:
+            entries.append((0, 2, tr("Remove a thing...")))
+            entries.append((0, 5, tr("Who did what...")))
+        if gone:
+            entries.append((0, 3, tr("Recently removed...")))
+        entries.append((0, 4, tr("Leave the household list")))
+        choice = self.popup(entries)
+        if 100 <= choice < 100 + len(live):
+            iid, item = live[choice - 100]
+            house_sync(v.state, v.can_save, lambda d: house_change(
+                d, me, "unticked" if item["done"] else "ticked", iid, at=at))
+        elif choice == 1:
+            text = typed_plan(self.typed())
+            if not text:
+                self.inform(tr("Type the thing in the plan box first, then choose this again."))
+                return
+            house_sync(v.state, v.can_save, lambda d: house_change(d, me, "added", text=text, at=at))
+            self.set_text(self.PLAN, v.plan())
+        elif choice == 2:
+            picked = self.popup([(0, 200 + n, i["text"]) for n, (_, i) in enumerate(live)])
+            if picked:
+                iid = live[picked - 200][0]
+                house_sync(v.state, v.can_save, lambda d: house_change(d, me, "removed", iid, at=at))
+        elif choice == 3:
+            picked = self.popup([(0, 300 + n, i["text"]) for n, (_, i) in enumerate(gone)])
+            if picked:
+                iid = gone[picked - 300][0]
+                house_sync(v.state, v.can_save, lambda d: house_change(d, me, "restored", iid, at=at))
+        elif choice == 5:
+            self.inform("\n\n".join(i["text"] + "\n" + house_history(doc, i) for _, i in live))
+        elif choice == 4 and self.confirm(tr("Leave the household list?")):
+            self.inform(house_leave_now(v.state, v.can_save))
+
     def pro_menu(self):
         """Pro: paste a key from the clipboard, or Pro's settings."""
         v, checked = self.visit, 0x8
@@ -8078,9 +8525,14 @@ class Window:
                             tr("Funny farewells for plans put aside")))
         entries.append((0, 23, tr("Print a big page for the fridge")))
         entries.append((0, 24, tr("This year...")))
+        if counts_server() and not policy("TurnOffSync"):
+            entries.append((0, 26, tr("Household list...")))
         if v.state["intent"]:
             entries.insert(0, (0, 25, tr("End the day...")))
         choice = self.popup(entries)
+        if choice == 26:
+            self.household_menu()
+            return
         if choice == 25:
             def choose(part):
                 picked = self.popup([(0x1, 0, part), (0x800, 0, None),
