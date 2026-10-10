@@ -124,6 +124,26 @@ The designs went back to them before building:
 - The cart vendor: giant buttons, works with no signal, a reminder at 6:15,
   and Arabic for his cousin.
 
+## Gen Z, pessimists and trusting boomers, 1.54.0
+
+Three more rounds of eight cheap agents each, with the Profit Maximizer
+reading every round. Gen Z (a TikTok creator, a CS student with ADHD, a
+night-shift CNA, a streamer who sleeps 4am to noon, a deinfluencer, a
+finance intern, a tattoo apprentice, a delivery-driver dad) wanted their own
+day start (three of eight) and reminders that reach them. The pessimists
+(housing, jobs, school, Gen Alpha) all said the reminder is the habit and
+expected to drop the app within two weeks without one on the phone; seven
+of eight said not to charge for the basic nudge. The trusting boomers all
+named the same risk: someone pretending to be hello-world to get the sync
+code or sell a fake key. Everyone in all three rounds would pay $5 once and
+no one wanted a subscription.
+
+The design went back to four of them before building. Dolores: a coached
+victim just answers no, so wait before the code shows. Marisol: say that
+18:00 is what keeps a night shift on one day. Kai: a fixed 8am repeat
+buzzes while he sleeps. Noor: a push address with a time zone and a time
+reveals a sleep routine, so store less and delete on opt-out.
+
 ## Track record
 
 What each simulated review found, and what happened to it. Status is as of
@@ -171,6 +191,15 @@ the pull request named.
 | Design review, round 82 | Say plans leave the device; no "neither can we" without an audit; losing the code; no personal notes on a server at work | Bank analyst | Built in 1.54.0: plain wording, unaudited said, code shown again on the PC, TurnOffSync policy |
 | Design review, round 81 | No reminder by default; 6:15 for the cart; Arabic; say where phone notes live | Rider, cart vendor, analyst | Built in 1.53.0 |
 | Design review, round 80 | Charge for pets and themes (Profit Maximizer) vs. keep pets free, charge for history and reminders (indie developer) | Disagreement | Pets stay free; Pro is history, a second reminder and themes |
+| Gen Z, 1.54.0 | Own day start; a check-in that lands when awake | Night-shift CNA, streamer, Profit Maximizer | Built in 1.55.0: day start at 0, 4, 12 or 18; reminders at 15, 18, 22 |
+| Gen Z, 1.54.0 | Offer yesterday's leftovers instead of a blank box | TikTok creator | Built in 1.55.0: up to three plans put aside, by number |
+| Gen Z, 1.54.0 | History is worth more free, with an export | Deinfluencer, Profit Maximizer | Built in 1.55.0: a year of history free; export already free |
+| Pessimists, 1.54.0 | The reminder must reach the phone, free | Seven of eight | Queued: round 84 (phone reminder) |
+| Boomers, 1.54.0 | Fake "support" asking for the sync code | All eight | Built in 1.55.0: scam line, on-the-phone question, a wait, Change my sync code |
+| Boomers, 1.54.0 | A guessable sync code ("password123") | Hank | Already impossible: the app makes every code; confirmed in the code |
+| Boomers, 1.54.0 | Signed builds and checksums | Dolores, Walt, Barbara | Checksums already published (SHA256SUMS); Authenticode and a Store listing are owner steps |
+| Design review, round 83 | Wait before the code shows; say 18:00 is the night-shift setting; "Small is fine", not "counts" | Dolores, Marisol, Noor | Built in 1.55.0 |
+| Profit Maximizer, round 3 | A "day went sideways" button and softer wording | Profit Maximizer | Built in 1.55.0 |
 | Personas, 1.43.0 | Formulas run in the spreadsheet export | Skye, confirmed in code | Fixed in 1.46.1 |
 | Personas, 1.43.0 | Forklift horns, bakery orders, badge login, a supply locator, an email "lie detector" | Rick, Harold, Denise | Not buildable here: they need hardware or outside services |
 

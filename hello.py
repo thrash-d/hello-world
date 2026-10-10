@@ -517,7 +517,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.54.0"
+VERSION = "1.55.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -553,6 +553,11 @@ UNSURE_WORDS = ("?", "not sure", "unsure", "i'm not sure", "im not sure",
                 "no estoy seguro", "no estoy segura", "pas sûr", "pas sur",
                 "je ne sais plus", "não sei", "nao sei", "weiß nicht",
                 "weiss nicht", "nicht sicher")
+# "The day went sideways" at "Did you do it?": the plan goes aside with no
+# follow-up and nothing marked (profit panel, round 3).
+SIDEWAYS_WORDS = ("sideways", "day went sideways", "de lado", "se torció",
+                  "se torcio", "de travers", "deu errado", "schief",
+                  "schiefgelaufen")
 GENTLE_WORDS = ("gentle", "suave", "doux", "sanft")
 PET_WORDS = ("pet", "mascota", "mascotte", "bichinho", "haustier")
 ASIDE_WORDS = ("aside", "apartados", "de côté", "guardados", "beiseite")
@@ -614,8 +619,16 @@ class OutputClosed(Exception):
     """Writing to stdout failed, so nothing more can be shown."""
 
 
+# The hour a new day starts (Marisol, Kai): 18 keeps a 10pm-6am shift on
+# one day. Read from the notes by load().
+DAY_STARTS = (0, 4, 12, 18)
+DAY_START = 0
+
+
 def today():
-    return datetime.date.fromisoformat(TODAY) if TODAY else datetime.date.today()
+    if TODAY:
+        return datetime.date.fromisoformat(TODAY)
+    return (datetime.datetime.now() - datetime.timedelta(hours=DAY_START)).date()
 
 
 def missed_a_workday(last, d):
@@ -965,9 +978,10 @@ def set_sync(state, can_save, on):
             net_bytes(f"/v1/sync/{sync_keys(old)[0]}", b"", method="DELETE")
         return tr("Sync is off, and the copy on the server is deleted.")
     sync_now(state, can_save)
-    return tr("Sync is on. On your phone, open hello-world, choose Sync, and type this "
-              "code: {code}. With sync on, your plan and done list leave this computer, "
-              "encrypted with that code.").format(code=state["sync"])
+    return tr(SCAM_LINE) + " " + tr(
+        "Sync is on. On your phone, open hello-world, choose Sync, and type this "
+        "code: {code}. With sync on, your plan and done list leave this computer, "
+        "encrypted with that code.").format(code=state["sync"])
 
 
 def net_bytes(path, body=None, method=None):
@@ -1257,6 +1271,16 @@ def aside_lines(state):
     return rows, lines
 
 
+MAX_PICKS = 3
+
+
+def aside_picks(state):
+    """The newest plans put aside, offered by number at today's question.
+    The earlier plan has same, so it isn't offered twice."""
+    rows = [r for r in aside_lines(state)[0] if r["text"] != state.get("previous")]
+    return rows[:MAX_PICKS]
+
+
 def bring_back(state, can_save, row, d):
     """Put a plan from the list back on today's plan. Returns what to say."""
     refresh(state, can_save)
@@ -1494,7 +1518,7 @@ SWITCHES = ("nudge", "open_after", "weekends", "name", "no_startup_visits",
             "plan_in_reminder", "gentle", "gentle_offered", "large_text",
             "farewells", "tray")
 SETTINGS = ("streak", "tips", "text", "offered", "offer_skips", "lang",
-            "remind_at", "standup", "pet") + SWITCHES
+            "remind_at", "standup", "pet", "day_start") + SWITCHES
 
 
 def new_state():
@@ -1512,9 +1536,10 @@ def saved_plan(state):
     asking next time."""
     return tr("Saved. Type done when you finish it.") if gentle(state) else tr(SAVED_PLAN)
 MAX_FINISHED = 50
-# Finished plans are kept for 14 days, or 90 with "long_history", and at most
-# this many, so "This week" always has the whole week.
-LONG_FINISHED = 300
+# Finished plans are kept for 14 days, or a year with "long_history" (free:
+# history only matters after months, Noor), and at most this many, so "This
+# week" always has the whole week.
+LONG_FINISHED = 600
 
 
 def finished_cap(state):
@@ -1522,7 +1547,7 @@ def finished_cap(state):
 
 
 def keep_days(state):
-    return 90 if state.get("long_history") else 14
+    return 365 if state.get("long_history") else 14
 SHOWN_AFTER_DONE = 3
 
 
@@ -1854,6 +1879,11 @@ def load(repair=True):
         state["previous_date"] = day(raw.get("previous_date"))
     except ValueError:
         pass
+    global DAY_START
+    start = raw.get("day_start")
+    if start in DAY_STARTS[1:] and not isinstance(start, bool):
+        state["day_start"] = start
+    DAY_START = state.get("day_start", 0)
     if raw.get("remind_at") in REMINDER_TIMES:
         state["remind_at"] = raw["remind_at"]
     code = raw.get("sync")
@@ -2211,9 +2241,9 @@ def not_a_choice(word, choices):
         + " " + choices)
 
 
-def ask_choice(prompt, yes, no, hint, tries=3, unsure=()):
+def ask_choice(prompt, yes, no, hint, tries=3, unsure=(), sideways=()):
     """Ask until the answer is recognised. Returns "yes", "no", "unsure"
-    (one of `unsure`), "" or None.
+    (one of `unsure`), "sideways" (one of `sideways`), "" or None.
 
     "" means Enter, None means nobody could answer or the answers were not
     understood three times, so the caller treats it as no answer.
@@ -2233,6 +2263,8 @@ def ask_choice(prompt, yes, no, hint, tries=3, unsure=()):
             return "no"
         if text in unsure:
             return "unsure"
+        if text in sideways:
+            return "sideways"
         not_a_choice(answer, hint)
     return None
 
@@ -3133,7 +3165,7 @@ def more_settings(state, can_save):
             (tr("Save my plans to a file"), export),
             (marked(tr("Keep a longer history"), state.get("long_history")), flip(
                 "long_history",
-                tr("Finished plans are kept for 90 days instead of 14."),
+                tr("Finished plans are kept for a year instead of 14 days."),
                 tr("Finished plans are kept for 14 days, as usual."))),
             (tr("What I did..."), history),
             (marked(tr("No follow-up questions"), gentle(state)),
@@ -3166,27 +3198,133 @@ def more_settings(state, can_save):
     if os.name == "nt" or TRAY_STARTS is not None:
         entries.append((marked(tr("Keep hello-world in the tray"), state.get("tray")),
                         lambda: para(set_tray(state, can_save, not state.get("tray")))))
+    if not plans_off():
+        entries.append((tr("My day starts at..."), lambda: pick([
+            (marked(day_start_label(h), state.get("day_start", 0) == h),
+             lambda h=h: para(set_day_start(state, can_save, h))) for h in DAY_STARTS])))
 
     pick(entries)
 
 
+# Said wherever the sync code is (the boomer panel: a "support" caller who
+# gets the code can read everything synced, and these readers believe them).
+SCAM_LINE = ("hello-world has no phone line and no support staff. We never call, "
+             "email or text. Nobody real will ever ask for your sync code. If "
+             "someone asks, hang up.")
+# Seconds before the code shows, so nobody on the line can hurry it out
+# (Dolores). Tests set it to 0.
+SHIELD_WAIT = 10
+# Is someone on the line? Yes words also hide the code from the window.
+SHIELD_QUESTION = ("Is anyone on the phone with you, or asking for this code, "
+                   "right now? (y or n) > ")
+SHIELD_STOP = ("Then the code stays hidden. Hang up: hello-world never calls, "
+               "and nobody needs your code to help you.")
+
+
+def shielded_code(state):
+    """Ask whether anyone is on the line, wait, then show the code. False
+    when it stays hidden."""
+    para(tr(SCAM_LINE))
+    answer = ask_choice(tr(SHIELD_QUESTION), strict_yes(), NO_WORDS, tr("Type y or n."))
+    if answer != "no":
+        para(tr(SHIELD_STOP) if answer == "yes" else tr("Nothing changed."))
+        return False
+    if SHIELD_WAIT:
+        para(tr("The code shows in {n} seconds. Anyone telling you to hurry is "
+                "the scam.").format(n=SHIELD_WAIT))
+        time.sleep(SHIELD_WAIT)
+    para(tr("Your sync code: {code}").format(code=state["sync"]))
+    return True
+
+
+def change_sync_code(state, can_save):
+    """A new code: the copy moves to it and the old copy is deleted, so a
+    code someone else saw stops working. Returns what to say."""
+    if not sync_on(state):
+        return tr("Sync isn't on.")
+    refresh(state, can_save)
+    old = state.get("sync")
+    base = copy.deepcopy(state)
+    state["sync"] = sync_code()
+    mark_synced_change(state)
+    if not commit(state, base, can_save):
+        undo(state, base)
+        return tr("Could not save that choice on this computer.")
+    sync_now(state, can_save)
+    if old:
+        net_bytes(f"/v1/sync/{sync_keys(old)[0]}", b"", method="DELETE")
+    return tr("The old code no longer works. Type the new code on your phone: "
+              "choose Sync there, then Change code.")
+
+
+def day_start_label(hour):
+    """A day-start choice in words."""
+    if hour == 0:
+        return tr("Midnight, as usual")
+    if hour == 18:
+        return tr("18:00, so a night shift from 22:00 to 6:00 stays one day")
+    return f"{hour}:00"
+
+
+def set_day_start(state, can_save, hour):
+    """When "today" starts. Returns what to say."""
+    global DAY_START
+    refresh(state, can_save)
+    base = copy.deepcopy(state)
+    if hour:
+        state["day_start"] = hour
+    else:
+        state.pop("day_start", None)
+    if not commit(state, base, can_save):
+        undo(state, base)
+        return tr("Could not save that choice on this computer.")
+    DAY_START = hour
+    return tr("Your day now starts at {at}.").format(at=f"{hour}:00")
+
+
 def sync_prompt(state, can_save):
-    """Turn sync on and show the code, show it again, or turn it off."""
+    """Turn sync on and show the code, show it again, change it, or turn it
+    off."""
     if not state.get("sync"):
         para(tr("Sync keeps your plan and done list the same on this computer and "
                 "your phone. They leave this computer encrypted with a code only "
                 "your devices have, and the server keeps only the encrypted copy. "
                 "This encryption has not had an outside audit."))
         if ask_choice(tr("Turn on sync? (y or n) > "), strict_yes(), NO_THANKS,
-                      tr("Type y or n.")) == "yes":
-            para(set_sync(state, can_save, True))
+                      tr("Type y or n.")) != "yes":
+            say(tr("Nothing changed."))
+            return
+        said = set_sync(state, can_save, True)
+        if not state.get("sync"):
+            para(said)
+            return
+        para(tr("Sync is on. With sync on, your plan and done list leave this "
+                "computer, encrypted with your code."))
+        if shielded_code(state):
+            para(tr("On your phone, open hello-world, choose Sync, and type it."))
+        return
+    para(tr(SCAM_LINE))
+    entries = [tr("Show my sync code"), tr("Change my sync code"),
+               tr("Turn off sync and delete the server's copy")]
+    for n, label in enumerate(entries, 1):
+        say(wrapped(f" {n:>2}  ", label))
+    choice = (ask(tr("Type a number from 1 to {n}, or Enter to go back > ")
+                  .format(n=len(entries))) or "").strip(TRIM)
+    if choice.lower() in QUIT_WORDS:
+        raise Quit
+    if choice == "1":
+        shielded_code(state)
+    elif choice == "2":
+        para(change_sync_code(state, can_save))
+    elif choice == "3":
+        if ask_choice(tr("Turn off sync and delete the server's copy? (y or n) > "),
+                      strict_yes(), NO_WORDS, tr("Type y or n.")) == "yes":
+            para(set_sync(state, can_save, False))
         else:
             say(tr("Nothing changed."))
-        return
-    para(tr("Your sync code: {code}").format(code=state["sync"]))
-    if ask_choice(tr("Turn off sync and delete the server's copy? (y or n) > "),
-                  strict_yes(), NO_WORDS, tr("Type y or n.")) == "yes":
-        para(set_sync(state, can_save, False))
+    elif choice:
+        not_a_choice(choice, tr("Type a number from 1 to {n}, or press Enter "
+                                "to go back.").format(n=len(entries)))
 
 
 def pet_prompt(state, can_save):
@@ -3375,7 +3513,8 @@ def ask_parts(parts, label):
     for n, part in enumerate(parts, 1):
         say(wrapped(f"  {n}  ", part))
     hint = tr("Type y for all, n for not yet, the numbers you did, such as "
-              "1 3, or ? if you're not sure. Enter skips.")
+              "1 3, ? if you're not sure, or sideways if the day went sideways. "
+              "Enter skips.")
     for _ in range(3):
         typed = ask(tr("Did you do them? (y for all, n for not yet, numbers "
                        "for the ones you did, ? if you're not sure, Enter to "
@@ -3396,6 +3535,8 @@ def ask_parts(parts, label):
             return "no", None
         if text in UNSURE_WORDS:
             return "unsure", None
+        if text in SIDEWAYS_WORDS:
+            return "sideways", None
         not_a_choice(typed, hint)
     return None, None
 
@@ -3470,7 +3611,7 @@ def kept_settings(settings):
              ("floor_tips", tr("floor and shift tips")),
              ("hide_thought", tr("thought hidden")), ("long_history", tr("longer history")),
              ("numbers", tr("my numbers")), ("farewells", tr("funny farewells")),
-             ("text", tr("text screen"))]
+             ("text", tr("text screen")), ("day_start", tr("day start"))]
     shown = [label for key, label in names if settings.get(key)]
     if settings.get("tips") is False:
         shown.append(tr("thought and tip hidden"))
@@ -3963,9 +4104,13 @@ def note_unsure(state, text, date):
     state["unsure"] = (rows + [{"text": text, "date": date}])[-MAX_UNSURE:]
 
 
+SIDEWAYS_SAID = "That's okay. It's set aside, and tomorrow is new."
+
+
 def answer_plan(state, can_save, d, choice, text, parts=None):
     """Answer "Did you do it?" for the plan `text` from the window or the
-    sign-in reminder: "yes", "no" (not yet, kept for today) or "skip".
+    sign-in reminder: "yes", "no" (not yet, kept for today), "unsure",
+    "sideways" (put aside, nothing marked) or "skip".
 
     Returns (saved, message). Finishing counts on the plan's own day: the
     question is about last time, and the pilots read the answer's day as
@@ -3986,6 +4131,9 @@ def answer_plan(state, can_save, d, choice, text, parts=None):
                                     "since": intent.get("since", intent["date"]),
                                     **carried_due(intent, rest)}
         state["intent"] = state["intent"] or None
+    elif choice == "sideways":
+        put_aside(state, text)
+        state["intent"] = None
     elif choice in ("no", "unsure"):
         state["intent"] = {"text": text, "date": d.isoformat(),
                            "since": intent.get("since", intent["date"]), **carried_due(intent)}
@@ -4003,6 +4151,8 @@ def answer_plan(state, can_save, d, choice, text, parts=None):
             " " + tr("The rest is kept for today.") if rest else "")
     if choice == "unsure":
         return True, tr("That's fine. It's kept for today.")
+    if choice == "sideways":
+        return True, tr(SIDEWAYS_SAID)
     return True, tr("Kept for today.") if choice == "no" else tr(
         "Skipped. It asks again next time.")
 
@@ -4159,8 +4309,9 @@ def daily(startup):
                     tr("Did you do it? (y for yes, n for not yet, ? if you're "
                        "not sure, Enter to skip) > "),
                     strict_yes() + DONE_WORDS + DID_WORDS, NO,
-                    tr("Type y, n or ?, or press Enter to skip."),
-                    unsure=UNSURE_WORDS)
+                    tr("Type y, n or ?, sideways if the day went sideways, or "
+                       "press Enter to skip."),
+                    unsure=UNSURE_WORDS, sideways=SIDEWAYS_WORDS)
                 some = None
             else:
                 answer, some = ask_parts(parts, label)
@@ -4203,6 +4354,11 @@ def daily(startup):
                               "since": intent.get("since", intent["date"]), **carried_due(intent)}
                     say(tr("Kept for today."))
                 offer_gentle(state)
+            elif answer == "sideways":
+                answered = True
+                put_aside(state, intent["text"])
+                intent = None
+                say(tr(SIDEWAYS_SAID))
             elif answer == "unsure":
                 answered = True
                 note_unsure(state, intent["text"], intent["date"])
@@ -4250,12 +4406,29 @@ def daily(startup):
                 and not (intent and intent["date"] == iso)):
             skip = (tr("(Enter to skip)") if not intent else
                     tr("(A plan typed here replaces the old one. Enter to skip)"))
+            picks = [] if intent else aside_picks(state)
             if state.get("previous") and not intent:
                 say(wrapped(tr("Earlier plan: "), state["previous"]))
                 skip = tr("(Type same to reuse it, or Enter to skip)")
-            question = (tr("What is one thing you want to get done today?")
-                        + "\n" + skip + " > ")
+            if picks:
+                # One tap instead of a blank box (Jayden): the newest plans
+                # put aside, by number.
+                say(tr("Put aside, ready to bring back:"))
+                for n, row in enumerate(picks, 1):
+                    say(wrapped(f"  {n}  ", row["text"]))
+                skip = (tr("(Type same to reuse the earlier plan, a number to bring "
+                           "one back, or Enter to skip)") if state.get("previous") else
+                        tr("(Type a number to bring one back, or Enter to skip)"))
+            question = tr("Anything for today? Small is fine.") + "\n" + skip + " > "
             text = ask(question)
+            if picks and (text or "").strip(TRIM) in [str(n) for n in range(1, len(picks) + 1)]:
+                row = picks[int(text.strip(TRIM)) - 1]
+                state["put_aside"] = [r for r in state["put_aside"] if r != row]
+                if not state["put_aside"]:
+                    state.pop("put_aside")
+                if state.get("previous") == row["text"]:
+                    state.pop("previous")
+                text = row["text"]
             # The welcome mentions the menu, so someone may type it here
             # first. It opens, rather than being told where it lives.
             if (text or "").lower().strip(TRIM) in MENU_WORDS + HELP_WORDS:
@@ -5182,7 +5355,7 @@ def standup_command(args):
 
 
 def sync_command(args):
-    """hello sync on, off, now, or code."""
+    """hello sync on, off, now, code, or new."""
     state, can_save = load()
     if args == ["on"]:
         message = set_sync(state, can_save, True)
@@ -5195,13 +5368,17 @@ def sync_command(args):
         para(tr("Sync is off. Turn it on with: hello sync on"))
         return 1
     if args == ["code"]:
+        para(tr(SCAM_LINE))
         say(state["sync"])
+        return 0
+    if args == ["new"]:
+        para(change_sync_code(state, can_save))
         return 0
     if args in ([], ["now"]):
         ok = sync_now(state, can_save)
         para(tr("Synced.") if ok else tr("The server can't be reached just now."))
         return 0 if ok else 1
-    return usage(tr("Use: hello sync on, off, now or code"))
+    return usage(tr("Use: hello sync on, off, now, code or new"))
 
 
 def export_command():
@@ -5383,7 +5560,7 @@ TASK_NAME = "hello-world reminder " + "-".join(
     filter(None, (os.environ.get("USERDOMAIN"), os.environ.get("USERNAME") or "user")))
 # Before 1.37.0 the task carried only the user name.
 OLD_TASK_NAME = "hello-world reminder " + (os.environ.get("USERNAME") or "user")
-REMINDER_TIMES = ("08:00", "09:00", "10:00", "13:00")
+REMINDER_TIMES = ("08:00", "09:00", "10:00", "13:00", "15:00", "18:00", "22:00")
 
 
 def reminder_switches():
@@ -5992,7 +6169,7 @@ class Visit:
         return intent["text"] if intent and intent["date"] == self.iso else ""
 
     def answer(self, choice, parts=None):
-        """"yes", "no" or "skip" to "Did you do it?", with `parts` for the
+        """"yes", "no", "unsure", "sideways" or "skip" to "Did you do it?", with `parts` for the
         things done when only some were. Returns the message."""
         (saved, message), _ = quietly(answer_plan, self.state, self.can_save,
                                       self.d, choice, self.followup, parts)
@@ -6335,7 +6512,7 @@ class Window:
     # down an eighth of a line. Windows scales them with the font and DPI.
     WIDTH, MARGIN, LINE = 300, 12, 10
     TITLE, DATE, NOTE, PLANNED, ASK, DONE, NOT_YET, SKIP = range(100, 108)
-    UNSURE = 108
+    UNSURE, SIDEWAYS = 108, 109
     THOUGHT_LABEL, THOUGHT, TIP_LABEL, TIP, TIP_COUNT, TIP_DONE = range(110, 116)
     BOSS, PET = 116, 117
     REACT, REACT_NOTE = 150, 154  # REACT to REACT + 3, one button a reaction
@@ -6455,6 +6632,8 @@ class Window:
                                               (self.UNSURE, tr("I'm not s&ure")),
                                               (self.SKIP, tr("S&kip")))):
                 add(button, cid, label, tab, m + n * 75, 16, 70)
+            y += 20
+            add(button, self.SIDEWAYS, tr("The day went side&ways"), tab, m, 16, 145)
             y += 26
         if v.pair and not v.state.get("hide_thought"):
             para(self.THOUGHT_LABEL, tr("Thought for today:"), 1)
@@ -6717,7 +6896,7 @@ class Window:
 
     def command(self, cid):
         v = self.visit
-        if cid in (self.DONE, self.NOT_YET, self.UNSURE, self.SKIP):
+        if cid in (self.DONE, self.NOT_YET, self.UNSURE, self.SKIP, self.SIDEWAYS):
             ticks = self.ticked()
             # A tick missed by mistake must not finish everything.
             if (cid == self.DONE and self.item(self.TICK) and not ticks
@@ -6725,7 +6904,8 @@ class Window:
                 return
             typed = self.typed()
             message = v.answer({self.DONE: "yes", self.NOT_YET: "no",
-                                self.UNSURE: "unsure"}.get(cid, "skip"),
+                                self.UNSURE: "unsure",
+                                self.SIDEWAYS: "sideways"}.get(cid, "skip"),
                                ticks if cid == self.DONE and ticks else None)
             if tidy(typed) and not v.followup and clean(typed) != v.plan():
                 _, said, saved = v.save(typed)
@@ -6739,12 +6919,12 @@ class Window:
                 self.fresh = True
                 self.reopen(message)
                 return
-            for hidden in (self.ASK, self.DONE, self.NOT_YET, self.UNSURE, self.SKIP) + tuple(
-                    self.TICK + n for n in range(MAX_PARTS)):
+            for hidden in (self.ASK, self.DONE, self.NOT_YET, self.UNSURE, self.SKIP,
+                           self.SIDEWAYS) + tuple(self.TICK + n for n in range(MAX_PARTS)):
                 self.show(hidden, False)
             # The question's line stays as space under the answer.
             first = self.TICK if self.item(self.TICK) else self.DONE
-            self.collapse(first, self.SKIP)
+            self.collapse(first, self.SIDEWAYS)
             self.asking = False
             self.set_text(self.PLANNED, message)
             self.refresh_plan()
@@ -6825,9 +7005,10 @@ class Window:
             if self.asking:
                 # A new plan replaces the one asked about, which same keeps.
                 for hidden in (self.PLANNED, self.ASK, self.DONE, self.NOT_YET,
-                               self.UNSURE, self.SKIP) + tuple(self.TICK + n for n in range(MAX_PARTS)):
+                               self.UNSURE, self.SKIP, self.SIDEWAYS) + tuple(
+                                   self.TICK + n for n in range(MAX_PARTS)):
                     self.show(hidden, False)
-                self.collapse(self.PLANNED, self.SKIP)
+                self.collapse(self.PLANNED, self.SIDEWAYS)
                 self.asking = False
             elif self.item(self.PLANNED):
                 self.set_text(self.PLANNED, "")
@@ -6941,6 +7122,11 @@ class Window:
                      tr("At {at}").format(at=t.lstrip("0")))
                     for n, t in enumerate(REMINDER_TIMES)]
         entries.append((0x800, 0, None))
+        if not plans_off():
+            entries += [(checked if v.state.get("day_start", 0) == h else 0, 40 + n,
+                         tr("My day starts at {at}").format(at=day_start_label(h)))
+                        for n, h in enumerate(DAY_STARTS)]
+            entries.append((0x800, 0, None))
         switches = reminder_switches()
         for n, (key, label, _, _) in enumerate(switches):
             entries.append((checked if v.state.get(key) else 0, 20 + n, label))
@@ -6954,6 +7140,9 @@ class Window:
         elif 20 <= choice < 20 + len(switches):
             key, _, on_text, off_text = switches[choice - 20]
             self.set_text(self.STATUS, v.switch(key, on_text, off_text))
+        elif 40 <= choice < 40 + len(DAY_STARTS):
+            self.set_text(self.STATUS, set_day_start(v.state, v.can_save,
+                                                     DAY_STARTS[choice - 40]))
 
     def options(self):
         """A short menu, with the rest in four submenus."""
@@ -7196,7 +7385,7 @@ class Window:
         elif choice == 15:
             self.set_text(self.STATUS, v.switch(
                 "long_history",
-                tr("Finished plans are kept for 90 days instead of 14."),
+                tr("Finished plans are kept for a year instead of 14 days."),
                 tr("Finished plans are kept for 14 days, as usual.")))
         elif choice == 18:
             items = newest_first(v.state["finished"])[:20]
@@ -7206,6 +7395,14 @@ class Window:
             if picked and self.confirm(tr("Forget this finished plan? {text}").format(
                     text=items[picked - 200]["text"])):
                 self.set_text(self.STATUS, v.forget(items[picked - 200]))
+
+    def show_sync_code(self):
+        """The window's scam shield: asked first, and hidden on a yes."""
+        on_line = self.confirm(tr(SCAM_LINE) + "\n\n" + tr(
+            "Is anyone on the phone with you, or asking for this code, right now?"))
+        self.inform(tr(SHIELD_STOP) if on_line else
+                    tr("Your sync code: {code}").format(code=self.visit.state["sync"])
+                    + "\n\n" + tr("On your phone, open hello-world, choose Sync, and type it."))
 
     def saved_menu(self):
         v = self.visit
@@ -7223,9 +7420,25 @@ class Window:
                                    "your devices have, and the server keeps only the encrypted copy. "
                                    "This encryption has not had an outside audit.") + "\n\n"
                                 + tr("Turn on sync?")):
-                    self.inform(set_sync(v.state, v.can_save, True))
-            elif self.confirm(tr("Your sync code: {code}").format(code=v.state["sync"]) + "\n\n"
-                              + tr("Turn off sync and delete the server's copy?")):
+                    said = set_sync(v.state, v.can_save, True)
+                    if not v.state.get("sync"):
+                        self.inform(said)
+                    else:
+                        self.set_text(self.STATUS, tr(
+                            "Sync is on. With sync on, your plan and done list leave this "
+                            "computer, encrypted with your code."))
+                        self.show_sync_code()
+                return
+            which = self.popup([(0, 1, tr("Show my sync code")),
+                                (0, 2, tr("Change my sync code")),
+                                (0, 3, tr("Turn off sync and delete the server's copy"))])
+            if which == 1:
+                self.show_sync_code()
+            elif which == 2 and self.confirm(tr(SCAM_LINE) + "\n\n" + tr(
+                    "Change my sync code? The old code stops working, and your phone "
+                    "needs the new one.")):
+                self.inform(change_sync_code(v.state, v.can_save))
+            elif which == 3 and self.confirm(tr("Turn off sync and delete the server's copy?")):
                 self.set_text(self.STATUS, set_sync(v.state, v.can_save, False))
             return
         if choice == 19:
