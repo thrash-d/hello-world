@@ -203,6 +203,9 @@ the pull request named.
 | Boomers, 1.54.0 | Signed builds and checksums | Dolores, Walt, Barbara | Checksums already published (SHA256SUMS); Authenticode and a Store listing are owner steps |
 | Design review, round 83 | Wait before the code shows; say 18:00 is the night-shift setting; "Small is fine", not "counts" | Dolores, Marisol, Noor | Built in 1.55.0 |
 | Profit Maximizer, round 3 | A "day went sideways" button and softer wording | Profit Maximizer | Built in 1.55.0 |
+| Before 2000, 1.57.0 | Carry it over or set it aside; a fresh day with no count; a smaller plan offered | Six of eight | Built in 1.60.0 after a design review (equal answers, carry the default) |
+| Before 2000, 1.57.0 | An evening go/no-go, a Compline bell | Hank, Anselm | End the day, free, in 1.60.0; the timed second check-in with Pro in 1.59.0 |
+| Before 2000, 1.57.0 | Large print up front | Gordo, Neferet | Built in 1.60.0 |
 | Red team, 1.57.0 | Any number of sync copies, and no sweep: the disk can be filled | Capone, confirmed in code | Fixed in 1.58.0: quota, per-address limits, hourly sweep |
 | Red team, 1.57.0 | "1 person did the tip" in a 3-person office | Ivan IV | Fixed in 1.58.0: "a few" below 10, rounded to 5, published hourly (Noor's review) |
 | Red team, 1.57.0 | Organization content looks built in | Minister of Truth | Fixed in 1.58.0: labeled |

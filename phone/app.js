@@ -11,6 +11,15 @@ const UI = {
     hello: "Hello, world!", ask: "Did you do it?", yesterday: "Yesterday you planned:",
     on: "On {date} you planned:", yes: "Done", no: "Not yet", skip: "Skip",
     sideways: "The day went sideways", sidewaysSaid: "That's okay. It's set aside, and tomorrow is new.",
+    carryIt: "Carry it over", asideIt: "Set it aside", carriedSaid: "That's okay. It's carried over to today.",
+    fresh: "Fresh day. Bring it over, or start clean?", bring: "Bring it over", startClean: "Start clean",
+    cleanSaid: "Starting clean. It's set aside; tap it below to bring it back.",
+    comingBack: "This one keeps coming back. Make it smaller, or set it aside?", makeSmaller: "Make it smaller",
+    keepIt: "Keep it", smallerSaid: "Smaller it is. The bigger one is set aside.",
+    smallerNudge: "Want today's plan smaller? Small is fine.",
+    endDay: "End the day", endDone: "Done", endCarry: "Carry to tomorrow", endAside: "Set aside",
+    endClose: "Close the day", endTally: "Done {done}, carried {carried}, set aside {aside}. The day is closed.",
+    large: "Large print", usual: "Usual print",
     todayAsk: "Anything for today? Small is fine.", todayHave: "Your plan for today:",
     picks: "Put aside, tap one to bring it back:", back: "Back on today's plan.",
     did: "Done", clear: "Set aside", save: "Save", placeholder: "One thing, or a few with ;",
@@ -47,6 +56,15 @@ const UI = {
     hello: "¡Hola, mundo!", ask: "¿Lo hiciste?", yesterday: "Ayer planeaste:",
     on: "El {date} planeaste:", yes: "Hecho", no: "Todavía no", skip: "Saltar",
     sideways: "El día salió de lado", sidewaysSaid: "No pasa nada. Queda apartado, y mañana es un día nuevo.",
+    carryIt: "Llevarlo a hoy", asideIt: "Apartarlo", carriedSaid: "No pasa nada. Pasa a hoy.",
+    fresh: "Día nuevo. ¿Lo traes o empiezas de cero?", bring: "Traerlo", startClean: "Empezar de cero",
+    cleanSaid: "Empiezas de cero. Queda apartado; tócalo abajo para recuperarlo.",
+    comingBack: "Este vuelve una y otra vez. ¿Lo haces más pequeño o lo apartas?", makeSmaller: "Hacerlo más pequeño",
+    keepIt: "Dejarlo", smallerSaid: "Más pequeño, entonces. El grande queda apartado.",
+    smallerNudge: "¿Un plan más pequeño hoy? Algo pequeño está bien.",
+    endDay: "Cerrar el día", endDone: "Hecho", endCarry: "Pasar a mañana", endAside: "Apartar",
+    endClose: "Cerrar el día", endTally: "Hechos {done}, pasados {carried}, apartados {aside}. El día está cerrado.",
+    large: "Letra grande", usual: "Letra normal",
     todayAsk: "¿Algo para hoy? Algo pequeño está bien.", todayHave: "Tu plan para hoy:",
     picks: "Apartados, toca uno para recuperarlo:", back: "De nuevo en el plan de hoy.",
     did: "Hecho", clear: "Apartar", save: "Guardar", placeholder: "Una cosa, o varias con ;",
@@ -83,6 +101,15 @@ const UI = {
     hello: "مرحبًا بالعالم!", ask: "هل فعلتها؟", yesterday: "خططت أمس:",
     on: "خططت يوم {date}:", yes: "تم", no: "ليس بعد", skip: "تخطَّ",
     sideways: "اليوم لم يسر كما يجب", sidewaysSaid: "لا بأس. أُجّلت، والغد يوم جديد.",
+    carryIt: "انقلها إلى اليوم", asideIt: "أجّلها", carriedSaid: "لا بأس. نُقلت إلى اليوم.",
+    fresh: "يوم جديد. تنقلها أم تبدأ من جديد؟", bring: "انقلها", startClean: "ابدأ من جديد",
+    cleanSaid: "تبدأ من جديد. أُجّلت؛ المسها في الأسفل لإعادتها.",
+    comingBack: "هذه تعود كل مرة. تجعلها أصغر أم تؤجلها؟", makeSmaller: "اجعلها أصغر",
+    keepIt: "أبقها", smallerSaid: "أصغر إذن. الكبيرة أُجّلت.",
+    smallerNudge: "خطة أصغر اليوم؟ الصغير يكفي.",
+    endDay: "أنهِ اليوم", endDone: "تم", endCarry: "انقلها إلى الغد", endAside: "أجّلها",
+    endClose: "أغلق اليوم", endTally: "تم {done}، نُقل {carried}، أُجّل {aside}. أُغلق اليوم.",
+    large: "خط كبير", usual: "خط عادي",
     todayAsk: "أي شيء لليوم؟ الصغير يكفي.", todayHave: "خطتك لليوم:",
     picks: "خطط مؤجلة، المس واحدة لإعادتها:", back: "عادت إلى خطة اليوم.",
     did: "تم", clear: "أجّل", save: "احفظ", placeholder: "شيء واحد، أو عدة أشياء بينها ;",
@@ -195,6 +222,11 @@ function parse(raw) {
       const number = phoneNumber(data.family.number);
       if (number) state.family = { name: data.family.name.trim().slice(0, 40), number };
     }
+    if (Array.isArray(data.sideways)) state.sideways = data.sideways.filter(isDate).slice(-6);
+    if (isDate(data.smallerOffered)) state.smallerOffered = data.smallerOffered;
+    if (typeof data.smallerAsked === "string") state.smallerAsked = data.smallerAsked.slice(0, MAX_PLAN);
+    if (data.large === true) state.large = true;
+    if (data.intent && isDate(data.intent.since) && state.intent) state.intent.since = data.intent.since;
     if (typeof data.pushToken === "string" && /^[0-9a-f]{32}$/.test(data.pushToken)) state.pushToken = data.pushToken;
     if (typeof data.updated === "string" && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d$/.test(data.updated)) state.updated = data.updated;
     return state;
@@ -212,6 +244,59 @@ function putAside(state, text, today) {
   state.aside = state.aside.filter((a) => a.text !== text).concat([{ text, date: today }]).slice(-MAX_ASIDE);
 }
 
+function daysBetween(a, b) {
+  return Math.round((Date.UTC(...b.split("-").map((n, i) => i === 1 ? n - 1 : +n))
+    - Date.UTC(...a.split("-").map((n, i) => i === 1 ? n - 1 : +n))) / 86400000);
+}
+
+// Two days or more since the plan's day: "Fresh day", with no count.
+function fresh(state, today) {
+  return Boolean(state.intent && daysBetween(state.intent.date, today) >= 2);
+}
+
+// The days "sideways" was used, on this phone only, never shown (Dot).
+function noteSideways(state, today) {
+  state.sideways = (state.sideways || []).filter((x) => x !== today).concat([today]).slice(-6);
+}
+
+function smallerDue(state, today) {
+  const recent = (state.sideways || []).filter((x) => daysBetween(x, today) < 7);
+  return recent.length >= 3 && !(state.smallerOffered && daysBetween(state.smallerOffered, today) < 7);
+}
+
+function comingBack(state, today) {
+  const i = state.intent;
+  return Boolean(i && daysBetween(i.since || i.date, today) >= 2 && state.smallerAsked !== i.text);
+}
+
+// Make it smaller (the new words) or, with none, keep it; the bigger one is
+// set aside.
+function smaller(state, text, today) {
+  const plan = clean(text);
+  state.smallerAsked = state.intent ? state.intent.text : null;
+  if (!plan || !state.intent) return "";
+  putAside(state, state.intent.text, today);
+  state.intent = { text: plan, date: today, skips: 0 };
+  return "smallerSaid";
+}
+
+// End the day: each thing done, carried to tomorrow, or set aside.
+function endDay(state, choices, today) {
+  if (!state.intent) return null;
+  const parts = state.intent.text.split(";").map((p) => p.trim()).filter(Boolean);
+  const tally = { done: 0, carried: 0, aside: 0 }, carried = [];
+  parts.forEach((part, i) => {
+    const c = choices[i] || "carry";
+    if (c === "done") { state.finished.push({ text: part, date: today }); tally.done++; }
+    else if (c === "aside") { putAside(state, part, today); tally.aside++; }
+    else { carried.push(part); tally.carried++; }
+  });
+  const [y, m, d] = today.split("-").map(Number);
+  state.intent = carried.length ? { text: carried.join("; "), date: iso(new Date(y, m - 1, d + 1)), skips: 0,
+                                    since: state.intent.since || state.intent.date } : null;
+  return tally;
+}
+
 function answer(state, choice, today) {
   const intent = state.intent;
   if (!asks(state, today)) return "";
@@ -220,15 +305,18 @@ function answer(state, choice, today) {
     state.intent = null;
     return "good";
   }
-  if (choice === "no") {
-    state.intent = { text: intent.text, date: today, skips: 0 };
-    return "kept";
+  if (choice === "no" || choice === "carry") {
+    const wasFresh = fresh(state, today);
+    if (choice === "carry") noteSideways(state, today);
+    state.intent = { text: intent.text, date: today, skips: 0, since: intent.since || intent.date };
+    return choice === "carry" ? "carriedSaid" : wasFresh ? "carriedSaid" : "kept";
   }
-  if (choice === "sideways") {
+  if (choice === "sideways" || choice === "clean") {
     // Set aside with nothing marked; no follow-up.
+    if (choice === "sideways") noteSideways(state, today);
     putAside(state, intent.text, today);
     state.intent = null;
-    return "sidewaysSaid";
+    return choice === "clean" ? "cleanSaid" : "sidewaysSaid";
   }
   intent.skips = (intent.skips || 0) + 1;
   return "skipped";
@@ -439,7 +527,8 @@ function stamp(state) {
 if (typeof module !== "undefined") {
   module.exports = { UI, ordinal, todaysPair, clean, parse, asks, answer, setPlan, finishToday, language, blank,
     syncKeys, sealSync, openSync, mergeSync, syncForm, normalCode, todayOf, clearToday, picks, bringBack,
-    phoneNumber, smsLink, utcTime, pushText, exportText, setDayStart, REMIND_TIMES, DAY_STARTS };
+    phoneNumber, smsLink, utcTime, pushText, exportText, setDayStart, REMIND_TIMES, DAY_STARTS,
+    fresh, smallerDue, comingBack, smaller, endDay, noteSideways };
 }
 
 if (typeof document !== "undefined") {
@@ -448,7 +537,9 @@ if (typeof document !== "undefined") {
   let timer = null;
   const t = () => UI[language(state, navigator.languages)];
   const today = () => todayOf(state);
-  const say = (key) => { $("status").textContent = key ? t()[key] : ""; };
+  const say = (key) => {
+    $("status").textContent = key === "endTally" ? $("status").dataset.tally : key ? t()[key] : "";
+  };
 
   // What the service worker shows for a push, kept where it can read it.
   // It stays on this phone.
@@ -546,11 +637,54 @@ if (typeof document !== "undefined") {
       $("ask-plan").textContent = state.intent.text;
     }
     ["yes", "no", "skip", "sideways", "did", "clear", "save"].forEach((id) => { $(id).textContent = s[id]; });
+    document.body.classList.toggle("large", Boolean(state.large));
+    $("large").textContent = state.large ? s.usual : s.large;
+    const isFresh = asking && fresh(state, day);
+    if (isFresh) {
+      $("ask-label").textContent = s.fresh;
+      $("no").textContent = s.bring;
+      $("sideways").textContent = s.startClean;
+    }
+    $("fork").hidden = !forking || !asking;
+    $("carry-it").textContent = s.carryIt;
+    $("aside-it").textContent = s.asideIt;
+    const offering = !asking && comingBack(state, day) && state.offerSmaller;
+    $("smaller-offer").hidden = !offering;
+    $("coming-back").textContent = s.comingBack;
+    $("make-smaller").textContent = s.makeSmaller;
+    $("aside-smaller").textContent = s.asideIt;
+    $("keep-it").textContent = s.keepIt;
     const planned = state.intent && state.intent.date === day;
     $("today-label").textContent = planned ? s.todayHave : s.todayAsk;
     $("today-plan").hidden = $("today-buttons").hidden = !planned;
     $("today-plan").textContent = planned ? state.intent.text : "";
     $("plan-form").hidden = planned || asking;
+    // Once a week at most: noted the first time it shows, and shown for
+    // the rest of that visit.
+    if (nudging === null) {
+      nudging = !planned && !asking && smallerDue(state, day);
+      if (nudging) { state.smallerOffered = day; save(); }
+    }
+    $("smaller-nudge").hidden = planned || asking || !nudging;
+    $("smaller-nudge").textContent = s.smallerNudge;
+    $("end-day").hidden = !planned || ending;
+    $("end-day").textContent = s.endDay;
+    $("end-panel").hidden = !ending || !state.intent;
+    $("end-close").textContent = s.endClose;
+    if (ending && state.intent) {
+      $("end-list").replaceChildren(...state.intent.text.split(";").map((p) => p.trim()).filter(Boolean).map((part, i) => {
+        const label = document.createElement("label");
+        label.textContent = part;
+        label.htmlFor = "end-" + i;
+        const select = document.createElement("select");
+        select.id = "end-" + i;
+        [["carry", s.endCarry], ["done", s.endDone], ["aside", s.endAside]]
+          .forEach(([v, t]) => select.add(new Option(t, v)));
+        const div = document.createElement("div");
+        div.append(label, select);
+        return div;
+      }));
+    }
     $("plan-input").placeholder = s.placeholder;
     const offered = planned || asking ? [] : picks(state);
     $("picks").hidden = !offered.length;
@@ -608,6 +742,7 @@ if (typeof document !== "undefined") {
     drawSync();
   }
 
+  let forking = false, ending = false, nudging = null;
   const SYNC_KEY = "hello-world-sync";
   let keys = null;
   let changing = false;
@@ -683,9 +818,48 @@ if (typeof document !== "undefined") {
     };
   }
   $("yes").addEventListener("click", act(() => answer(state, "yes", today())));
-  $("no").addEventListener("click", act(() => answer(state, "no", today())));
+  $("no").addEventListener("click", act(() => afterCarry(answer(state, "no", today()))));
   $("skip").addEventListener("click", act(() => answer(state, "skip", today())));
-  $("sideways").addEventListener("click", act(() => answer(state, "sideways", today())));
+  // Sideways asks carry or set aside, two equal buttons (Mary); a fresh
+  // day's "Start clean" sets it aside at once.
+  $("sideways").addEventListener("click", (event) => {
+    if (fresh(state, today())) return act(() => answer(state, "clean", today()))(event);
+    forking = true; draw();
+  });
+  const afterCarry = (said) => {
+    forking = false;
+    if (comingBack(state, today())) state.offerSmaller = true;
+    return said;
+  };
+  $("carry-it").addEventListener("click", act(() => afterCarry(answer(state, "carry", today()))));
+  $("aside-it").addEventListener("click", act(() => { forking = false; return answer(state, "sideways", today()); }));
+  $("make-smaller").addEventListener("click", act(() => {
+    state.offerSmaller = false;
+    const said = smaller(state, $("smaller-input").value, today());
+    $("smaller-input").value = "";
+    return said || "nothing";
+  }));
+  $("aside-smaller").addEventListener("click", act(() => {
+    state.offerSmaller = false;
+    state.smallerAsked = state.intent && state.intent.text;
+    return clearToday(state, today());
+  }));
+  $("keep-it").addEventListener("click", act(() => {
+    state.offerSmaller = false;
+    state.smallerAsked = state.intent && state.intent.text;
+    return "kept";
+  }));
+  $("end-day").addEventListener("click", () => { ending = true; draw(); });
+  $("end-close").addEventListener("click", act(() => {
+    const parts = state.intent ? state.intent.text.split(";").map((p) => p.trim()).filter(Boolean) : [];
+    const tally = endDay(state, parts.map((_, i) => $("end-" + i).value), today());
+    ending = false;
+    if (!tally) return "";
+    $("status").dataset.tally = t().endTally.replace("{done}", tally.done)
+      .replace("{carried}", tally.carried).replace("{aside}", tally.aside);
+    return "endTally";
+  }));
+  $("large").addEventListener("click", act(() => { state.large = !state.large; return ""; }));
   $("did").addEventListener("click", act(() => finishToday(state, today())));
   $("clear").addEventListener("click", act(() => clearToday(state, today())));
   $("plan-form").addEventListener("submit", act(() => {

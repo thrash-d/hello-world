@@ -1999,7 +1999,7 @@ def _screen_keys():
             and n.args and isinstance(n.args[0], ast.Constant)]
     keys += [hello.HELP, hello.MENU_HELP, hello.SAVED_PLAN, hello.GREETING,
              hello.SCAM_LINE, hello.SHIELD_QUESTION, hello.SHIELD_STOP, hello.SIDEWAYS_SAID,
-             hello.KEY_SCAM_LINE, hello.PRO_PITCH]
+             hello.KEY_SCAM_LINE, hello.PRO_PITCH, hello.CARRIED_SAID]
     # say() doesn't wrap, so what it prints as is must fit 72 columns, less
     # the "  2  " in front of a menu line.
     raw = {n.args[0].value: isinstance(call.args[0], ast.BinOp)
@@ -2124,7 +2124,8 @@ def test_other_languages_words_work_in_english_too():
         assert p.stdout.rstrip().endswith("Closing."), quit_word
     for same in ("repetir", "reprendre", "wieder"):
         q = run(text="Old plan\n\n", day="2026-09-20")
-        r = run(text=f"n\nn\n{same}\n\n", home=q.home)
+        # Two weeks old: a fresh day, and s starts clean.
+        r = run(text=f"s\n{same}\n\n", home=q.home)
         assert notes(r.home)["intent"]["text"] == "Old plan", same
 
 
@@ -3124,9 +3125,9 @@ def test_menu_option_12_has_the_windows_other_settings():
     assert "The greeting uses your first name." in p.stdout
     assert "Finished plans are kept for a year instead of 14 days." in p.stdout
     assert "Days you opened hello-world: 1" in p.stdout
-    # Windows also lists Keep hello-world in the tray; Every day, This year,
-    # the fridge page and My day starts at come last.
-    entries = 17 if os.name == "nt" else 16
+    # Windows also lists Keep hello-world in the tray; End the day, Every day,
+    # This year, the fridge page and My day starts at come last.
+    entries = 18 if os.name == "nt" else 17
     assert f'Type a number from 1 to {entries}, or press Enter to go back.' in p.stdout
     saved = notes(p.home)
     assert saved["name"] is True and saved["long_history"] is True
@@ -4433,7 +4434,7 @@ def test_plans_put_aside_are_offered_by_number():
 
 def test_the_day_went_sideways_sets_the_plan_aside_with_nothing_marked():
     first = run(text="Write the report\n\n")
-    p = run(text="sideways\n\n\n", home=first.home, day="2026-10-02")
+    p = run(text="sideways\ns\n\n\n", home=first.home, day="2026-10-02")
     assert "That's okay. It's set aside, and tomorrow is new." in p.stdout
     saved = notes(first.home)
     assert not saved.get("intent") and not saved.get("finished") and not saved.get("unsure")
@@ -4808,3 +4809,79 @@ def test_pro_is_offered_plainly_in_the_text_screen():
     assert "History, pets and everything you have now stay free." in out
     assert "there is no account and nothing is sent" in out
     assert "never calls, texts or emails to sell you a key" in out
+
+
+def test_sideways_carries_over_by_default_and_a_fresh_day_has_no_count():
+    first = run(text="Write the report\n\n")
+    p = run(text="sideways\n\n\n\n", home=first.home, day="2026-10-02")
+    assert "Carry it over, or set it aside?" in p.stdout
+    assert "That's okay. It's carried over to today." in p.stdout
+    saved = notes(first.home)
+    assert saved["intent"]["text"] == "Write the report" and saved["intent"]["date"] == "2026-10-02"
+    assert saved["sideways"] == ["2026-10-02"]
+    # Two days or more: "Fresh day", no number of days missed.
+    q = run(text="b\n\n\n", home=first.home, day="2026-10-05")
+    assert "Fresh day. Bring it over, or start clean?" in q.stdout
+    assert "Brought over to today." in q.stdout and "days" not in q.stdout.split("Fresh day")[1].split("\n")[0]
+    # Carried more than twice: once, make it smaller or set it aside.
+    assert "This one keeps coming back." in q.stdout
+    r = run(text="s\n\n\n", home=first.home, day="2026-10-08")
+    assert "Starting clean." in r.stdout and not notes(first.home).get("intent")
+
+
+def test_a_plan_that_keeps_coming_back_can_be_made_smaller():
+    first = run(text="Clean the garage\n\n", day="2026-10-01")
+    run(text="n\n\n\n\n", home=first.home, day="2026-10-02")
+    p = run(text="n\n\nOpen the garage door\n\n\n", home=first.home, day="2026-10-03")
+    assert "This one keeps coming back." in p.stdout
+    saved = notes(first.home)
+    assert saved["intent"]["text"] == "Open the garage door"
+    assert saved["put_aside"][-1]["text"] == "Clean the garage"
+
+
+def test_three_sideways_days_in_a_week_offer_a_smaller_plan_once():
+    hello = _load_hello()
+    d = hello.datetime.date(2026, 10, 8)
+    state = {"sideways": ["2026-10-03", "2026-10-05", "2026-10-07"]}
+    assert hello.smaller_due(state, d)
+    state["smaller_offered"] = "2026-10-08"
+    assert not hello.smaller_due(state, d)
+    assert not hello.smaller_due({"sideways": ["2026-09-01", "2026-10-05", "2026-10-07"]}, d)
+
+
+def test_ending_the_day_marks_each_thing_and_says_a_plain_tally():
+    first = run(text="Call Ana; buy milk; fix the gutter\n\n", day="2026-10-05")
+    p = run(text="end\nd\n\ns\n\n", home=first.home, day="2026-10-05")
+    assert "Done 1, carried 1, set aside 1. The day is closed." in p.stdout
+    saved = notes(first.home)
+    assert saved["intent"] == {"text": "buy milk", "date": "2026-10-06", "since": "2026-10-05"}
+    assert saved["finished"][-1]["text"] == "Call Ana"
+    assert saved["put_aside"][-1]["text"] == "fix the gutter"
+    # Tomorrow it's simply tomorrow's plan, with no "Did you do it?".
+    q = run(text="\n\n", home=first.home, day="2026-10-06")
+    assert "Did you do it?" not in q.stdout and "buy milk" in q.stdout
+
+
+def test_the_phone_carries_starts_clean_shrinks_and_ends_the_day():
+    got = _node("""
+        const app = require("./app.js");
+        const s = app.blank(), out = [];
+        app.setPlan(s, "Write the report", "2026-10-01");
+        out.push(app.answer(s, "carry", "2026-10-02"), s.intent.date, s.intent.since, s.sideways);
+        out.push(app.fresh(s, "2026-10-04"), app.comingBack(s, "2026-10-04"));
+        out.push(app.answer(s, "no", "2026-10-04"), app.smaller(s, "Write one page", "2026-10-04"), s.intent.text,
+                 s.aside.map((a) => a.text));
+        app.setPlan(s, "Call Ana; buy milk; fix it", "2026-10-05");
+        out.push(app.endDay(s, ["done", "carry", "aside"], "2026-10-05"), s.intent);
+        const t = app.blank();
+        app.setPlan(t, "Old", "2026-10-01");
+        out.push(app.answer(t, "clean", "2026-10-05"), t.intent, t.sideways || null);
+        const u = app.blank();
+        ["2026-10-03", "2026-10-05", "2026-10-07"].forEach((d) => app.noteSideways(u, d));
+        out.push(app.smallerDue(u, "2026-10-08"));
+        console.log(JSON.stringify(out));""")
+    assert got == ["carriedSaid", "2026-10-02", "2026-10-01", ["2026-10-02"], True, True,
+                   "carriedSaid", "smallerSaid", "Write one page", ["Write the report"],
+                   {"done": 1, "carried": 1, "aside": 1},
+                   {"text": "buy milk", "date": "2026-10-06", "skips": 0, "since": "2026-10-05"},
+                   "cleanSaid", None, None, True]
