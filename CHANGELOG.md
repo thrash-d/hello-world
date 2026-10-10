@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-10-10: letters to family, and the devices syncing
+
+Version 1.62.0. The last two things from the review rounds. Mary, Noor,
+Dolores and the red team's Mielke reviewed the design first.
+
+- **Letters to family** (Mary): written in hello-world, kept only on the
+  device, and sent with the person's own mail or messages app, which opens
+  with the words filled in. hello-world never sends anything and isn't a
+  messaging service. Sent letters aren't kept unless asked; **Delete every
+  letter** clears them in one step (Mary's change). Only something that is
+  an email address goes into a mail link.
+- **The devices syncing** (Mielke): each device's chosen name and last day,
+  inside the encrypted sync copy, listed on the sync screen with a short ID
+  each and a warning when two share a name (Mielke's change). Change my sync
+  code lists only this device after. The README says exactly what the server
+  keeps (Noor).
+
 ## 2026-10-10: the household list
 
 Version 1.61.0. Okiku's shared slab, built with every rule the red team
