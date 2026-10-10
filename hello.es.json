@@ -575,7 +575,6 @@
   "Everyone who uses this PC sees handoff notes. No patient or customer details. Not a safety or defect record.": "Todos los que usan este equipo ven las notas del relevo. Sin datos de pacientes ni clientes. No es un registro de seguridad ni de averías.",
   "Keep it until someone clears it? (y or n, Enter for no) > ": "¿Conservarla hasta que alguien la borre? (s o n, Enter para no) > ",
   "Kept until cleared. ": "Se conserva hasta que se borre. ",
-  "Left for the next shift.": "Dejada para el siguiente turno.",
   "No handoff notes in the last {n} hours.": "No hay notas del relevo en las últimas {n} horas.",
   "Shift handoff on this PC (turned on by your organization):": "Relevo de turno en este equipo (activado por tu organización):",
   "Sign it if the next shift may need to ask you.": "Fírmala si el siguiente turno puede necesitar preguntarte.",
@@ -618,7 +617,14 @@
   "nothing noted": "nada anotado",
   "{text} (done)": "{text} (hecho)",
   "{text} (not sure)": "{text} (no estoy seguro)",
-  "{text} (still open)": "{text} (todavía abierto)"
+  "{text} (still open)": "{text} (todavía abierto)",
+  "Counting...": "Contando...",
+  "Note left for the next shift, {time}.": "Nota dejada para el siguiente turno, {time}.",
+  "React to the thought: type love, ha, dead or eyeroll at the end. The counts show after.": "Reacciona al pensamiento: escribe love, ha, dead o eyeroll al final. Los números se ven después.",
+  "Reactions so far: {list}": "Reacciones hasta ahora: {list}",
+  "Yesterday's top reaction: {name}": "La reacción más dada ayer: {name}",
+  "Your first name will be shown with your note.": "Tu nombre de pila se mostrará con tu nota.",
+  "{text} ({name})": "{text} ({name})"
  },
  "tips_floor": [
   "Comprueba que tu zona de paso está despejada antes de la primera tarea del turno.",

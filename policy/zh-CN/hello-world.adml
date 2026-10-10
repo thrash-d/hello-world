@@ -114,6 +114,15 @@
       <string id="SupportLine_Help">启用此策略后，这段文字（例如员工援助计划的电话）会显示在“如果感到沉重，可以找人聊聊”下面：位于文字菜单选项的末尾，以及窗口“选项”中的一项。它总在同一个位置。它不会自行弹出，也不会对输入的内容作出反应，也不会记录谁查看过。
 
 禁用或未配置此策略时，没有支持热线。</string>
+      <string id="SUPPORTED_1_48">hello-world 1.48.0 或更高版本</string>
+      <string id="HandoffSharedLogin">共享登录的交接</string>
+      <string id="HandoffSharedLogin_Help">启用后，适用于整个班次共用一个 Windows 登录的电脑（例如 DOCK3）：只要有交接留言，登录时就会打开 hello-world，因为无法判断谁已读过；留言也从不署名。
+
+禁用或未配置时，只有在此 Windows 帐户有未看过的留言时才会在登录时打开，自己的留言不会触发。</string>
+      <string id="HandoffSignNames">交接留言署名</string>
+      <string id="HandoffSignNames_Help">启用后，每条新的交接留言末尾会加上作者在 Windows 中的名字，输入前输入框会说明这一点。启用策略之前的留言不会署名。与“共享登录的交接”同时使用时无效。
+
+禁用或未配置时，留言不署名；如果下一班可能需要询问，屏幕会建议署名。</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">

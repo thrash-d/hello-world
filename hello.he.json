@@ -575,7 +575,6 @@
   "Everyone who uses this PC sees handoff notes. No patient or customer details. Not a safety or defect record.": "כל מי שמשתמש במחשב הזה רואה את הערות ההעברה. בלי פרטי מטופלים או לקוחות. זה לא רישום בטיחות או תקלות.",
   "Keep it until someone clears it? (y or n, Enter for no) > ": "לשמור עד שמישהו ינקה אותה? (y או n, ‏Enter ללא) > ",
   "Kept until cleared. ": "נשמרת עד ניקוי. ",
-  "Left for the next shift.": "הושארה למשמרת הבאה.",
   "No handoff notes in the last {n} hours.": "אין הערות העברה ב-{n} השעות האחרונות.",
   "Shift handoff on this PC (turned on by your organization):": "העברת משמרת במחשב הזה (הופעלה על ידי הארגון):",
   "Sign it if the next shift may need to ask you.": "כדאי לחתום אם המשמרת הבאה עשויה לרצות לשאול אותך.",
@@ -618,7 +617,14 @@
   "nothing noted": "לא נרשם כלום",
   "{text} (done)": "{text} (בוצע)",
   "{text} (not sure)": "{text} (לא בטוח)",
-  "{text} (still open)": "{text} (עדיין פתוח)"
+  "{text} (still open)": "{text} (עדיין פתוח)",
+  "Counting...": "סופרים...",
+  "Note left for the next shift, {time}.": "הושארה הערה למשמרת הבאה, {time}.",
+  "React to the thought: type love, ha, dead or eyeroll at the end. The counts show after.": "הגיבו למחשבה: הקלידו love,‏ ha,‏ dead או eyeroll בסוף. המספרים יוצגו אחר כך.",
+  "Reactions so far: {list}": "תגובות עד עכשיו: {list}",
+  "Yesterday's top reaction: {name}": "התגובה הנפוצה אתמול: {name}",
+  "Your first name will be shown with your note.": "השם הפרטי שלך יוצג עם ההערה.",
+  "{text} ({name})": "{text} ({name})"
  },
  "tips_floor": [
   "לבדוק שהמעבר פנוי לפני המשימה הראשונה במשמרת.",

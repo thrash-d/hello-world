@@ -22,7 +22,11 @@ hello-world isn't only for companies. Anyone on Windows can install it for
 themselves, with no administrator and no account: see "For one person,
 without an administrator" below. A package built for people outside an
 organization sets `COUNTS_SERVER` in `hello.py` to a public counts server, so
-the shared count works for them too once they say yes to it.
+the shared count works for them too once they say yes to it. To run that
+public server, put `server/counts_server.py` on any host with Python 3.11 and
+an https front end (a reverse proxy or a platform that terminates TLS), start
+it with `--trust-proxy` behind that proxy, and set `COUNTS_SERVER` to its
+address before building the package. It keeps one small file of numbers a day.
 
 ## For employees
 
@@ -231,7 +235,13 @@ your organization changes that. A note about safety can be kept until
 someone clears it, and anyone can clear a note that is wrong.
 
 Everyone who signs in to that PC reads the notes, and the screen says so.
-They aren't signed unless you sign them, and they aren't a safety or defect
+Press Enter in the note box to leave it; you'll see "Note left for the next
+shift, 22:40." Where the organization asks for it, hello-world opens by itself
+at sign-in when there's a note you haven't seen (never for your own), and
+signs new notes with your first name, which the box says before you type.
+Notes written before that was turned on are never signed.
+
+They aren't signed unless you or your organization sign them, and they aren't a safety or defect
 record, or a place for patient or customer details. They are locked to the PC
 in `ProgramData\hello-world`, or kept in a unit's shared folder that your
 organization names, so every cart on a unit shows the same notes. Your own
@@ -245,6 +255,13 @@ people do each day's tip?" Say yes and the count shows under the tip. Type
 `tip` at the last prompt, or click **I did this tip** in the window, when you
 have done it, and you are counted once for that day.
 
+The thought gets reactions too: love, ha, dead or eyeroll (or the emoji),
+typed at the last prompt or clicked under the thought in the window. The
+counts stay hidden until you react, so you aren't nudged, and the screen
+shows yesterday's top reaction. Each PC has one reaction a day; picking
+another moves it. The window opens at once and fills the numbers in when the
+server answers.
+
 Each count sends the date and nothing else: never a plan, a name or a
 computer name. The server sees your PC's network address, as any website
 does. The reference server, `server/counts_server.py`, doesn't write
@@ -255,7 +272,8 @@ screen, or `hello.cmd --set shared off`. Without a server, nothing is asked
 and nothing is sent.
 
 The file also holds the day you last counted yourself for the tip, whether
-you answered the shared count question, the plans you answered "I'm not
+you answered the shared count question, today's reaction, the newest handoff
+note you have seen, the plans you answered "I'm not
 sure" about in the last two weeks, and your settings for no follow-up
 questions and large text.
 
@@ -329,7 +347,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.47.0'
+$tag = 'v1.48.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

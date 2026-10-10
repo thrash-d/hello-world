@@ -114,6 +114,15 @@ Si se deshabilita o no se configura, las notas se muestran 72 horas.</string>
       <string id="SupportLine_Help">Si se habilita, este texto, como el número del programa de asistencia al empleado, se muestra bajo "Si todo pesa demasiado, alguien con quien hablar": al final de las opciones del menú de texto y como una entrada en Opciones de la ventana. Siempre está en el mismo sitio. Nunca aparece solo ni reacciona a nada de lo que se escribe, y nada registra que alguien lo haya mirado.
 
 Si se deshabilita o no se configura, no hay línea de apoyo.</string>
+      <string id="SUPPORTED_1_48">hello-world 1.48.0 o posterior</string>
+      <string id="HandoffSharedLogin">Relevo con un inicio de sesión compartido</string>
+      <string id="HandoffSharedLogin_Help">Si se habilita, para equipos donde todo el turno inicia sesión con una sola cuenta de Windows, como DOCK3: hello-world se abre al iniciar sesión siempre que haya notas de relevo, porque no puede saber quién las ha leído, y las notas nunca se firman con un nombre.
+
+Si se deshabilita o no se configura, hello-world se abre al iniciar sesión solo cuando hay una nota que esta cuenta de Windows no ha visto, y nunca por las notas propias.</string>
+      <string id="HandoffSignNames">Firmar las notas de relevo con el nombre</string>
+      <string id="HandoffSignNames_Help">Si se habilita, cada nota de relevo nueva termina con el nombre de pila de quien la escribe, tomado de Windows, y el cuadro lo avisa antes de escribir. Las notas dejadas antes de activar la directiva nunca se firman. No tiene efecto con Relevo con un inicio de sesión compartido.
+
+Si se deshabilita o no se configura, las notas no se firman; la pantalla sugiere firmar si el siguiente turno puede necesitar preguntar.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">

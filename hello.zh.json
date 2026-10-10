@@ -575,7 +575,6 @@
   "Everyone who uses this PC sees handoff notes. No patient or customer details. Not a safety or defect record.": "使用此电脑的每个人都能看到交接记录。不要写患者或客户信息。这不是安全或故障记录。",
   "Keep it until someone clears it? (y or n, Enter for no) > ": "保留到有人清除吗？（y 或 n，按 Enter 表示否）> ",
   "Kept until cleared. ": "保留到清除：",
-  "Left for the next shift.": "已留给下一班。",
   "No handoff notes in the last {n} hours.": "过去 {n} 小时没有交接记录。",
   "Shift handoff on this PC (turned on by your organization):": "此电脑上的交接班（由您的组织开启）：",
   "Sign it if the next shift may need to ask you.": "如果下一班可能需要问您，请署名。",
@@ -618,7 +617,14 @@
   "nothing noted": "没有记录",
   "{text} (done)": "{text}（完成）",
   "{text} (not sure)": "{text}（不确定）",
-  "{text} (still open)": "{text}（尚未完成）"
+  "{text} (still open)": "{text}（尚未完成）",
+  "Counting...": "正在统计...",
+  "Note left for the next shift, {time}.": "已给下一班留言，{time}。",
+  "React to the thought: type love, ha, dead or eyeroll at the end. The counts show after.": "对今天的想法作出反应：在最后输入 love、ha、dead 或 eyeroll。之后会显示数字。",
+  "Reactions so far: {list}": "目前的反应：{list}",
+  "Yesterday's top reaction: {name}": "昨天最多的反应：{name}",
+  "Your first name will be shown with your note.": "你的名字会和留言一起显示。",
+  "{text} ({name})": "{text}（{name}）"
  },
  "tips_floor": [
   "开始第一单活之前，先确认您走的通道畅通。",

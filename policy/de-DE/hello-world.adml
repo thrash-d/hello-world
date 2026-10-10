@@ -114,6 +114,15 @@ Wenn Sie diese Einstellung deaktivieren oder nicht konfigurieren, werden Notizen
       <string id="SupportLine_Help">Wenn Sie diese Einstellung aktivieren, wird dieser Text, etwa die Nummer Ihres Mitarbeiterunterstützungsprogramms, unter „Wenn es schwer wird, jemand zum Reden“ angezeigt: am Ende der Optionen im Textmenü und als Eintrag in den Optionen des Fensters. Er steht immer an derselben Stelle. Er erscheint nie von selbst, reagiert nie auf Eingaben, und nichts zeichnet auf, dass jemand ihn angesehen hat.
 
 Wenn Sie diese Einstellung deaktivieren oder nicht konfigurieren, gibt es kein Hilfeangebot.</string>
+      <string id="SUPPORTED_1_48">hello-world 1.48.0 oder neuer</string>
+      <string id="HandoffSharedLogin">Übergabe bei gemeinsamer Anmeldung</string>
+      <string id="HandoffSharedLogin_Help">Wenn aktiviert, für PCs, an denen sich die ganze Schicht mit einer Windows-Anmeldung anmeldet, etwa DOCK3: hello-world öffnet sich bei der Anmeldung, sobald es Übergabenotizen gibt, weil es nicht erkennen kann, wer sie gelesen hat, und Notizen werden nie mit einem Namen unterschrieben.
+
+Wenn deaktiviert oder nicht konfiguriert, öffnet sich hello-world bei der Anmeldung nur, wenn es eine Notiz gibt, die dieses Windows-Konto noch nicht gesehen hat, und nie wegen eigener Notizen.</string>
+      <string id="HandoffSignNames">Übergabenotizen mit Vornamen unterschreiben</string>
+      <string id="HandoffSignNames_Help">Wenn aktiviert, endet jede neue Übergabenotiz mit dem Vornamen der schreibenden Person aus Windows, und das Feld sagt das vor dem Tippen. Notizen von vor dem Einschalten werden nie unterschrieben. Ohne Wirkung zusammen mit Übergabe bei gemeinsamer Anmeldung.
+
+Wenn deaktiviert oder nicht konfiguriert, werden Notizen nicht unterschrieben; der Bildschirm schlägt vor zu unterschreiben, falls die nächste Schicht nachfragen muss.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">

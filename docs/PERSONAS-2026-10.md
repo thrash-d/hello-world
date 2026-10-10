@@ -112,11 +112,14 @@ the pull request named.
 | Review of 1.43.0 | A date already past made a new plan overdue at once; fractions became due dates | Own test run | Fixed in 1.43.1 (#69) |
 | Personas, 1.43.0 | Self-censoring because IT could read the notes | All seven | Notes locked to the Windows account, 1.44.0 (#70) |
 | Personas, 1.43.0 | Nothing built on the shared tip | Skye, Jaylen | Shared tip count and reference server, 1.45.0 (#71) |
+| Design review, round 75 | Reactions love, ha, dead, eyeroll, not a thumbs-up; counts hidden until you react; yesterday's top reaction; say how one-a-PC is counted without an ID | Skye | Built in 1.48.0 |
 | Personas, 1.43.0 | Plan text shown on a shared screen | Denise, Rick | Queued: plan-free notification on shared PCs (`TODO.md`) |
 | Personas, 1.43.0 | Shift handoff notes | Denise, Rick, Profit Maximizer | Built in 1.46.0 (#72) after a design review with both |
 | Design review of handoff | Ages not times; hours set per site; keep until cleared; not a safety record; a unit-wide folder | Denise, Rick | Built in 1.46.0 |
 | Design review of handoff | Signed by default (Denise) vs. never automatic (Rick) | Disagreement | Unsigned with a hint; a signing policy queued |
-| Design review of handoff | Open by itself at sign-in on handoff PCs | Rick | Queued |
+| Design review of handoff | Open by itself at sign-in on handoff PCs | Rick | Built in 1.48.0 (round 75) |
+| Design review, round 75 | Your own note isn't new; a policy for one shared login that opens every time and never signs; Enter leaves the note and says the time; names never added to older notes; the box says the name will show | Rick | Built in 1.48.0 |
+| Design review, round 75 | Signed notes for units that want them | Denise | Built in 1.48.0 as a policy, off by default (Rick's side of the earlier disagreement) |
 | Personas, 1.43.0 | "I don't remember", the day a plan was written, big print | Harold | Built in 1.47.0 (round 74) after a design review |
 | Personas, 1.43.0 | Gentle mode, a static support link | Sam | Built in 1.47.0 (round 74) after a design review |
 | Design review, round 74 | "I'm not sure" not "I don't remember"; `?` not `r`; the date with the day; "not sure" kept as itself; Print; take back a Done | Harold | Built in 1.47.0 |

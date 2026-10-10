@@ -14,9 +14,13 @@ only, a hash of the address with a random key made fresh each day, so the
 hashes can't be matched to addresses or across days, and are gone at a
 restart or at midnight UTC.
 
-    GET  /v1/day/2026-10-05       {"tip": 212}
-    POST /v1/day/2026-10-05/tip   counts one, then {"tip": 213}
-    GET  /health                  {"ok": true}
+    GET  /v1/day/2026-10-05             {"tip": 212, "react": {"love": 4, ...}}
+    POST /v1/day/2026-10-05/tip         counts one, then the same answer
+    POST /v1/day/2026-10-05/react/love  one reaction a PC a day; a second
+                                        moves it rather than adding one
+    GET  /health                        {"ok": true}
+
+The reactions are love, ha, dead and eyeroll.
 
 Only today and the day either side, in UTC, are accepted, so time zones work
 and nobody can fill the disk with old dates.
@@ -32,8 +36,8 @@ import secrets
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-DAY_PATH = re.compile(r"^/v1/day/(\d{4}-\d{2}-\d{2})(/tip)?$")
-WHAT = ("tip",)
+REACTIONS = ("love", "ha", "dead", "eyeroll")
+DAY_PATH = re.compile(r"^/v1/day/(\d{4}-\d{2}-\d{2})(/tip|/react/(?:%s))?$" % "|".join(REACTIONS))
 
 
 class Counts:
@@ -45,35 +49,50 @@ class Counts:
         self.lock = threading.Lock()
         self.salt_day = None
         self.salt = b""
-        self.seen = set()
+        # Hash of who counted, mapped to the reaction they gave, or True.
+        self.seen = {}
 
     def path(self, day):
         return os.path.join(self.folder, f"{day}.json")
 
     def read(self, day):
+        """The day's numbers: {"tip": n, "react": {reaction: n}}."""
         try:
             with open(self.path(day), encoding="utf-8") as f:
                 data = json.load(f)
         except (OSError, ValueError):
-            return {}
-        return {k: v for k, v in data.items()
-                if k in WHAT and isinstance(v, int) and v >= 0}
+            data = {}
+        tip = data.get("tip")
+        react = data.get("react") if isinstance(data.get("react"), dict) else {}
+        return {"tip": tip if isinstance(tip, int) and tip >= 0 else 0,
+                "react": {r: react[r] if isinstance(react.get(r), int) and react[r] >= 0 else 0
+                          for r in REACTIONS}}
 
     def add(self, day, what, address):
+        """Count the tip once a PC a day, or set its one reaction, moving it
+        when it changes. Returns the day's numbers."""
         with self.lock:
             today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
             if self.salt_day != today:
                 # A fresh key each day forgets yesterday's hashes for good.
-                self.salt_day, self.salt, self.seen = today, secrets.token_bytes(32), set()
-            key = hashlib.sha256(self.salt + f"{day}|{what}|{address}".encode()).digest()
+                self.salt_day, self.salt, self.seen = today, secrets.token_bytes(32), {}
+            kind = "tip" if what == "tip" else "react"
+            key = hashlib.sha256(self.salt + f"{day}|{kind}|{address}".encode()).digest()
             data = self.read(day)
-            if key not in self.seen:
-                self.seen.add(key)
-                data[what] = data.get(what, 0) + 1
-                tmp = self.path(day) + ".tmp"
-                with open(tmp, "w", encoding="utf-8") as f:
-                    json.dump(data, f)
-                os.replace(tmp, self.path(day))
+            before = self.seen.get(key)
+            if kind == "tip" and before is None:
+                data["tip"] += 1
+            elif kind == "react" and before != what:
+                if before in data["react"]:
+                    data["react"][before] = max(0, data["react"][before] - 1)
+                data["react"][what] += 1
+            else:
+                return data
+            self.seen[key] = True if kind == "tip" else what
+            tmp = self.path(day) + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(data, f)
+            os.replace(tmp, self.path(day))
             return data
 
 
@@ -112,7 +131,7 @@ def handler(counts):
             day, add = self.route()
             if day is None or add:
                 return self.reply(404, {"error": "not found"})
-            self.reply(200, {"tip": counts.read(day).get("tip", 0)})
+            self.reply(200, counts.read(day))
 
         def do_POST(self):
             # Bodies are ignored, and refused when large, so nothing else
@@ -132,8 +151,8 @@ def handler(counts):
             address = self.client_address[0]
             if self.server.trust_proxy:
                 address = (self.headers.get("X-Forwarded-For") or address).split(",")[0].strip()
-            data = counts.add(day, "tip", address)
-            self.reply(200, {"tip": data.get("tip", 0)})
+            what = "tip" if add == "/tip" else add.rsplit("/", 1)[1]
+            self.reply(200, counts.add(day, what, address))
 
         def log_message(self, format, *args):
             # No access log: it would hold addresses.

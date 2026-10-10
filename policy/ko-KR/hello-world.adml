@@ -114,6 +114,15 @@
       <string id="SupportLine_Help">이 정책 설정을 사용하면 이 텍스트(예: 직원 지원 프로그램 전화번호)가 '힘들 때 이야기할 곳' 아래에, 텍스트 메뉴 옵션의 맨 끝과 창의 옵션 항목으로 표시됩니다. 항상 같은 자리에 있습니다. 저절로 나타나거나 입력한 내용에 반응하지 않으며, 누가 봤는지도 기록하지 않습니다.
 
 사용하지 않거나 구성하지 않으면 상담 창구가 없습니다.</string>
+      <string id="SUPPORTED_1_48">hello-world 1.48.0 이상</string>
+      <string id="HandoffSharedLogin">공유 로그인에서의 인수인계</string>
+      <string id="HandoffSharedLogin_Help">사용하면 DOCK3처럼 근무조 전체가 하나의 Windows 로그인을 쓰는 PC에서, 인수인계 메모가 있으면 로그인할 때마다 hello-world가 열립니다. 누가 읽었는지 알 수 없기 때문입니다. 메모에는 이름이 붙지 않습니다.
+
+사용 안 함 또는 구성되지 않음이면 이 Windows 계정이 아직 보지 않은 메모가 있을 때만 로그인 시 열리며, 자기 메모로는 열리지 않습니다.</string>
+      <string id="HandoffSignNames">인수인계 메모에 이름 붙이기</string>
+      <string id="HandoffSignNames_Help">사용하면 새 인수인계 메모 끝에 작성자의 Windows 이름이 붙고, 입력하기 전에 입력란이 이를 알려 줍니다. 정책을 켜기 전에 남긴 메모에는 붙지 않습니다. 공유 로그인에서의 인수인계와 함께면 효과가 없습니다.
+
+사용 안 함 또는 구성되지 않음이면 메모에 이름이 붙지 않으며, 다음 근무조가 물어볼 수 있으면 서명하라고 화면이 권합니다.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">

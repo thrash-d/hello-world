@@ -17,6 +17,7 @@
       <definition name="SUPPORTED_1_45" displayName="$(string.SUPPORTED_1_45)" />
       <definition name="SUPPORTED_1_46" displayName="$(string.SUPPORTED_1_46)" />
       <definition name="SUPPORTED_1_47" displayName="$(string.SUPPORTED_1_47)" />
+      <definition name="SUPPORTED_1_48" displayName="$(string.SUPPORTED_1_48)" />
     </definitions>
   </supportedOn>
   <categories>
@@ -142,6 +143,18 @@
       <parentCategory ref="HelloWorld" />
       <supportedOn ref="SUPPORTED_1_47" />
       <elements><text id="SupportLine" valueName="SupportLine" maxLength="200" /></elements>
+    </policy>
+    <policy name="HandoffSharedLogin" class="Machine" displayName="$(string.HandoffSharedLogin)" explainText="$(string.HandoffSharedLogin_Help)" key="SOFTWARE\Policies\hello-world" valueName="HandoffSharedLogin">
+      <parentCategory ref="HelloWorld" />
+      <supportedOn ref="SUPPORTED_1_48" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+    <policy name="HandoffSignNames" class="Machine" displayName="$(string.HandoffSignNames)" explainText="$(string.HandoffSignNames_Help)" key="SOFTWARE\Policies\hello-world" valueName="HandoffSignNames">
+      <parentCategory ref="HelloWorld" />
+      <supportedOn ref="SUPPORTED_1_48" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
     </policy>
   </policies>
 </policyDefinitions>
