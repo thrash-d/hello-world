@@ -117,8 +117,12 @@ the pull request named.
 | Design review of handoff | Ages not times; hours set per site; keep until cleared; not a safety record; a unit-wide folder | Denise, Rick | Built in 1.46.0 |
 | Design review of handoff | Signed by default (Denise) vs. never automatic (Rick) | Disagreement | Unsigned with a hint; a signing policy queued |
 | Design review of handoff | Open by itself at sign-in on handoff PCs | Rick | Queued |
-| Personas, 1.43.0 | "I don't remember", the day a plan was written, big print | Harold | Queued |
-| Personas, 1.43.0 | Gentle mode, a static support link | Sam | Queued |
+| Personas, 1.43.0 | "I don't remember", the day a plan was written, big print | Harold | Built in 1.47.0 (round 74) after a design review |
+| Personas, 1.43.0 | Gentle mode, a static support link | Sam | Built in 1.47.0 (round 74) after a design review |
+| Design review, round 74 | "I'm not sure" not "I don't remember"; `?` not `r`; the date with the day; "not sure" kept as itself; Print; take back a Done | Harold | Built in 1.47.0 |
+| Design review, round 74 | Old plans fold away; no label saying a mode is on; offered once after a "not yet"; "If things feel heavy, someone to talk to"; nothing logged | Sam | Built in 1.47.0 |
+| Design review, round 74 | "Not in" for days Harold wasn't at work | Harold | Not possible without keeping every visit date, which is off by default for privacy; shown as "nothing noted" |
+| Design review, round 74 | A family member seeing the history | Harold | Not built: it would send plans off the PC |
 | Personas, 1.43.0 | Desk pet, plan graveyard, boss fight | Jaylen, Skye | Queued |
 | Personas, 1.43.0 | Command line, todo.txt, standup | Priyanka | Queued |
 | Personas, 1.43.0 | Formulas run in the spreadsheet export | Skye, confirmed in code | Fixed in 1.46.1 |

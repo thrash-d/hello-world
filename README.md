@@ -35,8 +35,11 @@ so you can compare notes with a coworker.
 A few things for one day go in the same box with `;` between them, such as
 `Call Ana; send the report`. Saving says "Saved." and leaves the window open;
 Enter again closes it.
-The next day the window asks "Did you do it?" with three buttons: **Done**,
-**Not yet** (keeps the plan for today) and **Skip** (asks again next time).
+The next day the window names the day, "Yesterday you planned: ..." or "On
+Friday, 2 October 2026 you planned: ...", and asks "Did you do it?" with
+four buttons: **Done**, **Not yet** (keeps the plan for today), **I'm not
+sure** (keeps it for today with no mark either way; `?` on the text screen)
+and **Skip** (asks again next time).
 For a plan of a few things, up to ten, tick the ones you did before clicking
 Done, and the rest are kept for today. The text screen asks the same with
 numbers: `1 3` means the first and third are done, and `1-3` the first
@@ -62,8 +65,9 @@ plan while it is carried over. After a missed workday the window says
 
 After your first plan it asks once whether you want a reminder when you sign
 in. With it on, a Windows notification appears at your first sign-in of the
-day, only when there is a plan to ask about: "Last time you planned: ... Did
-you do it?". Click **Done** or **Not yet** on it and that's the answer; nothing
+day, only when there is a plan to ask about: "Did you do it?". It leaves the
+plan's words out, so a shared screen doesn't show them, unless you choose
+**Options > Reminder settings > Show my plan in the reminder**. Click **Done** or **Not yet** on it and that's the answer; nothing
 else opens, and Done brings a short thank-you. Skip is there too. For a plan
 of a few things the notification has **Open** instead of Done, so you tick
 the ones you did. In the text screen, `done` on a plan of a few things asks
@@ -167,6 +171,30 @@ the program itself, use Settings > Apps > Installed apps > hello-world >
 Uninstall. That needs an administrator password, so ask IT if you don't have
 one.
 
+### What I did, large text, and no follow-up questions
+
+**Options > My plans > What I did...** (menu option 12 in the text screen)
+lists the last two weeks, one line a day, newest first: what you finished,
+what you weren't sure about, and "nothing noted" on days with nothing, so no
+gap is left to wonder about. It offers to print the page. **Take back a
+Done...** undoes a Done clicked by mistake and puts the thing back on
+today's plan.
+
+**Options > What the window shows > Large text** makes the whole window half
+as big again, and stays that way.
+
+**No follow-up questions** in the same menu, or `gentle` at the last prompt,
+stops "Did you do it?". Your plan stays until you mark it done or change it;
+after three days it folds away quietly, and `same` brings it back. Days and
+dates you type stay words, not due dates, and the days-in-a-row message
+doesn't show. It's offered once, after a first "not yet" or "not sure", and
+never again. Nothing records that you turned it on.
+
+If your organization sets a support line, such as an employee assistance
+number, it is under "If things feel heavy, someone to talk to" at the end of
+the text menu's options and in the window's Options. It never appears by
+itself, never reacts to what you type, and nothing records that you looked.
+
 ### What is saved, and who can see it
 
 This is the one place that lists what is saved. `PLAN.md` and the why-doc link
@@ -226,8 +254,10 @@ PC counts once a day. Turn the count on or off in the window under
 screen, or `hello.cmd --set shared off`. Without a server, nothing is asked
 and nothing is sent.
 
-The file also holds the day you last counted yourself for the tip, and
-whether you answered the shared count question.
+The file also holds the day you last counted yourself for the tip, whether
+you answered the shared count question, the plans you answered "I'm not
+sure" about in the last two weeks, and your settings for no follow-up
+questions and large text.
 
 Since 1.44.0 the file is locked to your Windows account with the Windows
 Data Protection API, so a plan can be anything you want to get done, at work
@@ -299,7 +329,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.46.1'
+$tag = 'v1.47.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

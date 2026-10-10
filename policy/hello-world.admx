@@ -16,6 +16,7 @@
       <definition name="SUPPORTED_1_44" displayName="$(string.SUPPORTED_1_44)" />
       <definition name="SUPPORTED_1_45" displayName="$(string.SUPPORTED_1_45)" />
       <definition name="SUPPORTED_1_46" displayName="$(string.SUPPORTED_1_46)" />
+      <definition name="SUPPORTED_1_47" displayName="$(string.SUPPORTED_1_47)" />
     </definitions>
   </supportedOn>
   <categories>
@@ -136,6 +137,11 @@
       <parentCategory ref="HelloWorld" />
       <supportedOn ref="SUPPORTED_1_46" />
       <elements><decimal id="HandoffHours" valueName="HandoffHours" minValue="1" maxValue="336" /></elements>
+    </policy>
+    <policy name="SupportLine" class="Both" displayName="$(string.SupportLine)" explainText="$(string.SupportLine_Help)" presentation="$(presentation.SupportLine)" key="SOFTWARE\Policies\hello-world">
+      <parentCategory ref="HelloWorld" />
+      <supportedOn ref="SUPPORTED_1_47" />
+      <elements><text id="SupportLine" valueName="SupportLine" maxLength="200" /></elements>
     </policy>
   </policies>
 </policyDefinitions>

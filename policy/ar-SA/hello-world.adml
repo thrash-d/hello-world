@@ -105,6 +105,11 @@
       <string id="HandoffHours_Help">عند التمكين، تظهر ملاحظات التسليم لهذا العدد من الساعات، من 1 إلى 336، باستثناء الملاحظات المُبقاة حتى المسح. يناسب 24 المناوبات ذات 12 ساعة؛ ويغطي 168 عطلة نهاية أسبوع طويلة.
 
 عند التعطيل أو عدم التكوين، تظهر الملاحظات 72 ساعة.</string>
+      <string id="SUPPORTED_1_47">hello-world 1.47.0 أو أحدث</string>
+      <string id="SupportLine">خط الدعم</string>
+      <string id="SupportLine_Help">عند التمكين، يظهر هذا النص، مثل رقم برنامج مساعدة الموظفين، تحت "إن ثقلت الأمور، شخص تتحدث إليه": في نهاية خيارات قائمة النص وكإدخال في خيارات النافذة. يكون دائمًا في المكان نفسه. لا يظهر من تلقاء نفسه أبدًا ولا يتفاعل مع أي شيء يُكتب، ولا يُسجّل شيء أن أحدًا اطّلع عليه.
+
+عند التعطيل أو عدم التكوين، لا يوجد خط دعم.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -121,6 +126,9 @@
       </presentation>
       <presentation id="HandoffHours">
         <decimalTextBox refId="HandoffHours" defaultValue="72">الساعات:</decimalTextBox>
+      </presentation>
+      <presentation id="SupportLine">
+        <textBox refId="SupportLine"><label>النص:</label></textBox>
       </presentation>
     </presentationTable>
   </resources>

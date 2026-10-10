@@ -109,6 +109,11 @@ Si vous désactivez ce paramètre ou ne le configurez pas, chaque PC garde ses p
       <string id="HandoffHours_Help">Si vous activez ce paramètre, les notes de relève s'affichent pendant ce nombre d'heures, de 1 à 336, sauf celles conservées jusqu'à effacement. 24 convient aux postes de 12 heures; 168 couvre un long week-end.
 
 Si vous désactivez ce paramètre ou ne le configurez pas, les notes s'affichent 72 heures.</string>
+      <string id="SUPPORTED_1_47">hello-world 1.47.0 ou version ultérieure</string>
+      <string id="SupportLine">Ligne de soutien</string>
+      <string id="SupportLine_Help">Si vous activez ce paramètre, ce texte, par exemple le numéro de votre programme d'aide aux employés, s'affiche sous « Si c'est lourd, quelqu'un à qui parler »: à la fin des options du menu texte et comme entrée dans les Options de la fenêtre. Il est toujours au même endroit. Il n'apparaît jamais de lui-même, ne réagit jamais à ce qui est tapé, et rien n'enregistre que quelqu'un l'a consulté.
+
+Si vous désactivez ce paramètre ou ne le configurez pas, il n'y a pas de ligne de soutien.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -125,6 +130,9 @@ Si vous désactivez ce paramètre ou ne le configurez pas, les notes s'affichent
       </presentation>
       <presentation id="HandoffHours">
         <decimalTextBox refId="HandoffHours" defaultValue="72">Heures:</decimalTextBox>
+      </presentation>
+      <presentation id="SupportLine">
+        <textBox refId="SupportLine"><label>Texte:</label></textBox>
       </presentation>
     </presentationTable>
   </resources>

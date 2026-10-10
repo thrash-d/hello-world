@@ -109,6 +109,11 @@ Quando desabilitada ou não configurada, cada computador guarda suas próprias n
       <string id="HandoffHours_Help">Quando habilitada, as notas da passagem aparecem por esse número de horas, de 1 a 336, exceto as que ficam até serem apagadas. 24 serve para turnos de 12 horas; 168 cobre um feriado prolongado.
 
 Quando desabilitada ou não configurada, as notas aparecem por 72 horas.</string>
+      <string id="SUPPORTED_1_47">hello-world 1.47.0 ou posterior</string>
+      <string id="SupportLine">Linha de apoio</string>
+      <string id="SupportLine_Help">Quando habilitada, este texto, como o número do programa de assistência ao empregado, aparece em "Se as coisas pesarem, alguém para conversar": no fim das opções do menu de texto e como um item em Opções da janela. Fica sempre no mesmo lugar. Nunca aparece sozinho, nunca reage ao que é digitado, e nada registra que alguém o viu.
+
+Quando desabilitada ou não configurada, não há linha de apoio.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -125,6 +130,9 @@ Quando desabilitada ou não configurada, as notas aparecem por 72 horas.</string
       </presentation>
       <presentation id="HandoffHours">
         <decimalTextBox refId="HandoffHours" defaultValue="72">Horas:</decimalTextBox>
+      </presentation>
+      <presentation id="SupportLine">
+        <textBox refId="SupportLine"><label>Texto:</label></textBox>
       </presentation>
     </presentationTable>
   </resources>

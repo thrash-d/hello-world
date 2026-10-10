@@ -109,6 +109,11 @@ Si se deshabilita o no se configura, cada equipo guarda sus propias notas en Pro
       <string id="HandoffHours_Help">Si se habilita, las notas del relevo se muestran durante este número de horas, de 1 a 336, salvo las que se conservan hasta que se borren. 24 va bien con turnos de 12 horas; 168 cubre un fin de semana largo.
 
 Si se deshabilita o no se configura, las notas se muestran 72 horas.</string>
+      <string id="SUPPORTED_1_47">hello-world 1.47.0 o posterior</string>
+      <string id="SupportLine">Línea de apoyo</string>
+      <string id="SupportLine_Help">Si se habilita, este texto, como el número del programa de asistencia al empleado, se muestra bajo "Si todo pesa demasiado, alguien con quien hablar": al final de las opciones del menú de texto y como una entrada en Opciones de la ventana. Siempre está en el mismo sitio. Nunca aparece solo ni reacciona a nada de lo que se escribe, y nada registra que alguien lo haya mirado.
+
+Si se deshabilita o no se configura, no hay línea de apoyo.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -125,6 +130,9 @@ Si se deshabilita o no se configura, las notas se muestran 72 horas.</string>
       </presentation>
       <presentation id="HandoffHours">
         <decimalTextBox refId="HandoffHours" defaultValue="72">Horas:</decimalTextBox>
+      </presentation>
+      <presentation id="SupportLine">
+        <textBox refId="SupportLine"><label>Texto:</label></textBox>
       </presentation>
     </presentationTable>
   </resources>

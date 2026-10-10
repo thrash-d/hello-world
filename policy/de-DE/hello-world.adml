@@ -109,6 +109,11 @@ Wenn Sie diese Einstellung deaktivieren oder nicht konfigurieren, speichert jede
       <string id="HandoffHours_Help">Wenn Sie diese Einstellung aktivieren, werden Übergabenotizen so viele Stunden angezeigt, von 1 bis 336, außer denen, die bis zum Löschen bleiben. 24 passt zu 12-Stunden-Schichten; 168 deckt ein langes Wochenende ab.
 
 Wenn Sie diese Einstellung deaktivieren oder nicht konfigurieren, werden Notizen 72 Stunden angezeigt.</string>
+      <string id="SUPPORTED_1_47">hello-world 1.47.0 oder höher</string>
+      <string id="SupportLine">Hilfeangebot</string>
+      <string id="SupportLine_Help">Wenn Sie diese Einstellung aktivieren, wird dieser Text, etwa die Nummer Ihres Mitarbeiterunterstützungsprogramms, unter „Wenn es schwer wird, jemand zum Reden“ angezeigt: am Ende der Optionen im Textmenü und als Eintrag in den Optionen des Fensters. Er steht immer an derselben Stelle. Er erscheint nie von selbst, reagiert nie auf Eingaben, und nichts zeichnet auf, dass jemand ihn angesehen hat.
+
+Wenn Sie diese Einstellung deaktivieren oder nicht konfigurieren, gibt es kein Hilfeangebot.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -125,6 +130,9 @@ Wenn Sie diese Einstellung deaktivieren oder nicht konfigurieren, werden Notizen
       </presentation>
       <presentation id="HandoffHours">
         <decimalTextBox refId="HandoffHours" defaultValue="72">Stunden:</decimalTextBox>
+      </presentation>
+      <presentation id="SupportLine">
+        <textBox refId="SupportLine"><label>Text:</label></textBox>
       </presentation>
     </presentationTable>
   </resources>

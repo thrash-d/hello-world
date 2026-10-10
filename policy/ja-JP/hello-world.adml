@@ -109,6 +109,11 @@
       <string id="HandoffHours_Help">このポリシー設定を有効にすると、引き継ぎメモは 1 から 336 までのこの時間数だけ表示されます (消すまで残すメモを除く)。12 時間勤務なら 24、連休をまたぐなら 168 が目安です。
 
 無効にするか構成しない場合、メモは 72 時間表示されます。</string>
+      <string id="SUPPORTED_1_47">hello-world 1.47.0 以降</string>
+      <string id="SupportLine">相談窓口</string>
+      <string id="SupportLine_Help">このポリシー設定を有効にすると、このテキスト (従業員支援プログラムの電話番号など) が「つらいときの相談先」として、テキスト メニューの選択肢の最後と、ウィンドウの［オプション］の項目に表示されます。いつも同じ場所にあります。勝手に表示されることも、入力内容に反応することもなく、誰が見たかも記録されません。
+
+無効にするか構成しない場合、相談窓口は表示されません。</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -125,6 +130,9 @@
       </presentation>
       <presentation id="HandoffHours">
         <decimalTextBox refId="HandoffHours" defaultValue="72">時間:</decimalTextBox>
+      </presentation>
+      <presentation id="SupportLine">
+        <textBox refId="SupportLine"><label>テキスト:</label></textBox>
       </presentation>
     </presentationTable>
   </resources>

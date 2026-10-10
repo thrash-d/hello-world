@@ -109,6 +109,11 @@
       <string id="HandoffHours_Help">启用此策略后，交接记录显示这么多小时（1 到 336），保留到清除的记录除外。12 小时班次适合设为 24；168 可以覆盖长周末。
 
 禁用或未配置此策略时，记录显示 72 小时。</string>
+      <string id="SUPPORTED_1_47">hello-world 1.47.0 或更高版本</string>
+      <string id="SupportLine">支持热线</string>
+      <string id="SupportLine_Help">启用此策略后，这段文字（例如员工援助计划的电话）会显示在“如果感到沉重，可以找人聊聊”下面：位于文字菜单选项的末尾，以及窗口“选项”中的一项。它总在同一个位置。它不会自行弹出，也不会对输入的内容作出反应，也不会记录谁查看过。
+
+禁用或未配置此策略时，没有支持热线。</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -125,6 +130,9 @@
       </presentation>
       <presentation id="HandoffHours">
         <decimalTextBox refId="HandoffHours" defaultValue="72">小时：</decimalTextBox>
+      </presentation>
+      <presentation id="SupportLine">
+        <textBox refId="SupportLine"><label>文字：</label></textBox>
       </presentation>
     </presentationTable>
   </resources>
