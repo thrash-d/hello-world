@@ -1,5 +1,32 @@
 # Changelog
 
+## 2026-10-10: a desk pet, plans put aside, and a weekly boss
+
+Version 1.50.0. Jaylen and Skye asked for these; the design went to them and
+to Sam first, and all three changed it.
+
+- **Desk pet**, off until turned on (`pet`, or Options > What the window
+  shows), named by you. It never gets hungry, sad or dies. Sixteen rotating
+  lines (Jaylen: one line every day turns into wallpaper), a hop after a done,
+  a sleep while you're away, and a line under the plan so it never pushes the
+  plan down. Every 5 finished things it gets something, which shows on its
+  face (Skye: "unseen loot isn't loot"), with a countdown to the next one so it
+  can be seen coming. After twelve the things come round again in new colours,
+  so they never run out.
+- **Plans put aside**: plans that move aside are listed plainly, only when
+  asked, and come back by number. Jaylen asked for a graveyard with eulogies.
+  Sam said death wording for abandoned plans hurts in a low patch, so the list
+  uses plain wording, the funny farewells are a switch, and none of them uses
+  "here lies", "RIP" or "it was a good idea at the time". They never show with
+  no follow-up questions.
+- **The weekly boss** on the shared counts server: every tip anyone does that
+  week is one hit. Its hit points are 70% of last week's tips, at least 20
+  (Skye: a 30-person company must be able to win), or fixed with `--boss-hp`.
+  It's worked out from the day files, so the server stores nothing new. Totals
+  only, with no names and no penalty. When it falls, every pet gets the same
+  trophy (Skye's conversation starter). The line says "from everyone's tips",
+  so it's plain where the number comes from (Jaylen).
+
 ## 2026-10-10: a command line for engineers
 
 Version 1.49.0. Priyanka asked for this in the persona review and changed the

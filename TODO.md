@@ -17,13 +17,12 @@ questions, What I did, large text, no follow-up questions, the support line
 and a plan-free reminder by default; 1.48.0 added reactions to the thought,
 a window that doesn't wait for the server, and handoff that opens by itself,
 with policies for shared logins and signed notes; 1.49.0 added the command
-line, todo.txt import and the standup. The reminder was already
+line, todo.txt import and the standup; 1.50.0 added the desk pet, plans put
+aside and the weekly boss. The reminder was already
 offered on the first day, right after the first plan. Running a public
 counts server for the individual package is the owner's step; the README says
 how.
 
-6. Fun: a desk pet that sleeps and never dies, a plan graveyard with kind
-   eulogies, a company boss fight on the shared counts (Jaylen, Skye).
 8. Paid tiers from the memo need a billing and licensing service outside
    this repo; noted, not buildable here.
 9. A due date for one thing in a plan instead of the whole plan (Priya,

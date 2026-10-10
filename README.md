@@ -199,6 +199,29 @@ number, it is under "If things feel heavy, someone to talk to" at the end of
 the text menu's options and in the window's Options. It never appears by
 itself, never reacts to what you type, and nothing records that you looked.
 
+### A desk pet, plans put aside, and the weekly boss
+
+Type `pet` at the last prompt, or choose **Options > What the window shows >
+Desk pet**, for a small pet that lives under your plan: `(o.o)  Biscuit is
+judging the weather.` It sleeps while you're away and is glad when you're back.
+It never gets hungry, never gets sad and never dies. Every 5 things you finish
+it gets something to keep, and wears the newest one; the screen says how many
+more until the next. Turn it off and it keeps its things for next time.
+
+Plans that move aside (one replaced, cleared, or put away after two weeks) are
+listed under **Plans put aside**, from the menu, Options > My plans, or by
+typing `aside`, and only there. A number puts one back on today's plan. They're
+listed plainly. **Funny farewells** ("It went to find itself.") is a switch,
+and never shows with no follow-up questions.
+
+With the shared count on, each week has a silly boss, such as The Inbox Hydra
+or Gerald. Every tip anyone does that week is one hit: "This week's boss: The
+Inbox Hydra. 212 of 500 hit points gone, from everyone's tips." Its hit points
+are 70% of last week's tips, so a small company can win too. It's counted
+from the same numbers as the tip count, with nothing more sent. When it falls,
+every desk pet gets a trophy. There are no names, no per-person scores and no
+penalty if it survives.
+
 ### From a command line, for engineers
 
 `hello.cmd` in PowerShell or cmd, or `hello` in WSL and Git Bash (it runs
@@ -376,7 +399,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.49.0'
+$tag = 'v1.50.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

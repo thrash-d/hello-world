@@ -18,7 +18,14 @@ restart or at midnight UTC.
     POST /v1/day/2026-10-05/tip         counts one, then the same answer
     POST /v1/day/2026-10-05/react/love  one reaction a PC a day; a second
                                         moves it rather than adding one
+    GET  /v1/week/2026-10-05            {"hp": 150, "hits": 212,
+                                         "defeated": "2026-10-08"}
     GET  /health                        {"ok": true}
+
+The week is the boss fight: every tip anyone does that week is one hit. Its
+hit points are 70% of last week's tips, at least 20, so a small company can
+win too, or a fixed number with --boss-hp. It is worked out from the day
+files, so nothing more is stored.
 
 The reactions are love, ha, dead and eyeroll.
 
@@ -37,14 +44,17 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 REACTIONS = ("love", "ha", "dead", "eyeroll")
+WEEK_PATH = re.compile(r"^/v1/week/(\d{4}-\d{2}-\d{2})$")
+BOSS_FLOOR = 20
 DAY_PATH = re.compile(r"^/v1/day/(\d{4}-\d{2}-\d{2})(/tip|/react/(?:%s))?$" % "|".join(REACTIONS))
 
 
 class Counts:
     """The day files and today's in-memory set of who already counted."""
 
-    def __init__(self, folder):
+    def __init__(self, folder, boss_hp=None):
         self.folder = folder
+        self.boss_hp = boss_hp
         os.makedirs(folder, exist_ok=True)
         self.lock = threading.Lock()
         self.salt_day = None
@@ -67,6 +77,20 @@ class Counts:
         return {"tip": tip if isinstance(tip, int) and tip >= 0 else 0,
                 "react": {r: react[r] if isinstance(react.get(r), int) and react[r] >= 0 else 0
                           for r in REACTIONS}}
+
+    def week(self, monday):
+        """The week's boss: its hit points, the hits so far, and the day it
+        fell, if it did."""
+        start = datetime.date.fromisoformat(monday)
+        tips = [self.read((start + datetime.timedelta(days=n)).isoformat())["tip"]
+                for n in range(-7, 7)]
+        hp = self.boss_hp or max(BOSS_FLOOR, round(sum(tips[:7]) * 0.7))
+        total, defeated = 0, None
+        for n, hits in enumerate(tips[7:]):
+            total += hits
+            if defeated is None and total >= hp:
+                defeated = (start + datetime.timedelta(days=n)).isoformat()
+        return {"hp": hp, "hits": total, "defeated": defeated}
 
     def add(self, day, what, address):
         """Count the tip once a PC a day, or set its one reaction, moving it
@@ -94,6 +118,17 @@ class Counts:
                 json.dump(data, f)
             os.replace(tmp, self.path(day))
             return data
+
+
+def this_week(monday):
+    """A Monday whose week holds today or a day either side, in UTC."""
+    try:
+        start = datetime.date.fromisoformat(monday)
+    except ValueError:
+        return False
+    today = datetime.datetime.now(datetime.timezone.utc).date()
+    return (start.weekday() == 0
+            and start - datetime.timedelta(days=1) <= today <= start + datetime.timedelta(days=7))
 
 
 def allowed(day):
@@ -128,6 +163,10 @@ def handler(counts):
         def do_GET(self):
             if self.path == "/health":
                 return self.reply(200, {"ok": True})
+            if week := WEEK_PATH.match(self.path):
+                if not this_week(week.group(1)):
+                    return self.reply(404, {"error": "not found"})
+                return self.reply(200, counts.week(week.group(1)))
             day, add = self.route()
             if day is None or add:
                 return self.reply(404, {"error": "not found"})
@@ -161,8 +200,8 @@ def handler(counts):
     return Handler
 
 
-def serve(port=8080, folder="counts", host="0.0.0.0", trust_proxy=False):
-    server = ThreadingHTTPServer((host, port), handler(Counts(folder)))
+def serve(port=8080, folder="counts", host="0.0.0.0", trust_proxy=False, boss_hp=None):
+    server = ThreadingHTTPServer((host, port), handler(Counts(folder, boss_hp)))
     server.trust_proxy = trust_proxy
     return server
 
@@ -174,8 +213,10 @@ def main(argv=None):
     parser.add_argument("--data", default="counts", help="folder for the day files")
     parser.add_argument("--trust-proxy", action="store_true",
                         help="count by X-Forwarded-For, behind your own https proxy")
+    parser.add_argument("--boss-hp", type=int, default=None,
+                        help="fixed hit points for the weekly boss, instead of 70%% of last week")
     args = parser.parse_args(argv)
-    server = serve(args.port, args.data, args.host, args.trust_proxy)
+    server = serve(args.port, args.data, args.host, args.trust_proxy, args.boss_hp)
     print(f"hello-world counts on {args.host}:{server.server_address[1]}, data in {args.data}")
     server.serve_forever()
 

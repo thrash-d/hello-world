@@ -3119,7 +3119,7 @@ def test_menu_option_12_has_the_windows_other_settings():
     assert "Done. The greeting uses your first name." in p.stdout
     assert "Done. Finished plans are kept for 90 days instead of 14." in p.stdout
     assert "Days you opened hello-world: 1" in p.stdout
-    assert 'Type a number from 1 to 10, or press Enter to go back.' in p.stdout
+    assert 'Type a number from 1 to 12, or press Enter to go back.' in p.stdout
     saved = notes(p.home)
     assert saved["name"] is True and saved["long_history"] is True
     assert saved["numbers"] is True
@@ -3134,7 +3134,7 @@ def test_the_text_menu_sets_a_reminder_time_and_forgets_the_earlier_plan(capsys)
     with open(os.path.join(first.home, "notes.json"), "w") as f:
         json.dump(saved, f)
     state, can_save = hello.load()
-    answers = iter(["1", "3", "1", "8", "12", "y"])
+    answers = iter(["1", "3", "1", "8", "13", "y"])
     hello.ask = lambda prompt: next(answers)
     hello.more_settings(state, can_save)
     out = capsys.readouterr().out
@@ -3951,3 +3951,126 @@ def test_the_bash_shim_is_written_the_same_by_both_installers():
     if bash:
         check = subprocess.run([bash, "-n"], input="\n".join(shims[0]) + "\n", text=True)
         assert check.returncode == 0
+
+
+def test_the_desk_pet_is_opt_in_gets_things_and_never_dies():
+    p = run(text="Call bank\n\n", day="2026-10-05")
+    assert "(o.o)" not in p.stdout
+    on = run(text="pet\ny\nBiscuit\n\n", day="2026-10-05", home=p.home)
+    out = " ".join(on.stdout.split())
+    assert "Done. Say hello to Biscuit." in out
+    assert "5 more finished things until Biscuit's next surprise." in out
+    done = run(text="done\n\n", day="2026-10-05", home=p.home)
+    assert "(o.o) Biscuit does a little hop." in " ".join(done.stdout.split())
+    # Four more things, and the fifth brings the first one, which it wears.
+    run(["plan", "a; b; c; d"], day="2026-10-05", home=p.home)
+    fifth = run(text="done\ny\n\n", day="2026-10-05", home=p.home)
+    out = " ".join(fifth.stdout.split())
+    assert "(o.o)~ Biscuit got a scarf!" in out
+    assert "5 more finished things until Biscuit's next surprise." in out
+    # Days away: it slept, and nothing is lost.
+    back = run(text="\n\n", day="2026-10-12", home=p.home)
+    assert "(o.o)~ Biscuit slept while you were away and is glad you're here." in \
+        " ".join(back.stdout.split())
+    off = run(text="pet\noff\n\n", day="2026-10-12", home=p.home)
+    assert "It keeps its things for next time." in " ".join(off.stdout.split())
+    assert "(o.o)" not in run(text="\n\n", day="2026-10-13", home=p.home).stdout
+    again = run(text="pet\ny\n\n\n", day="2026-10-13", home=p.home)
+    assert "Done. Say hello to Biscuit." in " ".join(again.stdout.split())
+    assert notes(p.home)["pet"]["done"] == 5
+
+
+def test_pet_items_never_run_out():
+    hello = _load_hello()
+    count = len(hello.PET_LOOKS)
+    assert hello.pet_item(0)[0] == "a scarf"
+    assert hello.pet_item(count)[0] == "a scarf, in a new colour"
+
+
+def test_plans_put_aside_are_plain_and_come_back_by_number():
+    p = run(text="Clean the garage\n\n", day="2026-10-05")
+    run(text="n\nn\nWrite the report\n\n", day="2026-10-06", home=p.home)
+    listed = run(text="aside\n1\n\n", day="2026-10-06", home=p.home)
+    out = " ".join(listed.stdout.split())
+    assert "1. Clean the garage, put aside Tuesday, 6 October 2026." in out
+    assert "It " not in out.split("put aside Tuesday, 6 October 2026.")[1][:4]
+    assert "Back on today's plan: Clean the garage" in out
+    assert notes(p.home)["intent"]["text"] == "Write the report; Clean the garage"
+    assert "put_aside" not in notes(p.home)
+
+
+def test_funny_farewells_are_a_switch_and_never_with_no_follow_up():
+    hello = _load_hello()
+    state = {"intent": None, "put_aside": [{"text": "Organize Drive", "date": "2026-10-05"}]}
+    plain = hello.aside_lines(state)[1][0]
+    assert plain == "1. Organize Drive, put aside Monday, 5 October 2026."
+    state["farewells"] = True
+    funny = hello.aside_lines(state)[1][0]
+    assert funny.startswith(plain + " It ")
+    for word in ("Here lies", "RIP", "gave up", "good idea at the time"):
+        assert all(word not in line for line in hello.farewells())
+    state["gentle"] = True
+    assert hello.aside_lines(state)[1][0] == plain
+
+
+def test_the_boss_adapts_to_last_week_and_falls():
+    import datetime
+    server, url, folder = _counts_server()
+    today = datetime.date.fromisoformat(_utc_today())
+    monday = today - datetime.timedelta(days=today.weekday())
+    try:
+        import urllib.request
+
+        def week(when):
+            with urllib.request.urlopen(f"{url}/v1/week/{when}", timeout=5) as r:
+                return json.loads(r.read())
+        assert week(monday.isoformat()) == {"hp": 20, "hits": 0, "defeated": None}
+        # Last week had 100 tips: this week's boss has 70.
+        for n in range(1, 8):
+            with open(os.path.join(folder, f"{monday - datetime.timedelta(days=n)}.json"),
+                      "w", encoding="utf-8") as f:
+                json.dump({"tip": 100 // 7 + (1 if n <= 100 % 7 else 0)}, f)
+        with open(os.path.join(folder, f"{monday}.json"), "w", encoding="utf-8") as f:
+            json.dump({"tip": 80}, f)
+        assert week(monday.isoformat()) == {"hp": 70, "hits": 80, "defeated": monday.isoformat()}
+        for bad in ((monday - datetime.timedelta(days=14)).isoformat(),
+                    (monday + datetime.timedelta(days=1)).isoformat()):
+            try:
+                week(bad)
+                raise AssertionError(bad)
+            except urllib.error.HTTPError as e:
+                assert e.code == 404
+        # The text screen names the boss, and every pet gets the trophy.
+        p = run(text="y\n\npet\ny\n\n\n", day=today.isoformat(), policy={"SharedCountsServer": url})
+        hello = _load_hello()
+        name, trophy = hello.bosses()[hello.boss_index(monday)]
+        again = run(text="\n\n", day=today.isoformat(), home=p.home,
+                    policy={"SharedCountsServer": url})
+        out = " ".join(again.stdout.split())
+        assert f"{name} fell on" in out and "Everyone did that." in out
+        assert f"Pip is showing off {trophy}." in out
+        assert notes(p.home)["pet"]["trophies"] == [monday.isoformat()]
+    finally:
+        server.shutdown()
+
+
+def test_the_window_shows_the_pet_under_the_plan_and_fetches_the_boss():
+    server, url, _ = _counts_server()
+    day = _utc_today()
+    try:
+        first = run(text="y\nCall bank\npet\ny\nBiscuit\n\n", day=day,
+                    policy={"SharedCountsServer": url})
+        hello = _window_hello(day=day, home=first.home)
+        hello.POLICY = {"SharedCountsServer": url}
+        visit = hello.Visit()
+        visit.counts_thread.join(5)
+        assert visit.boss["hp"] == 20
+        assert hello.boss_line(visit.boss).endswith("0 of 20 hit points gone, from everyone's tips.")
+        items, _ = hello.Window(visit).layout()
+        ids = [cid for _, cid, *_ in items]
+        assert ids.index(hello.Window.PET) > ids.index(hello.Window.PLAN)
+        texts = {cid: text for _, cid, text, *_ in items}
+        assert texts[hello.Window.PET].startswith("(o.o)  Biscuit ")
+        assert "Biscuit does a little hop." in (visit.finish_parts(["Call bank"]) and visit.pet_text)
+    finally:
+        server.shutdown()

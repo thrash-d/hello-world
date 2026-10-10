@@ -126,7 +126,11 @@ the pull request named.
 | Design review, round 74 | Old plans fold away; no label saying a mode is on; offered once after a "not yet"; "If things feel heavy, someone to talk to"; nothing logged | Sam | Built in 1.47.0 |
 | Design review, round 74 | "Not in" for days Harold wasn't at work | Harold | Not possible without keeping every visit date, which is off by default for privacy; shown as "nothing noted" |
 | Design review, round 74 | A family member seeing the history | Harold | Not built: it would send plans off the PC |
-| Personas, 1.43.0 | Desk pet, plan graveyard, boss fight | Jaylen, Skye | Queued |
+| Personas, 1.43.0 | Desk pet, plan graveyard, boss fight | Jaylen, Skye | Built in 1.50.0 (round 77) after a design review |
+| Design review, round 77 | Rotating pet lines; reacts to more than open and done; a countdown to the next thing; never pushes the plan down; mixed bosses; say plainly how the boss is counted | Jaylen | Built in 1.50.0 |
+| Design review, round 77 | Things visible on the pet; boss hit points from last week (70%, floor 20); the same trophy on every pet when it falls; absurd bosses, no corporate puns | Skye | Built in 1.50.0 |
+| Design review, round 77 | "Graveyard" and eulogies hurt in a low patch; plain "put aside" list for everyone, jokes opt-in | Sam | Built in 1.50.0: plain list, funny farewells a switch, off with no follow-up questions |
+| Design review, round 77 | Funny eulogies by default (Jaylen) vs. no death framing (Sam) | Disagreement | Sam's way by default, Jaylen's as a switch with no death words |
 | Personas, 1.43.0 | Command line, todo.txt, standup | Priyanka | Built in 1.49.0 (round 76) after a design review |
 | Design review, round 76 | WSL and Git Bash decide it; commits from several repos and emails; `--git` opt-in with a remembered default; bare `done` refuses several things; last workday spelled out; import safe to run twice; plain-text export to grep | Priyanka | Built in 1.49.0 |
 | Design review, round 76 | `hello` with no words printing only the plan | Priyanka | Not built: it would change the daily screen for everyone; `hello plan` does it |

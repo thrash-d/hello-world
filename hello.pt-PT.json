@@ -298,7 +298,18 @@
   "Type numbers from 1 to {n}, such as 1 3 or 1-3.": "Escreva números de 1 a {n}, por exemplo 1 3 ou 1-3.",
   "Type the thing to add, such as: hello add review PR 88": "Escreva o que quer acrescentar, por exemplo: hello add rever PR 88",
   "Which ones for today? Type numbers such as 1 3 or 1-3, or Enter to go back > ": "Quais para hoje? Escreva números como 1 3 ou 1-3, ou Enter para voltar > ",
-  "git wasn't found, so no commits are listed.": "O git não foi encontrado, por isso não são mostrados commits."
+  "git wasn't found, so no commits are listed.": "O git não foi encontrado, por isso não são mostrados commits.",
+  "A desk pet that sleeps when you're away and never dies. Want one? (y or n) > ": "Um bichinho de secretária que dorme quando não está e nunca morre. Quer um? (s ou n) > ",
+  "A desk pet that sleeps when you're away and never dies. Want one? You can rename it by typing pet in the text screen.": "Um bichinho de secretária que dorme quando não está e nunca morre. Quer um? Pode mudar-lhe o nome escrevendo bichinho no ecrã de texto.",
+  "Desk pet...": "Bichinho de secretária...",
+  "Done. Say hello to {name}.": "Feito. Diga olá a {name}.",
+  "Name it, or press Enter for {name} > ": "Dê-lhe um nome, ou prima Enter para {name} > ",
+  "Turn the desk pet off?": "Desligar o bichinho de secretária?",
+  "Type a new name, off to turn the pet off, or Enter to go back > ": "Escreva um nome novo, off para desligar o bichinho, ou Enter para voltar > ",
+  "Type a number to put it back on today's plan, or Enter to go back > ": "Escreva um número para o pôr de volta no plano de hoje, ou Enter para voltar > ",
+  "Type y or n.": "Escreva s ou n.",
+  "a cup of tea": "uma chávena de chá",
+  "{name} brought you an imaginary coffee.": "{name} trouxe-lhe um café imaginário."
  },
  "thoughts": {
   "0": "Abrir aquele documento que tem andado a adiar e ler só o primeiro parágrafo.",
