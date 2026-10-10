@@ -517,7 +517,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.58.0"
+VERSION = "1.59.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -559,6 +559,7 @@ SIDEWAYS_WORDS = ("sideways", "day went sideways", "de lado", "se torció",
                   "se torcio", "de travers", "deu errado", "schief",
                   "schiefgelaufen")
 GENTLE_WORDS = ("gentle", "suave", "doux", "sanft")
+PRO_WORDS = ("pro",)
 PET_WORDS = ("pet", "mascota", "mascotte", "bichinho", "haustier")
 ASIDE_WORDS = ("aside", "apartados", "de côté", "guardados", "beiseite")
 HANDOFF_WORDS = ("handoff", "relevo", "relève", "passagem", "übergabe", "ubergabe")
@@ -1082,6 +1083,239 @@ PET_LOOKS = ("(o.o)~", "^(o.o)", "(o.o) *", "(o.o)>", "(-.-)", "(o.o)/", "(o.o)P
 BOSS_COUNT = 7
 
 
+# Pro: $5 once, unlocked by a key checked on this PC (the teacher: "no
+# account, nothing phoning home"). A key is a signed note, "HW1." then the
+# note and an Ed25519 signature, base64. Only the public half of the signing
+# key is here, so this file can check keys but never make them;
+# tools/pro_keys.py makes them with the private half the owner keeps.
+# Empty until the owner puts their own public key here, and then no key works.
+PRO_PUBLIC_KEY = ""
+PRO_CONTEXT = b"hello-world pro\0"
+# Pets stay free (the indie developer); Pro is a year of history, an
+# afternoon check-in and window colours.
+PRO_KEEP_DAYS = 366
+PRO_FINISHED = 1000
+# The second check-in (the round-7 evening bell, Hank's go/no-go):
+# afternoon or evening, off unless chosen.
+AFTERNOON_TIMES = ("15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00")
+THEMES = ("sea", "sand", "night")
+
+_P = 2 ** 255 - 19
+_L = 2 ** 252 + 27742317777372353535851937790883648493
+_D = -121665 * pow(121666, _P - 2, _P) % _P
+_SQRT_M1 = pow(2, (_P - 1) // 4, _P)
+
+
+def _ed_add(a, b):
+    x1, y1, z1, t1 = a
+    x2, y2, z2, t2 = b
+    pa, pb = (y1 - x1) * (y2 - x2) % _P, (y1 + x1) * (y2 + x2) % _P
+    pc, pd = 2 * t1 * t2 * _D % _P, 2 * z1 * z2 % _P
+    e, f, g, h = pb - pa, pd - pc, pd + pc, pb + pa
+    return (e * f % _P, g * h % _P, f * g % _P, e * h % _P)
+
+
+def _ed_mul(n, point):
+    result = (0, 1, 1, 0)
+    while n:
+        if n & 1:
+            result = _ed_add(result, point)
+        point, n = _ed_add(point, point), n >> 1
+    return result
+
+
+def _ed_x(y, sign):
+    if y >= _P:
+        return None
+    x2 = (y * y - 1) * pow(_D * y * y + 1, _P - 2, _P) % _P
+    if x2 == 0:
+        return None if sign else 0
+    x = pow(x2, (_P + 3) // 8, _P)
+    if (x * x - x2) % _P:
+        x = x * _SQRT_M1 % _P
+    if (x * x - x2) % _P:
+        return None
+    return _P - x if (x & 1) != sign else x
+
+
+def _ed_point(raw):
+    if len(raw) != 32:
+        return None
+    y = int.from_bytes(raw, "little")
+    sign, y = y >> 255, y & ((1 << 255) - 1)
+    x = _ed_x(y, sign)
+    return None if x is None else (x, y, 1, x * y % _P)
+
+
+_G_Y = 4 * pow(5, _P - 2, _P) % _P
+_ED_BASE = (_ed_x(_G_Y, 0), _G_Y, 1, _ed_x(_G_Y, 0) * _G_Y % _P)
+
+
+def ed25519_verify(public, message, signature):
+    """RFC 8032 Ed25519 signature check, in the standard library only."""
+    if len(public) != 32 or len(signature) != 64:
+        return False
+    a, r = _ed_point(public), _ed_point(signature[:32])
+    s = int.from_bytes(signature[32:], "little")
+    if a is None or r is None or s >= _L:
+        return False
+    h = int.from_bytes(hashlib.sha512(signature[:32] + public + message).digest(),
+                       "little") % _L
+    left, right = _ed_mul(s, _ED_BASE), _ed_add(r, _ed_mul(h, a))
+    return ((left[0] * right[2] - right[0] * left[2]) % _P == 0
+            and (left[1] * right[2] - right[1] * left[2]) % _P == 0)
+
+
+def _b64(text):
+    return base64.urlsafe_b64decode(text + "=" * (-len(text) % 4))
+
+
+def pro_license(key):
+    """The note a Pro key carries, {"to": ..., "on": ...}, or None when the
+    key isn't one this program's owner signed."""
+    key = "".join((key or "").split())
+    parts = key.split(".")
+    if len(parts) != 3 or parts[0] != "HW1" or not PRO_PUBLIC_KEY:
+        return None
+    try:
+        note, signature = _b64(parts[1]), _b64(parts[2])
+        if not ed25519_verify(bytes.fromhex(PRO_PUBLIC_KEY), PRO_CONTEXT + note, signature):
+            return None
+        data = json.loads(note)
+    except (ValueError, TypeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+_PRO_CHECKED = {}
+
+
+def pro_on(state):
+    key = state.get("pro_key")
+    if not key:
+        return False
+    if (key, PRO_PUBLIC_KEY) not in _PRO_CHECKED:
+        _PRO_CHECKED[key, PRO_PUBLIC_KEY] = pro_license(key) is not None
+    return _PRO_CHECKED[key, PRO_PUBLIC_KEY]
+
+
+def set_pro_key(state, can_save, key):
+    """Save a pasted Pro key, once it checks out. Returns what to say."""
+    key = "".join((key or "").split())
+    license = pro_license(key)
+    if license is None:
+        return tr("That isn't a hello-world Pro key. Nothing changed.")
+    refresh(state, can_save)
+    base = copy.deepcopy(state)
+    state["pro_key"] = key
+    if not commit(state, base, can_save):
+        undo(state, base)
+        return tr("Could not save that choice on this computer.")
+    to = tidy(str(license.get("to", "")))[:60]
+    if license.get("kind") == "family":
+        return (tr("Pro is on for the household. Use the same key on everyone's devices. "
+                   "Thank you, {name}.").format(name=to) if to else
+                tr("Pro is on for the household. Use the same key on everyone's devices. "
+                   "Thank you."))
+    return (tr("Pro is on. Thank you, {name}.").format(name=to) if to
+            else tr("Pro is on. Thank you."))
+
+
+def family_on(state):
+    """A household key: Pro, plus the shared household list."""
+    return pro_on(state) and (pro_license(state["pro_key"]) or {}).get("kind") == "family"
+
+
+def month_name(month):
+    data = translation()
+    return (data["months"] if data else MONTHS)[month - 1]
+
+
+def year_page(state, d):
+    """This year: each month with what was finished in it, newest first.
+    Free since 1.59.0 (history only pays off after months, so it isn't what
+    anyone buys)."""
+    rows = [i for i in state.get("finished", []) if i["date"][:4] == str(d.year)]
+    lines = [tr("This year")]
+    for month in range(d.month, 0, -1):
+        done = [i["text"] for i in rows if int(i["date"][5:7]) == month]
+        name = month_name(month)
+        lines.append(tr("{month}: {n} finished").format(month=name, n=len(done))
+                     + (" - " + "; ".join(done[:12]) if done else ""))
+    return lines
+
+
+def afternoon_due(state, d):
+    """The afternoon check-in's text, or None: only with Pro, only for a
+    plan set today and still open, and never with no follow-up questions."""
+    intent = state["intent"]
+    if not (pro_on(state) and intent and intent["date"] == d.isoformat()) or gentle(state):
+        return None
+    if not state.get("plan_in_reminder"):
+        return tr("Something is still on today's plan.")
+    return tr("Still on today's plan: {text}").format(text=intent["text"])
+
+
+def afternoon():
+    """The afternoon task's run: one notification with Open, or nothing."""
+    state, _ = load(repair=False)
+    text = afternoon_due(state, today())
+    if text is None:
+        return 0
+    notify('<toast activationType="protocol" launch="hello-world:open">'
+           '<visual><binding template="ToastGeneric">'
+           f'<text>{xml_text(text)}</text>'
+           '</binding></visual><actions>'
+           f'<action content="{xml_text(tr("&Open").replace("&", ""))}" '
+           'activationType="protocol" arguments="hello-world:open"/>'
+           '</actions></toast>')
+    return 0
+
+
+def set_afternoon(state, can_save, at):
+    """Turn the afternoon check-in on at "HH:MM", or off with None."""
+    if at and not pro_on(state):
+        return tr("The second check-in comes with Pro.")
+    refresh(state, can_save)
+    base = copy.deepcopy(state)
+    if at:
+        state["afternoon_at"] = at
+    else:
+        state.pop("afternoon_at", None)
+    if not commit(state, base, can_save):
+        undo(state, base)
+        return tr("Could not save that choice on this computer.")
+    if not reminder_task(at, afternoon=True):
+        return tr("Could not set the second check-in on this computer.")
+    return (tr("The second check-in comes at {at} on days with an open plan.").format(
+        at=at.lstrip("0")) if at else tr("The second check-in is off."))
+
+
+def set_theme(state, can_save, theme):
+    """Window colours (Pro), or None for the system's own."""
+    if theme and not pro_on(state):
+        return tr("Window colours come with Pro.")
+    refresh(state, can_save)
+    base = copy.deepcopy(state)
+    if theme:
+        state["theme"] = theme
+    else:
+        state.pop("theme", None)
+    if not commit(state, base, can_save):
+        undo(state, base)
+        return tr("Could not save that choice on this computer.")
+    return tr("The new colours show next time the window opens.")
+
+
+def theme_names():
+    return {"sea": tr("Sea"), "sand": tr("Sand"), "night": tr("Night")}
+
+
+# (text, background) as Windows COLORREF, 0x00BBGGRR.
+THEME_COLOURS = {"sea": (0x3F2A10, 0xF4ECE1), "sand": (0x1F3A4A, 0xDCEFF8),
+                 "night": (0xE8E8E8, 0x2A2420)}
+
+
 def pet_items():
     return (tr("a scarf"),
             tr("a tiny hat"),
@@ -1528,7 +1762,8 @@ SWITCHES = ("nudge", "open_after", "weekends", "name", "no_startup_visits",
             "plan_in_reminder", "gentle", "gentle_offered", "large_text",
             "farewells", "tray")
 SETTINGS = ("streak", "tips", "text", "offered", "offer_skips", "lang",
-            "remind_at", "standup", "pet", "day_start") + SWITCHES
+            "remind_at", "standup", "pet", "day_start", "pro_key", "theme",
+            "afternoon_at") + SWITCHES
 
 
 def new_state():
@@ -1553,6 +1788,8 @@ LONG_FINISHED = 600
 
 
 def finished_cap(state):
+    if pro_on(state):
+        return PRO_FINISHED
     return LONG_FINISHED if state.get("long_history") else MAX_FINISHED
 
 
@@ -1906,6 +2143,13 @@ def load(repair=True):
         updated = raw.get("sync_updated")
         if isinstance(updated, str) and re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d", updated):
             state["sync_updated"] = updated
+    key = raw.get("pro_key")
+    if isinstance(key, str) and re.fullmatch(r"HW1\.[A-Za-z0-9_-]{1,400}\.[A-Za-z0-9_-]{86}", key):
+        state["pro_key"] = key
+    if raw.get("theme") in THEMES:
+        state["theme"] = raw["theme"]
+    if raw.get("afternoon_at") in AFTERNOON_TIMES:
+        state["afternoon_at"] = raw["afternoon_at"]
     seen = raw.get("handoff_seen")
     if isinstance(seen, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}", seen):
         state["handoff_seen"] = seen
@@ -3057,29 +3301,33 @@ def menu(state, can_save=True, iso=None, alone=False):
             not_a_choice(choice, tr("Type 1 to 12, or press Enter to go back."))
 
 
+def marked(label, on):
+    """A setting's menu label with its state."""
+    return (tr("{setting} (now on)") if on else
+            tr("{setting} (now off)")).format(setting=label)
+
+def pick(entries):
+    """A numbered menu; the chosen entry's action runs."""
+    for n, (label, _) in enumerate(entries, 1):
+        say(wrapped(f" {n:>2}  ", label))
+    choice = (ask(tr("Type a number from 1 to {n}, or Enter to go back > ")
+                  .format(n=len(entries))) or "").strip(TRIM)
+    if choice.lower() in QUIT_WORDS:
+        raise Quit
+    if choice in [str(n) for n in range(1, len(entries) + 1)]:
+        entries[int(choice) - 1][1]()
+    elif choice:
+        not_a_choice(choice, tr("Type a number from 1 to {n}, or press Enter "
+                                "to go back.").format(n=len(entries)))
+
+
+
 def more_settings(state, can_save):
     """Menu option 12: the settings the window's Options has that the menu
     above doesn't, by number."""
     v = Visit.using(state, can_save)
     yes_no = " " + tr("(y or n, Enter to go back) > ")
     hint = tr("Type y or n, or press Enter to go back.")
-
-    def marked(label, on):
-        return (tr("{setting} (now on)") if on else
-                tr("{setting} (now off)")).format(setting=label)
-
-    def pick(entries):
-        for n, (label, _) in enumerate(entries, 1):
-            say(wrapped(f" {n:>2}  ", label))
-        choice = (ask(tr("Type a number from 1 to {n}, or Enter to go back > ")
-                      .format(n=len(entries))) or "").strip(TRIM)
-        if choice.lower() in QUIT_WORDS:
-            raise Quit
-        if choice in [str(n) for n in range(1, len(entries) + 1)]:
-            entries[int(choice) - 1][1]()
-        elif choice:
-            not_a_choice(choice, tr("Type a number from 1 to {n}, or press Enter "
-                                    "to go back.").format(n=len(entries)))
 
     def flip(key, on_text, off_text):
         return lambda: para(v.switch(key, on_text, off_text))
@@ -3234,6 +3482,8 @@ def more_settings(state, can_save):
                         lambda: para(set_tray(state, can_save, not state.get("tray")))))
     if not plans_off():
         entries.append((tr("Every day..."), every_day))
+        entries.append((tr("This year..."), lambda: [say(wrapped("", line)) for line in
+                                                    year_page(state, today())]))
         entries.append((tr("Print a big page for the fridge"),
                         lambda: para(fridge_page(state, today()))))
         entries.append((tr("My day starts at..."), lambda: pick([
@@ -3453,6 +3703,45 @@ def sync_prompt(state, can_save):
     elif choice:
         not_a_choice(choice, tr("Type a number from 1 to {n}, or press Enter "
                                 "to go back.").format(n=len(entries)))
+
+
+# Said wherever a key is entered (the red team's Ponzi).
+KEY_SCAM_LINE = ("Pro keys come only from the official store. hello-world never calls, "
+                 "texts or emails to sell you a key or to check one.")
+# The memos' split: history and the core loop free, Pro for reach and
+# timing, a household key for the family list.
+PRO_PITCH = ("Pro is $5 once, or $8 once for a household: a second check-in in the "
+             "afternoon or evening, and window colours; a household key also opens "
+             "the shared household list. History, pets and everything you have now "
+             "stay free. A key is checked on this computer; there is no account and "
+             "nothing is sent.")
+
+
+def pro_prompt(state, can_save):
+    """Pro from the text screen: paste a key, or Pro's own settings."""
+    if not pro_on(state):
+        para(tr(PRO_PITCH))
+        para(tr(KEY_SCAM_LINE))
+        typed = ask(tr("Paste your Pro key, or press Enter to go back > "))
+        if (typed or "").lower().strip(TRIM) in QUIT_WORDS:
+            raise Quit
+        if typed and typed.strip():
+            para(set_pro_key(state, can_save, typed))
+        return
+    entries = []
+    at = state.get("afternoon_at")
+    if launcher_place()[0] and not policy("DisableSignInLauncher"):
+        entries += [(marked(tr("Second check-in at {at}").format(at=t.lstrip("0")), at == t),
+                     lambda t=t: para(set_afternoon(state, can_save, t)))
+                    for t in AFTERNOON_TIMES]
+        entries.append((marked(tr("No second check-in"), not at),
+                        lambda: para(set_afternoon(state, can_save, None))))
+    names = theme_names()
+    entries += [(marked(tr("Colours: {name}").format(name=names[t]), state.get("theme") == t),
+                 lambda t=t: para(set_theme(state, can_save, t))) for t in THEMES]
+    entries.append((marked(tr("Colours: the system's own"), not state.get("theme")),
+                    lambda: para(set_theme(state, can_save, None))))
+    pick(entries)
 
 
 def pet_prompt(state, can_save):
@@ -4963,6 +5252,9 @@ def last_prompt(state, can_save, intent, person, d, iso, open_menu=False):
         elif answer in HANDOFF_WORDS and handoff_on():
             handoff_prompt(state, can_save)
             continue
+        elif answer in PRO_WORDS:
+            pro_prompt(state, can_save)
+            continue
         elif answer in PET_WORDS:
             same = state["intent"] == intent
             pet_prompt(state, can_save)
@@ -5137,7 +5429,7 @@ def check_content(path, local=False):
 # The command line Priyanka asked for: hello plan, add, done, import,
 # standup and export, with no prompts unless at a terminal, plain output,
 # --json for scripts, and exit codes 0 worked, 1 failed, 2 bad usage.
-COMMANDS = ("plan", "add", "done", "import", "standup", "export", "sync")
+COMMANDS = ("plan", "add", "done", "import", "standup", "export", "sync", "pro")
 MAX_STANDUP = 20
 MAX_PATH = 260
 # The commits git prints, at most, for one repository.
@@ -5150,7 +5442,7 @@ STANDUP_USAGE = ("hello standup [--git] [--repos FOLDER ...] [--author EMAIL ...
 
 def command(name, args):
     flags = {a.lower() for a in args if a.startswith("--")}
-    if plans_off() and name != "export":
+    if plans_off() and name not in ("export", "pro"):
         say(tr("Plans are turned off by your organization."))
         return 1
     if name == "plan":
@@ -5165,6 +5457,13 @@ def command(name, args):
         return standup_command(args)
     if name == "sync":
         return sync_command([a.lower() for a in args])
+    if name == "pro":
+        if not args:
+            return usage(tr("Paste the key after pro, such as: hello pro HW1.abc.def"))
+        state, can_save = load()
+        message = set_pro_key(state, can_save, " ".join(args))
+        para(message)
+        return 0 if pro_on(state) else 1
     return export_command()
 
 
@@ -5536,7 +5835,8 @@ def main():
             pass
     args = [a.lower() for a in sys.argv[1:]]
     # pythonw.exe has no stdout, so the window and the sign-in run start here.
-    if (args in (["--window"], ["--tray"], ["--repeat"]) or args[:1] == ["--answer"] and len(args) == 2
+    if (args in (["--window"], ["--tray"], ["--repeat"], ["--afternoon"])
+            or args[:1] == ["--answer"] and len(args) == 2
             or args == ["--startup"] and sys.stdout is None):
         try:
             return gui(args)
@@ -5633,6 +5933,8 @@ def gui(args):
             return run_tray()
         if args == ["--repeat"]:
             return show_repeat()
+        if args == ["--afternoon"]:
+            return afternoon()
         return show_window()
 
 
@@ -5693,6 +5995,8 @@ TASK_NAME = "hello-world reminder " + "-".join(
 # The daily repeat's own task. "hello-world reminder" first, so the
 # all-users uninstall finds it with the others.
 REPEAT_TASK_NAME = TASK_NAME.replace("reminder ", "reminder repeat ", 1)
+# Pro's afternoon check-in (the evening bell) has its own task too.
+AFTERNOON_TASK = TASK_NAME + " afternoon"
 # Before 1.37.0 the task carried only the user name.
 OLD_TASK_NAME = "hello-world reminder " + (os.environ.get("USERNAME") or "user")
 REMINDER_TIMES = ("08:00", "09:00", "10:00", "13:00", "15:00", "18:00", "22:00")
@@ -5736,13 +6040,15 @@ def move_old_task():
         reminder_task(at)
 
 
-def reminder_task(at, repeat=False):
+def reminder_task(at, repeat=False, afternoon=False):
     """Create the daily reminder task at "HH:MM", or remove it for None; with
-    repeat, the daily repeat's task. It runs as this user, so it needs no
-    administrator. True when it worked."""
-    name, arg = (REPEAT_TASK_NAME, "--repeat") if repeat else (TASK_NAME, "--startup")
+    repeat, the daily repeat's task, and with afternoon, Pro's afternoon
+    check-in. It runs as this user, so it needs no administrator. True when
+    it worked."""
+    name, arg = ((REPEAT_TASK_NAME, "--repeat") if repeat else
+                 (AFTERNOON_TASK, "--afternoon") if afternoon else (TASK_NAME, "--startup"))
     if TASKS is not None:
-        TASKS.append(f"repeat {at}" if repeat else at)
+        TASKS.append(f"repeat {at}" if repeat else f"afternoon {at}" if afternoon else at)
         return True
     if os.name != "nt":
         return False
@@ -5789,9 +6095,11 @@ def reminder_task(at, repeat=False):
 def task_on(name=None):
     name = name or TASK_NAME
     if TASKS is not None:
-        repeat = name == REPEAT_TASK_NAME
-        mine = [t for t in TASKS if str(t).startswith("repeat ") == repeat]
-        return bool(mine and mine[-1] and mine[-1] != "repeat None")
+        kind = ("repeat " if name == REPEAT_TASK_NAME else
+                "afternoon " if name == AFTERNOON_TASK else "")
+        mine = [t for t in TASKS if (str(t).split(" ")[0] + " " if str(t).startswith(
+            ("repeat ", "afternoon ")) else "") == kind]
+        return bool(mine and mine[-1] and not str(mine[-1]).endswith(" None"))
     if os.name != "nt":
         return False
     import subprocess
@@ -6677,6 +6985,29 @@ class Window:
         self.finished = False  # a plan was finished in this window
         self.asking = bool(visit.followup)
 
+    def theme_colours(self):
+        """Pro's window colours, or None: none with high contrast on, which
+        always wins."""
+        state = self.visit.state
+        if not (pro_on(state) and state.get("theme") in THEME_COLOURS):
+            return None
+        if getattr(self, "theme_brush", None) is None:
+            import ctypes
+            from ctypes import wintypes as wt
+
+            class HIGHCONTRASTW(ctypes.Structure):
+                _fields_ = [("cbSize", wt.UINT), ("dwFlags", wt.DWORD),
+                            ("lpszDefaultScheme", wt.LPWSTR)]
+            contrast = HIGHCONTRASTW(ctypes.sizeof(HIGHCONTRASTW), 0, None)
+            self.user.SystemParametersInfoW(0x42, ctypes.sizeof(contrast),
+                                            ctypes.byref(contrast), 0)
+            if contrast.dwFlags & 1:
+                self.theme_brush = False
+                return None
+            self.gdi.CreateSolidBrush.restype = wt.HBRUSH
+            self.theme_brush = self.gdi.CreateSolidBrush(THEME_COLOURS[state["theme"]][1])
+        return THEME_COLOURS[state["theme"]] if self.theme_brush else None
+
     def react_label(self, kind):
         """A reaction's button: its count once this PC has reacted, so the
         counts stay hidden until then (Skye)."""
@@ -6969,6 +7300,11 @@ class Window:
             self.init_dialog()
             return 0
         if msg in (0x136, 0x138, 0x135):  # WM_CTLCOLORDLG, STATIC, BTN
+            colours = self.theme_colours()
+            if colours:
+                self.gdi.SetTextColor(wparam, colours[0])
+                self.gdi.SetBkColor(wparam, colours[1])
+                return self.theme_brush
             # The system's window colours, so high contrast themes still apply.
             self.gdi.SetTextColor(wparam, user.GetSysColor(8))
             self.gdi.SetBkColor(wparam, user.GetSysColor(5))
@@ -7328,6 +7664,7 @@ class Window:
         if not plans_off():
             entries.append((0, 21, tr("My plans...")))
         entries.append((0, 22, tr("My saved notes...")))
+        entries.append((0, 25, tr("Pro...")))
         if not policy("ForceEnglish"):
             entries.append((0, 8, tr("Language...")))
         if feedback_address():
@@ -7344,6 +7681,9 @@ class Window:
                                   | (checked if text_screen(v.state) else 0), 3,
                                   tr("Use the text screen")),
                                  (0, 4, tr("Open the text menu"))])
+        if choice == 25:
+            self.pro_menu()
+            return
         if choice == 23:
             self.toggled("large_text", tr("The text is larger."),
                          tr("The text is the usual size."))
@@ -7453,6 +7793,59 @@ class Window:
             self.toggled("streak", tr("The days-in-a-row message is on."),
                          tr("The days-in-a-row message is off."))
 
+    def clipboard_text(self):
+        """The text on the clipboard, or ""."""
+        import ctypes
+        from ctypes import wintypes as wt
+        kernel = ctypes.WinDLL("kernel32")
+        kernel.GlobalLock.restype = ctypes.c_void_p
+        kernel.GlobalLock.argtypes = kernel.GlobalUnlock.argtypes = [wt.HGLOBAL]
+        self.user.GetClipboardData.restype = wt.HANDLE
+        if not self.user.OpenClipboard(self.hwnd):
+            return ""
+        try:
+            handle = self.user.GetClipboardData(13)  # CF_UNICODETEXT
+            pointer = kernel.GlobalLock(handle) if handle else None
+            if not pointer:
+                return ""
+            try:
+                return ctypes.wstring_at(pointer)[:2000]
+            finally:
+                kernel.GlobalUnlock(handle)
+        finally:
+            self.user.CloseClipboard()
+
+    def pro_menu(self):
+        """Pro: paste a key from the clipboard, or Pro's settings."""
+        v, checked = self.visit, 0x8
+        if not pro_on(v.state):
+            if self.confirm(tr(PRO_PITCH) + "\n\n" + tr(KEY_SCAM_LINE) + "\n\n"
+                            + tr("Copy your Pro key, then click Yes to paste it. It is "
+                                 "checked on this computer; nothing is sent.")):
+                self.set_text(self.STATUS, set_pro_key(v.state, v.can_save,
+                                                       self.clipboard_text()))
+            return
+        at, theme, names = v.state.get("afternoon_at"), v.state.get("theme"), theme_names()
+        entries = []
+        if launcher_place()[0] and not policy("DisableSignInLauncher"):
+            entries += [(checked if at == t else 0, 10 + n,
+                         tr("Second check-in at {at}").format(at=t.lstrip("0")))
+                        for n, t in enumerate(AFTERNOON_TIMES)]
+            entries.append((checked if not at else 0, 19, tr("No second check-in")))
+        entries += [(checked if theme == t else 0, 20 + n,
+                     tr("Colours: {name}").format(name=names[t])) for n, t in enumerate(THEMES)]
+        entries.append((checked if not theme else 0, 29, tr("Colours: the system's own")))
+        choice = self.popup(entries)
+        if 10 <= choice < 10 + len(AFTERNOON_TIMES):
+            self.set_text(self.STATUS, set_afternoon(v.state, v.can_save,
+                                                     AFTERNOON_TIMES[choice - 10]))
+        elif choice == 19:
+            self.set_text(self.STATUS, set_afternoon(v.state, v.can_save, None))
+        elif 20 <= choice < 20 + len(THEMES):
+            self.set_text(self.STATUS, set_theme(v.state, v.can_save, THEMES[choice - 20]))
+        elif choice == 29:
+            self.set_text(self.STATUS, set_theme(v.state, v.can_save, None))
+
     def pet_menu(self):
         """Turn the pet on (named Pip until renamed in the text screen), see
         what it has, or turn it off."""
@@ -7496,7 +7889,13 @@ class Window:
             entries.append((checked if v.state.get("farewells") else 0, 22,
                             tr("Funny farewells for plans put aside")))
         entries.append((0, 23, tr("Print a big page for the fridge")))
+        entries.append((0, 24, tr("This year...")))
         choice = self.popup(entries)
+        if choice == 24:
+            page = year_page(v.state, v.d)
+            if self.confirm("\n".join(page) + "\n\n" + tr("Print this page?")):
+                self.set_text(self.STATUS, print_page(page))
+            return
         if choice == 23:
             self.set_text(self.STATUS, fridge_page(v.state, v.d))
             return

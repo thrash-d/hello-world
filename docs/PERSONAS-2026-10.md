@@ -186,7 +186,7 @@ the pull request named.
 | Design review, round 78 | Offer to reset kept settings on delete (Mónica, pilot) vs. no second question (Harold) | Disagreement | Harold's way; the kept settings are named, with where to change them |
 | Street research, 1.51.0 | Tray icon; one nudge at a chosen time, not a pop-up | Indie developer | Built in 1.52.0; the timed reminder is the nudge |
 | Street research, 1.51.0 | No-install build | Bank analyst | Built in 1.52.0 for personal PCs only, after the analyst said it would break a bank's rules on a work PC |
-| Street research, 1.51.0 | A way to pay, offline, no sign-in | Profit Maximizer, teacher, indie developer | Queued: round 80 |
+| Street research, 1.51.0 | A way to pay, offline, no sign-in | Profit Maximizer, teacher, indie developer | Built in 1.59.0: Pro, $5 once, a signed key checked on the device, and an $8 family key |
 | Street research, 1.51.0 | A phone version, Spanish, big buttons, offline | Cart vendor, rider, analyst | Built in 1.53.0 as an offline web app; sync queued |
 | Design review, round 82 | Say plans leave the device; no "neither can we" without an audit; losing the code; no personal notes on a server at work | Bank analyst | Built in 1.54.0: plain wording, unaudited said, code shown again on the PC, TurnOffSync policy |
 | Design review, round 81 | No reminder by default; 6:15 for the cart; Arabic; say where phone notes live | Rider, cart vendor, analyst | Built in 1.53.0 |

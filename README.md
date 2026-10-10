@@ -220,6 +220,25 @@ yesterday's plan waits for an answer. Click it to open hello-world, or
 right-click for **Done**, **Not yet** and **Open**. It never opens anything by
 itself; for one nudge at a time you pick, use **Options > Reminder...**.
 
+### Pro
+
+Pro is $5 once, or $8 once for a household: a second check-in in the
+afternoon or evening (15:00 to 21:00) on days your plan is still open, and
+window colours; a household key is used on everyone's devices and also opens
+the shared household list when it ships. History (a year, with a **This
+year** page), pets, reminders and everything else stay free. Keys come only
+from the official store, and hello-world never calls, texts or emails to sell
+or check one; the screen where you paste a key says so.
+
+hello-world collects nothing about anyone, adult or child: no account, no
+name, no age, and no plan text leaves a device unless you turn on sync,
+encrypted with a code only your devices have. That is why a household key
+needs nothing from a child to work. Paste the key in **Options > Pro...** (copy it
+first; it is read from the clipboard), type `pro` at the end of the text
+screen, or run `hello.cmd pro <key>`. The key is checked on your PC: there is
+no account and nothing is sent. Window colours step aside when Windows high
+contrast is on. `docs/PRO.md` is how the owner makes and sells keys.
+
 ### A desk pet, plans put aside, and the weekly boss
 
 Type `pet` at the last prompt, or choose **Options > What the window shows >
@@ -507,7 +526,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.58.0'
+$tag = 'v1.59.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
