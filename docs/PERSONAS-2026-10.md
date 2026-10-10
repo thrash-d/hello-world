@@ -134,6 +134,10 @@ the pull request named.
 | Personas, 1.43.0 | Command line, todo.txt, standup | Priyanka | Built in 1.49.0 (round 76) after a design review |
 | Design review, round 76 | WSL and Git Bash decide it; commits from several repos and emails; `--git` opt-in with a remembered default; bare `done` refuses several things; last workday spelled out; import safe to run twice; plain-text export to grep | Priyanka | Built in 1.49.0 |
 | Design review, round 76 | `hello` with no words printing only the plan | Priyanka | Not built: it would change the daily screen for everyone; `hello plan` does it |
+| Design review, round 78 | Due date named with its thing; keep a kind word in the done lines; Large text and Language at the top of Options; "Welcome back" and the open list after months; no second question while deleting | Harold | Built in 1.51.0 |
+| Design review, round 78 | Break the JSON to objects with a version, `n`, `done` and an ISO-or-null `due`; the menu's single date must not overwrite per-thing dates silently | Priyanka | Built in 1.51.0 |
+| Design review, round 78 | Strip "by Friday" from the text once read | Priyanka | Not built: the words are the person's own |
+| Design review, round 78 | Offer to reset kept settings on delete (Mónica, pilot) vs. no second question (Harold) | Disagreement | Harold's way; the kept settings are named, with where to change them |
 | Personas, 1.43.0 | Formulas run in the spreadsheet export | Skye, confirmed in code | Fixed in 1.46.1 |
 | Personas, 1.43.0 | Forklift horns, bakery orders, badge login, a supply locator, an email "lie detector" | Rick, Harold, Denise | Not buildable here: they need hardware or outside services |
 

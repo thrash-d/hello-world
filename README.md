@@ -71,13 +71,13 @@ After your first plan it asks once whether you want a reminder when you sign
 in. With it on, a Windows notification appears at your first sign-in of the
 day, only when there is a plan to ask about: "Did you do it?". It leaves the
 plan's words out, so a shared screen doesn't show them, unless you choose
-**Options > Reminder settings > Show my plan in the reminder**. Click **Done** or **Not yet** on it and that's the answer; nothing
+**Options > Reminder... > Show my plan in the reminder**. Click **Done** or **Not yet** on it and that's the answer; nothing
 else opens, and Done brings a short thank-you. Skip is there too. For a plan
 of a few things the notification has **Open** instead of Done, so you tick
 the ones you did. In the text screen, `done` on a plan of a few things asks
 which ones, by number. Click the notification itself
 to open the window. With no plan, it stays quiet, unless you choose
-**Options > Reminder settings > Also on days with no plan**. The same menu
+**Options > Reminder... > Also on days with no plan**. The same menu
 moves the reminder to 8:00, 9:00, 10:00 or 13:00 instead of sign-in, opens
 the window after you answer, and comes on weekends only if you choose **Also
 on weekends**. Days your organization
@@ -114,7 +114,7 @@ closes it.
 ### The text screen
 
 hello-world also runs as text in a console window, for anyone who prefers
-typing to clicking. Choose **Options > Use the text screen** in the
+typing to clicking. Choose **Options > Text screen... > Use the text screen** in the
 window, or ask IT, who can set it for everyone. In the text screen, menu
 option 9 switches back to the window. Press Enter at each question to skip it,
 and once more to close.
@@ -184,7 +184,7 @@ gap is left to wonder about. It offers to print the page. **Take back a
 Done...** undoes a Done clicked by mistake and puts the thing back on
 today's plan.
 
-**Options > What the window shows > Large text** makes the whole window half
+**Options > Large text** makes the whole window half
 as big again, and stays that way.
 
 **No follow-up questions** in the same menu, or `gentle` at the last prompt,
@@ -399,7 +399,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.50.0'
+$tag = 'v1.51.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

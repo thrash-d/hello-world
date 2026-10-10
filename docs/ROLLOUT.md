@@ -39,7 +39,7 @@ Subject: A 20-second start to the day, if you want one
 - Does it work with a screen reader? Yes. The window uses standard Windows
   buttons and labels, and was checked with Narrator, NVDA, JAWS, Magnifier
   and high contrast. The text screen, plain text read top to bottom, is there
-  too: Options > Use the text screen.
+  too: Options > Text screen... > Use the text screen.
 
 ## For privacy and records reviewers
 

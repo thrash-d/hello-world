@@ -2319,10 +2319,10 @@ def test_the_window_switches_to_the_text_screen_and_back():
 def test_menu_option_9_switches_the_start_menu_and_policy_can_set_it():
     p = run(text="\nm\n9\n\n\n")
     assert "Use this text screen (now a window with buttons)" in p.stdout
-    assert "Done. The Start menu opens this text screen." in p.stdout
+    assert "The Start menu opens this text screen." in p.stdout
     assert notes(p.home)["text"] is True
     p = run(text="\nm\n9\n\n\n", home=p.home, day="2026-10-02")
-    assert "Done. The Start menu opens a window with buttons." in p.stdout
+    assert "The Start menu opens a window with buttons." in p.stdout
     assert "text" not in notes(p.home)
     p = run(text="\nm\n9\n\n\n", policy={"UseTextScreen": 1})
     assert "Window or text screen (set by your organization)" in p.stdout
@@ -2493,7 +2493,8 @@ def test_a_plan_of_several_things_is_split_and_each_is_finished_on_its_own():
     p = run(text="1 3\n\n", day="2026-10-02", home=first.home)
     assert "1  Call Ana" in p.stdout and "The rest is kept for today." in p.stdout
     saved = notes(first.home)
-    assert [f["text"] for f in saved["finished"]] == ["Call Ana", "book travel"]
+    # Stored last-first, so newest_first shows them in plan order.
+    assert [f["text"] for f in saved["finished"]] == ["book travel", "Call Ana"]
     assert saved["done"] == 2
     assert saved["intent"]["text"] == "send the report"
     assert saved["intent"]["since"] == "2026-10-01"
@@ -2540,7 +2541,8 @@ def test_delete_everything_keeps_the_settings():
     visit = hello.Visit()
     assert visit.toggle("streak") and visit.toggle("tips")
     said = visit.delete_all()
-    assert "Your settings were kept." in said
+    assert ("Your settings were kept: thought and tip hidden, days-in-a-row message."
+            in " ".join(said.split()))
     saved = notes(first.home)
     assert saved["streak"] is True and saved["tips"] is False
     assert saved["intent"] is None and "finished" not in saved
@@ -2980,7 +2982,7 @@ def test_some_parts_of_todays_plan_can_be_finished_from_the_window():
     message = visit.finish_parts(["Call Ana", "book travel"])
     assert message == "Good. 2 things are off your list. The rest is kept for today."
     saved = notes(first.home)
-    assert [i["text"] for i in saved["finished"]] == ["Call Ana", "book travel"]
+    assert [i["text"] for i in saved["finished"]] == ["book travel", "Call Ana"]
     assert saved["intent"]["text"] == "send the report"
 
 
@@ -3116,8 +3118,8 @@ def test_menu_option_12_has_the_windows_other_settings():
     p = run(text="\nm\n12\n1\n12\n7\n12\n5\ny\n12\nbanana\n\n\n")
     assert "12  More settings..." in p.stdout
     assert "Greet me by name (now off)" in p.stdout
-    assert "Done. The greeting uses your first name." in p.stdout
-    assert "Done. Finished plans are kept for 90 days instead of 14." in p.stdout
+    assert "The greeting uses your first name." in p.stdout
+    assert "Finished plans are kept for 90 days instead of 14." in p.stdout
     assert "Days you opened hello-world: 1" in p.stdout
     assert 'Type a number from 1 to 12, or press Enter to go back.' in p.stdout
     saved = notes(p.home)
@@ -3144,14 +3146,14 @@ def test_the_text_menu_sets_a_reminder_time_and_forgets_the_earlier_plan(capsys)
     assert notes(first.home)["weekends"] is True
     hello.more_settings(state, can_save)
     assert "previous" not in notes(first.home)
-    assert "Done. The earlier plan is forgotten." in capsys.readouterr().out
+    assert "The earlier plan is forgotten." in capsys.readouterr().out
 
 
 def test_done_in_the_text_screen_asks_which_of_several():
     p = run(text="Call Ana; send it; book travel\ndone\n1 3\n\n")
     assert "Good. 2 things are off your list. The rest is kept for today." in p.stdout
     saved = notes(p.home)
-    assert [i["text"] for i in saved["finished"]] == ["Call Ana", "book travel"]
+    assert [i["text"] for i in saved["finished"]] == ["book travel", "Call Ana"]
     assert saved["intent"]["text"] == "send it"
     p = run(text="done\n\n", home=p.home)
     assert "Which did you finish?" not in p.stdout
@@ -3183,7 +3185,7 @@ def test_the_text_menu_turns_off_a_reminder_at_a_set_time():
     visit.reminder_at("09:00")
     assert hello.reminder_on()
     message = hello.Visit.using(*hello.load()).set_reminder(False)
-    assert message == "Done. The sign-in reminder is off."
+    assert message == "The sign-in reminder is off."
     assert not hello.reminder_on() and "remind_at" not in notes(hello.HOME)
 
 
@@ -3286,7 +3288,7 @@ def test_a_due_date_is_shown_and_carried_with_the_plan():
     first = run(text="Send the invoice\n\n")
     hello = _window_hello(day="2026-10-01", home=first.home)
     visit = hello.Visit()
-    assert visit.set_due("2026-10-05") == "Done. Due Monday, 5 October 2026."
+    assert visit.set_due("2026-10-05") == "Due Monday, 5 October 2026."
     hello = _window_hello(day="2026-10-02", home=first.home)
     visit = hello.Visit()
     assert visit.answer("no").startswith("Kept for today.")
@@ -3297,7 +3299,7 @@ def test_a_due_date_is_shown_and_carried_with_the_plan():
     assert "Due today." in hello.SHOWN[0]
     p = run(text="\n", day="2026-10-06", home=first.home)
     assert "It was due Monday, 5 October 2026." in p.stdout
-    assert visit.set_due(None) == "Done. The plan has no due date."
+    assert visit.set_due(None) == "The plan has no due date now."
     assert "due" not in notes(first.home)["intent"]
 
 
@@ -3311,7 +3313,7 @@ def test_the_export_has_a_spreadsheet_copy_and_can_be_deleted():
     with open(hello.export_file(".csv"), encoding="utf-8-sig") as f:
         assert f.read().splitlines()[:2] == ["Date;Plan;Due;Finished",
                                              "2026-10-01;Call Ana;;"]
-    assert hello.delete_export() == "Done. The plans file you saved is deleted."
+    assert hello.delete_export() == "The plans file you saved is deleted."
     assert not os.listdir(hello.EXPORT_DIR)
 
 
@@ -3550,7 +3552,7 @@ def test_the_window_counts_the_tip():
         assert visit.tip_people == 0
         assert visit.did_tip() == "Counted. People who did today's tip so far: 1"
         assert visit.tip_people == 1
-        assert visit.shared_switch() == "Done. Nothing is sent, and no count shows."
+        assert visit.shared_switch() == "Nothing is sent, and no count shows."
         assert "shared" not in notes(first.home)
     finally:
         server.shutdown()
@@ -3750,7 +3752,7 @@ def test_the_question_names_the_day_with_its_date():
 
 def test_no_follow_up_questions_stops_asking_and_folds_old_plans_away():
     first = run(text="Reply to Dana\ngentle\n\n")
-    assert "Done. It won't ask about your plans." in first.stdout
+    assert "It won't ask about your plans." in first.stdout
     assert notes(first.home)["gentle"] is True
     p = run(text="\n\n\n", day="2026-10-02", home=first.home)
     assert "Did you do it?" not in p.stdout and "Still open since" in p.stdout
@@ -3827,12 +3829,14 @@ def test_the_reminder_leaves_the_plan_out_unless_it_is_turned_on():
 
 def test_the_command_line_sets_shows_and_finishes_a_plan():
     p = run(["plan", "Fix flaky test; review PR 88 by Friday"], day="2026-10-05")
-    assert p.returncode == 0 and "Saved. Due Friday, 9 October 2026." in p.stdout
+    assert p.returncode == 0
+    assert "Saved. Due Friday, 9 October 2026: review PR 88 by Friday" in p.stdout
     shown = run(["plan"], day="2026-10-05", home=p.home)
     assert shown.stdout.splitlines()[:2] == ["1  Fix flaky test", "2  review PR 88 by Friday"]
     data = json.loads(run(["plan", "--json"], day="2026-10-05", home=p.home).stdout)
-    assert data == {"date": "2026-10-05", "due": "2026-10-09",
-                    "things": ["Fix flaky test", "review PR 88 by Friday"]}
+    assert data == {"version": 2, "date": "2026-10-05", "due": "2026-10-09", "things": [
+        {"n": 1, "text": "Fix flaky test", "due": None, "done": False},
+        {"n": 2, "text": "review PR 88 by Friday", "due": "2026-10-09", "done": False}]}
     assert run(["add", "ship 1.2"], day="2026-10-05", home=p.home).returncode == 0
     again = run(["add", "Ship 1.2"], day="2026-10-05", home=p.home)
     assert "already on the plan" in again.stdout
@@ -3867,10 +3871,12 @@ def test_todo_txt_import_reads_open_tasks_and_never_duplicates():
     assert "1  Call Ana +hiring @phone (due:2026-10-08)" in listed.stdout
     assert "Done already" not in listed.stdout
     p = run(["import", path, "--pick", "1", "2"], day="2026-10-05", home=listed.home)
-    assert p.returncode == 0 and "Due Thursday, 8 October 2026." in p.stdout
+    assert p.returncode == 0
+    assert "Due Thursday, 8 October 2026: Call Ana +hiring @phone" in p.stdout
     saved = notes(p.home)["intent"]
     assert saved["text"] == "Call Ana +hiring @phone; Review PR 88, carefully +core"
     assert saved["due"] == "2026-10-08"
+    assert saved["dues"] == {"Call Ana +hiring @phone": "2026-10-08"}
     # Running it again adds only what isn't there yet.
     again = run(["import", path, "--pick", "1-3"], day="2026-10-05", home=p.home)
     assert notes(again.home)["intent"]["text"].count("Call Ana") == 1
@@ -3950,7 +3956,7 @@ def test_the_desk_pet_is_opt_in_gets_things_and_never_dies():
     assert "(o.o)" not in p.stdout
     on = run(text="pet\ny\nBiscuit\n\n", day="2026-10-05", home=p.home)
     out = " ".join(on.stdout.split())
-    assert "Done. Say hello to Biscuit." in out
+    assert "Say hello to Biscuit." in out
     assert "5 more finished things until Biscuit's next surprise." in out
     done = run(text="done\n\n", day="2026-10-05", home=p.home)
     assert "(o.o) Biscuit does a little hop." in " ".join(done.stdout.split())
@@ -3968,7 +3974,7 @@ def test_the_desk_pet_is_opt_in_gets_things_and_never_dies():
     assert "It keeps its things for next time." in " ".join(off.stdout.split())
     assert "(o.o)" not in run(text="\n\n", day="2026-10-13", home=p.home).stdout
     again = run(text="pet\ny\n\n\n", day="2026-10-13", home=p.home)
-    assert "Done. Say hello to Biscuit." in " ".join(again.stdout.split())
+    assert "Say hello to Biscuit." in " ".join(again.stdout.split())
     assert notes(p.home)["pet"]["done"] == 5
 
 
@@ -4066,3 +4072,53 @@ def test_the_window_shows_the_pet_under_the_plan_and_fetches_the_boss():
         assert "Biscuit does a little hop." in (visit.finish_parts(["Call bank"]) and visit.pet_text)
     finally:
         server.shutdown()
+
+
+def test_things_finished_together_list_in_plan_order():
+    p = run(["plan", "Call Ana; send it; book travel"], day="2026-10-05")
+    run(["done", "all"], day="2026-10-05", home=p.home)
+    out = run(["standup"], day="2026-10-06", home=p.home).stdout.splitlines()
+    assert out[1:4] == ["- Call Ana", "- send it", "- book travel"]
+    shown = run(text="m\n1\n\n\n", day="2026-10-06", home=p.home).stdout
+    assert shown.index("Call Ana") < shown.index("send it") < shown.index("book travel")
+
+
+def test_back_after_months_is_welcomed_back_not_as_new():
+    p = run(text="Call the bank\n\n", day="2026-06-01")
+    later = run(text="\n\n", day="2026-10-01", home=p.home)
+    out = " ".join(later.stdout.split())
+    assert "Welcome back. Glad you are here." in out
+    assert "Welcome. Each day" not in out
+    assert "Call the bank" in out
+
+
+def test_a_deadline_word_after_the_day_reads_in_chinese_japanese_and_korean():
+    # 2026-10-05 is a Monday.
+    for lang, plan, due in (("ja", "報告書を金曜まで", "2026-10-09"),
+                            ("ja", "見積もりを明日までに", "2026-10-06"),
+                            ("ja", "金額を確認する", None),
+                            ("ko", "보고서 금요일까지", "2026-10-09"),
+                            ("ko", "보고서를 내일까지", "2026-10-06"),
+                            ("zh", "周五前交报告", "2026-10-09"),
+                            ("zh", "明天之前回复", "2026-10-06")):
+        p = run(["plan", plan], day="2026-10-05", lang=lang)
+        assert notes(p.home)["intent"].get("due") == due, (lang, plan)
+
+
+def test_a_due_date_belongs_to_the_thing_it_is_written_in():
+    p = run(["plan", "call the bank by Friday; water plants; ship 1.2 by tomorrow"], day="2026-10-05")
+    saved = notes(p.home)["intent"]
+    assert saved["due"] == "2026-10-06"
+    assert saved["dues"] == {"call the bank by Friday": "2026-10-09",
+                             "ship 1.2 by tomorrow": "2026-10-06"}
+    assert "Due tomorrow: ship 1.2 by tomorrow" in p.stdout
+    # Finishing the thing with the nearest date moves to the next one.
+    done = run(["done", "3"], day="2026-10-05", home=p.home)
+    assert done.returncode == 0
+    saved = notes(p.home)["intent"]
+    assert saved["due"] == "2026-10-09" and list(saved["dues"]) == ["call the bank by Friday"]
+    shown = run(["plan"], day="2026-10-05", home=p.home).stdout
+    assert "Due Friday, 9 October 2026: call the bank by Friday" in shown
+    run(["done", "1"], day="2026-10-05", home=p.home)
+    saved = notes(p.home)["intent"]
+    assert saved["text"] == "water plants" and "due" not in saved and "dues" not in saved
