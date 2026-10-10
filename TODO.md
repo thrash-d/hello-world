@@ -36,6 +36,31 @@ how.
    night shift, drive days, job hunts, shifts and rent, quarterly targets, a
    gift key card) wait for Pro itself (item 1). A family key waits for a
    decision on children's privacy law.
+4. Round 86, from the pre-2000 round (six of eight asked): "The day went
+   sideways" becomes two equal buttons, **Carry to tomorrow** (the default)
+   and **Set aside**, on the PC and the phone. After a missed day the first
+   screen is "Fresh day. Bring yesterday's over, or start clean?", with no
+   overdue count. A plan carried twice gets "Make it smaller, or set it
+   aside?". The pet stays content whatever happens.
+5. A count of sideways taps kept only on the device and never shown as a
+   number, used only to offer "Want tomorrow's plan smaller?" after several
+   in a week (Dot).
+6. **Close today**, free: an evening screen with Done, Carry or Set aside for
+   each thing, then quiet (Hank's go/no-go, Anselm's Compline).
+7. An evening bell at a chosen time, a second reminder, off unless turned on;
+   with Pro (item 1).
+8. **Large print** as a toggle on the first screen of the window and the
+   phone, and on the fridge page (Gordo, Neferet).
+9. A household list (Okiku): a separate list people put things on on
+   purpose, anyone on it adds and ticks, personal plans never in it, no
+   count of who did what, on its own opt-in encrypted sync code. With the
+   family key, so it waits for that decision; the hard rule against any
+   view of someone else's plans stays.
+10. Private letters to family (Mary): the phone's Draft text button already
+    opens the phone's own messages; a letter written in hello-world, kept on
+    the device and handed to the phone's own mail or messages to send, is
+    the version that keeps hello-world from becoming a messaging service.
+    The Profit Maximizer advised against more than that (abuse risk).
 
 ## Needs the deploying organization
 
