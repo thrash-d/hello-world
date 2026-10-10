@@ -40,8 +40,10 @@ how.
    before they're promoted widely.
 4. Pro-only ideas from the memos (Discord and calendar reminders, presets for
    night shift, drive days, job hunts, shifts and rent, quarterly targets, a
-   gift key card) wait for Pro itself (item 2). A family key waits for a
-   decision on children's privacy law.
+   gift key card) wait for Pro itself (item 2). The family key ($8 once)
+   is a go: the owner decided on 2026-10-10 to sell it. hello-world collects
+   nothing about anyone, child or adult, and keeps no accounts, which is
+   what children's privacy law is about; the README will say so plainly.
 5. Round 86, from the pre-2000 round (six of eight asked): "The day went
    sideways" becomes two equal buttons, **Carry to tomorrow** (the default)
    and **Set aside**, on the PC and the phone. After a missed day the first
@@ -86,7 +88,18 @@ how.
     anyone leaves (Torquemada); each item's own history of who added, ticked
     or removed it, visible to everyone on the list, and 30 days to restore a
     removed one (Caligula), with no totals or rankings per person; and the
-    household code never on the fridge page or in a text.
+    household code never on the fridge page or in a text. Built with the
+    family key, after those protections, not before.
+17. A list of the devices syncing with a code, without accounts: each device
+    writes a name it's given ("Kitchen tablet") into the encrypted copy when
+    it syncs, so the list is only readable with the code, and **Change my
+    sync code** is how one is removed (Mielke). The Profit Maximizer had
+    thought this needed accounts; this way doesn't.
+18. Below the minimum group, counts read "a few people" instead of a
+    number, so nothing is hidden that wasn't already guessable (item 12).
+
+Nothing from a review is cut (the owner, 2026-10-10): what a memo would
+have dropped is built in the safe form named above.
 
 ## Needs the deploying organization
 
