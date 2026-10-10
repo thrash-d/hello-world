@@ -1449,6 +1449,17 @@ def sync_in_background(can_save):
     threading.Thread(target=run).start()
 
 
+def commit_then_sync(state, base, can_save):
+    """Save without a background sync, for callers that sync right after:
+    two at once could write the server's copy over each other."""
+    global SYNCING
+    was, SYNCING = SYNCING, True
+    try:
+        return commit(state, base, can_save)
+    finally:
+        SYNCING = was
+
+
 def mark_synced_change(state):
     """Stamp a change to the plan, so the newer side wins a merge."""
     if state.get("sync"):
@@ -1470,7 +1481,7 @@ def set_sync(state, can_save, on):
         state.pop("sync", None)
         state.pop("sync_updated", None)
         state.pop("devices", None)
-    if not commit(state, base, can_save):
+    if not commit_then_sync(state, base, can_save):
         undo(state, base)
         return tr("Could not save that choice on this computer.")
     if not on:
@@ -4077,7 +4088,7 @@ def change_sync_code(state, can_save):
     # Only this device has the new code, so only it is listed.
     state["devices"] = {}
     mark_synced_change(state)
-    if not commit(state, base, can_save):
+    if not commit_then_sync(state, base, can_save):
         undo(state, base)
         return tr("Could not save that choice on this computer.")
     sync_now(state, can_save)
@@ -4241,7 +4252,11 @@ def sync_prompt(state, can_save):
         para(change_sync_code(state, can_save))
     elif choice == "4":
         name = (ask(tr("A name the other devices will see, such as Kitchen PC > ")) or "").strip()
-        if name and Visit.using(state, can_save).setting("device_name", name[:MAX_HOUSE_NAME]):
+        refresh(state, can_save)
+        base = copy.deepcopy(state)
+        if name:
+            state["device_name"] = name[:MAX_HOUSE_NAME]
+        if name and commit_then_sync(state, base, can_save):
             sync_now(state, can_save)
             para(tr("This computer is listed as {name}.").format(name=name[:MAX_HOUSE_NAME]))
         else:
