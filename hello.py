@@ -517,7 +517,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.49.0"
+VERSION = "1.50.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -554,6 +554,8 @@ UNSURE_WORDS = ("?", "not sure", "unsure", "i'm not sure", "im not sure",
                 "je ne sais plus", "não sei", "nao sei", "weiß nicht",
                 "weiss nicht", "nicht sicher")
 GENTLE_WORDS = ("gentle", "suave", "doux", "sanft")
+PET_WORDS = ("pet", "mascota", "mascotte", "bichinho", "haustier")
+ASIDE_WORDS = ("aside", "apartados", "de côté", "guardados", "beiseite")
 HANDOFF_WORDS = ("handoff", "relevo", "relève", "passagem", "übergabe", "ubergabe")
 CLEAR_WORDS = ("clear", "borrar", "effacer", "limpar", "löschen", "loschen")
 HELP_WORDS = ("h", "help", "?", "ayuda", "aide", "ajuda", "hilfe")
@@ -819,6 +821,283 @@ def shared_lines(state, d, counts, thought=True):
     return lines
 
 
+# The desk pet (Jaylen, Skye): off until turned on, named by its person. It
+# never gets hungry, sad or dies, and nothing is lost by staying away. Every
+# PET_EVERY finished things it gets something to keep, which shows on it.
+PET_DEFAULT = "Pip"
+PET_EVERY = 5
+MAX_TROPHIES = 60
+PET_FACE = "(o.o)"
+# How it looks wearing each thing it gets, in the order of pet_items().
+PET_LOOKS = ("(o.o)~", "^(o.o)", "(o.o) *", "(o.o)>", "(-.-)", "(o.o)/", "(o.o)P", "(o.o)u", "w(o.o)", "(o.o)[]", "(o.o)o")
+# Bosses for the week (Skye: absurd, never corporate puns), with the trophy
+# every pet gets when everyone's tips beat it.
+BOSS_COUNT = 7
+
+
+def pet_items():
+    return (tr("a scarf"),
+            tr("a tiny hat"),
+            tr("a plant"),
+            tr("a bow tie"),
+            tr("sunglasses"),
+            tr("a cape"),
+            tr("a little flag"),
+            tr("a cup of tea"),
+            tr("a crown"),
+            tr("a book"),
+            tr("a balloon"))
+
+
+def pet_lines():
+    return (tr("{name} is awake and stretching."),
+            tr("{name} found a sock and is very proud."),
+            tr("{name} is judging the weather."),
+            tr("{name} is sorting a pebble collection."),
+            tr("{name} is pretending to read your screen."),
+            tr("{name} had a nap and feels great about it."),
+            tr("{name} is humming something off-key."),
+            tr("{name} is guarding your desk from crumbs."),
+            tr("{name} counted the ceiling tiles. Twice."),
+            tr("{name} is practising a little wave."),
+            tr("{name} brought you an imaginary coffee."),
+            tr("{name} is sitting very still, like a professional."),
+            tr("{name} is waiting to see what today is about."),
+            tr("{name} discovered the stapler. Again."),
+            tr("{name} is stretching one tiny leg."),
+            tr("{name} says hello in its own way."))
+
+
+def bosses():
+    """(name, trophy) for each weekly boss."""
+    return ((tr("The Inbox Hydra"), tr("a tiny Hydra tooth")),
+            (tr("The Meeting That Could Have Been an Email"), tr("a tiny calendar invite")),
+            (tr("Gerald"), tr("Gerald's tiny tie")),
+            (tr("The Printer Jam Golem"), tr("a tiny paper crown")),
+            (tr("The Reply-All Swarm"), tr("a tiny bee")),
+            (tr("The Monday Fog"), tr("a tiny umbrella")),
+            (tr("The Lost Charger Gremlin"), tr("a tiny cable")))
+
+
+def pet_on(state):
+    return bool(state.get("pet")) and not state["pet"].get("off")
+
+
+def pet_item(n):
+    """The nth thing the pet got (from 0), and how it looks: after the list
+    runs out they come round again in new colours, so they never run out."""
+    name, look = pet_items()[n % len(PET_LOOKS)], PET_LOOKS[n % len(PET_LOOKS)]
+    return (name if n < len(PET_LOOKS)
+            else tr("{item}, in a new colour").format(item=name)), look
+
+
+def pet_look(state):
+    got = state["pet"]["done"] // PET_EVERY
+    return pet_item(got - 1)[1] if got else PET_FACE
+
+
+def pet_line(state, d, event=None):
+    """The pet's line: what it is doing, or what just happened, with its
+    face wearing the newest thing it got."""
+    pet = state["pet"]
+    name = pet["name"]
+    if event == "done":
+        got = pet["done"] // PET_EVERY
+        text = (tr("{name} got {item}!").format(name=name, item=pet_item(got - 1)[0])
+                if pet["done"] % PET_EVERY == 0 and got else
+                tr("{name} does a little hop.").format(name=name))
+    elif event is None and state.get("put_aside") and state["put_aside"][-1]["date"] == d.isoformat():
+        text = tr("{name} keeps it safe on the shelf.").format(name=name)
+    elif pet.get("seen") and pet["seen"] < d.isoformat() and missed_a_workday(pet["seen"], d):
+        text = tr("{name} slept while you were away and is glad you're here.").format(name=name)
+    elif (trophy := week_trophy(state, d)):
+        text = tr("{name} is showing off {trophy}.").format(name=name, trophy=trophy)
+    else:
+        lines = pet_lines()
+        text = lines[(d.toordinal() + sum(map(ord, name))) % len(lines)].format(name=name)
+    return f"{pet_look(state)}  {text}"
+
+
+def pet_countdown(state):
+    """How far off the next thing is, so it can be seen coming (Jaylen)."""
+    left = PET_EVERY - state["pet"]["done"] % PET_EVERY
+    name = state["pet"]["name"]
+    return (tr("One more finished thing until {name}'s next surprise.").format(name=name)
+            if left == 1 else
+            tr("{n} more finished things until {name}'s next surprise.").format(n=left, name=name))
+
+
+def pet_things(state):
+    """Everything the pet has, for "What does it have?"."""
+    pet = state["pet"]
+    things = [pet_item(n)[0] for n in range(pet["done"] // PET_EVERY)]
+    things += [bosses()[boss_index(datetime.date.fromisoformat(w))][1]
+               for w in pet.get("trophies", [])]
+    return things
+
+
+def week_trophy(state, d):
+    """This week's trophy, once everyone beat the boss, or None."""
+    monday = (d - datetime.timedelta(days=d.weekday())).isoformat()
+    if monday in state["pet"].get("trophies", []):
+        return bosses()[boss_index(datetime.date.fromisoformat(monday))][1]
+    return None
+
+
+def mark_pet_seen(state, can_save, d):
+    """Remember the day the pet was shown, so it knows when you were away."""
+    if not pet_on(state) or state["pet"].get("seen") == d.isoformat():
+        return
+    refresh(state, can_save)
+    if not pet_on(state):
+        return
+    base = copy.deepcopy(state)
+    state["pet"] = dict(state["pet"], seen=d.isoformat())
+    if not commit(state, base, can_save):
+        undo(state, base)
+
+
+def set_pet(state, can_save, name):
+    """Turn the pet on with this name (or rename it), or off with None. Its
+    things are kept while it's off. Returns what to say."""
+    refresh(state, can_save)
+    base = copy.deepcopy(state)
+    if name is None:
+        if state.get("pet"):
+            state["pet"] = dict(state["pet"], off=True)
+    else:
+        old = {k: v for k, v in (state.get("pet") or {}).items() if k != "off"}
+        state["pet"] = {"done": 0, **old, "name": tidy(name)[:20] or PET_DEFAULT}
+    if not commit(state, base, can_save):
+        undo(state, base)
+        return tr("Could not save that choice on this computer.")
+    if name is None:
+        return tr("Done. The desk pet is off. It keeps its things for next time.")
+    return tr("Done. Say hello to {name}.").format(name=state["pet"]["name"])
+
+
+def pet_count(state, n):
+    """Count finished things for the pet."""
+    if pet_on(state):
+        state["pet"] = dict(state["pet"], done=min(state["pet"]["done"] + n, 99999))
+
+
+# Plans put aside (Jaylen asked for a graveyard; Sam asked that it not be
+# one): plans that moved aside, plainly listed, shown only when asked, and
+# brought back by number. Funny farewells are a switch, never on with no
+# follow-up questions.
+MAX_ASIDE = 30
+
+
+def farewells():
+    return (tr("It went to find itself."),
+            tr("It is on a long lunch."),
+            tr("It saw things no folder should see."),
+            tr("It joined a band. They're not bad."),
+            tr("It is resting its eyes."),
+            tr("It is on a sabbatical in the cloud."),
+            tr("It left a note: back soon, probably."),
+            tr("It is on a beach somewhere, thinking of you."))
+
+
+def put_aside(state, text, d=None):
+    """Move a plan aside: it becomes the earlier plan for same, and joins
+    the list of plans put aside."""
+    state["previous"] = text
+    when = (d or today()).isoformat()
+    rows = [r for r in state.get("put_aside", []) if r["text"] != text]
+    state["put_aside"] = (rows + [{"text": text, "date": when}])[-MAX_ASIDE:]
+
+
+def aside_lines(state):
+    """The list, newest first, numbered."""
+    # One brought back with same is on the plan again, not aside.
+    intent = state.get("intent")
+    have = {p.casefold() for p in plan_parts(intent["text"])} | {intent["text"].casefold()} if intent else set()
+    rows = [r for r in newest_first(state.get("put_aside", [])) if r["text"].casefold() not in have]
+    funny = state.get("farewells") and not gentle(state)
+    lines = []
+    for n, row in enumerate(rows, 1):
+        line = tr("{n}. {text}, put aside {date}.").format(
+            n=n, text=row["text"], date=long_date(datetime.date.fromisoformat(row["date"])))
+        if funny:
+            line += " " + farewells()[sum(map(ord, row["text"])) % len(farewells())]
+        lines.append(line)
+    return rows, lines
+
+
+def bring_back(state, can_save, row, d):
+    """Put a plan from the list back on today's plan. Returns what to say."""
+    refresh(state, can_save)
+    if row not in state.get("put_aside", []):
+        return tr("Nothing changed.")
+    base = copy.deepcopy(state)
+    state["put_aside"] = [r for r in state["put_aside"] if r != row]
+    if not state["put_aside"]:
+        state.pop("put_aside")
+    if state.get("previous") == row["text"]:
+        state.pop("previous")
+    intent = state["intent"]
+    have = plan_parts(intent["text"]) if intent else []
+    if row["text"].casefold() not in {p.casefold() for p in have}:
+        text = clean("; ".join(have + [row["text"]]))
+        state["intent"] = {**(intent or {}), "text": text, "date": d.isoformat()}
+    if not commit(state, base, can_save):
+        undo(state, base)
+        return tr("Could not save that on this computer. Nothing changed.")
+    return tr("Back on today's plan: {text}").format(text=row["text"])
+
+
+def boss_index(monday):
+    return monday.toordinal() // 7 % BOSS_COUNT
+
+
+def week_boss(d):
+    """This week's boss from the counts server: {"hp", "hits", "defeated"},
+    or None when it can't say. Only totals: everyone's tips this week."""
+    monday = d - datetime.timedelta(days=d.weekday())
+    data = net(f"/v1/week/{monday.isoformat()}")
+    if not isinstance(data, dict):
+        return None
+    hp, hits = data.get("hp"), data.get("hits")
+    if not all(isinstance(n, int) and not isinstance(n, bool) and n >= 0 for n in (hp, hits)) or not hp:
+        return None
+    try:
+        defeated = day(data["defeated"]) if data.get("defeated") else None
+    except ValueError:
+        defeated = None
+    return {"monday": monday.isoformat(), "hp": hp, "hits": hits, "defeated": defeated}
+
+
+def boss_line(boss):
+    name = bosses()[boss_index(datetime.date.fromisoformat(boss["monday"]))][0]
+    if boss["defeated"]:
+        return tr("{boss} fell on {date}. Everyone did that.").format(
+            boss=name, date=long_date(datetime.date.fromisoformat(boss["defeated"])))
+    return tr("This week's boss: {boss}. {hits} of {hp} hit points gone, from "
+              "everyone's tips.").format(boss=name, hits=min(boss["hits"], boss["hp"]),
+                                         hp=boss["hp"])
+
+
+def award_trophy(state, can_save, boss):
+    """Every pet gets the trophy when the boss falls (Skye). Returns True
+    when it was new."""
+    if not (boss and boss["defeated"] and pet_on(state)):
+        return False
+    if boss["monday"] in state["pet"].get("trophies", []):
+        return False
+    refresh(state, can_save)
+    if not pet_on(state):
+        return False
+    base = copy.deepcopy(state)
+    trophies = sorted(set(state["pet"].get("trophies", []) + [boss["monday"]]))
+    state["pet"] = dict(state["pet"], trophies=trophies[-MAX_TROPHIES:])
+    if not commit(state, base, can_save):
+        undo(state, base)
+        return False
+    return True
+
+
 def react(state, can_save, d, kind):
     """This PC's one reaction to the day's thought; a second moves it. The
     server counts each PC once a day by a hash with a key made fresh each
@@ -981,9 +1260,10 @@ SWITCHES = ("nudge", "open_after", "weekends", "name", "no_startup_visits",
             "long_history", "hide_finished", "expire_same", "no_count",
             "numbers", "close_after_done", "colon_prompts", "floor_tips",
             "private_reminder", "hide_thought", "shared", "shared_asked",
-            "plan_in_reminder", "gentle", "gentle_offered", "large_text")
+            "plan_in_reminder", "gentle", "gentle_offered", "large_text",
+            "farewells")
 SETTINGS = ("streak", "tips", "text", "offered", "offer_skips", "lang",
-            "remind_at", "standup") + SWITCHES
+            "remind_at", "standup", "pet") + SWITCHES
 
 
 def new_state():
@@ -1448,6 +1728,37 @@ def load(repair=True):
             pass
     if unsure:
         state["unsure"] = unsure[-MAX_UNSURE:]
+    aside = []
+    for item in raw.get("put_aside") if isinstance(raw.get("put_aside"), list) else []:
+        try:
+            if isinstance(item, dict) and isinstance(item.get("text"), str):
+                text, when = clean(item["text"]), day(item.get("date"))
+                if text and when <= latest:
+                    aside.append({"text": text, "date": when})
+        except ValueError:
+            pass
+    if aside:
+        state["put_aside"] = aside[-MAX_ASIDE:]
+    if isinstance(raw.get("pet"), dict):
+        pet = raw["pet"]
+        name = tidy(pet.get("name")) if isinstance(pet.get("name"), str) else ""
+        done = pet.get("done")
+        trophies = []
+        for when in pet.get("trophies") if isinstance(pet.get("trophies"), list) else []:
+            try:
+                trophies.append(day(when))
+            except ValueError:
+                pass
+        state["pet"] = {"name": name[:20] or PET_DEFAULT,
+                        "done": done if isinstance(done, int) and not isinstance(done, bool)
+                        and 0 <= done < 100000 else 0,
+                        **({"trophies": sorted(set(trophies))[-MAX_TROPHIES:]} if trophies else {})}
+        if pet.get("off") is True:
+            state["pet"]["off"] = True
+        try:
+            state["pet"]["seen"] = day(pet.get("seen"))
+        except ValueError:
+            pass
     if isinstance(raw.get("standup"), dict):
         saved = raw["standup"]
         lists = {key: [tidy(v)[:MAX_PATH] for v in saved.get(key, [])
@@ -2213,7 +2524,7 @@ def set_plan(state, can_save, iso=None, after_done=False, in_menu=False):
     # Changing today's plan is a correction, so only a plan carried over from
     # an earlier day is kept for same.
     if old and old["text"] != text and old["date"] != iso:
-        state["previous"] = old["text"]
+        put_aside(state, old["text"])
     state["intent"] = {"text": text, "date": iso, **plan_due(
         old, text, datetime.date.fromisoformat(iso), gentle(state))}
     if commit(state, base, can_save):
@@ -2564,6 +2875,7 @@ def more_settings(state, can_save):
              lambda: para(set_gentle(state, can_save, not gentle(state))))]
     entries.append((marked(tr("Large text in the window"), state.get("large_text")), flip(
         "large_text", tr("Done. The text is larger."), tr("Done. The text is the usual size."))))
+    entries.append((marked(tr("Desk pet..."), pet_on(state)), lambda: pet_prompt(state, can_save)))
     if not plans_off():
         # Entries that come and go are last, so the others keep their numbers.
         if state.get("previous"):
@@ -2576,8 +2888,65 @@ def more_settings(state, can_save):
     if counts_server() and state.get("tips", True) and not policy("HideThoughtAndTip"):
         entries.append((marked(tr("Show how many people did the tip"), state.get("shared")),
                         lambda: para(v.shared_switch())))
+    if not plans_off():
+        if aside_lines(state)[0]:
+            entries.append((tr("Plans put aside..."), lambda: aside_prompt(state, can_save)))
+        if not gentle(state):
+            entries.append((marked(tr("Funny farewells for plans put aside"),
+                                   state.get("farewells")), flip(
+                "farewells", tr("Done. Plans put aside get a funny farewell."),
+                tr("Done. Plans put aside are listed plainly."))))
 
     pick(entries)
+
+
+def pet_prompt(state, can_save):
+    """The desk pet from the text screen: turn it on and name it, see what
+    it has, rename it, or turn it off."""
+    d = today()
+    if not pet_on(state):
+        if ask_choice(tr("A desk pet that sleeps when you're away and never dies. "
+                         "Want one? (y or n) > "), strict_yes(), NO_THANKS,
+                      tr("Type y or n.")) != "yes":
+            say(tr("Nothing changed."))
+            return
+        name = ask(tr("Name it, or press Enter for {name} > ").format(
+            name=(state.get("pet") or {}).get("name") or PET_DEFAULT))
+        if (name or "").lower().strip(TRIM) in QUIT_WORDS:
+            raise Quit
+        para(set_pet(state, can_save, name or (state.get("pet") or {}).get("name") or PET_DEFAULT))
+        say(pet_line(state, d))
+        para(pet_countdown(state))
+        return
+    say(pet_line(state, d))
+    things = pet_things(state)
+    para(tr("{name} has: {things}").format(name=state["pet"]["name"], things="; ".join(things))
+         if things else pet_countdown(state))
+    typed = ask(tr("Type a new name, off to turn the pet off, or Enter to go back > "))
+    word = (typed or "").lower().strip(TRIM)
+    if word in QUIT_WORDS:
+        raise Quit
+    if not word:
+        return
+    para(set_pet(state, can_save, None if word in ("off", *NO_THANKS) else typed))
+
+
+def aside_prompt(state, can_save):
+    """The plans put aside, newest first; a number brings one back."""
+    rows, lines = aside_lines(state)
+    if not rows:
+        say(tr("No plans are put aside."))
+        return
+    for line in lines:
+        say(wrapped("  ", line))
+    typed = ask(tr("Type a number to put it back on today's plan, or Enter to go back > "))
+    word = (typed or "").strip(TRIM)
+    if word.lower() in QUIT_WORDS:
+        raise Quit
+    if word not in [str(n) for n in range(1, len(rows) + 1)]:
+        say(tr("Nothing changed."))
+        return
+    para(bring_back(state, can_save, rows[int(word) - 1], today()))
 
 
 def set_language(state, can_save, code):
@@ -2683,6 +3052,7 @@ def _finish_plan(state, text, d, parts=None):
         state.pop("previous")
     every = plan_parts(text)
     chosen = [every[i] for i in sorted(set(parts))] if parts else every
+    pet_count(state, len(chosen))
     for part in chosen:
         # A count only for someone who keeps "My numbers".
         if (state.get("numbers") or COUNT_ALWAYS) and not state.get("no_count"):
@@ -2958,6 +3328,9 @@ def mark_done_now(state, can_save, d, which=True, in_menu=False):
         return False
     say(done_message(state, d, len(chosen) if chosen else len(every)) + (
         " " + tr("The rest is kept for today.") if rest else ""))
+    if pet_on(state):
+        say(pet_line(state, d, "done"))
+        para(pet_countdown(state))
     show_finished(state, SHOWN_AFTER_DONE)
     return True
 
@@ -3194,7 +3567,7 @@ def plan_on_open(state, d):
     # (Sam: "an old plan that sits there forever turns into a gravestone").
     limit = 3 if gentle(state) else 14
     if intent and (d - datetime.date.fromisoformat(since)).days > limit:
-        state["previous"] = intent["text"]
+        put_aside(state, intent["text"], d)
         return None, True
     return intent, False
 
@@ -3336,6 +3709,7 @@ def take_back(state, can_save, item, d):
         state["done"] -= 1
         if not state["done"]:
             state.pop("done")
+    pet_count(state, -1 if pet_on(state) and state["pet"]["done"] else 0)
     intent = state["intent"]
     text = (intent["text"] + "; " + item["text"]) if intent else item["text"]
     state["intent"] = {**(intent or {}), "text": clean(text), "date": d.isoformat()}
@@ -3460,7 +3834,7 @@ def daily(startup):
                     tr("Type y to keep it, n to clear it, or press Enter to "
                        "keep it."))
                 if keep == "no":
-                    state["previous"] = intent["text"]
+                    put_aside(state, intent["text"])
                     intent = None
                     say(tr("Cleared. Type same at a plan prompt if you want it back."))
                 else:
@@ -3495,6 +3869,9 @@ def daily(startup):
             if shared_on(state) and (counts := day_counts(d)) is not None:
                 for line in shared_lines(state, d, counts, not state.get("hide_thought")):
                     say(indent(line))
+                if boss := week_boss(d):
+                    say(indent(boss_line(boss)))
+                    award_trophy(state, can_save, boss)
             say()
 
         if intent and intent["date"] == iso:
@@ -3534,7 +3911,7 @@ def daily(startup):
                 text = typed_plan(reuse(state, text))
                 if text:
                     if intent and intent["text"] != text:
-                        state["previous"] = intent["text"]
+                        put_aside(state, intent["text"])
                     intent = {"text": text, "date": iso,
                               **plan_due(intent, text, d, gentle(state))}
                     typed_new = True
@@ -3875,6 +4252,14 @@ def last_prompt(state, can_save, intent, person, d, iso, open_menu=False):
     if open_menu:
         menu(state, can_save, iso)
         intent = state["intent"]
+    if pet_on(state) and not open_menu:
+        # Last, so it never pushes the plan down (Jaylen).
+        say(pet_line(state, d))
+        para(pet_countdown(state))
+        say()
+        mark_pet_seen(state, can_save, d)
+        if state["intent"] == intent:
+            intent = state["intent"]  # the same plan, re-read with the save
     while True:
         planned = bool(intent and person and state["intent"] is intent)
         # q, x and the other close words still work; naming them only
@@ -3913,6 +4298,16 @@ def last_prompt(state, can_save, intent, person, d, iso, open_menu=False):
             continue
         elif answer in HANDOFF_WORDS and handoff_on():
             handoff_prompt(state, can_save)
+            continue
+        elif answer in PET_WORDS:
+            same = state["intent"] == intent
+            pet_prompt(state, can_save)
+            if same and state["intent"] == intent:
+                intent = state["intent"]
+            continue
+        elif answer in ASIDE_WORDS and not plans_off():
+            aside_prompt(state, can_save)
+            intent = state["intent"]
             continue
         elif answer in GENTLE_WORDS and person:
             para(set_gentle(state, can_save, True))
@@ -4947,6 +5342,9 @@ class Visit:
         if handoff_on():
             # The window shows every note, so they're all seen now.
             quietly(mark_handoff_seen, state, self.can_save)
+        # Worked out before it is marked seen, so it knows you were away.
+        self.pet_text = pet_line(state, d) if pet_on(state) else None
+        quietly(mark_pet_seen, state, self.can_save, d)
         intent = state["intent"]
         self.followup = (intent["text"] if asks_followup(intent, d) and not gentle(state)
                          else None)
@@ -4955,6 +5353,7 @@ class Visit:
         # The shared numbers come from the network, so they are fetched in
         # the background and the window opens without waiting for them.
         self.counts = None
+        self.boss = None
         self.yesterday_top = None
         self.counts_thread = None
         if self.pair and shared_on(state):
@@ -4964,6 +5363,8 @@ class Visit:
 
     def fetch_counts(self):
         self.counts = day_counts(self.d)
+        if self.counts:
+            self.boss = week_boss(self.d)
         if self.counts and not self.state.get("hide_thought"):
             self.yesterday_top = top_reaction(day_counts(self.d - datetime.timedelta(days=1)))
 
@@ -4983,6 +5384,8 @@ class Visit:
                                       self.d, choice, self.followup, parts)
         if saved:
             self.followup = None
+        if saved and choice == "yes":
+            self.pet_done()
         if saved and choice in ("no", "unsure") and not self.state.get("gentle_offered"):
             self.setting("gentle_offered", True)
             message += " " + tr("Prefer no follow-up questions? Options > What "
@@ -5017,7 +5420,7 @@ class Visit:
         base = copy.deepcopy(state)
         old = state["intent"]
         if old and old["text"] != text and old["date"] != self.iso:
-            state["previous"] = old["text"]
+            put_aside(state, old["text"])
         state["intent"] = {"text": text, "date": self.iso,
                            **plan_due(old, text, self.d, gentle(state))}
         saved, said = quietly(commit, state, base, self.can_save)
@@ -5046,7 +5449,7 @@ class Visit:
         quietly(refresh, self.state, self.can_save)
         base = copy.deepcopy(self.state)
         if self.state["intent"]:
-            self.state["previous"] = self.state["intent"]["text"]
+            put_aside(self.state, self.state["intent"]["text"])
         self.state["intent"] = None
         saved, said = quietly(commit, self.state, base, self.can_save)
         if not saved:
@@ -5109,8 +5512,13 @@ class Visit:
         if not saved:
             undo(self.state, base)
             return said or tr("Could not save that on this computer. The plan is still open.")
+        self.pet_done()
         return done_message(self.state, self.d, len(set(parts))) + (
             " " + tr("The rest is kept for today.") if rest else "")
+
+    def pet_done(self):
+        if pet_on(self.state):
+            self.pet_text = pet_line(self.state, self.d, "done")
 
     def forget(self, item):
         """Forget one finished plan, as text menu option 7 does."""
@@ -5315,6 +5723,7 @@ class Window:
     TITLE, DATE, NOTE, PLANNED, ASK, DONE, NOT_YET, SKIP = range(100, 108)
     UNSURE = 108
     THOUGHT_LABEL, THOUGHT, TIP_LABEL, TIP, TIP_COUNT, TIP_DONE = range(110, 116)
+    BOSS, PET = 116, 117
     REACT, REACT_NOTE = 150, 154  # REACT to REACT + 3, one button a reaction
     PLAN_LABEL, PLAN, STATUS, OPTIONS, DID_IT = range(120, 125)
     TICK = 130  # to 139, one tick box for each thing in the plan
@@ -5356,6 +5765,11 @@ class Window:
             self.set_text(self.REACT_NOTE, tr("Yesterday's top reaction: {name}").format(
                 name=REACTION_EMOJI[v.yesterday_top] + " " + v.yesterday_top)
                 if v.yesterday_top else "")
+        if v.boss:
+            self.set_text(self.BOSS, boss_line(v.boss))
+            if quietly(award_trophy, v.state, v.can_save, v.boss)[0] and self.item(self.PET):
+                v.pet_text = pet_line(v.state, v.d)
+                self.set_text(self.PET, v.pet_text + "\n" + pet_countdown(v.state))
 
     def lines(self, text):
         per_line = int(self.WIDTH / 4.2)
@@ -5442,6 +5856,7 @@ class Window:
             para(self.TIP, v.pair[1], 8)
             if v.counts_thread:
                 para(self.TIP_COUNT, tr("Counting..."), 2)
+                para(self.BOSS, "", 2)
                 if v.state.get("tip_day") != v.iso:
                     add(button, self.TIP_DONE, tr("I did this &tip"), tab, m, 16, 100)
                     y += 22
@@ -5457,6 +5872,9 @@ class Window:
         add(static, self.STATUS, "" if plans_off() else due or tr(
             "A few things? Put ; between them."), text_style, m, 2 * line)
         y += 2 * line + 6
+        if v.pet_text:
+            # Under the plan, so it never pushes the plan down (Jaylen).
+            para(self.PET, v.pet_text + "\n" + pet_countdown(v.state), 2)
         add(button, self.OPTIONS, tr("&Options"), tab, m, 16, 64)
         right = m + w
         # Added left to right, which is the Tab order.
@@ -6024,7 +6442,11 @@ class Window:
         entries.append((checked if v.state.get("large_text") else 0, 19, tr("Large text")))
         if not plans_off():
             entries.append((checked if gentle(v.state) else 0, 20, tr("No follow-up questions")))
+        entries.append((checked if pet_on(v.state) else 0, 21, tr("Desk pet...")))
         choice = self.popup(entries)
+        if choice == 21:
+            self.pet_menu()
+            return
         if choice == 18:
             self.reopen(v.shared_switch())
         elif choice == 19:
@@ -6049,6 +6471,27 @@ class Window:
             self.toggled("streak", tr("Done. The days-in-a-row message is on."),
                          tr("Done. The days-in-a-row message is off."))
 
+    def pet_menu(self):
+        """Turn the pet on (named Pip until renamed in the text screen), see
+        what it has, or turn it off."""
+        v = self.visit
+        if not pet_on(v.state):
+            if self.confirm(tr("A desk pet that sleeps when you're away and never dies. "
+                               "Want one? You can rename it by typing pet in the text "
+                               "screen.")):
+                message = set_pet(v.state, v.can_save, (v.state.get("pet") or {}).get("name")
+                                  or PET_DEFAULT)
+                v.pet_text = pet_line(v.state, v.d) if pet_on(v.state) else None
+                self.reopen(message)
+            return
+        things = pet_things(v.state)
+        if self.confirm((tr("{name} has: {things}").format(
+                name=v.state["pet"]["name"], things="; ".join(things)) if things
+                else pet_countdown(v.state)) + "\n\n" + tr("Turn the desk pet off?")):
+            message = set_pet(v.state, v.can_save, None)
+            v.pet_text = None
+            self.reopen(message)
+
     def plans_menu(self):
         v, checked = self.visit, 0x8
         entries = [(0, 19, tr("What I did...")),
@@ -6064,7 +6507,24 @@ class Window:
         if v.state.get("finished"):
             entries.append((0, 18, tr("Forget a finished plan...")))
             entries.append((0, 20, tr("Take back a Done...")))
+        rows, lines = aside_lines(v.state)
+        if rows:
+            entries.append((0, 21, tr("Plans put aside...")))
+        if not gentle(v.state):
+            entries.append((checked if v.state.get("farewells") else 0, 22,
+                            tr("Funny farewells for plans put aside")))
         choice = self.popup(entries)
+        if choice == 21:
+            picked_row = self.popup([(0, 500 + n, line[:90]) for n, line in enumerate(lines)])
+            if picked_row:
+                self.fresh = True
+                self.reopen(bring_back(v.state, v.can_save, rows[picked_row - 500], v.d))
+            return
+        if choice == 22:
+            self.set_text(self.STATUS, v.switch(
+                "farewells", tr("Done. Plans put aside get a funny farewell."),
+                tr("Done. Plans put aside are listed plainly.")))
+            return
         if choice == 19:
             # A message box can't put Print at the top, so it asks first.
             page = what_i_did(v.state, v.d)
