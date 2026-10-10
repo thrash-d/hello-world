@@ -795,7 +795,12 @@
   "Today: {date}": "Hoy: {date}",
   "Type it, off to stop it, or Enter to go back > ": "Escríbelo, no para quitarlo, o Enter para volver > ",
   "Type what to do every day in the plan box, then choose the time again.": "Escribe en el cuadro del plan lo que harás cada día y luego elige la hora otra vez.",
-  "Your daily reminder from hello-world.": "Tu recordatorio diario de hello-world."
+  "Your daily reminder from hello-world.": "Tu recordatorio diario de hello-world.",
+  "If you didn't make it, choose Change my sync code.": "Si no lo hiciste tú, elige Cambiar mi código de sincronización.",
+  "Last change to your synced plan: {when}.": "Último cambio en tu plan sincronizado: {when}.",
+  "Thought for today, from your organization:": "Idea del día, de tu organización:",
+  "Try this today, from your organization:": "Prueba esto hoy, de tu organización:",
+  "a few": "unas pocas"
  },
  "tips_floor": [
   "Comprueba que tu zona de paso está despejada antes de la primera tarea del turno.",

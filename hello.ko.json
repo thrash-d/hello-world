@@ -795,7 +795,12 @@
   "Today: {date}": "오늘: {date}",
   "Type it, off to stop it, or Enter to go back > ": "입력하거나, off로 끄거나, Enter로 돌아가기 > ",
   "Type what to do every day in the plan box, then choose the time again.": "매일 할 일을 계획 칸에 입력한 다음 시간을 다시 고르세요.",
-  "Your daily reminder from hello-world.": "hello-world의 매일 알림이에요."
+  "Your daily reminder from hello-world.": "hello-world의 매일 알림이에요.",
+  "If you didn't make it, choose Change my sync code.": "내가 바꾼 게 아니라면 동기화 코드 바꾸기를 선택하세요.",
+  "Last change to your synced plan: {when}.": "동기화된 계획의 마지막 변경: {when}.",
+  "Thought for today, from your organization:": "오늘의 생각 (조직 제공):",
+  "Try this today, from your organization:": "오늘 해 볼 것 (조직 제공):",
+  "a few": "몇 명"
  },
  "tips_floor": [
   "첫 작업 전에 다니는 통로에 걸리는 게 없는지 확인하세요.",

@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-10-10: what the red team found
+
+Version 1.58.0. Eight of history's worst, run as a red team, and the
+Profit Maximizer's memo; four reviewers changed the design first.
+
+- The counts server could be filled up (Capone): anyone could PUT any number
+  of sync copies, and a year-old copy went only when someone read it. Now
+  there's a total quota (new copies refused when full, existing ones still
+  update), 20 new copies a day and 60 writes a minute per address (in memory,
+  under the daily key), and an hourly sweep.
+- Counts never single anyone out (Ivan IV): below 10 the server sends "few"
+  and hello-world shows "a few", larger numbers are rounded to 5, and the
+  published numbers change once an hour (Noor: rounding alone still shows a
+  step if you watch). The day files keep the exact numbers on the server.
+- Thoughts and tips an organization replaced say "from your organization"
+  (the Minister of Truth).
+- The sync screens show when the synced plan last changed, and what to do if
+  it wasn't you (Mielke, Dolores).
+- The phone's family buttons say "hello-world will never ask you for a code
+  or key" (Ponzi, Dolores).
+
 ## 2026-10-10: a daily repeat and a fridge page on Windows
 
 Version 1.57.0. What the trusting boomers asked for, on the PC too.
