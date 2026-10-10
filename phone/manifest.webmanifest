@@ -1,0 +1,11 @@
+{
+ "name": "hello-world",
+ "short_name": "hello-world",
+ "description": "One thought, one small thing to try, and did you do it?",
+ "start_url": "./index.html",
+ "scope": "./",
+ "display": "standalone",
+ "background_color": "#fbfaf7",
+ "theme_color": "#1f5f8b",
+ "icons": [{"src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}]
+}

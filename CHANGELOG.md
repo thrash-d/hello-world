@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-10-10: on a phone
+
+Version 1.53.0. For the three of five New Yorkers who couldn't use
+hello-world at all; the cart vendor, the rider and the analyst reviewed the
+design first.
+
+- `phone/`: an installable web page that works offline (a service worker
+  caches every file), with one screen: "Did you do it?" with buttons big
+  enough for greasy fingers (the cart vendor), a box for today's plan, and the
+  day's thought and tip, the same pair as the PC.
+- English, Spanish and Arabic (the rider; the cart vendor's cousin), right to
+  left for Arabic.
+- Plans stay in the phone's browser, which the screen says; nothing is sent.
+  The analyst asked where phone notes live.
+- No reminder unless asked (the rider's phone already buzzes all day). The
+  times start at 6:15 for the cart vendor, and the settings say plainly that a
+  phone may drop a web page's reminder.
+- The counts server serves it at `/phone/` with `--phone`, so one address does
+  both. `tools/build_phone.py` makes `phone/content.js` from `hello.py`, and a
+  test fails when they drift.
+
 ## 2026-10-10: in the tray, and portable
 
 Version 1.52.0. From five simulated New Yorkers and the Profit Maximizer's

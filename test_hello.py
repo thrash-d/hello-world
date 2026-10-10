@@ -4176,3 +4176,90 @@ def test_the_portable_build_keeps_notes_beside_it():
                        stdin=subprocess.DEVNULL)
     assert p.returncode == 0, p.stdout + p.stderr
     assert os.path.isfile(os.path.join(folder, "notes", "notes.json"))
+
+
+def _node(script):
+    node = shutil.which("node")
+    if not node:
+        raise unittest.SkipTest("needs node")
+    p = subprocess.run([node, "-e", script], capture_output=True, text=True,
+                       cwd=os.path.join(os.path.dirname(HELLO), "phone"))
+    assert p.returncode == 0, p.stderr
+    return json.loads(p.stdout)
+
+
+def test_the_phone_content_is_up_to_date_with_hello_py():
+    sys.path.insert(0, os.path.join(os.path.dirname(HELLO), "tools"))
+    import build_phone
+    with open(os.path.join(os.path.dirname(HELLO), "phone", "content.js"), encoding="utf-8") as f:
+        assert f.read() == build_phone.text(), "run python tools/build_phone.py"
+
+
+def test_the_phone_shows_the_same_thought_and_tip_as_the_pc():
+    import datetime
+    days = ["2026-10-05", "2026-12-31", "2027-02-28", "2030-06-15"]
+    got = _node("""
+        const fs = require("fs"); eval(fs.readFileSync("content.js", "utf8") + ";globalThis.CONTENT=CONTENT");
+        const app = require("./app.js");
+        const out = {};
+        for (const lang of ["en", "es", "ar"]) for (const d of %s) out[lang + d] = app.todaysPair(lang, d, CONTENT);
+        console.log(JSON.stringify(out));""" % json.dumps(days))
+    hello = _load_hello()
+    for lang in ("en", "es", "ar"):
+        hello.LANGUAGE, hello.WINDOW = lang, True
+        for d in days:
+            assert got[lang + d] == list(hello.todays_pair(datetime.date.fromisoformat(d))), (lang, d)
+
+
+def test_the_phone_asks_did_you_do_it_and_keeps_plans_local():
+    got = _node("""
+        const app = require("./app.js");
+        const s = app.blank(), out = [];
+        out.push(app.setPlan(s, "  call   the bank ;; water plants ", "2026-10-05"), s.intent.text);
+        out.push(app.asks(s, "2026-10-05"), app.asks(s, "2026-10-06"));
+        out.push(app.answer(s, "no", "2026-10-06"), s.intent.date);
+        out.push(app.answer(s, "yes", "2026-10-07"), s.intent, s.finished.length);
+        app.setPlan(s, "x", "2026-10-07");
+        out.push(app.answer(s, "skip", "2026-10-08"), app.answer(s, "skip", "2026-10-08"), app.asks(s, "2026-10-08"));
+        out.push(app.setPlan(s, " ; ", "2026-10-08"), app.finishToday(s, "2026-10-08"));
+        out.push(app.language({lang: null}, ["es-MX", "en"]), app.language({lang: null}, ["fr-FR"]),
+                 app.language({lang: "ar"}, ["es"]));
+        out.push(app.parse("not json").intent, app.parse('{"intent":{"text":"a","date":"bad"}}').intent);
+        console.log(JSON.stringify(out));""")
+    assert got == ["saved", "call the bank; water plants", False, True, "kept", "2026-10-06",
+                   "good", None, 1, "skipped", "skipped", False, "nothing", "good",
+                   "es", "en", "ar", None, None]
+
+
+def test_the_phone_ui_has_every_string_in_every_language():
+    got = _node("""const app = require("./app.js");
+        console.log(JSON.stringify(Object.fromEntries(Object.entries(app.UI).map(([k, v]) => [k, Object.keys(v).sort()]))));""")
+    assert got["es"] == got["en"] == got["ar"]
+
+
+def test_the_counts_server_can_serve_the_phone_app():
+    import importlib.util
+    import threading
+    import urllib.error
+    import urllib.request
+    spec = importlib.util.spec_from_file_location(
+        "counts_server", os.path.join(os.path.dirname(HELLO), "server", "counts_server.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    server = mod.serve(0, mkdtemp(), "127.0.0.1",
+                       phone=os.path.join(os.path.dirname(HELLO), "phone"))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    url = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        with urllib.request.urlopen(url + "/phone/", timeout=5) as r:
+            assert r.headers["Content-Type"].startswith("text/html") and b"app.js" in r.read()
+        with urllib.request.urlopen(url + "/phone/manifest.webmanifest", timeout=5) as r:
+            assert json.loads(r.read())["display"] == "standalone"
+        for bad in ("/phone/../hello.py", "/phone/secret.txt", "/hello.py"):
+            try:
+                urllib.request.urlopen(url + bad, timeout=5)
+                raise AssertionError(bad)
+            except urllib.error.HTTPError as e:
+                assert e.code == 404, bad
+    finally:
+        server.shutdown()
