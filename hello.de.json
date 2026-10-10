@@ -795,7 +795,12 @@
   "Today: {date}": "Heute: {date}",
   "Type it, off to stop it, or Enter to go back > ": "Eingeben, nein zum Beenden, oder Eingabetaste zum Zurückgehen > ",
   "Type what to do every day in the plan box, then choose the time again.": "Geben Sie ins Planfeld ein, was Sie jeden Tag tun, und wählen Sie die Zeit dann noch einmal.",
-  "Your daily reminder from hello-world.": "Ihre tägliche Erinnerung von hello-world."
+  "Your daily reminder from hello-world.": "Ihre tägliche Erinnerung von hello-world.",
+  "If you didn't make it, choose Change my sync code.": "Wenn Sie das nicht waren, wählen Sie Meinen Synchronisierungscode ändern.",
+  "Last change to your synced plan: {when}.": "Letzte Änderung an Ihrem synchronisierten Plan: {when}.",
+  "Thought for today, from your organization:": "Gedanke des Tages, von Ihrer Organisation:",
+  "Try this today, from your organization:": "Probieren Sie das heute, von Ihrer Organisation:",
+  "a few": "ein paar"
  },
  "tips_floor": [
   "Prüfen Sie vor der ersten Aufgabe der Schicht, ob Ihr Laufweg frei ist.",

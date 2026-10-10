@@ -40,6 +40,8 @@ const UI = {
     syncNote: "With sync on, your plan and done list leave this phone, encrypted with that code. The server keeps only the encrypted copy.",
     syncOn: "Sync is on.", syncOffDone: "Sync is off on this phone.", syncBad: "That code doesn't look right. Check it on the PC.", syncFail: "The PC's copy can't be reached just now.",
     scam: SCAM_EN,
+    familyScam: "hello-world will never ask you for a code or key.",
+    lastChange: "Last change to your synced plan: {when}. If you didn't make it, change the code on the PC.",
   },
   es: {
     hello: "¡Hola, mundo!", ask: "¿Lo hiciste?", yesterday: "Ayer planeaste:",
@@ -74,6 +76,8 @@ const UI = {
     syncNote: "Con la sincronización activada, tu plan y tu lista de hechos salen de este teléfono, cifrados con ese código. El servidor solo guarda la copia cifrada.",
     syncOn: "La sincronización está activada.", syncOffDone: "La sincronización está desactivada en este teléfono.", syncBad: "Ese código no parece correcto. Revísalo en el PC.", syncFail: "Ahora no se puede llegar a la copia del PC.",
     scam: "hello-world no tiene línea telefónica ni personal de soporte. Nunca llamamos, ni enviamos correos ni mensajes. Nadie de verdad te pedirá nunca tu código de sincronización. Si alguien lo pide, cuelga.",
+    familyScam: "hello-world nunca te pedirá un código ni una clave.",
+    lastChange: "Último cambio en tu plan sincronizado: {when}. Si no lo hiciste tú, cambia el código en el PC.",
   },
   ar: {
     hello: "مرحبًا بالعالم!", ask: "هل فعلتها؟", yesterday: "خططت أمس:",
@@ -108,6 +112,8 @@ const UI = {
     syncNote: "مع تشغيل المزامنة تغادر خطتك وقائمة ما أنجزته هذا الهاتف مشفّرة بذلك الرمز. لا يحتفظ الخادم إلا بالنسخة المشفّرة.",
     syncOn: "المزامنة تعمل.", syncOffDone: "المزامنة متوقفة على هذا الهاتف.", syncBad: "لا يبدو هذا الرمز صحيحًا. تحقق منه على الكمبيوتر.", syncFail: "لا يمكن الوصول إلى نسخة الكمبيوتر الآن.",
     scam: "ليس لدى hello-world خط هاتف ولا فريق دعم. لا نتصل ولا نرسل بريدًا أو رسائل أبدًا. لن يطلب منك أي شخص حقيقي رمز المزامنة. إن طلبه أحد، أغلق الخط.",
+    familyScam: "لن يطلب منك hello-world أبدًا رمزًا أو مفتاحًا.",
+    lastChange: "آخر تغيير في خطتك المتزامنة: {when}. إن لم تقم به، غيّر الرمز على الكمبيوتر.",
   },
 };
 const LANG_NAMES = { en: "English", es: "Español", ar: "العربية" };
@@ -558,6 +564,7 @@ if (typeof document !== "undefined") {
     $("repeat-today").hidden = !state.repeat;
     $("repeat-today").textContent = state.repeat ? s.printRepeat.replace("{at}", state.repeat.at) + " " + state.repeat.text : "";
     $("family-buttons").hidden = !state.family;
+    $("family-scam").textContent = s.familyScam;
     if (state.family) {
       $("draft").textContent = s.draft.replace("{name}", state.family.name);
       $("call").textContent = s.call.replace("{name}", state.family.name);
@@ -635,6 +642,10 @@ if (typeof document !== "undefined") {
     $("sync-change").hidden = !keys || changing;
     $("sync-code").hidden = $("sync-code-label").hidden = Boolean(keys) && !changing;
     $("sync-note").textContent = s.syncNote;
+    const when = keys && state.updated ? new Date(state.updated) : null;
+    $("sync-last").textContent = when && !isNaN(when)
+      ? s.lastChange.replace("{when}", when.toLocaleString(language(state, navigator.languages),
+          { weekday: "short", hour: "2-digit", minute: "2-digit" })) : "";
   }
 
   $("sync-change").addEventListener("click", (event) => {

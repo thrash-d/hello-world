@@ -344,6 +344,20 @@ PC counts once a day. Turn the count on or off in the window under
 screen, or `hello.cmd --set shared off`. Without a server, nothing is asked
 and nothing is sent.
 
+So a small office can't tell who did the tip, the reference server never
+sends a count below 10: it says "a few" instead, rounds larger counts to 5,
+and changes the numbers it sends only once an hour, so checking before and
+after someone's click shows nothing. `--min-group` and `--refresh` change
+those. Thoughts and tips your organization replaced are labeled "from your
+organization".
+
+To keep its disk from being filled, the server keeps at most `--sync-quota`
+encrypted sync copies (100,000; one already there can still be updated),
+takes at most 20 new copies a day and 60 writes a minute from one address,
+and removes copies untouched for a year every hour. Those per-address limits
+live in memory and reset when the server restarts, so rate-limit at the https
+proxy in front too.
+
 The file also holds the day you last counted yourself for the tip, whether
 you answered the shared count question, today's reaction, the newest handoff
 note you have seen, the plans you answered "I'm not
@@ -493,7 +507,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.57.0'
+$tag = 'v1.58.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

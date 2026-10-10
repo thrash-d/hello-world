@@ -203,6 +203,12 @@ the pull request named.
 | Boomers, 1.54.0 | Signed builds and checksums | Dolores, Walt, Barbara | Checksums already published (SHA256SUMS); Authenticode and a Store listing are owner steps |
 | Design review, round 83 | Wait before the code shows; say 18:00 is the night-shift setting; "Small is fine", not "counts" | Dolores, Marisol, Noor | Built in 1.55.0 |
 | Profit Maximizer, round 3 | A "day went sideways" button and softer wording | Profit Maximizer | Built in 1.55.0 |
+| Red team, 1.57.0 | Any number of sync copies, and no sweep: the disk can be filled | Capone, confirmed in code | Fixed in 1.58.0: quota, per-address limits, hourly sweep |
+| Red team, 1.57.0 | "1 person did the tip" in a 3-person office | Ivan IV | Fixed in 1.58.0: "a few" below 10, rounded to 5, published hourly (Noor's review) |
+| Red team, 1.57.0 | Organization content looks built in | Minister of Truth | Fixed in 1.58.0: labeled |
+| Red team, 1.57.0 | A leaked code goes unnoticed | Mielke, Torquemada | 1.58.0 shows the last change; Change my sync code since 1.55.0; a device list queued (TODO) |
+| Red team, 1.57.0 | No scam line on the family buttons or key entry | Ponzi | Family buttons in 1.58.0; key entry with Pro |
+| Red team, 1.57.0 | Anonymous household list invites silent erasing (Caligula) vs. strict self-joining (Rasputin) | Both | Queued together for the household list (TODO): per-item history, no per-person totals, self-join only, re-key on leave |
 | Personas, 1.43.0 | Formulas run in the spreadsheet export | Skye, confirmed in code | Fixed in 1.46.1 |
 | Personas, 1.43.0 | Forklift horns, bakery orders, badge login, a supply locator, an email "lie detector" | Rick, Harold, Denise | Not buildable here: they need hardware or outside services |
 

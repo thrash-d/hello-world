@@ -795,7 +795,12 @@
   "Today: {date}": "今天：{date}",
   "Type it, off to stop it, or Enter to go back > ": "请输入内容，输入 off 停止，或按 Enter 返回 > ",
   "Type what to do every day in the plan box, then choose the time again.": "请先在计划框中输入每天要做的事，然后再选择时间。",
-  "Your daily reminder from hello-world.": "来自 hello-world 的每日提醒。"
+  "Your daily reminder from hello-world.": "来自 hello-world 的每日提醒。",
+  "If you didn't make it, choose Change my sync code.": "如果不是你做的，请选择“更换我的同步代码”。",
+  "Last change to your synced plan: {when}.": "同步计划的最近一次更改：{when}。",
+  "Thought for today, from your organization:": "今日一思（来自你的组织）：",
+  "Try this today, from your organization:": "今天试试这个（来自你的组织）：",
+  "a few": "少数几位"
  },
  "tips_floor": [
   "开始第一单活之前，先确认您走的通道畅通。",
