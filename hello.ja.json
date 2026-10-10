@@ -735,7 +735,13 @@
   "text screen": "テキスト画面",
   "thought and tip hidden": "ひとこととヒントを非表示",
   "thought hidden": "ひとことを非表示",
-  "weekends": "週末"
+  "weekends": "週末",
+  "Keep hello-world in the tray": "hello-world を通知領域に常駐させる",
+  "Quit the tray icon": "通知領域のアイコンを終了",
+  "The tray icon is off.": "通知領域のアイコンをオフにしました。",
+  "The tray icon is on. It shows a dot while yesterday's plan waits for an answer, and starts again each time you sign in.": "通知領域のアイコンをオンにしました。昨日の予定の答えを待っている間は点が付き、サインインのたびに起動します。",
+  "hello-world: did you do it? {text}": "hello-world: できましたか？ {text}",
+  "hello-world: today's plan: {text}": "hello-world: 今日の予定: {text}"
  },
  "tips_floor": [
   "シフト最初の作業の前に、通路に物が置かれていないか確認しましょう。",

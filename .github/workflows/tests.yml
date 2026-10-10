@@ -42,14 +42,28 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
-          foreach ($f in 'install.ps1', 'uninstall.ps1', 'install-user.ps1', 'uninstall-user.ps1', 'tools\build-package.ps1', 'tools\reinstall.ps1') {
+          foreach ($f in 'install.ps1', 'uninstall.ps1', 'install-user.ps1', 'uninstall-user.ps1', 'tools\build-package.ps1', 'tools\build-portable.ps1', 'tools\reinstall.ps1') {
             $errors = $null
             [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f), [ref]$null, [ref]$errors)
             if ($errors) { $errors | Out-String | Write-Host; throw "$f does not parse." }
           }
           Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser -Force
-          $found = foreach ($f in 'install.ps1', 'uninstall.ps1', 'install-user.ps1', 'uninstall-user.ps1', 'tools\build-package.ps1', 'tools\reinstall.ps1') { Invoke-ScriptAnalyzer -Path $f -Severity Error }
+          $found = foreach ($f in 'install.ps1', 'uninstall.ps1', 'install-user.ps1', 'uninstall-user.ps1', 'tools\build-package.ps1', 'tools\build-portable.ps1', 'tools\reinstall.ps1') { Invoke-ScriptAnalyzer -Path $f -Severity Error }
           if ($found) { $found | Format-Table -AutoSize | Out-String | Write-Host; throw 'PSScriptAnalyzer found errors.' }
+      - name: Build the portable zip and run it from where it is unzipped
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $zip = Join-Path $env:RUNNER_TEMP 'hello-world-portable.zip'
+          powershell -NoProfile -ExecutionPolicy Bypass -File tools\build-portable.ps1 -OutFile $zip | Write-Host
+          if ($LASTEXITCODE) { throw 'build-portable.ps1 failed.' }
+          $where = Join-Path $env:RUNNER_TEMP 'portable'
+          Expand-Archive -LiteralPath $zip -DestinationPath $where
+          $app = Join-Path $where 'hello-world'
+          $out = & (Join-Path $app 'python\python.exe') -I (Join-Path $app 'hello.py') plan 'Water the plants'
+          if ($LASTEXITCODE) { throw "plan failed: $out" }
+          if (-not (Test-Path -LiteralPath (Join-Path $app 'notes\notes.json'))) { throw 'The notes are not in the notes folder beside the app.' }
+          Write-Host 'ok: the portable build keeps its notes beside it'
       # The runner is an administrator, so the package really installs here:
       # the same package the release workflow publishes, built the same way.
       - name: Install, reinstall, refuse, retry and uninstall the package

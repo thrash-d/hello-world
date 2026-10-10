@@ -515,7 +515,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.51.0"
+VERSION = "1.52.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -686,6 +686,10 @@ def long_date(d):
 def data_dir():
     if HOME:
         return HOME
+    # The portable build (tools/build-portable.ps1) keeps its notes beside it.
+    here = os.path.dirname(os.path.abspath(__file__))
+    if os.path.isfile(os.path.join(here, "portable.txt")):
+        return os.path.join(here, "notes")
     if os.name == "nt":
         base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
         return os.path.join(base, "hello-world")
@@ -1288,7 +1292,7 @@ SWITCHES = ("nudge", "open_after", "weekends", "name", "no_startup_visits",
             "numbers", "close_after_done", "colon_prompts", "floor_tips",
             "private_reminder", "hide_thought", "shared", "shared_asked",
             "plan_in_reminder", "gentle", "gentle_offered", "large_text",
-            "farewells")
+            "farewells", "tray")
 SETTINGS = ("streak", "tips", "text", "offered", "offer_skips", "lang",
             "remind_at", "standup", "pet") + SWITCHES
 
@@ -2943,6 +2947,9 @@ def more_settings(state, can_save):
                                    state.get("farewells")), flip(
                 "farewells", tr("Plans put aside get a funny farewell."),
                 tr("Plans put aside are listed plainly."))))
+    if os.name == "nt" or TRAY_STARTS is not None:
+        entries.append((marked(tr("Keep hello-world in the tray"), state.get("tray")),
+                        lambda: para(set_tray(state, can_save, not state.get("tray")))))
 
     pick(entries)
 
@@ -4959,7 +4966,7 @@ def main():
             pass
     args = [a.lower() for a in sys.argv[1:]]
     # pythonw.exe has no stdout, so the window and the sign-in run start here.
-    if (args == ["--window"] or args[:1] == ["--answer"] and len(args) == 2
+    if (args in (["--window"], ["--tray"]) or args[:1] == ["--answer"] and len(args) == 2
             or args == ["--startup"] and sys.stdout is None):
         try:
             return gui(args)
@@ -5052,6 +5059,8 @@ def gui(args):
             return answer_reminder(args[1])
         if args == ["--startup"]:
             return sign_in()
+        if args == ["--tray"]:
+            return run_tray()
         return show_window()
 
 
@@ -5274,6 +5283,8 @@ def sign_in():
     if policy("DisableSignInLauncher"):
         quietly(tidy_launcher)
         return 0
+    if state.get("tray"):
+        start_tray()
     if new_handoff(state):
         # Notes nobody goes looking for go unread (Rick), so a handoff PC
         # opens hello-world at sign-in when there is one this person hasn't
@@ -5307,6 +5318,207 @@ def open_window():
     import subprocess
     subprocess.Popen([window_python(), "-I", os.path.abspath(__file__), "--window"],
                      creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))
+
+
+# The tray icon (the indie developer: "I close windows but keep tray icons").
+# It shows a dot while "Did you do it?" waits for an answer, and never opens
+# anything by itself: the reminder at a time you pick does the one nudge.
+TRAY_DONE, TRAY_NOT_YET, TRAY_OPEN, TRAY_QUIT = 1, 2, 3, 4
+
+
+def tray_status(state, d):
+    """(waiting, tooltip): waiting while yesterday's plan has no answer."""
+    intent = state["intent"]
+    waiting = bool(asks_followup(intent, d) and not gentle(state))
+    if waiting:
+        tip = tr("hello-world: did you do it? {text}").format(text=intent["text"])
+    elif intent and intent["date"] == d.isoformat():
+        tip = tr("hello-world: today's plan: {text}").format(text=intent["text"])
+    else:
+        tip = "hello-world"
+    # Windows cuts a tray tooltip at 127 characters.
+    return waiting, tip[:120]
+
+
+def tray_menu(state, d):
+    """The right-click menu, as (id, label)."""
+    waiting, _ = tray_status(state, d)
+    entries = []
+    if waiting:
+        entries += [(TRAY_DONE, tr("&Done")), (TRAY_NOT_YET, tr("&Not yet"))]
+    return entries + [(TRAY_OPEN, tr("&Open")), (TRAY_QUIT, tr("Quit the tray icon"))]
+
+
+def set_tray(state, can_save, on):
+    """Turn the tray icon on, starting it now, or off; a running one
+    notices within a minute and leaves. Returns what to say."""
+    refresh(state, can_save)
+    base = copy.deepcopy(state)
+    if on:
+        state["tray"] = True
+    else:
+        state.pop("tray", None)
+    if not commit(state, base, can_save):
+        undo(state, base)
+        return tr("Could not save that choice on this computer.")
+    if not on:
+        return tr("The tray icon is off.")
+    start_tray()
+    return tr("The tray icon is on. It shows a dot while yesterday's plan waits for an answer, "
+              "and starts again each time you sign in.")
+
+
+def tray_answer(choice, d):
+    """Done or Not yet from the tray. Returns what to say, or ""."""
+    state, can_save = load(repair=not policy("LeaveDamagedFile"))
+    intent = state["intent"]
+    if not asks_followup(intent, d):
+        return ""
+    _, message = answer_plan(state, can_save, d, "yes" if choice == TRAY_DONE else "no",
+                             intent["text"])
+    return message
+
+
+# A list in tests: tray starts are recorded here instead.
+TRAY_STARTS = None
+
+
+def start_tray():
+    """Start the tray icon in its own pythonw.exe. One runs at a time."""
+    if TRAY_STARTS is not None:
+        TRAY_STARTS.append(True)
+        return True
+    if os.name != "nt":
+        return False
+    import subprocess
+    try:
+        subprocess.Popen([window_python(), "-I", os.path.abspath(__file__), "--tray"],
+                         creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))
+    except OSError:
+        return False
+    return True
+
+
+def run_tray():
+    """The tray icon's own process: a hidden window, the icon, and its menu."""
+    if os.name != "nt":
+        return 0
+    import ctypes
+    from ctypes import wintypes as wt
+    user = ctypes.WinDLL("user32", use_last_error=True)
+    shell = ctypes.WinDLL("shell32")
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.CreateMutexW.restype = wt.HANDLE
+    kernel.CreateMutexW.argtypes = [ctypes.c_void_p, wt.BOOL, wt.LPCWSTR]
+    mutex = kernel.CreateMutexW(None, False, "Local\\hello-world-tray")
+    if ctypes.get_last_error() == 183:  # ERROR_ALREADY_EXISTS
+        return 0
+    lresult = ctypes.c_ssize_t
+    proc_type = ctypes.WINFUNCTYPE(lresult, wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM)
+    user.DefWindowProcW.argtypes = [wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM]
+    user.DefWindowProcW.restype = lresult
+    user.CreateWindowExW.argtypes = [wt.DWORD, wt.LPCWSTR, wt.LPCWSTR, wt.DWORD] + [
+        ctypes.c_int] * 4 + [wt.HWND, wt.HMENU, wt.HINSTANCE, ctypes.c_void_p]
+    user.CreateWindowExW.restype = wt.HWND
+    user.LoadIconW.argtypes = [wt.HINSTANCE, ctypes.c_void_p]
+    user.LoadIconW.restype = wt.HICON
+    user.CreatePopupMenu.restype = wt.HMENU
+    user.AppendMenuW.argtypes = [wt.HMENU, wt.UINT, ctypes.c_size_t, wt.LPCWSTR]
+    user.TrackPopupMenu.argtypes = [wt.HMENU, wt.UINT, ctypes.c_int, ctypes.c_int,
+                                    ctypes.c_int, wt.HWND, ctypes.c_void_p]
+    user.DestroyMenu.argtypes = [wt.HMENU]
+    user.SetTimer.argtypes = [wt.HWND, ctypes.c_size_t, wt.UINT, ctypes.c_void_p]
+    user.GetCursorPos.argtypes = [ctypes.POINTER(wt.POINT)]
+    user.SetForegroundWindow.argtypes = [wt.HWND]
+    user.PostMessageW.argtypes = [wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM]
+
+    class WNDCLASSW(ctypes.Structure):
+        _fields_ = [("style", wt.UINT), ("lpfnWndProc", proc_type), ("cbClsExtra", ctypes.c_int),
+                    ("cbWndExtra", ctypes.c_int), ("hInstance", wt.HINSTANCE),
+                    ("hIcon", wt.HICON), ("hCursor", wt.HANDLE), ("hbrBackground", wt.HBRUSH),
+                    ("lpszMenuName", wt.LPCWSTR), ("lpszClassName", wt.LPCWSTR)]
+
+    class NOTIFYICONDATAW(ctypes.Structure):
+        _fields_ = [("cbSize", wt.DWORD), ("hWnd", wt.HWND), ("uID", wt.UINT),
+                    ("uFlags", wt.UINT), ("uCallbackMessage", wt.UINT), ("hIcon", wt.HICON),
+                    ("szTip", wt.WCHAR * 128), ("dwState", wt.DWORD),
+                    ("dwStateMask", wt.DWORD), ("szInfo", wt.WCHAR * 256),
+                    ("uVersion", wt.UINT), ("szInfoTitle", wt.WCHAR * 64),
+                    ("dwInfoFlags", wt.DWORD), ("guidItem", ctypes.c_byte * 16),
+                    ("hBalloonIcon", wt.HICON)]
+
+    shell.Shell_NotifyIconW.argtypes = [wt.DWORD, ctypes.POINTER(NOTIFYICONDATAW)]
+    callback = 0x0400 + 20  # WM_USER + 20
+    plain = user.LoadIconW(None, ctypes.c_void_p(32512))    # IDI_APPLICATION
+    waiting = user.LoadIconW(None, ctypes.c_void_p(32516))  # IDI_INFORMATION, the dot
+    data = NOTIFYICONDATAW()
+    data.cbSize = ctypes.sizeof(NOTIFYICONDATAW)
+    data.uID = 1
+    data.uFlags = 0x1 | 0x2 | 0x4  # NIF_MESSAGE | NIF_ICON | NIF_TIP
+    data.uCallbackMessage = callback
+
+    def refresh_icon(add=False):
+        d = today()
+        state, _ = load(repair=False)
+        if not state.get("tray"):
+            user.PostMessageW(data.hWnd, 0x0010, 0, 0)  # WM_CLOSE: turned off
+            return
+        is_waiting, tip = tray_status(state, d)
+        data.hIcon = waiting if is_waiting else plain
+        data.szTip = tip
+        shell.Shell_NotifyIconW(0 if add else 1, ctypes.byref(data))  # NIM_ADD, NIM_MODIFY
+
+    def menu():
+        state, _ = load(repair=False)
+        handle = user.CreatePopupMenu()
+        for cid, label in tray_menu(state, today()):
+            user.AppendMenuW(handle, 0, cid, label)
+        point = wt.POINT()
+        user.GetCursorPos(ctypes.byref(point))
+        # Without this the menu doesn't close when you click elsewhere.
+        user.SetForegroundWindow(data.hWnd)
+        choice = user.TrackPopupMenu(handle, 0x100 | 0x20, point.x, point.y, 0, data.hWnd, None)
+        user.DestroyMenu(handle)
+        return choice
+
+    def proc(hwnd, msg, wparam, lparam):
+        try:
+            if msg == callback and lparam in (0x0202, 0x0203):  # left click, double
+                open_window()
+            elif msg == callback and lparam == 0x0205:  # right button up
+                choice = menu()
+                if choice in (TRAY_DONE, TRAY_NOT_YET):
+                    tray_answer(choice, today())
+                    refresh_icon()
+                elif choice == TRAY_OPEN:
+                    open_window()
+                elif choice == TRAY_QUIT:
+                    user.PostMessageW(hwnd, 0x0010, 0, 0)
+            elif msg == 0x0113:  # WM_TIMER: a new day, or an answer elsewhere
+                refresh_icon()
+            elif msg == 0x0010:  # WM_CLOSE
+                shell.Shell_NotifyIconW(2, ctypes.byref(data))  # NIM_DELETE
+                user.PostQuitMessage(0)
+                return 0
+        except Exception as e:
+            log_error(e)
+        return user.DefWindowProcW(hwnd, msg, wparam, lparam)
+
+    wndproc = proc_type(proc)
+    instance = kernel.GetModuleHandleW(None)
+    klass = WNDCLASSW(lpfnWndProc=wndproc, hInstance=instance,
+                      lpszClassName="hello-world-tray")
+    user.RegisterClassW(ctypes.byref(klass))
+    data.hWnd = user.CreateWindowExW(0, "hello-world-tray", "hello-world", 0,
+                                     0, 0, 0, 0, None, None, instance, None)
+    refresh_icon(add=True)
+    user.SetTimer(data.hWnd, 1, 60_000, None)
+    message = wt.MSG()
+    while user.GetMessageW(ctypes.byref(message), None, 0, 0) > 0:
+        user.TranslateMessage(ctypes.byref(message))
+        user.DispatchMessageW(ctypes.byref(message))
+    kernel.CloseHandle(mutex)
+    return 0
 
 
 def show_nudge():
@@ -6590,7 +6802,12 @@ class Window:
         if not plans_off():
             entries.append((checked if gentle(v.state) else 0, 20, tr("No follow-up questions")))
         entries.append((checked if pet_on(v.state) else 0, 21, tr("Desk pet...")))
+        entries.append((checked if v.state.get("tray") else 0, 22,
+                        tr("Keep hello-world in the tray")))
         choice = self.popup(entries)
+        if choice == 22:
+            self.set_text(self.STATUS, set_tray(v.state, v.can_save, not v.state.get("tray")))
+            return
         if choice == 21:
             self.pet_menu()
             return

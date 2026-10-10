@@ -735,7 +735,13 @@
   "text screen": "텍스트 화면",
   "thought and tip hidden": "생각과 팁 숨김",
   "thought hidden": "생각 숨김",
-  "weekends": "주말"
+  "weekends": "주말",
+  "Keep hello-world in the tray": "알림 영역에 hello-world 두기",
+  "Quit the tray icon": "알림 영역 아이콘 끝내기",
+  "The tray icon is off.": "알림 영역 아이콘을 껐어요.",
+  "The tray icon is on. It shows a dot while yesterday's plan waits for an answer, and starts again each time you sign in.": "알림 영역 아이콘을 켰어요. 어제 계획에 답을 기다리는 동안 점이 보이고, 로그인할 때마다 다시 시작해요.",
+  "hello-world: did you do it? {text}": "hello-world: 했나요? {text}",
+  "hello-world: today's plan: {text}": "hello-world: 오늘 계획: {text}"
  },
  "tips_floor": [
   "첫 작업 전에 다니는 통로에 걸리는 게 없는지 확인하세요.",

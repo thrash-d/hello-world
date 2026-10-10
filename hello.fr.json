@@ -736,7 +736,13 @@
   "text screen": "écran texte",
   "thought and tip hidden": "pensée et astuce masquées",
   "thought hidden": "pensée masquée",
-  "weekends": "week-ends"
+  "weekends": "week-ends",
+  "Keep hello-world in the tray": "Garder hello-world dans la zone de notification",
+  "Quit the tray icon": "Fermer l'icône de notification",
+  "The tray icon is off.": "L'icône de notification est désactivée.",
+  "The tray icon is on. It shows a dot while yesterday's plan waits for an answer, and starts again each time you sign in.": "L'icône de notification est activée. Elle montre un point tant que le plan d'hier attend une réponse, et revient à chaque connexion.",
+  "hello-world: did you do it? {text}": "hello-world : l'avez-vous fait ? {text}",
+  "hello-world: today's plan: {text}": "hello-world : plan du jour : {text}"
  },
  "tips_floor": [
   "Vérifiez que votre allée est dégagée avant la première tâche du poste.",
