@@ -3121,7 +3121,9 @@ def test_menu_option_12_has_the_windows_other_settings():
     assert "The greeting uses your first name." in p.stdout
     assert "Finished plans are kept for 90 days instead of 14." in p.stdout
     assert "Days you opened hello-world: 1" in p.stdout
-    assert 'Type a number from 1 to 12, or press Enter to go back.' in p.stdout
+    # Windows also lists Keep hello-world in the tray.
+    entries = 13 if os.name == "nt" else 12
+    assert f'Type a number from 1 to {entries}, or press Enter to go back.' in p.stdout
     saved = notes(p.home)
     assert saved["name"] is True and saved["long_history"] is True
     assert saved["numbers"] is True
@@ -4130,3 +4132,49 @@ def test_a_due_date_belongs_to_the_thing_it_is_written_in():
     run(["done", "1"], day="2026-10-05", home=p.home)
     saved = notes(p.home)["intent"]
     assert saved["text"] == "water plants" and "due" not in saved and "dues" not in saved
+
+
+def test_the_tray_shows_a_dot_while_yesterdays_plan_waits():
+    first = run(text="Report & slides\n\n", day="2026-10-01")
+    hello = _window_hello(home=first.home, day="2026-10-02")
+    state, _ = hello.load()
+    waiting, tip = hello.tray_status(state, hello.today())
+    assert waiting and tip == "hello-world: did you do it? Report & slides"
+    labels = [label for _, label in hello.tray_menu(state, hello.today())]
+    assert labels == ["&Done", "&Not yet", "&Open", "Quit the tray icon"]
+    assert hello.tray_answer(hello.TRAY_NOT_YET, hello.today()) == "Kept for today."
+    state, _ = hello.load()
+    waiting, tip = hello.tray_status(state, hello.today())
+    assert not waiting and tip == "hello-world: today's plan: Report & slides"
+    assert [cid for cid, _ in hello.tray_menu(state, hello.today())] == [
+        hello.TRAY_OPEN, hello.TRAY_QUIT]
+    # With no follow-up questions there is never a dot.
+    state["gentle"] = True
+    state["intent"]["date"] = "2026-10-01"
+    assert hello.tray_status(state, hello.today())[0] is False
+
+
+def test_the_tray_is_a_switch_and_starts_at_sign_in():
+    first = run(text="Call Ana\n\n")
+    hello = _window_hello(home=first.home)
+    hello.TRAY_STARTS, hello.SHOWN = [], []
+    state, can_save = hello.load()
+    assert "tray icon is on" in hello.set_tray(state, can_save, True)
+    assert notes(first.home)["tray"] is True and hello.TRAY_STARTS == [True]
+    hello.sign_in()
+    assert hello.TRAY_STARTS == [True, True]
+    assert hello.set_tray(state, can_save, False) == "The tray icon is off."
+    assert "tray" not in notes(first.home)
+
+
+def test_the_portable_build_keeps_notes_beside_it():
+    folder = mkdtemp()
+    shutil.copy(HELLO, folder)
+    with open(os.path.join(folder, "portable.txt"), "w") as f:
+        f.write("portable\n")
+    env = dict(os.environ, PYTHONUTF8="1")
+    p = subprocess.run([sys.executable, "-I", os.path.join(folder, "hello.py"), "plan",
+                        "Water the plants"], capture_output=True, text=True, env=env,
+                       stdin=subprocess.DEVNULL)
+    assert p.returncode == 0, p.stdout + p.stderr
+    assert os.path.isfile(os.path.join(folder, "notes", "notes.json"))

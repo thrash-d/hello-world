@@ -735,7 +735,13 @@
   "text screen": "מסך טקסט",
   "thought and tip hidden": "מחשבה וטיפ מוסתרים",
   "thought hidden": "מחשבה מוסתרת",
-  "weekends": "סופי שבוע"
+  "weekends": "סופי שבוע",
+  "Keep hello-world in the tray": "להשאיר את hello-world באזור ההודעות",
+  "Quit the tray icon": "לסגור את הסמל באזור ההודעות",
+  "The tray icon is off.": "הסמל באזור ההודעות כבוי.",
+  "The tray icon is on. It shows a dot while yesterday's plan waits for an answer, and starts again each time you sign in.": "הסמל באזור ההודעות פועל. הוא מציג נקודה כל עוד התוכנית של אתמול מחכה לתשובה, ועולה מחדש בכל כניסה.",
+  "hello-world: did you do it? {text}": "hello-world: עשית את זה? {text}",
+  "hello-world: today's plan: {text}": "hello-world: התוכנית להיום: {text}"
  },
  "tips_floor": [
   "לבדוק שהמעבר פנוי לפני המשימה הראשונה במשמרת.",

@@ -52,6 +52,9 @@ jobs:
           if ($hash -notmatch '^[0-9a-f]{64}$') { throw "The build printed no package hash: $hash" }
           $zip = Join-Path $env:RUNNER_TEMP "hello-world-$version.zip"
           Compress-Archive -Path "$out\*" -DestinationPath $zip
+          $portable = Join-Path $env:RUNNER_TEMP "hello-world-portable-$version.zip"
+          $portableHash = (powershell -NoProfile -ExecutionPolicy Bypass -File tools\build-portable.ps1 -OutFile $portable | Select-Object -Last 1).Trim()
+          if ($portableHash -notmatch '^[0-9a-f]{64}$') { throw "The portable build printed no hash: $portableHash" }
           $notes = @"
           Offline install package for hello-world $version, built from commit $env:SHA.
 
@@ -64,10 +67,12 @@ jobs:
           ``````
 
           ``sbom.cdx.json`` is the CycloneDX bill of materials.
+
+          ``hello-world-portable-$version.zip`` (SHA-256 ``$portableHash``) runs with no install on a personal PC: unzip, then double-click ``Start hello-world.cmd``. On a work PC, ask IT to deploy the package above instead.
           "@
           $notesFile = Join-Path $env:RUNNER_TEMP 'notes.md'
           # UTF-8 without a byte-order mark, which Set-Content -Encoding utf8
           # adds in Windows PowerShell 5.1 and GitHub shows at the top.
           [IO.File]::WriteAllText($notesFile, ($notes -replace '(?m)^          ', ''), (New-Object Text.UTF8Encoding $false))
-          gh release create $tag $zip (Join-Path $out 'sbom.cdx.json') -R $env:REPO --target $env:SHA --title "hello-world $version" --notes-file $notesFile
+          gh release create $tag $zip $portable (Join-Path $out 'sbom.cdx.json') -R $env:REPO --target $env:SHA --title "hello-world $version" --notes-file $notesFile
           if ($LASTEXITCODE) { throw "gh release create failed with exit $LASTEXITCODE" }

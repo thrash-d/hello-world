@@ -18,13 +18,18 @@ and a plan-free reminder by default; 1.48.0 added reactions to the thought,
 a window that doesn't wait for the server, and handoff that opens by itself,
 with policies for shared logins and signed notes; 1.49.0 added the command
 line, todo.txt import and the standup; 1.50.0 added the desk pet, plans put
-aside and the weekly boss; 1.51.0 finished the polish list. The reminder was already
+aside and the weekly boss; 1.51.0 finished the polish list; 1.52.0 added the
+tray icon and the portable zip. The reminder was already
 offered on the first day, right after the first plan. Running a public
 counts server for the individual package is the owner's step; the README says
 how.
 
-8. Paid tiers from the memo need a billing and licensing service outside
-   this repo; noted, not buildable here.
+1. Pro, $5 once with an offline key and no account (round 80). Selling it
+   through a store or a payment service is the owner's step.
+2. A phone web app: offline, big buttons, Spanish and Arabic, notes on the
+   phone only, no reminder unless asked (round 81).
+3. Opt-in sync between PC and phone, encrypted with a passphrase only the
+   person knows (round 82).
 
 ## Needs the deploying organization
 

@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-10-10: in the tray, and portable
+
+Version 1.52.0. From five simulated New Yorkers and the Profit Maximizer's
+memo (`docs/PERSONAS-2026-10.md`), reviewed with them before it was built.
+
+- **Tray icon** (Options > What the window shows): a dot while yesterday's
+  plan waits, Done and Not yet on right-click, starts at each sign-in. It never
+  pops up; the indie developer asked for one nudge at a time they pick, which
+  the timed reminder already gives.
+- **Portable zip** for personal PCs: unzip, double-click, notes beside it in
+  a `notes` folder. The release publishes it, and CI builds and runs it. The
+  bank analyst pointed out that a bundled interpreter on a locked-down work PC
+  is a compliance problem, so the README and release notes say plainly that
+  it's for personal PCs and that IT deploys the normal package at work.
+- "Did you do it?" already came first in both screens, as the teacher and the
+  Profit Maximizer asked; no change was needed.
+
 ## 2026-10-10: the last polish items
 
 Version 1.51.0. The rest of the October list, from the round 68 pilot (Priya,

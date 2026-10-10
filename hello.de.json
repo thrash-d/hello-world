@@ -735,7 +735,13 @@
   "text screen": "Textbildschirm",
   "thought and tip hidden": "Gedanke und Tipp ausgeblendet",
   "thought hidden": "Gedanke ausgeblendet",
-  "weekends": "Wochenenden"
+  "weekends": "Wochenenden",
+  "Keep hello-world in the tray": "hello-world im Infobereich behalten",
+  "Quit the tray icon": "Symbol im Infobereich beenden",
+  "The tray icon is off.": "Das Symbol im Infobereich ist aus.",
+  "The tray icon is on. It shows a dot while yesterday's plan waits for an answer, and starts again each time you sign in.": "Das Symbol im Infobereich ist an. Es zeigt einen Punkt, solange der Plan von gestern auf eine Antwort wartet, und startet bei jeder Anmeldung neu.",
+  "hello-world: did you do it? {text}": "hello-world: Haben Sie es geschafft? {text}",
+  "hello-world: today's plan: {text}": "hello-world: Plan für heute: {text}"
  },
  "tips_floor": [
   "Prüfen Sie vor der ersten Aufgabe der Schicht, ob Ihr Laufweg frei ist.",

@@ -735,7 +735,13 @@
   "text screen": "الشاشة النصية",
   "thought and tip hidden": "الفكرة والنصيحة مخفيتان",
   "thought hidden": "الفكرة مخفية",
-  "weekends": "عطلات نهاية الأسبوع"
+  "weekends": "عطلات نهاية الأسبوع",
+  "Keep hello-world in the tray": "إبقاء hello-world في منطقة الإعلام",
+  "Quit the tray icon": "إغلاق أيقونة منطقة الإعلام",
+  "The tray icon is off.": "أيقونة منطقة الإعلام متوقفة.",
+  "The tray icon is on. It shows a dot while yesterday's plan waits for an answer, and starts again each time you sign in.": "أيقونة منطقة الإعلام تعمل. تُظهر نقطة ما دامت خطة الأمس تنتظر إجابة، وتعود مع كل تسجيل دخول.",
+  "hello-world: did you do it? {text}": "hello-world: هل فعلتها؟ {text}",
+  "hello-world: today's plan: {text}": "hello-world: خطة اليوم: {text}"
  },
  "tips_floor": [
   "التأكد من خلو الممر قبل أول مهمة في الوردية.",

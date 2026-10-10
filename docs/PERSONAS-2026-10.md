@@ -98,6 +98,32 @@ IT, which is the guilt the personas said drives them away.
 
 The owner then asked to reach individuals outside companies too.
 
+## Street research, 1.51.0
+
+Five fresh agents on a smaller model, each a person met on a New York street
+(a halal cart vendor, a junior bank analyst, a retired teacher, a delivery
+rider, an indie game developer with ADHD), heard a one-paragraph pitch and
+answered: first reaction, would they use it, what they'd pay, what would make
+them use it. Three of five couldn't use it at all: two have only a phone, and
+one has a locked-down work PC. All five singled out the daily "Did you do
+it?". Four would pay $0 to $5 once; one would pay $5 a month only for study
+help. The Profit Maximizer then ranked: a way to pay ($5 once, offline key),
+a phone app, and a tray icon with a portable build, and said to freeze new
+Windows-only features until those ship.
+
+The designs went back to them before building:
+- The game developer: the tray dot alone gets ignored by 11am, so one nudge
+  at a chosen time; keep pets free and charge for history and reminders, not
+  cosmetics.
+- The analyst: a bundled interpreter or a USB stick on a bank PC means a
+  compliance meeting; and say clearly where phone notes live.
+- The teacher: a key pasted once with no sign-in is fair; nagging after "Not
+  yet" would make her delete it.
+- The rider: no default reminders, his phone already buzzes all day; no PC
+  sync for him.
+- The cart vendor: giant buttons, works with no signal, a reminder at 6:15,
+  and Arabic for his cousin.
+
 ## Track record
 
 What each simulated review found, and what happened to it. Status is as of
@@ -138,6 +164,11 @@ the pull request named.
 | Design review, round 78 | Break the JSON to objects with a version, `n`, `done` and an ISO-or-null `due`; the menu's single date must not overwrite per-thing dates silently | Priyanka | Built in 1.51.0 |
 | Design review, round 78 | Strip "by Friday" from the text once read | Priyanka | Not built: the words are the person's own |
 | Design review, round 78 | Offer to reset kept settings on delete (Mónica, pilot) vs. no second question (Harold) | Disagreement | Harold's way; the kept settings are named, with where to change them |
+| Street research, 1.51.0 | Tray icon; one nudge at a chosen time, not a pop-up | Indie developer | Built in 1.52.0; the timed reminder is the nudge |
+| Street research, 1.51.0 | No-install build | Bank analyst | Built in 1.52.0 for personal PCs only, after the analyst said it would break a bank's rules on a work PC |
+| Street research, 1.51.0 | A way to pay, offline, no sign-in | Profit Maximizer, teacher, indie developer | Queued: round 80 |
+| Street research, 1.51.0 | A phone version, Spanish, big buttons, offline | Cart vendor, rider, analyst | Queued: rounds 81 and 82 |
+| Design review, round 80 | Charge for pets and themes (Profit Maximizer) vs. keep pets free, charge for history and reminders (indie developer) | Disagreement | Pets stay free; Pro is history, a second reminder and themes |
 | Personas, 1.43.0 | Formulas run in the spreadsheet export | Skye, confirmed in code | Fixed in 1.46.1 |
 | Personas, 1.43.0 | Forklift horns, bakery orders, badge login, a supply locator, an email "lie detector" | Rick, Harold, Denise | Not buildable here: they need hardware or outside services |
 

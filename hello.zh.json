@@ -735,7 +735,13 @@
   "text screen": "文本界面",
   "thought and tip hidden": "想法和小提示已隐藏",
   "thought hidden": "想法已隐藏",
-  "weekends": "周末"
+  "weekends": "周末",
+  "Keep hello-world in the tray": "让 hello-world 留在通知区域",
+  "Quit the tray icon": "退出通知区域图标",
+  "The tray icon is off.": "通知区域图标已关闭。",
+  "The tray icon is on. It shows a dot while yesterday's plan waits for an answer, and starts again each time you sign in.": "通知区域图标已打开。昨天的计划等待回答时会显示一个点，每次登录都会重新启动。",
+  "hello-world: did you do it? {text}": "hello-world：做了吗？{text}",
+  "hello-world: today's plan: {text}": "hello-world：今天的计划：{text}"
  },
  "tips_floor": [
   "开始第一单活之前，先确认您走的通道畅通。",

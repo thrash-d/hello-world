@@ -199,6 +199,14 @@ number, it is under "If things feel heavy, someone to talk to" at the end of
 the text menu's options and in the window's Options. It never appears by
 itself, never reacts to what you type, and nothing records that you looked.
 
+### In the tray
+
+**Options > What the window shows > Keep hello-world in the tray** puts a
+small icon in the corner of the taskbar from each sign-in. It shows a dot while
+yesterday's plan waits for an answer. Click it to open hello-world, or
+right-click for **Done**, **Not yet** and **Open**. It never opens anything by
+itself; for one nudge at a time you pick, use **Options > Reminder...**.
+
 ### A desk pet, plans put aside, and the weekly boss
 
 Type `pet` at the last prompt, or choose **Options > What the window shows >
@@ -392,6 +400,17 @@ Start menu and Settings > Apps, where Uninstall removes it. That folder is
 in their own profile, so they, and programs running as them, can change it;
 the all-users install is the one to use wherever IT can.
 
+### Portable, with no install
+
+For a personal PC: download `hello-world-portable-<version>.zip` from the
+release, unzip it anywhere you can write, such as Documents or a USB stick, and
+double-click **Start hello-world.cmd**. Nothing is installed and nothing goes
+in the registry. Notes stay in the `notes` folder next to it, locked to your
+Windows account, and deleting the folder removes everything.
+`tools\build-portable.ps1 -OutFile hello-world-portable.zip` builds the same
+zip. The portable zip is not a way around an employer's software rules: on a
+work PC, ask IT, who can deploy the package above.
+
 ### From a git clone
 
 Run these in one PowerShell window opened as administrator, each line on its own. Change the
@@ -399,7 +418,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.51.0'
+$tag = 'v1.52.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

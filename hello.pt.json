@@ -736,7 +736,13 @@
   "text screen": "tela de texto",
   "thought and tip hidden": "pensamento e dica ocultos",
   "thought hidden": "pensamento oculto",
-  "weekends": "fins de semana"
+  "weekends": "fins de semana",
+  "Keep hello-world in the tray": "Manter o hello-world na bandeja",
+  "Quit the tray icon": "Fechar o ícone da bandeja",
+  "The tray icon is off.": "O ícone da bandeja está desligado.",
+  "The tray icon is on. It shows a dot while yesterday's plan waits for an answer, and starts again each time you sign in.": "O ícone da bandeja está ligado. Ele mostra um ponto enquanto o plano de ontem espera resposta, e volta sempre que você entra.",
+  "hello-world: did you do it? {text}": "hello-world: você fez? {text}",
+  "hello-world: today's plan: {text}": "hello-world: plano de hoje: {text}"
  },
  "tips_floor": [
   "Confira se o corredor está livre antes da primeira tarefa do turno.",

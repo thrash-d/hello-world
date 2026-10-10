@@ -735,7 +735,13 @@
   "text screen": "pantalla de texto",
   "thought and tip hidden": "idea y sugerencia ocultas",
   "thought hidden": "idea oculta",
-  "weekends": "fines de semana"
+  "weekends": "fines de semana",
+  "Keep hello-world in the tray": "Mantener hello-world en la bandeja",
+  "Quit the tray icon": "Quitar el icono de la bandeja",
+  "The tray icon is off.": "El icono de la bandeja está desactivado.",
+  "The tray icon is on. It shows a dot while yesterday's plan waits for an answer, and starts again each time you sign in.": "El icono de la bandeja está activado. Muestra un punto mientras el plan de ayer espera respuesta, y vuelve cada vez que inicias sesión.",
+  "hello-world: did you do it? {text}": "hello-world: ¿lo hiciste? {text}",
+  "hello-world: today's plan: {text}": "hello-world: plan de hoy: {text}"
  },
  "tips_floor": [
   "Comprueba que tu zona de paso está despejada antes de la primera tarea del turno.",
