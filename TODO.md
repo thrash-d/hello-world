@@ -34,17 +34,6 @@ how.
    night shift, drive days, job hunts, shifts and rent, quarterly targets, a
    gift key card), now that Pro is in (1.59.0). Selling keys, and putting the
    public key in `hello.py`, are the owner's steps (`docs/PRO.md`).
-3. Private letters to family (Mary): the phone's Draft text button already
-    opens the phone's own messages; a letter written in hello-world, kept on
-    the device and handed to the phone's own mail or messages to send, is
-    the version that keeps hello-world from becoming a messaging service.
-    The Profit Maximizer advised against more than that (abuse risk).
-4. A list of the devices syncing with a code, without accounts: each device
-    writes a name it's given ("Kitchen tablet") into the encrypted copy when
-    it syncs, so the list is only readable with the code, and **Change my
-    sync code** is how one is removed (Mielke). The Profit Maximizer had
-    thought this needed accounts; this way doesn't.
-
 Nothing from a review is cut (the owner, 2026-10-10): what a memo would
 have dropped is built in the safe form named above.
 

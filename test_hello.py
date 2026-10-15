@@ -3125,9 +3125,9 @@ def test_menu_option_12_has_the_windows_other_settings():
     assert "The greeting uses your first name." in p.stdout
     assert "Finished plans are kept for a year instead of 14 days." in p.stdout
     assert "Days you opened hello-world: 1" in p.stdout
-    # Windows also lists Keep hello-world in the tray; End the day, Every day,
+    # Windows also lists Keep hello-world in the tray; End the day, Letters, Every day,
     # This year, the fridge page and My day starts at come last.
-    entries = 18 if os.name == "nt" else 17
+    entries = 19 if os.name == "nt" else 18
     assert f'Type a number from 1 to {entries}, or press Enter to go back.' in p.stdout
     saved = notes(p.home)
     assert saved["name"] is True and saved["long_history"] is True
@@ -4995,3 +4995,71 @@ def test_the_household_list_is_the_same_on_the_pc_and_the_phone():
     assert hello.house_news(back, "aaaaaaaaaaaa", 1)[0] == ["Taro joined the household list."]
     # A different salt from sync: the same code never opens the other.
     assert hello.house_keys(code)[0] != hello.sync_keys(code)[0]
+
+
+def test_devices_syncing_are_listed_inside_the_encryption_with_short_ids():
+    server, url, folder = _counts_server()
+    try:
+        first = run(text="Call Ana\n\n", policy={"SharedCountsServer": url})
+        hello = _window_hello(home=first.home)
+        hello.POLICY = {"SharedCountsServer": url}
+        state, can_save = hello.load()
+        hello.set_sync(state, can_save, True)
+        state["device_name"] = "Kitchen PC"
+        assert hello.save(state)
+        assert hello.sync_now(state, can_save)
+        label, enc, mac = hello.sync_keys(state["sync"])
+        with open(os.path.join(folder, "sync", label), "rb") as f:
+            stored = f.read()
+        assert b"Kitchen" not in stored
+        devices = hello.open_sync(enc, mac, stored)["devices"]
+        me = state["device_id"]
+        assert devices[me]["name"] == "Kitchen PC"
+        # Another device writes its own name; both show, with short IDs.
+        other = dict(hello.open_sync(enc, mac, stored))
+        other["devices"] = dict(devices, cccccccccccc={"name": "Kitchen PC", "seen": hello.today().isoformat()})
+        with open(os.path.join(folder, "sync", label), "wb") as f:
+            f.write(hello.seal_sync(enc, mac, other))
+        hello.SYNCING = False
+        hello.sync_now(state, can_save)
+        line = hello.devices_line(state)
+        assert "this computer (" + me[:4] + "), today" in line and "Kitchen PC (cccc), today" in line
+        assert "same name" in line and "Change my sync code" in line
+        # A new code lists only this device.
+        hello.change_sync_code(state, can_save)
+        assert list(notes(first.home)["devices"]) == [me]
+    finally:
+        server.shutdown()
+
+
+def test_letters_stay_here_until_sent_with_your_own_mail_and_clear_in_one_step():
+    first = run(text="Call Ana\n\n")
+    p = run(text="letters\nnew\nmum@example.com\nI'm well, Mother. Love, Mary\n\n", home=first.home)
+    assert "never sends anything itself" in p.stdout and "Saved on this computer." in p.stdout
+    assert notes(first.home)["letters"][0]["to"] == "mum@example.com"
+    hello = _window_hello(home=first.home)
+    hello.STARTED = []
+    state, can_save = hello.load()
+    assert hello.mail_letter(state["letters"][0])
+    assert hello.STARTED[-1] == "mailto:mum@example.com?body=I%27m%20well%2C%20Mother.%20Love%2C%20Mary"
+    # Something that isn't an address never goes into the link.
+    hello.mail_letter({"to": "x?cc=evil@example.com", "text": "hi"})
+    assert hello.STARTED[-1] == "mailto:?body=hi"
+    q = run(text="letters\nclear\ny\n\n", home=first.home)
+    assert "Every letter is deleted." in q.stdout and "letters" not in notes(first.home)
+
+
+def test_the_phone_lists_devices_and_makes_letter_links():
+    got = _node("""
+        const app = require("./app.js");
+        const s = app.blank();
+        s.deviceName = "Kitchen tablet";
+        app.noteDevice(s, {"aaaaaaaaaaaa": {name: "Office PC", seen: "2026-10-01"}, "bad": {name: "x", seen: "y"}}, "2026-10-05");
+        console.log(JSON.stringify([Object.keys(s.devices).length, s.devices[s.deviceId],
+            app.mergeDevices({"aaaaaaaaaaaa": {name: "A", seen: "2026-10-01"}}, {"aaaaaaaaaaaa": {name: "A", seen: "2026-10-04"}}),
+            app.letterLink({to: "mum@example.com", text: "Hi Mum"}, "mail"),
+            app.letterLink({to: "?cc=x@y.z", text: "Hi"}, "mail"),
+            app.letterLink({to: "+1 555 0100", text: "Hi"}, "sms", false)]));""")
+    assert got == [2, {"name": "Kitchen tablet", "seen": "2026-10-05"},
+                   {"aaaaaaaaaaaa": {"name": "A", "seen": "2026-10-04"}},
+                   "mailto:mum@example.com?body=Hi%20Mum", "mailto:?body=Hi", "sms:+15550100?body=Hi"]

@@ -114,6 +114,23 @@
     <p class="note" id="family-scam"></p>
   </section>
 
+  <section id="letters">
+    <h2 id="letters-label"></h2>
+    <p class="note" id="letters-note"></p>
+    <label for="letter-to" id="letter-to-label"></label>
+    <input type="text" id="letter-to" maxlength="100" autocomplete="off">
+    <label for="letter-text" id="letter-text-label"></label>
+    <textarea id="letter-text" maxlength="4000" rows="5" style="width:100%;font:inherit;padding:12px;border-radius:12px;border:2px solid var(--line);background:var(--bg);color:var(--fg)"></textarea>
+    <p><label><input type="checkbox" id="letter-keep"> <span id="letter-keep-label"></span></label></p>
+    <div class="buttons">
+      <button id="letter-save"></button>
+      <button class="primary" id="letter-mail"></button>
+      <button id="letter-sms"></button>
+    </div>
+    <div id="letter-list"></div>
+    <p><button id="letters-clear" hidden></button></p>
+  </section>
+
   <section id="house">
     <h2 id="house-label"></h2>
     <p class="note" id="house-intro"></p>
@@ -183,6 +200,12 @@
       <p><button id="sync-save"></button> <button id="sync-change" hidden></button></p>
       <p class="note" id="sync-note"></p>
       <p class="note" id="sync-last"></p>
+      <p class="note" id="sync-devices"></p>
+      <div id="device-row" hidden>
+        <label for="device-name" id="device-name-label"></label>
+        <input type="text" id="device-name" maxlength="40" autocomplete="off">
+        <p><button id="device-save"></button></p>
+      </div>
       <p><button id="forget"></button></p>
     </details>
     <p class="note" id="privacy"></p>

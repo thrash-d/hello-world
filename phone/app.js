@@ -20,6 +20,14 @@ const UI = {
     endDay: "End the day", endDone: "Done", endCarry: "Carry to tomorrow", endAside: "Set aside",
     endClose: "Close the day", endTally: "Done {done}, carried {carried}, set aside {aside}. The day is closed.",
     large: "Large print", usual: "Usual print",
+    aPhone: "A phone", deviceName: "This phone's name, as the other devices see it", deviceSave: "Save the name",
+    devices: "Devices syncing: {list}. A name you don't know means the code got out: change the code on the PC.",
+    sameName: "Two devices have the same name; one of them may not be yours.", thisPhone: "this phone", todayWord: "today",
+    letters: "Letters to family", lettersNote: "Letters stay on this phone until you send one with your own mail or messages. hello-world never sends anything itself.",
+    letterTo: "To (an email address or a phone number)", letterText: "The letter", letterSave: "Save here",
+    letterMail: "Send with my own mail", letterSms: "Send with my own messages", letterKeep: "Keep a copy after sending",
+    letterOpen: "Open", letterDelete: "Delete", lettersClear: "Delete every letter", lettersClearAsk: "Delete every letter on this phone?",
+    letterSaved: "Saved on this phone.", lettersCleared: "Every letter is deleted.",
     house: "Household list", houseIntro: "Things anyone in the household can add and tick, each on their own phone or PC. Each thing shows who added, ticked or removed it, and nothing counts who did what. Someone with a household key starts one on a PC.",
     houseCode: "The household code", houseName: "Your name, as the others will see it", houseJoin: "Join", houseJoined: "You've joined the household list. Everyone on it is told.",
     houseNotFound: "That code didn't find a household list. Check it, or ask for the new one.", houseAdd: "Add",
@@ -76,6 +84,14 @@ const UI = {
     endDay: "Cerrar el día", endDone: "Hecho", endCarry: "Pasar a mañana", endAside: "Apartar",
     endClose: "Cerrar el día", endTally: "Hechos {done}, pasados {carried}, apartados {aside}. El día está cerrado.",
     large: "Letra grande", usual: "Letra normal",
+    aPhone: "Un teléfono", deviceName: "El nombre de este teléfono, como lo ven los demás dispositivos", deviceSave: "Guardar el nombre",
+    devices: "Dispositivos sincronizando: {list}. Un nombre que no conoces significa que el código se filtró: cambia el código en el PC.",
+    sameName: "Dos dispositivos tienen el mismo nombre; uno puede no ser tuyo.", thisPhone: "este teléfono", todayWord: "hoy",
+    letters: "Cartas a la familia", lettersNote: "Las cartas se quedan en este teléfono hasta que envías una con tu propio correo o mensajes. hello-world nunca envía nada por su cuenta.",
+    letterTo: "Para (un correo o un número de teléfono)", letterText: "La carta", letterSave: "Guardar aquí",
+    letterMail: "Enviar con mi correo", letterSms: "Enviar con mis mensajes", letterKeep: "Guardar una copia después de enviar",
+    letterOpen: "Abrir", letterDelete: "Borrar", lettersClear: "Borrar todas las cartas", lettersClearAsk: "¿Borrar todas las cartas de este teléfono?",
+    letterSaved: "Guardada en este teléfono.", lettersCleared: "Todas las cartas están borradas.",
     house: "Lista del hogar", houseIntro: "Cosas que cualquiera del hogar puede añadir y marcar, cada uno en su propio teléfono o PC. Cada cosa muestra quién la añadió, marcó o quitó, y nada cuenta quién hizo qué. Alguien con una clave de hogar la empieza en un PC.",
     houseCode: "El código del hogar", houseName: "Tu nombre, como lo verán los demás", houseJoin: "Unirme", houseJoined: "Te uniste a la lista del hogar. Todos los demás lo verán.",
     houseNotFound: "Ese código no encontró ninguna lista del hogar. Revísalo, o pide el nuevo.", houseAdd: "Añadir",
@@ -132,6 +148,14 @@ const UI = {
     endDay: "أنهِ اليوم", endDone: "تم", endCarry: "انقلها إلى الغد", endAside: "أجّلها",
     endClose: "أغلق اليوم", endTally: "تم {done}، نُقل {carried}، أُجّل {aside}. أُغلق اليوم.",
     large: "خط كبير", usual: "خط عادي",
+    aPhone: "هاتف", deviceName: "اسم هذا الهاتف كما تراه الأجهزة الأخرى", deviceSave: "احفظ الاسم",
+    devices: "الأجهزة المتزامنة: {list}. اسم لا تعرفه يعني أن الرمز تسرّب: غيّر الرمز على الكمبيوتر.",
+    sameName: "جهازان يحملان الاسم نفسه؛ قد لا يكون أحدهما لك.", thisPhone: "هذا الهاتف", todayWord: "اليوم",
+    letters: "رسائل إلى العائلة", lettersNote: "تبقى الرسائل على هذا الهاتف حتى ترسل واحدة ببريدك أو رسائلك. hello-world لا يرسل شيئًا بنفسه أبدًا.",
+    letterTo: "إلى (بريد إلكتروني أو رقم هاتف)", letterText: "الرسالة", letterSave: "احفظ هنا",
+    letterMail: "أرسل ببريدي", letterSms: "أرسل برسائلي", letterKeep: "احتفظ بنسخة بعد الإرسال",
+    letterOpen: "افتح", letterDelete: "احذف", lettersClear: "احذف كل الرسائل", lettersClearAsk: "حذف كل الرسائل من هذا الهاتف؟",
+    letterSaved: "حُفظت على هذا الهاتف.", lettersCleared: "حُذفت كل الرسائل.",
     house: "قائمة الأسرة", houseIntro: "أشياء يمكن لأي فرد في الأسرة إضافتها وتعليمها، كلٌّ على هاتفه أو حاسوبه. يُظهر كل شيء من أضافه أو علّمه أو حذفه، ولا شيء يحسب من فعل ماذا. يبدأها شخص لديه مفتاح الأسرة على حاسوب.",
     houseCode: "رمز الأسرة", houseName: "اسمك كما سيراه الآخرون", houseJoin: "انضم", houseJoined: "انضممت إلى قائمة الأسرة. سيعلم الجميع.",
     houseNotFound: "لم يجد هذا الرمز قائمة أسرة. تحقق منه أو اطلب الرمز الجديد.", houseAdd: "أضف",
@@ -265,6 +289,13 @@ function parse(raw) {
       state.house = { code: data.house.code, me: data.house.me, seen: Number(data.house.seen) || 0,
                       asked: Array.isArray(data.house.asked) ? data.house.asked.filter((x) => typeof x === "string") : [] };
       if (data.houseList && typeof data.houseList === "object") state.houseList = houseMerge(data.houseList, {});
+    }
+    if (/^[0-9a-f]{12}$/.test(data.deviceId)) state.deviceId = data.deviceId;
+    if (typeof data.deviceName === "string" && data.deviceName.trim()) state.deviceName = data.deviceName.trim().slice(0, 40);
+    if (data.devices) state.devices = mergeDevices(data.devices, {});
+    if (Array.isArray(data.letters)) {
+      state.letters = data.letters.filter((l) => l && typeof l.text === "string" && l.text.trim() && isDate(l.date))
+        .map((l) => ({ to: String(l.to || "").slice(0, 100), text: l.text.slice(0, 4000), date: l.date })).slice(-20);
     }
     if (typeof data.pushToken === "string" && /^[0-9a-f]{32}$/.test(data.pushToken)) state.pushToken = data.pushToken;
     if (typeof data.updated === "string" && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d$/.test(data.updated)) state.updated = data.updated;
@@ -658,7 +689,32 @@ function houseLeftUnasked(doc, me, asked) {
 
 function syncForm(state) {
   return { intent: state.intent ? { text: state.intent.text, date: state.intent.date } : null,
-           finished: state.finished, updated: state.updated || "" };
+           finished: state.finished, updated: state.updated || "", devices: state.devices || {} };
+}
+
+// The devices syncing with a code, inside the encryption, the newest day
+// for each, as hello.py's merge_devices does.
+function mergeDevices(mine, theirs) {
+  const out = {};
+  [mine, theirs].forEach((side) => Object.entries(side || {}).forEach(([id, d]) => {
+    if (/^[0-9a-f]{12}$/.test(id) && d && typeof d.name === "string" && typeof d.seen === "string"
+        && (!out[id] || d.seen > out[id].seen)) out[id] = { name: d.name.slice(0, 40), seen: d.seen.slice(0, 10) };
+  }));
+  return Object.fromEntries(Object.entries(out).sort((a, b) => (a[1].seen < b[1].seen ? -1 : 1)).slice(-20));
+}
+
+function noteDevice(state, others, today) {
+  if (!state.deviceId) state.deviceId = randomHex(6);
+  state.devices = mergeDevices(state.devices, others);
+  state.devices[state.deviceId] = { name: state.deviceName || UI.en.aPhone, seen: today };
+}
+
+// Mailto and sms links for a letter, opened in the phone's own apps.
+function letterLink(letter, how, apple) {
+  const to = String(letter.to || "").trim();
+  if (how === "sms") return smsLink(phoneNumber(to), letter.text, apple);
+  const mail = /^[^@\s<>?&]+@[^@\s<>?&]+\.[^@\s<>?&]+$/.test(to) ? to : "";
+  return `mailto:${mail}?body=${encodeURIComponent(letter.text)}`;
 }
 
 // Finished things from both sides, and the plan from whichever side changed
@@ -672,6 +728,7 @@ function mergeSync(state, other, today) {
       have.add(item.text + "\n" + item.date);
     }
   }
+  state.devices = mergeDevices(state.devices, other.devices);
   state.finished.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   state.finished = state.finished.slice(-100);
   const theirs = typeof other.updated === "string" ? other.updated : "";
@@ -693,7 +750,7 @@ if (typeof module !== "undefined") {
   module.exports = { UI, ordinal, todaysPair, clean, parse, asks, answer, setPlan, finishToday, language, blank,
     syncKeys, sealSync, openSync, mergeSync, syncForm, normalCode, todayOf, clearToday, picks, bringBack,
     phoneNumber, smsLink, utcTime, pushText, exportText, setDayStart, REMIND_TIMES, DAY_STARTS,
-    fresh, smallerDue, comingBack, smaller, endDay, noteSideways,
+    fresh, smallerDue, comingBack, smaller, endDay, noteSideways, mergeDevices, noteDevice, letterLink,
     houseKeys, houseNew, houseJoin, houseLeave, houseChange, houseMerge, houseTidy, houseBody, houseHistory,
     houseNews, houseLeftUnasked, newCode };
 }
@@ -908,6 +965,7 @@ if (typeof document !== "undefined") {
     $("fridge-note").textContent = s.printNote;
     drawSync();
     if (typeof drawHouse === "function") drawHouse();
+    if (typeof drawLetters === "function") drawLetters();
   }
 
   let forking = false, ending = false, nudging = null;
@@ -927,6 +985,7 @@ if (typeof document !== "undefined") {
         const other = await openSync(k, await got.arrayBuffer());
         if (other) { mergeSync(state, other, today()); save(); draw(); }
       }
+      noteDevice(state, null, today()); save();
       await fetch(url, { method: "PUT", body: await sealSync(k, syncForm(state)),
                          headers: { "Content-Type": "application/octet-stream" } });
       if (loud) say("syncOn");
@@ -945,11 +1004,82 @@ if (typeof document !== "undefined") {
     $("sync-change").hidden = !keys || changing;
     $("sync-code").hidden = $("sync-code-label").hidden = Boolean(keys) && !changing;
     $("sync-note").textContent = s.syncNote;
+    $("device-name-label").textContent = s.deviceName;
+    $("device-save").textContent = s.deviceSave;
+    $("device-row").hidden = !keys;
+    if (!$("device-name").value) $("device-name").value = state.deviceName || "";
+    const devs = Object.entries(state.devices || {}).sort((a, b) => (a[1].seen < b[1].seen ? 1 : -1));
+    const lang = language(state, navigator.languages);
+    const list = devs.map(([id, d]) => {
+      const [y, m, dd] = d.seen.split("-").map(Number);
+      const day = d.seen === today() ? s.todayWord : new Date(y, m - 1, dd).toLocaleDateString(lang, { weekday: "long" });
+      return `${id === state.deviceId ? s.thisPhone : d.name} (${id.slice(0, 4)}), ${day}`;
+    });
+    const names = devs.map(([, d]) => d.name.toLowerCase());
+    $("sync-devices").textContent = keys && list.length
+      ? s.devices.replace("{list}", list.join("; ")) + (new Set(names).size !== names.length ? " " + s.sameName : "") : "";
     const when = keys && state.updated ? new Date(state.updated) : null;
     $("sync-last").textContent = when && !isNaN(when)
       ? s.lastChange.replace("{when}", when.toLocaleString(language(state, navigator.languages),
           { weekday: "short", hour: "2-digit", minute: "2-digit" })) : "";
   }
+
+  $("device-save").addEventListener("click", (event) => {
+    event.preventDefault();
+    state.deviceName = $("device-name").value.trim().slice(0, 40) || undefined;
+    save(); sync(false); drawSync();
+  });
+  // Letters: kept here until sent with the phone's own mail or messages.
+  function drawLetters() {
+    const s = t();
+    $("letters-label").textContent = s.letters;
+    $("letters-note").textContent = s.lettersNote;
+    $("letter-to-label").textContent = s.letterTo;
+    $("letter-text-label").textContent = s.letterText;
+    $("letter-save").textContent = s.letterSave;
+    $("letter-mail").textContent = s.letterMail;
+    $("letter-sms").textContent = s.letterSms;
+    $("letter-keep-label").textContent = s.letterKeep;
+    $("letters-clear").textContent = s.lettersClear;
+    $("letters-clear").hidden = !(state.letters || []).length;
+    $("letter-list").replaceChildren(...(state.letters || []).map((letter, i) => {
+      const div = document.createElement("div");
+      const open = Object.assign(document.createElement("button"), { textContent: s.letterOpen, className: "small-button" });
+      open.addEventListener("click", () => { $("letter-to").value = letter.to; $("letter-text").value = letter.text; editing = i; });
+      const del = Object.assign(document.createElement("button"), { textContent: s.letterDelete, className: "small-button" });
+      del.addEventListener("click", () => { state.letters.splice(i, 1); save(); drawLetters(); });
+      div.append(Object.assign(document.createElement("p"), { textContent: (letter.to || "…") + ": " + letter.text.slice(0, 60) }), open, del);
+      return div;
+    }));
+  }
+  let editing = -1;
+  const currentLetter = () => ({ to: $("letter-to").value.trim().slice(0, 100), text: $("letter-text").value.trim().slice(0, 4000), date: today() });
+  function keepLetter(letter) {
+    state.letters = (state.letters || []).filter((_, i) => i !== editing);
+    if (letter) state.letters.push(letter);
+    state.letters = state.letters.slice(-20);
+    editing = -1;
+    save(); drawLetters();
+  }
+  $("letter-save").addEventListener("click", (event) => {
+    event.preventDefault();
+    const letter = currentLetter();
+    if (!letter.text) { say("nothing"); return; }
+    keepLetter(letter); say("letterSaved");
+  });
+  ["mail", "sms"].forEach((how) => $("letter-" + how).addEventListener("click", (event) => {
+    event.preventDefault();
+    const letter = currentLetter();
+    if (!letter.text) { say("nothing"); return; }
+    location.href = letterLink(letter, how, /iPhone|iPad/.test(navigator.userAgent));
+    keepLetter($("letter-keep").checked ? letter : null);
+    $("letter-text").value = "";
+  }));
+  $("letters-clear").addEventListener("click", () => {
+    if (!confirm(t().lettersClearAsk)) return;
+    state.letters = []; editing = -1; save(); drawLetters(); say("lettersCleared");
+  });
+  drawLetters();
 
   $("sync-change").addEventListener("click", (event) => {
     event.preventDefault();
