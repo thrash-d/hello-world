@@ -339,7 +339,15 @@
   "Something to do every day, such as taking pills, with its own reminder. A reminder only, not a medical device.": "Algo para fazer todos os dias, como tomar comprimidos, com o seu próprio lembrete. Só um lembrete, não um dispositivo médico.",
   "If you didn't make it, choose Change my sync code.": "Se não foi você, escolha Mudar o meu código de sincronização.",
   "Try this today, from your organization:": "Experimente isto hoje, da sua organização:",
-  "Could not set the second check-in on this computer.": "Não foi possível definir o segundo aviso neste computador."
+  "Could not set the second check-in on this computer.": "Não foi possível definir o segundo aviso neste computador.",
+  "(y if you did it, b to bring it over, s to start clean, Enter to skip) > ": "(s se fez, l para trazer, d para começar do zero, Enter para saltar) > ",
+  "Type y, b or s, or press Enter to skip.": "Escreva s, l ou d, ou prima Enter para saltar.",
+  "Type c or s, or press Enter to carry it over.": "Escreva l ou d, ou prima Enter para passar.",
+  "Type d, c or s, or press Enter to carry it.": "Escreva s, l ou d, ou prima Enter para passar.",
+  "Set aside. Type same at a plan prompt if you want it back.": "Deixado de lado. Escreva repetir numa pergunta de plano se o quiser de volta.",
+  "Starting clean. It's set aside; type same to bring it back.": "A começar do zero. Ficou de lado; escreva repetir para o trazer de volta.",
+  "This one keeps coming back. Make it smaller, or set it aside? (type a smaller version, s to set it aside, Enter keeps it) > ": "Este volta sempre. Torná-lo mais pequeno ou deixá-lo de lado? (escreva uma versão mais pequena, d para deixar de lado, Enter mantém) > ",
+  "You can type a smaller version as today's plan instead.": "Pode escrever uma versão mais pequena como plano de hoje."
  },
  "thoughts": {
   "0": "Abrir aquele documento que tem andado a adiar e ler só o primeiro parágrafo.",

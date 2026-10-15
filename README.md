@@ -159,8 +159,17 @@ If you don't type `done`, the next visit asks "Did you do it?". A yes is
 counted on the spot, and `ok`, `sure`, `did it` and `finished` are yes
 too; `nah` and `not really` are "not yet". If the plan is more than a day old, it lists the days
 since and you pick one by number. "Not yet" lets you keep the plan for today, as many days as you
-need. `sideways` (or **The day went sideways** in the window) sets the plan
-aside with nothing marked and says tomorrow is new. Press Enter to skip the question; after two skips it stops asking and
+need. `sideways` (or **The day went sideways** in the window) asks: carry it
+over, or set it aside? Carrying it over is the default; either way nothing is
+marked. A plan two or more days old asks "Fresh day. Bring it over, or start
+clean?", never how many days were missed. A plan carried over again and again
+gets asked once whether to make it smaller or set it aside, and after a few
+sideways days in a week the plan question offers once to keep today's plan
+small. Those sideways days are kept only on the PC and never shown.
+**End the day** (`end` at the last prompt, More settings, or **My plans** in
+the window) goes through each thing: done, carry to tomorrow, or set aside,
+then says plainly what happened ("Done 1, carried 1, set aside 1"). The
+window and the phone have a **Large print** button on the first screen. Press Enter to skip the question; after two skips it stops asking and
 shows the plan as still open, and `done` still works. A plan first set more
 than two weeks ago is put away, and `same` brings it back. With no plan, the
 question ("Anything for today? Small is fine.") lists up to three plans put
@@ -526,7 +535,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.59.0'
+$tag = 'v1.60.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

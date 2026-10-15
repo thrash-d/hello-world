@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-10-10: carry it over, a fresh day, and end the day
+
+Version 1.60.0. Six of eight people from before 2000 asked for the same
+thing: make the reset kinder. Four of them reviewed the design first.
+
+- "The day went sideways" asks: carry it over, or set it aside? Carrying is
+  the default, and both answers are named the same size (Mary).
+- A plan two or more days old asks "Fresh day. Bring it over, or start
+  clean?", with no count of the days missed.
+- A plan that keeps coming back is asked about once: make it smaller (type
+  the smaller version) or set it aside.
+- The days "sideways" is used are kept on the device only and never shown;
+  after three in a week the plan question offers once, "Want today's plan
+  smaller? Small is fine." (Dot).
+- **End the day**, free, on the PC and the phone: done, carry to tomorrow or
+  set aside for each thing, then one plain line, "Done 1, carried 1, set
+  aside 1. The day is closed." (Hank). What's carried is tomorrow's plan,
+  with no "Did you do it?" about it.
+- A **Large print** button on the first screen of the window and the phone
+  (Gordo, Neferet).
+
 ## 2026-10-10: Pro, and a household key
 
 Version 1.59.0. Pro, built in round 80 and held for the owner's go-ahead,

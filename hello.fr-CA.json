@@ -40,7 +40,13 @@
   "If you didn't make it, choose Change my sync code.": "Si ce n'est pas vous, choisissez Changer mon code de synchronisation.",
   "Last change to your synced plan: {when}.": "Dernière modification de votre plan synchronisé: {when}.",
   "Thought for today, from your organization:": "Pensée du jour, de votre organisation:",
-  "Try this today, from your organization:": "Essayez ceci aujourd'hui, de votre organisation:"
+  "Try this today, from your organization:": "Essayez ceci aujourd'hui, de votre organisation:",
+  "Fresh day. Bring it over, or start clean?": "Nouveau jour. Vous le reprenez, ou vous repartez de zéro?",
+  "That's okay. Carry it over to today?": "Ce n'est pas grave. Le reporter à aujourd'hui?",
+  "That's okay. Carry it over, or set it aside? (c to carry it over, s to set it aside, Enter carries it over) > ": "Ce n'est pas grave. Le reporter ou le mettre de côté? (g pour le reporter, a pour le mettre de côté, Entrée le reporte) > ",
+  "This one keeps coming back. Make it smaller, or set it aside? (type a smaller version, s to set it aside, Enter keeps it) > ": "Celui-ci revient sans cesse. Le rendre plus petit, ou le mettre de côté? (tapez une version plus petite, a pour le mettre de côté, Entrée le garde) > ",
+  "This one keeps coming back. Set it aside for now?": "Celui-ci revient sans cesse. Le mettre de côté pour l'instant?",
+  "Want today's plan smaller? Small is fine.": "Un plan plus petit aujourd'hui? Petit, c'est bien."
  },
  "thoughts": {
   "13": "Si la matinée n'a rien donné, choisissez une tâche après le dîner et commencez-la avant de consulter vos messages.",

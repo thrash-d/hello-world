@@ -517,7 +517,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.59.0"
+VERSION = "1.60.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -558,6 +558,13 @@ UNSURE_WORDS = ("?", "not sure", "unsure", "i'm not sure", "im not sure",
 SIDEWAYS_WORDS = ("sideways", "day went sideways", "de lado", "se torció",
                   "se torcio", "de travers", "deu errado", "schief",
                   "schiefgelaufen")
+# The two answers after "sideways", and a fresh day's (the pre-2000 round):
+# carry it over (the default) or set it aside / start clean.
+CARRY_WORDS = ("c", "carry", "carry it", "carry it over", "bring", "bring it over",
+               "b", "l", "llevar", "garder", "g", "levar", "mitnehmen", "m")
+CLEAN_WORDS = ("s", "aside", "set aside", "set it aside", "clean", "start clean",
+               "a", "apartar", "de côté", "deixar", "d", "beiseite")
+END_WORDS = ("end", "end the day", "terminar", "fin", "encerrar", "feierabend")
 GENTLE_WORDS = ("gentle", "suave", "doux", "sanft")
 PRO_WORDS = ("pro",)
 PET_WORDS = ("pet", "mascota", "mascotte", "bichinho", "haustier")
@@ -2133,6 +2140,15 @@ def load(repair=True):
     DAY_START = state.get("day_start", 0)
     if raw.get("remind_at") in REMINDER_TIMES:
         state["remind_at"] = raw["remind_at"]
+    days = raw.get("sideways")
+    if isinstance(days, list):
+        kept = [x for x in days if isinstance(x, str) and re.fullmatch(r"\d{4}-\d\d-\d\d", x)
+                and x <= today().isoformat()]
+        if kept:
+            state["sideways"] = kept[-SIDEWAYS_WEEK * 2:]
+    for key in ("smaller_offered", "smaller_asked"):
+        if isinstance(raw.get(key), str) and len(raw[key]) <= MAX_PLAN:
+            state[key] = raw[key]
     every = raw.get("repeat")
     if (isinstance(every, dict) and isinstance(every.get("text"), str)
             and every.get("at") in REMINDER_TIMES and clean(every["text"])):
@@ -3481,6 +3497,7 @@ def more_settings(state, can_save):
         entries.append((marked(tr("Keep hello-world in the tray"), state.get("tray")),
                         lambda: para(set_tray(state, can_save, not state.get("tray")))))
     if not plans_off():
+        entries.append((tr("End the day..."), lambda: end_day_prompt(state, can_save, today())))
         entries.append((tr("Every day..."), every_day))
         entries.append((tr("This year..."), lambda: [say(wrapped("", line)) for line in
                                                     year_page(state, today())]))
@@ -4522,6 +4539,95 @@ def note_unsure(state, text, date):
 
 
 SIDEWAYS_SAID = "That's okay. It's set aside, and tomorrow is new."
+CARRIED_SAID = "That's okay. It's carried over to today."
+# The days "sideways" was used, kept on this device only and never shown as
+# a number (Dot): after this many in a week it offers a smaller plan once.
+SIDEWAYS_WEEK = 3
+
+
+def end_day(state, can_save, d, choose):
+    """End the day (Hank's go/no-go, Anselm's Compline): for each thing on
+    the plan, choose(part) gives "done", "carry" (to tomorrow) or "aside".
+    Returns the plain tally, or what went wrong."""
+    refresh(state, can_save)
+    intent = state["intent"]
+    if not intent:
+        return tr("There is no plan to end the day with.")
+    parts = plan_parts(intent["text"])
+    picks = [choose(part) for part in parts]
+    base = copy.deepcopy(state)
+    done = [i for i, c in enumerate(picks) if c == "done"]
+    if done:
+        finish_plan(state, intent["text"], d, done)
+    for part, c in zip(parts, picks):
+        if c == "aside":
+            put_aside(state, part)
+    carried = [part for part, c in zip(parts, picks) if c == "carry"]
+    state["intent"] = {"text": "; ".join(carried),
+                       "date": (d + datetime.timedelta(days=1)).isoformat(),
+                       "since": intent.get("since", intent["date"])} if carried else None
+    if not commit(state, base, can_save):
+        undo(state, base)
+        return tr("Could not save that on this computer. Nothing changed.")
+    # One plain line, no judgment words (Hank).
+    return tr("Done {done}, carried {carried}, set aside {aside}. The day is closed.").format(
+        done=len(done), carried=len(carried), aside=picks.count("aside"))
+
+
+def end_day_prompt(state, can_save, d):
+    """End the day in the text screen, a question for each thing."""
+    def choose(part):
+        say(wrapped("  ", part))
+        answer = ask_choice(tr("d done, c carry to tomorrow, s set aside (Enter "
+                               "carries it) > "),
+                            DONE_WORDS + ("d",) + strict_yes(), CARRY_WORDS,
+                            tr("Type d, c or s, or press Enter to carry it."),
+                            sideways=CLEAN_WORDS)
+        return {"yes": "done", "sideways": "aside"}.get(answer, "carry")
+    para(end_day(state, can_save, d, choose))
+
+
+def offer_smaller(state, intent, d):
+    """Once for a plan that keeps coming back: make it smaller, set it aside,
+    or keep it. Returns the plan to keep, or None when set aside."""
+    if not intent or not keeps_coming_back(state, intent, d):
+        return intent
+    state["smaller_asked"] = intent["text"]
+    typed = ask(tr("This one keeps coming back. Make it smaller, or set it aside? "
+                   "(type a smaller version, s to set it aside, Enter keeps it) > "))
+    word = (typed or "").lower().strip(TRIM)
+    if word in QUIT_WORDS:
+        raise Quit
+    if word in CLEAN_WORDS:
+        put_aside(state, intent["text"])
+        para(tr("Set aside. Type same at a plan prompt if you want it back."))
+        return None
+    smaller = typed_plan(typed or "") if word else ""
+    if smaller:
+        put_aside(state, intent["text"])
+        para(tr("Smaller it is. The bigger one is set aside."))
+        return {"text": smaller, "date": d.isoformat()}
+    return intent
+
+
+def note_sideways(state, d):
+    days = [x for x in state.get("sideways", []) if x != d.isoformat()]
+    state["sideways"] = (days + [d.isoformat()])[-SIDEWAYS_WEEK * 2:]
+
+
+def smaller_due(state, d):
+    """True once a week at most, after several sideways days this week."""
+    week = (d - datetime.timedelta(days=6)).isoformat()
+    recent = [x for x in state.get("sideways", []) if x >= week]
+    offered = state.get("smaller_offered", "")
+    return len(recent) >= SIDEWAYS_WEEK and not offered >= week
+
+
+def keeps_coming_back(state, intent, d):
+    """A plan carried over twice or more, not yet asked about."""
+    since = intent.get("since", intent["date"])
+    return ((d - datetime.date.fromisoformat(since)).days >= 2
+            and state.get("smaller_asked") != intent["text"])
 
 
 def answer_plan(state, can_save, d, choice, text, parts=None):
@@ -4551,6 +4657,11 @@ def answer_plan(state, can_save, d, choice, text, parts=None):
     elif choice == "sideways":
         put_aside(state, text)
         state["intent"] = None
+        note_sideways(state, d)
+    elif choice == "carry":
+        state["intent"] = {"text": text, "date": d.isoformat(),
+                           "since": intent.get("since", intent["date"]), **carried_due(intent)}
+        note_sideways(state, d)
     elif choice in ("no", "unsure"):
         state["intent"] = {"text": text, "date": d.isoformat(),
                            "since": intent.get("since", intent["date"]), **carried_due(intent)}
@@ -4570,6 +4681,8 @@ def answer_plan(state, can_save, d, choice, text, parts=None):
         return True, tr("That's fine. It's kept for today.")
     if choice == "sideways":
         return True, tr(SIDEWAYS_SAID)
+    if choice == "carry":
+        return True, tr(CARRIED_SAID)
     return True, tr("Kept for today.") if choice == "no" else tr(
         "Skipped. It asks again next time.")
 
@@ -4720,7 +4833,20 @@ def daily(startup):
             if note := due_note(intent, d):
                 say(note)
             label = planned_label(intent["date"], d)
-            if len(parts) == 1:
+            # Two days or more: a fresh day, with no count of days missed
+            # (the pre-2000 round).
+            fresh = (d - datetime.date.fromisoformat(intent["date"])).days >= 2
+            if len(parts) == 1 and fresh:
+                say(wrapped(label, intent["text"]))
+                say(tr("Fresh day. Bring it over, or start clean?"))
+                answer = ask_choice(
+                    tr("(y if you did it, b to bring it over, s to start clean, "
+                       "Enter to skip) > "),
+                    strict_yes() + DONE_WORDS + DID_WORDS, NO + CARRY_WORDS,
+                    tr("Type y, b or s, or press Enter to skip."),
+                    unsure=UNSURE_WORDS, sideways=CLEAN_WORDS + SIDEWAYS_WORDS)
+                some = None
+            elif len(parts) == 1:
                 say(wrapped(label, intent["text"]))
                 answer = ask_choice(
                     tr("Did you do it? (y for yes, n for not yet, ? if you're "
@@ -4756,7 +4882,7 @@ def daily(startup):
                            "was not counted."))
             elif answer == "no":
                 answered = True
-                keep = ask_choice(
+                keep = "yes" if fresh and len(parts) == 1 else ask_choice(
                     tr("That is fine. Keep it for today? (y or n, Enter to "
                        "keep it) > "),
                     strict_yes() + NOT_YET, NO_WORDS,
@@ -4769,13 +4895,31 @@ def daily(startup):
                 else:
                     intent = {"text": intent["text"], "date": iso,
                               "since": intent.get("since", intent["date"]), **carried_due(intent)}
-                    say(tr("Kept for today."))
+                    say(tr("Brought over to today.") if fresh else tr("Kept for today."))
+                    intent = offer_smaller(state, intent, d)
                 offer_gentle(state)
             elif answer == "sideways":
                 answered = True
-                put_aside(state, intent["text"])
-                intent = None
-                say(tr(SIDEWAYS_SAID))
+                if fresh:
+                    carry = False
+                else:
+                    # Two equal answers, carrying over the default (Dot, Mary).
+                    carry = ask_choice(
+                        tr("That's okay. Carry it over, or set it aside? (c to carry "
+                           "it over, s to set it aside, Enter carries it over) > "),
+                        CARRY_WORDS, CLEAN_WORDS,
+                        tr("Type c or s, or press Enter to carry it over.")) != "no"
+                    note_sideways(state, d)
+                if carry:
+                    intent = {"text": intent["text"], "date": iso,
+                              "since": intent.get("since", intent["date"]), **carried_due(intent)}
+                    para(tr(CARRIED_SAID))
+                    intent = offer_smaller(state, intent, d)
+                else:
+                    put_aside(state, intent["text"])
+                    intent = None
+                    para(tr("Starting clean. It's set aside; type same to bring it back.")
+                         if fresh else tr(SIDEWAYS_SAID))
             elif answer == "unsure":
                 answered = True
                 note_unsure(state, intent["text"], intent["date"])
@@ -4838,6 +4982,9 @@ def daily(startup):
                 skip = (tr("(Type same to reuse the earlier plan, a number to bring "
                            "one back, or Enter to skip)") if state.get("previous") else
                         tr("(Type a number to bring one back, or Enter to skip)"))
+            if smaller_due(state, d):
+                para(tr("Want today's plan smaller? Small is fine."))
+                state["smaller_offered"] = iso
             question = tr("Anything for today? Small is fine.") + "\n" + skip + " > "
             text = ask(question)
             if picks and (text or "").strip(TRIM) in [str(n) for n in range(1, len(picks) + 1)]:
@@ -5263,6 +5410,10 @@ def last_prompt(state, can_save, intent, person, d, iso, open_menu=False):
             continue
         elif answer in ASIDE_WORDS and not plans_off():
             aside_prompt(state, can_save)
+            intent = state["intent"]
+            continue
+        elif answer in END_WORDS and person and not plans_off():
+            end_day_prompt(state, can_save, d)
             intent = state["intent"]
             continue
         elif answer in GENTLE_WORDS and person:
@@ -6619,6 +6770,21 @@ class Visit:
         intent = self.state["intent"]
         return intent["text"] if intent and intent["date"] == self.iso else ""
 
+    def aside_today(self):
+        """Set today's plan aside. Returns the message."""
+        quietly(refresh, self.state, self.can_save)
+        intent = self.state["intent"]
+        if not intent:
+            return ""
+        base = copy.deepcopy(self.state)
+        put_aside(self.state, intent["text"])
+        self.state["intent"] = None
+        saved, _ = quietly(commit, self.state, base, self.can_save)
+        if not saved:
+            undo(self.state, base)
+            return tr("Could not save that on this computer. Nothing changed.")
+        return tr("Set aside. Type same at a plan prompt if you want it back.")
+
     def answer(self, choice, parts=None):
         """"yes", "no", "unsure", "sideways" or "skip" to "Did you do it?", with `parts` for the
         things done when only some were. Returns the message."""
@@ -6964,6 +7130,7 @@ class Window:
     WIDTH, MARGIN, LINE = 300, 12, 10
     TITLE, DATE, NOTE, PLANNED, ASK, DONE, NOT_YET, SKIP = range(100, 108)
     UNSURE, SIDEWAYS = 108, 109
+    LARGE = 126
     THOUGHT_LABEL, THOUGHT, TIP_LABEL, TIP, TIP_COUNT, TIP_DONE = range(110, 116)
     BOSS, PET = 116, 117
     REACT, REACT_NOTE = 150, 154  # REACT to REACT + 3, one button a reaction
@@ -7099,7 +7266,9 @@ class Window:
             ticks(parts)
         elif v.followup:
             para(self.PLANNED, since + v.followup, 2)
-            para(self.ASK, tr("Did you do it?"), 4)
+            fresh = (v.d - datetime.date.fromisoformat(v.state["intent"]["date"])).days >= 2
+            para(self.ASK, tr("Fresh day. Bring it over, or start clean?") if fresh
+                 else tr("Did you do it?"), 4)
         if v.followup:
             for n, (cid, label) in enumerate(((self.DONE, tr("&Done")),
                                               (self.NOT_YET, tr("&Not yet")),
@@ -7153,6 +7322,10 @@ class Window:
             add(button, self.CLOSE, self.close_label(), tab, right - 64, 16, 64)
         else:
             add(button, self.CLOSE, tr("Close"), tab | 1, right - 64, 16, 64)
+        y += 20
+        # On the first screen, not under Options (Gordo, Neferet).
+        add(button, self.LARGE, tr("Usual print") if v.state.get("large_text")
+            else tr("Large print"), tab, m, 16, 80)
         return items, y + 26
 
     def plan_label(self):
@@ -7384,10 +7557,22 @@ class Window:
                     and not self.confirm(tr("Mark all of them done?"))):
                 return
             typed = self.typed()
-            message = v.answer({self.DONE: "yes", self.NOT_YET: "no",
-                                self.UNSURE: "unsure",
-                                self.SIDEWAYS: "sideways"}.get(cid, "skip"),
-                               ticks if cid == self.DONE and ticks else None)
+            choice = {self.DONE: "yes", self.NOT_YET: "no", self.UNSURE: "unsure",
+                      self.SIDEWAYS: "sideways"}.get(cid, "skip")
+            if choice == "sideways" and self.confirm(tr(
+                    "That's okay. Carry it over to today?") + "\n\n" + tr(
+                    "Yes carries it over. No sets it aside.")):
+                choice = "carry"
+            asked = v.followup
+            message = v.answer(choice, ticks if cid == self.DONE and ticks else None)
+            intent = v.state["intent"]
+            if (choice in ("no", "carry") and intent and intent["text"] == asked
+                    and keeps_coming_back(v.state, intent, v.d)):
+                v.setting("smaller_asked", intent["text"])
+                if self.confirm(tr("This one keeps coming back. Set it aside for now?")
+                                + "\n\n" + tr("You can type a smaller version as "
+                                               "today's plan instead.")):
+                    message = v.aside_today()
             if tidy(typed) and not v.followup and clean(typed) != v.plan():
                 _, said, saved = v.save(typed)
                 if said:
@@ -7462,6 +7647,9 @@ class Window:
             self.user.EndDialog(self.hwnd, 2)
         elif cid == self.OPTIONS:
             self.options()
+        elif cid == self.LARGE:
+            self.toggled("large_text", tr("The text is larger."),
+                         tr("The text is the usual size."))
 
     def save_typed(self, redraw=False):
         """Save the box. True when saved, False when refused (the window
@@ -7890,7 +8078,19 @@ class Window:
                             tr("Funny farewells for plans put aside")))
         entries.append((0, 23, tr("Print a big page for the fridge")))
         entries.append((0, 24, tr("This year...")))
+        if v.state["intent"]:
+            entries.insert(0, (0, 25, tr("End the day...")))
         choice = self.popup(entries)
+        if choice == 25:
+            def choose(part):
+                picked = self.popup([(0x1, 0, part), (0x800, 0, None),
+                                     (0, 1, tr("Done")), (0, 2, tr("Carry to tomorrow")),
+                                     (0, 3, tr("Set aside"))])
+                return {1: "done", 3: "aside"}.get(picked, "carry")
+            message = end_day(v.state, v.can_save, v.d, choose)
+            self.fresh = True
+            self.reopen(message)
+            return
         if choice == 24:
             page = year_page(v.state, v.d)
             if self.confirm("\n".join(page) + "\n\n" + tr("Print this page?")):
