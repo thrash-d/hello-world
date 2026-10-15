@@ -1998,7 +1998,8 @@ def _screen_keys():
             if isinstance(n, ast.Call) and getattr(n.func, "id", "") in ("tr", "t")
             and n.args and isinstance(n.args[0], ast.Constant)]
     keys += [hello.HELP, hello.MENU_HELP, hello.SAVED_PLAN, hello.GREETING,
-             hello.SCAM_LINE, hello.SHIELD_QUESTION, hello.SHIELD_STOP, hello.SIDEWAYS_SAID]
+             hello.SCAM_LINE, hello.SHIELD_QUESTION, hello.SHIELD_STOP, hello.SIDEWAYS_SAID,
+             hello.KEY_SCAM_LINE, hello.PRO_PITCH]
     # say() doesn't wrap, so what it prints as is must fit 72 columns, less
     # the "  2  " in front of a menu line.
     raw = {n.args[0].value: isinstance(call.args[0], ast.BinOp)
@@ -3123,9 +3124,9 @@ def test_menu_option_12_has_the_windows_other_settings():
     assert "The greeting uses your first name." in p.stdout
     assert "Finished plans are kept for a year instead of 14 days." in p.stdout
     assert "Days you opened hello-world: 1" in p.stdout
-    # Windows also lists Keep hello-world in the tray; Every day, the fridge
-    # page and My day starts at come last.
-    entries = 16 if os.name == "nt" else 15
+    # Windows also lists Keep hello-world in the tray; Every day, This year,
+    # the fridge page and My day starts at come last.
+    entries = 17 if os.name == "nt" else 16
     assert f'Type a number from 1 to {entries}, or press Enter to go back.' in p.stdout
     saved = notes(p.home)
     assert saved["name"] is True and saved["long_history"] is True
@@ -4720,3 +4721,90 @@ def test_organization_content_is_labeled_and_sync_shows_the_last_change():
     assert hello.last_change_line({}) == ""
     line = hello.last_change_line({"sync_updated": "2026-10-06T15:14:00"})
     assert "Tuesday, 6 October 2026 15:14" in line and "Change my sync code" in line
+def _pro():
+    """A throwaway signing key, its public half in hello.py, and a key."""
+    sys.path.insert(0, os.path.join(os.path.dirname(HELLO), "tools"))
+    import pro_keys
+    secret = bytes(range(32))
+    return pro_keys, secret, pro_keys.public_key(secret).hex()
+
+
+def test_ed25519_matches_rfc_8032():
+    hello = _load_hello()
+    pro_keys, _, _ = _pro()
+    secret = bytes.fromhex("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60")
+    public = pro_keys.public_key(secret)
+    assert public.hex() == "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
+    signature = pro_keys.sign(secret, b"")
+    assert signature.hex().startswith("e5564300c360ac729086e2cc806e828a84877f1e")
+    assert hello.ed25519_verify(public, b"", signature)
+    assert not hello.ed25519_verify(public, b"x", signature)
+    assert not hello.ed25519_verify(public, b"", signature[:-1] + b"\0")
+
+
+def test_a_pro_key_is_checked_here_and_turns_pro_on():
+    pro_keys, secret, public = _pro()
+    key = pro_keys.issue(secret, "Ana Lopez", "2026-10-10")
+    first = run(text="Call Ana\n\n")
+    hello = _window_hello(home=first.home)
+    state, can_save = hello.load()
+    # With no public key set, no key works.
+    assert hello.set_pro_key(state, can_save, key).startswith("That isn't")
+    hello.PRO_PUBLIC_KEY = public
+    assert hello.set_pro_key(state, can_save, key[:-2] + "AA").startswith("That isn't")
+    assert hello.set_pro_key(state, can_save, " " + key + "\n") == "Pro is on. Thank you, Ana Lopez."
+    state, _ = hello.load()
+    # History isn't what Pro sells any more; a year is free with the setting.
+    assert hello.pro_on(state) and hello.keep_days(state) == 14 and not hello.family_on(state)
+    # A household key is Pro too, and opens the household list.
+    family = pro_keys.issue(secret, "The Lopez household", "2026-10-10", family=True)
+    assert "household" in hello.set_pro_key(state, can_save, family)
+    state, _ = hello.load()
+    assert hello.pro_on(state) and hello.family_on(state)
+    # A key signed by anyone else is refused.
+    other = pro_keys.issue(bytes(32), "Mallory")
+    assert hello.pro_license(other) is None
+    # The command line takes it too.
+    p = run(["pro", key], extra={"PRO_PUBLIC_KEY": public})
+    assert p.returncode == 0 and "Pro is on." in p.stdout
+    assert run(["pro", "HW1.nope.nope"], extra={"PRO_PUBLIC_KEY": public}).returncode == 1
+
+
+def test_this_year_is_free_and_pro_has_a_second_check_in_and_colours():
+    pro_keys, secret, public = _pro()
+    first = run(text="Call Ana\ndone\n\n", day="2026-10-05")
+    hello = _window_hello(home=first.home, day="2026-10-05")
+    hello.TASKS, hello.STARTUP_DIR = [], mkdtemp()
+    state, can_save = hello.load()
+    assert hello.set_afternoon(state, can_save, "16:00") == "The second check-in comes with Pro."
+    page = hello.year_page(state, hello.today())
+    assert page[0] == "This year" and page[1] == "October: 1 finished - Call Ana"
+    assert hello.set_theme(state, can_save, "sea") == "Window colours come with Pro."
+    hello.PRO_PUBLIC_KEY = public
+    hello.set_pro_key(state, can_save, pro_keys.issue(secret, "Ana"))
+    state, can_save = hello.load()
+    assert page[-1] == "January: 0 finished"
+    said = hello.set_afternoon(state, can_save, "20:00")
+    assert said == "The second check-in comes at 20:00 on days with an open plan."
+    assert hello.TASKS == ["afternoon 20:00"] and not hello.task_on()
+    assert hello.task_on(hello.AFTERNOON_TASK)
+    assert notes(first.home)["afternoon_at"] == "20:00"
+    # Only for a plan set today and still open, and private unless asked.
+    assert hello.afternoon_due(state, hello.today()) is None
+    state["intent"] = {"text": "Send the report", "date": "2026-10-05"}
+    assert hello.afternoon_due(state, hello.today()) == "Something is still on today's plan."
+    state["plan_in_reminder"] = True
+    assert hello.afternoon_due(state, hello.today()) == "Still on today's plan: Send the report"
+    state["gentle"] = True
+    assert hello.afternoon_due(state, hello.today()) is None
+    assert hello.set_theme(state, can_save, "night").startswith("The new colours")
+    assert notes(first.home)["theme"] == "night"
+
+
+def test_pro_is_offered_plainly_in_the_text_screen():
+    p = run(text="\npro\n\n\n")
+    out = " ".join(p.stdout.split())
+    assert "Pro is $5 once, or $8 once for a household" in out
+    assert "History, pets and everything you have now stay free." in out
+    assert "there is no account and nothing is sent" in out
+    assert "never calls, texts or emails to sell you a key" in out

@@ -34,10 +34,10 @@ try {
     # native command, and schtasks writes some when there is no task.
     # -join binds looser than +, so the join needs its own parentheses.
     $task = 'hello-world reminder ' + ((@($env:USERDOMAIN, $env:USERNAME) | Where-Object { $_ }) -join '-')
-    # Before 1.37.0 the task carried only the user name.
-    # The daily repeat has its own task (1.57.0).
+    # The daily repeat (1.57.0) and Pro's afternoon check-in have their own
+    # tasks. Before 1.37.0 the task carried only the user name.
     $repeat = $task -replace '^hello-world reminder ', 'hello-world reminder repeat '
-    foreach ($name in $task, $repeat, "hello-world reminder $env:USERNAME") {
+    foreach ($name in $task, $repeat, "$task afternoon", "hello-world reminder $env:USERNAME") {
         & (Join-Path $sys32 'cmd.exe') /d /c "`"$(Join-Path $sys32 'schtasks.exe')`" /Delete /F /TN `"$name`" >nul 2>&1"
     }
     foreach ($k in 'HKCU:\Software\Classes\hello-world', 'HKCU:\Software\Classes\AppUserModelId\hello-world',
