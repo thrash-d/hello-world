@@ -795,7 +795,12 @@
   "Today: {date}": "今日: {date}",
   "Type it, off to stop it, or Enter to go back > ": "入力するか、off で停止、Enter で戻る > ",
   "Type what to do every day in the plan box, then choose the time again.": "毎日することを予定の欄に入力してから、もう一度時刻を選んでください。",
-  "Your daily reminder from hello-world.": "hello-world からの毎日のリマインダー。"
+  "Your daily reminder from hello-world.": "hello-world からの毎日のリマインダー。",
+  "If you didn't make it, choose Change my sync code.": "心当たりがなければ「同期コードを変更」を選んでください。",
+  "Last change to your synced plan: {when}.": "同期した予定の最終変更: {when}。",
+  "Thought for today, from your organization:": "今日のひとこと（組織より）:",
+  "Try this today, from your organization:": "今日やってみよう（組織より）:",
+  "a few": "数人"
  },
  "tips_floor": [
   "シフト最初の作業の前に、通路に物が置かれていないか確認しましょう。",

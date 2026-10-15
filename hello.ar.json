@@ -795,7 +795,12 @@
   "Today: {date}": "اليوم: {date}",
   "Type it, off to stop it, or Enter to go back > ": "اكتبه، أو off لإيقافه، أو Enter للرجوع > ",
   "Type what to do every day in the plan box, then choose the time again.": "اكتب ما تفعله كل يوم في مربع الخطة، ثم اختر الوقت مرة أخرى.",
-  "Your daily reminder from hello-world.": "تذكيرك اليومي من hello-world."
+  "Your daily reminder from hello-world.": "تذكيرك اليومي من hello-world.",
+  "If you didn't make it, choose Change my sync code.": "إن لم تقم به، اختر تغيير رمز المزامنة.",
+  "Last change to your synced plan: {when}.": "آخر تغيير في خطتك المتزامنة: {when}.",
+  "Thought for today, from your organization:": "فكرة اليوم، من مؤسستك:",
+  "Try this today, from your organization:": "جرّب هذا اليوم، من مؤسستك:",
+  "a few": "بضعة أشخاص"
  },
  "tips_floor": [
   "التأكد من خلو الممر قبل أول مهمة في الوردية.",

@@ -795,7 +795,12 @@
   "Today: {date}": "היום: {date}",
   "Type it, off to stop it, or Enter to go back > ": "להקליד, off לעצירה, או Enter לחזרה > ",
   "Type what to do every day in the plan box, then choose the time again.": "יש להקליד בתיבת התוכנית מה לעשות כל יום, ואז לבחור שוב את השעה.",
-  "Your daily reminder from hello-world.": "התזכורת היומית שלך מ-hello-world."
+  "Your daily reminder from hello-world.": "התזכורת היומית שלך מ-hello-world.",
+  "If you didn't make it, choose Change my sync code.": "אם זה לא היה אתה, יש לבחור החלפת קוד הסנכרון.",
+  "Last change to your synced plan: {when}.": "השינוי האחרון בתוכנית המסונכרנת: {when}.",
+  "Thought for today, from your organization:": "מחשבה להיום, מהארגון שלך:",
+  "Try this today, from your organization:": "נסו את זה היום, מהארגון שלך:",
+  "a few": "כמה"
  },
  "tips_floor": [
   "לבדוק שהמעבר פנוי לפני המשימה הראשונה במשמרת.",

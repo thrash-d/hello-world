@@ -3436,7 +3436,7 @@ def test_windows_locks_notes_to_the_account():
     assert hello.lock_kind() == "plain"
 
 
-def _counts_server(remind=False):
+def _counts_server(remind=False, min_group=1, refresh=0):
     """The reference counts server on a free local port, in a thread."""
     import importlib.util
     import threading
@@ -3445,7 +3445,9 @@ def _counts_server(remind=False):
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     folder = mkdtemp()
-    server = mod.serve(0, folder, "127.0.0.1", remind=remind)
+    # Exact and live by default, so the counting itself can be tested; the
+    # rounding has its own test.
+    server = mod.serve(0, folder, "127.0.0.1", remind=remind, min_group=min_group, refresh=refresh)
     server.mod = mod
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return server, f"http://127.0.0.1:{server.server_address[1]}", folder
@@ -4643,3 +4645,78 @@ def test_the_fridge_page_is_big_print_and_never_has_the_sync_code():
     assert "Take my &lt;pills&gt;" in page and "<pills>" not in page
     assert "Anyone in the room can read" in page and "abcde" not in page
     assert "onload=\"print()\"" in page
+
+
+def test_the_counts_server_hides_small_counts_rounds_the_rest_and_holds_them_an_hour():
+    import urllib.request
+    server, url, folder = _counts_server(min_group=10, refresh=3600)
+    day = _utc_today()
+    try:
+        def get():
+            with urllib.request.urlopen(url + f"/v1/day/{day}", timeout=5) as r:
+                return json.loads(r.read())
+        counts = server.counts
+        assert counts.shown(0) == 0 and counts.shown(3) == "few" and counts.shown(9) == "few"
+        assert counts.shown(10) == 10 and counts.shown(12) == 10 and counts.shown(13) == 15
+        assert counts.shown(212) == 210
+        first = get()
+        for n in range(4):
+            counts.add(day, "tip", f"10.0.0.{n}")
+        # The published numbers stay fixed within the hour, so a tap can't be
+        # watched for; the file has the exact count.
+        assert get() == first
+        with open(os.path.join(folder, f"{day}.json")) as f:
+            assert json.load(f)["tip"] == 4
+        counts.published = {}
+        assert get()["tip"] == "few"
+    finally:
+        server.shutdown()
+    hello = _load_hello()
+    assert hello.counts_of({"tip": "few", "react": {"love": "few", "ha": 2}}) == {
+        "tip": "few", "react": {"love": "few", "ha": 2, "dead": 0, "eyeroll": 0}}
+    assert hello.counts_of({"tip": "lots"})["tip"] is None
+    assert hello.reaction_line({"love": "few", "ha": 2}) == "love a few, ha 2, dead 0, eyeroll 0"
+    assert hello.top_reaction({"react": {"love": "few"}}) == "love"
+
+
+def test_the_counts_server_limits_writes_and_sweeps_old_copies():
+    import time
+    import urllib.error
+    import urllib.request
+    server, url, folder = _counts_server()
+    counts = server.counts
+    try:
+        def put(label):
+            request = urllib.request.Request(url + "/v1/sync/" + label, data=b"x" * 60, method="PUT")
+            try:
+                with urllib.request.urlopen(request, timeout=5) as r:
+                    return r.status
+            except urllib.error.HTTPError as e:
+                return e.code
+        labels = [f"{n:064x}" for n in range(server.mod.NEW_LABELS_A_DAY + 1)]
+        assert [put(l) for l in labels[:-1]] == [200] * server.mod.NEW_LABELS_A_DAY
+        # A 21st new copy from one address today is refused; updating one
+        # it already has is not.
+        assert put(labels[-1]) == 429 and put(labels[0]) == 200
+        # A full server refuses new copies but still takes updates.
+        counts.labels_today = {}
+        counts.sync_quota = counts.sync_count()
+        assert put("f" * 64) == 507 and put(labels[1]) == 200
+        # The sweep removes a copy untouched for a year without anyone
+        # asking for it.
+        old = os.path.join(folder, "sync", labels[2])
+        os.utime(old, (time.time() - 400 * 86400,) * 2)
+        assert counts.sweep() == 1 and not os.path.exists(old)
+    finally:
+        server.shutdown()
+
+
+def test_organization_content_is_labeled_and_sync_shows_the_last_change():
+    p = run(text="\n", extra={"CONTENT": SAMPLE})
+    assert "Try this today, from your organization:" in p.stdout
+    plain = run(text="\n")
+    assert "Try this today:" in plain.stdout and "from your organization" not in plain.stdout
+    hello = _load_hello()
+    assert hello.last_change_line({}) == ""
+    line = hello.last_change_line({"sync_updated": "2026-10-06T15:14:00"})
+    assert "Tuesday, 6 October 2026 15:14" in line and "Change my sync code" in line

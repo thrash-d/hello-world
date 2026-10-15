@@ -336,7 +336,9 @@
   "Every day at {at}: {text}": "Todos os dias às {at}: {text}",
   "Every day at {at}: {text}. A reminder only, not a medical device.": "Todos os dias às {at}: {text}. Só um lembrete, não um dispositivo médico.",
   "Every day...": "Todos os dias...",
-  "Something to do every day, such as taking pills, with its own reminder. A reminder only, not a medical device.": "Algo para fazer todos os dias, como tomar comprimidos, com o seu próprio lembrete. Só um lembrete, não um dispositivo médico."
+  "Something to do every day, such as taking pills, with its own reminder. A reminder only, not a medical device.": "Algo para fazer todos os dias, como tomar comprimidos, com o seu próprio lembrete. Só um lembrete, não um dispositivo médico.",
+  "If you didn't make it, choose Change my sync code.": "Se não foi você, escolha Mudar o meu código de sincronização.",
+  "Try this today, from your organization:": "Experimente isto hoje, da sua organização:"
  },
  "thoughts": {
   "0": "Abrir aquele documento que tem andado a adiar e ler só o primeiro parágrafo.",

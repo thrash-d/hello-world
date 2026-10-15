@@ -517,7 +517,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.57.0"
+VERSION = "1.58.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -1016,26 +1016,36 @@ def day_counts(d):
     return counts_of(data)
 
 
+def a_count(n):
+    """A count from the server: a whole number, or "few", which a server
+    sends below its minimum group so a small office can't tell who did it."""
+    return n == "few" or isinstance(n, int) and not isinstance(n, bool) and n >= 0
+
+
+def count_word(n):
+    return tr("a few") if n == "few" else str(n)
+
+
 def counts_of(data):
     if not isinstance(data, dict):
         return None
     tip = data.get("tip")
     react = data.get("react") if isinstance(data.get("react"), dict) else {}
-    return {"tip": tip if isinstance(tip, int) and not isinstance(tip, bool) and tip >= 0 else None,
-            "react": {r: n for r in REACTIONS
-                      if isinstance(n := react.get(r, 0), int) and not isinstance(n, bool) and n >= 0}}
+    return {"tip": tip if a_count(tip) else None,
+            "react": {r: n for r in REACTIONS if a_count(n := react.get(r, 0))}}
 
 
 def top_reaction(counts):
     """The reaction most people gave, or None when nobody reacted."""
-    react = (counts or {}).get("react") or {}
+    react = {r: 1 if n == "few" else n for r, n in ((counts or {}).get("react") or {}).items()}
     best = max(REACTIONS, key=lambda r: react.get(r, 0))
     return best if react.get(best, 0) else None
 
 
 def reaction_line(react, emoji=False):
     """"love 4, ha 2, dead 1, eyeroll 7", with emoji in the window."""
-    return ", ".join(f"{REACTION_EMOJI[r] if emoji else r} {react.get(r, 0)}" for r in REACTIONS)
+    return ", ".join(f"{REACTION_EMOJI[r] if emoji else r} {count_word(react.get(r, 0))}"
+                     for r in REACTIONS)
 
 
 def shared_lines(state, d, counts, thought=True):
@@ -1052,7 +1062,7 @@ def shared_lines(state, d, counts, thought=True):
         if top := top_reaction(day_counts(d - datetime.timedelta(days=1))):
             lines.append(tr("Yesterday's top reaction: {name}").format(name=top))
     if counts["tip"] is not None:
-        lines.append(tr("People who did today's tip so far: {n}").format(n=counts["tip"]))
+        lines.append(tr("People who did today's tip so far: {n}").format(n=count_word(counts["tip"])))
         if state.get("tip_day") != iso:
             lines.append(tr("Type tip at the end once you have done it."))
     return lines
@@ -3386,6 +3396,18 @@ def fridge_page(state, d):
     return tr("The page opened in your browser. Print it from there.")
 
 
+def last_change_line(state):
+    """When the synced plan last changed, on any device, so a change nobody
+    here made stands out if the code leaked (the red team's Mielke)."""
+    when = state.get("sync_updated")
+    if not when:
+        return ""
+    at = datetime.datetime.fromisoformat(when)
+    return (tr("Last change to your synced plan: {when}.").format(
+        when=f"{long_date(at.date())} {at.strftime('%H:%M')}") + " " + tr(
+        "If you didn't make it, choose Change my sync code."))
+
+
 def sync_prompt(state, can_save):
     """Turn sync on and show the code, show it again, change it, or turn it
     off."""
@@ -3408,6 +3430,8 @@ def sync_prompt(state, can_save):
             para(tr("On your phone, open hello-world, choose Sync, and type it."))
         return
     para(tr(SCAM_LINE))
+    if line := last_change_line(state):
+        para(line)
     entries = [tr("Show my sync code"), tr("Change my sync code"),
                tr("Turn off sync and delete the server's copy")]
     for n, label in enumerate(entries, 1):
@@ -4480,10 +4504,12 @@ def daily(startup):
         if state.get("tips", True) and not policy("HideThoughtAndTip"):
             thought, tip = todays_pair(d)
             if not state.get("hide_thought"):
-                say(tr("Thought for today:"))
+                say(tr("Thought for today, from your organization:") if org_content()
+                    else tr("Thought for today:"))
                 say(indent(thought))
                 say()
-            say(tr("Try this today:"))
+            say(tr("Try this today, from your organization:") if org_content()
+                else tr("Try this today:"))
             say(indent(tip))
             if person and not seen_today:
                 offer_shared(state)
@@ -6253,6 +6279,9 @@ class Visit:
         intent = state["intent"]
         self.followup = (intent["text"] if asks_followup(intent, d) and not gentle(state)
                          else None)
+        # Labeled when an organization replaced them (the red team's
+        # Minister of Truth).
+        self.from_org = org_content() is not None
         self.pair = (todays_pair(d) if state.get("tips", True)
                      and not policy("HideThoughtAndTip") else None)
         # The shared numbers come from the network, so they are fetched in
@@ -6654,7 +6683,7 @@ class Window:
         counts = (self.visit.counts or {}).get("react") or {}
         if self.visit.reacted() and self.visit.counts:
             mark = "\u2713 " if self.visit.state.get("react") == kind else ""
-            return f"{mark}{REACTION_EMOJI[kind]} {counts.get(kind, 0)}"
+            return f"{mark}{REACTION_EMOJI[kind]} {count_word(counts.get(kind, 0))}"
         return f"{REACTION_EMOJI[kind]} {kind}"
 
     def show_counts(self):
@@ -6663,7 +6692,7 @@ class Window:
         if not self.item(self.TIP_COUNT):
             return
         self.set_text(self.TIP_COUNT, "" if v.tip_people is None else
-                      tr("People who did today's tip so far: {n}").format(n=v.tip_people))
+                      tr("People who did today's tip so far: {n}").format(n=count_word(v.tip_people)))
         if self.item(self.REACT):
             for n, kind in enumerate(REACTIONS):
                 self.set_text(self.REACT + n, self.react_label(kind).replace("&", "&&"))
@@ -6750,7 +6779,8 @@ class Window:
             add(button, self.SIDEWAYS, tr("The day went side&ways"), tab, m, 16, 145)
             y += 26
         if v.pair and not v.state.get("hide_thought"):
-            para(self.THOUGHT_LABEL, tr("Thought for today:"), 1)
+            para(self.THOUGHT_LABEL, tr("Thought for today, from your organization:")
+                 if v.from_org else tr("Thought for today:"), 1)
             para(self.THOUGHT, v.pair[0], 6)
             if v.counts_thread:
                 for n, kind in enumerate(REACTIONS):
@@ -6759,7 +6789,8 @@ class Window:
                 add(static, self.REACT_NOTE, "", text_style, m, line)
                 y += line + 6
         if v.pair:
-            para(self.TIP_LABEL, tr("Try this today:"), 1)
+            para(self.TIP_LABEL, tr("Try this today, from your organization:")
+                 if v.from_org else tr("Try this today:"), 1)
             para(self.TIP, v.pair[1], 8)
             if v.counts_thread:
                 para(self.TIP_COUNT, tr("Counting..."), 2)
@@ -7542,7 +7573,9 @@ class Window:
             "Is anyone on the phone with you, or asking for this code, right now?"))
         self.inform(tr(SHIELD_STOP) if on_line else
                     tr("Your sync code: {code}").format(code=self.visit.state["sync"])
-                    + "\n\n" + tr("On your phone, open hello-world, choose Sync, and type it."))
+                    + "\n\n" + tr("On your phone, open hello-world, choose Sync, and type it.")
+                    + ("\n\n" + last_change_line(self.visit.state)
+                       if last_change_line(self.visit.state) else ""))
 
     def saved_menu(self):
         v = self.visit

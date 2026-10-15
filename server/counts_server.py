@@ -56,6 +56,20 @@ The reactions are love, ha, dead and eyeroll.
 
 Only today and the day either side, in UTC, are accepted, so time zones work
 and nobody can fill the disk with old dates.
+
+Counts below --min-group (10) are sent as "few", and larger ones rounded to
+5, so in a small office a count before and after can't show who did the tip
+(the red team's Ivan IV). The numbers sent out change only once an hour
+(--refresh), so checking before and after one person's tap shows nothing
+(Noor). The day files keep the exact numbers; they never leave the server.
+
+Writes are limited so nobody can fill the disk (the red team's Capone): at
+most --sync-quota encrypted copies in all (an existing one can still be
+updated when it's full), 20 new labels and 60 writes a minute from one
+address, counted in memory only with the same daily key as the counts, and an
+hourly sweep removes copies untouched for a year. The per-address limits
+live in memory, so a restart resets them: rate-limit at the https proxy in
+front as well.
 """
 
 import argparse
@@ -87,15 +101,30 @@ PUSH_HOSTS = ("fcm.googleapis.com", "push.services.mozilla.com", "push.apple.com
 PUSH_CONTACT = "https://github.com/thrash-d/hello-world"
 WEEK_PATH = re.compile(r"^/v1/week/(\d{4}-\d{2}-\d{2})$")
 BOSS_FLOOR = 20
+MIN_GROUP = 10
+SYNC_QUOTA = 100_000
+NEW_LABELS_A_DAY = 20
+WRITES_A_MINUTE = 60
+REFRESH = 3600
 DAY_PATH = re.compile(r"^/v1/day/(\d{4}-\d{2}-\d{2})(/tip|/react/(?:%s))?$" % "|".join(REACTIONS))
 
 
 class Counts:
     """The day files and today's in-memory set of who already counted."""
 
-    def __init__(self, folder, boss_hp=None):
+    def __init__(self, folder, boss_hp=None, min_group=MIN_GROUP, sync_quota=SYNC_QUOTA,
+                 refresh=REFRESH):
         self.folder = folder
+        self.refresh = refresh
+        # (day, period) -> the numbers sent out for that day in that period.
+        self.published = {}
         self.boss_hp = boss_hp
+        self.min_group = min_group
+        self.sync_quota = sync_quota
+        # Per address, hashed with the daily key: new labels today, and
+        # writes in the current minute.
+        self.labels_today = {}
+        self.minute = (None, {})
         os.makedirs(folder, exist_ok=True)
         self.lock = threading.Lock()
         self.salt_day = None
@@ -131,16 +160,104 @@ class Counts:
             total += hits
             if defeated is None and total >= hp:
                 defeated = (start + datetime.timedelta(days=n)).isoformat()
-        return {"hp": hp, "hits": total, "defeated": defeated}
+        # Rounded like the day counts, so a week's numbers can't single out a
+        # day's one tip either.
+        return {"hp": max(5, 5 * round(hp / 5)), "hits": 5 * round(total / 5), "defeated": defeated}
+
+    def fresh_salt(self):
+        """The daily key, made new at midnight UTC, which also forgets every
+        address seen. Call with the lock held."""
+        today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+        if self.salt_day != today:
+            self.salt_day, self.salt, self.seen = today, secrets.token_bytes(32), {}
+            self.labels_today = {}
+
+    def shown(self, n):
+        """A count as it may leave the server: "few" below the minimum group,
+        else rounded to 5."""
+        if n <= 0:
+            return 0
+        if n < self.min_group:
+            return "few"
+        return max(self.min_group, 5 * round(n / 5))
+
+    def public(self, data):
+        return {"tip": self.shown(data["tip"]),
+                "react": {r: self.shown(n) for r, n in data["react"].items()}}
+
+    def publish(self, day, week=False):
+        """The day's numbers, or the week's boss, as sent out: fixed for each
+        refresh period, so they can't be watched for one person's change."""
+        make = (lambda: self.week(day)) if week else (lambda: self.public(self.read(day)))
+        if not self.refresh:
+            return make()
+        period = int(time.time() // self.refresh)
+        with self.lock:
+            key = (week, day, period)
+            if key not in self.published:
+                self.published = {k: v for k, v in self.published.items() if k[2] == period}
+                self.published[key] = make()
+            return self.published[key]
+
+    def may_write(self, address, new):
+        """None when this address may write now, else why not: too many
+        writes this minute, too many new labels today, or the quota full."""
+        with self.lock:
+            self.fresh_salt()
+            key = hashlib.sha256(self.salt + f"write|{address}".encode()).digest()
+            minute = int(time.time() // 60)
+            if self.minute[0] != minute:
+                self.minute = (minute, {})
+            writes = self.minute[1]
+            if writes.get(key, 0) >= WRITES_A_MINUTE:
+                return 429, "too many writes; try again in a minute"
+            if new:
+                if self.labels_today.get(key, 0) >= NEW_LABELS_A_DAY:
+                    return 429, "too many new copies from here today"
+                if self.sync_count() >= self.sync_quota:
+                    return 507, "this server is full"
+                self.labels_today[key] = self.labels_today.get(key, 0) + 1
+            writes[key] = writes.get(key, 0) + 1
+            return None
+
+    def sync_count(self):
+        try:
+            return sum(1 for n in os.listdir(os.path.join(self.folder, "sync"))
+                       if not n.endswith(".tmp"))
+        except OSError:
+            return 0
+
+    def sweep(self, now=None):
+        """Remove encrypted copies untouched for a year, without waiting for
+        someone to ask for them. Returns how many went."""
+        now = now or time.time()
+        folder = os.path.join(self.folder, "sync")
+        gone = 0
+        try:
+            names = os.listdir(folder)
+        except OSError:
+            return 0
+        for name in names:
+            path = os.path.join(folder, name)
+            try:
+                if now - os.path.getmtime(path) > SYNC_DAYS * 86400:
+                    os.remove(path)
+                    gone += 1
+            except OSError:
+                pass
+        return gone
+
+    def run_sweep(self):
+        while True:
+            self.sweep()
+            time.sleep(3600)
 
     def add(self, day, what, address):
         """Count the tip once a PC a day, or set its one reaction, moving it
         when it changes. Returns the day's numbers."""
         with self.lock:
-            today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
-            if self.salt_day != today:
-                # A fresh key each day forgets yesterday's hashes for good.
-                self.salt_day, self.salt, self.seen = today, secrets.token_bytes(32), {}
+            # A fresh key each day forgets yesterday's hashes for good.
+            self.fresh_salt()
             kind = "tip" if what == "tip" else "react"
             key = hashlib.sha256(self.salt + f"{day}|{kind}|{address}".encode()).digest()
             data = self.read(day)
@@ -455,11 +572,19 @@ def handler(counts, phone=None, push=None):
             if week := WEEK_PATH.match(self.path):
                 if not this_week(week.group(1)):
                     return self.reply(404, {"error": "not found"})
-                return self.reply(200, counts.week(week.group(1)))
+                return self.reply(200, counts.publish(week.group(1), week=True))
             day, add = self.route()
             if day is None or add:
                 return self.reply(404, {"error": "not found"})
-            self.reply(200, counts.read(day))
+            self.reply(200, counts.publish(day))
+
+        def address(self):
+            # Behind a proxy every request comes from the proxy, so the
+            # address it passes on counts instead, when it is set to.
+            address = self.client_address[0]
+            if self.server.trust_proxy:
+                address = (self.headers.get("X-Forwarded-For") or address).split(",")[0].strip()
+            return address
 
         def body(self):
             try:
@@ -480,6 +605,9 @@ def handler(counts, phone=None, push=None):
 
         def do_PUT(self):
             if (match := PUSH_PATH.match(self.path)) and push:
+                refused = counts.may_write(self.address(), not os.path.exists(push.path(match.group(1))))
+                if refused:
+                    return self.reply(refused[0], {"error": refused[1]})
                 raw = self.body()
                 try:
                     data = json.loads(raw or b"")
@@ -491,6 +619,9 @@ def handler(counts, phone=None, push=None):
             path = self.sync_file()
             if path is None:
                 return self.reply(404, {"error": "not found"})
+            refused = counts.may_write(self.address(), not os.path.exists(path))
+            if refused:
+                return self.reply(refused[0], {"error": refused[1]})
             raw = self.body()
             if not raw:
                 return self.reply(413, {"error": "too large or empty"})
@@ -526,13 +657,9 @@ def handler(counts, phone=None, push=None):
             day, add = self.route()
             if day is None or not add:
                 return self.reply(404, {"error": "not found"})
-            # Behind a proxy every request comes from the proxy, so the
-            # address it passes on counts instead, when it is set to.
-            address = self.client_address[0]
-            if self.server.trust_proxy:
-                address = (self.headers.get("X-Forwarded-For") or address).split(",")[0].strip()
             what = "tip" if add == "/tip" else add.rsplit("/", 1)[1]
-            self.reply(200, counts.add(day, what, address))
+            counts.add(day, what, self.address())
+            self.reply(200, counts.publish(day))
 
         def log_message(self, format, *args):
             # No access log: it would hold addresses.
@@ -542,10 +669,12 @@ def handler(counts, phone=None, push=None):
 
 
 def serve(port=8080, folder="counts", host="0.0.0.0", trust_proxy=False, boss_hp=None, phone=None,
-          remind=False):
+          remind=False, min_group=MIN_GROUP, sync_quota=SYNC_QUOTA, refresh=REFRESH):
     """The server. With remind, phones' reminders are kept and sent too."""
     push = Push(folder) if remind else None
-    server = ThreadingHTTPServer((host, port), handler(Counts(folder, boss_hp), phone, push))
+    counts = Counts(folder, boss_hp, min_group, sync_quota, refresh)
+    server = ThreadingHTTPServer((host, port), handler(counts, phone, push))
+    server.counts = counts
     server.trust_proxy = trust_proxy
     server.push = push
     return server
@@ -562,11 +691,19 @@ def main(argv=None):
                         help="fixed hit points for the weekly boss, instead of 70%% of last week")
     parser.add_argument("--phone", default=None,
                         help="the phone app's folder, served at /phone/")
+    parser.add_argument("--min-group", type=int, default=MIN_GROUP,
+                        help="counts below this are shown as \"few\" (default 10)")
+    parser.add_argument("--sync-quota", type=int, default=SYNC_QUOTA,
+                        help="most encrypted sync copies kept in all (default 100000)")
+    parser.add_argument("--refresh", type=int, default=REFRESH,
+                        help="seconds the published counts stay fixed (default 3600)")
     parser.add_argument("--remind", action="store_true",
                         help="keep and send phones' reminders, by Web Push with no content")
     args = parser.parse_args(argv)
     server = serve(args.port, args.data, args.host, args.trust_proxy, args.boss_hp, args.phone,
-                   args.remind)
+                   args.remind, max(1, args.min_group), max(1, args.sync_quota),
+                   max(60, args.refresh))
+    threading.Thread(target=server.counts.run_sweep, daemon=True).start()
     if server.push:
         threading.Thread(target=server.push.run, daemon=True).start()
     print(f"hello-world counts on {args.host}:{server.server_address[1]}, data in {args.data}")

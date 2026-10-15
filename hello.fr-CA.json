@@ -36,7 +36,11 @@
   "Every day at {at}: {text}. A reminder only, not a medical device.": "Chaque jour à {at}: {text}. Un simple rappel, pas un dispositif médical.",
   "Stop the daily reminder: {text}": "Arrêter le rappel quotidien: {text}",
   "Today: {date}": "Aujourd'hui: {date}",
-  "The notification leaves the words out, for a shared screen; Show my plan in the reminder puts them in.": "La notification n'affiche pas les mots, pour un écran partagé; Afficher mon plan dans le rappel les affiche."
+  "The notification leaves the words out, for a shared screen; Show my plan in the reminder puts them in.": "La notification n'affiche pas les mots, pour un écran partagé; Afficher mon plan dans le rappel les affiche.",
+  "If you didn't make it, choose Change my sync code.": "Si ce n'est pas vous, choisissez Changer mon code de synchronisation.",
+  "Last change to your synced plan: {when}.": "Dernière modification de votre plan synchronisé: {when}.",
+  "Thought for today, from your organization:": "Pensée du jour, de votre organisation:",
+  "Try this today, from your organization:": "Essayez ceci aujourd'hui, de votre organisation:"
  },
  "thoughts": {
   "13": "Si la matinée n'a rien donné, choisissez une tâche après le dîner et commencez-la avant de consulter vos messages.",
