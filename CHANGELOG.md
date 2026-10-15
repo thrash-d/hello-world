@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-10-10: the household list
+
+Version 1.61.0. Okiku's shared slab, built with every rule the red team
+asked for, and reviewed by Okiku, Noor and the red team's Rasputin and
+Caligula first.
+
+- A household key starts a list with its own code; each adult joins on their
+  own device with their own name, and leaves any time. Nobody adds anyone.
+- Notices: "Omar joined the household list", "Omar left".
+- Each thing keeps its own history, visible to everyone: who added, ticked,
+  unticked, removed or restored it, and the day, not the minute (Rasputin).
+  No counts or totals per person anywhere.
+- Merged thing by thing, so nobody's change offline is lost and nobody can
+  quietly undo someone else's (Caligula); things removed for good stay gone.
+- Removed things can be restored for 30 days.
+- When someone leaves, the others are asked until they answer whether to
+  make a new code; the list, with any changes made here, moves to it and the
+  old copy is deleted. The leave prompt says the person who left keeps what
+  was already on their device (Noor).
+- Encrypted with its own code and salt before it leaves a device, and padded
+  to whole kilobytes (Noor). The same on the PC, the window and the phone.
+- Delete everything also leaves the list, so the others are told.
+
 ## 2026-10-10: carry it over, a fresh day, and end the day
 
 Version 1.60.0. Six of eight people from before 2000 asked for the same

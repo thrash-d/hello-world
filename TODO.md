@@ -34,26 +34,12 @@ how.
    night shift, drive days, job hunts, shifts and rent, quarterly targets, a
    gift key card), now that Pro is in (1.59.0). Selling keys, and putting the
    public key in `hello.py`, are the owner's steps (`docs/PRO.md`).
-3. A household list (Okiku): a separate list people put things on on
-   purpose, anyone on it adds and ticks, personal plans never in it, no
-   count of who did what, on its own opt-in encrypted sync code. With the
-   family key; the hard rule against any view of someone else's plans
-   stays.
-4. Private letters to family (Mary): the phone's Draft text button already
+3. Private letters to family (Mary): the phone's Draft text button already
     opens the phone's own messages; a letter written in hello-world, kept on
     the device and handed to the phone's own mail or messages to send, is
     the version that keeps hello-world from becoming a messaging service.
     The Profit Maximizer advised against more than that (abuse risk).
-5. The household list (item 3) only with: each adult joining from their
-    own device and leaving any time; a notice to everyone when someone joins
-    or leaves; nobody adding another adult, setting their reminders or
-    sending "I'm okay" for them (Rasputin); a new key for the group when
-    anyone leaves (Torquemada); each item's own history of who added, ticked
-    or removed it, visible to everyone on the list, and 30 days to restore a
-    removed one (Caligula), with no totals or rankings per person; and the
-    household code never on the fridge page or in a text. Built with the
-    family key, after those protections, not before.
-6. A list of the devices syncing with a code, without accounts: each device
+4. A list of the devices syncing with a code, without accounts: each device
     writes a name it's given ("Kitchen tablet") into the encrypted copy when
     it syncs, so the list is only readable with the code, and **Change my
     sync code** is how one is removed (Mielke). The Profit Maximizer had

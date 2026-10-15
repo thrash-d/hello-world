@@ -114,6 +114,30 @@
     <p class="note" id="family-scam"></p>
   </section>
 
+  <section id="house">
+    <h2 id="house-label"></h2>
+    <p class="note" id="house-intro"></p>
+    <form id="house-join" hidden>
+      <label for="house-code" id="house-code-label"></label>
+      <input type="text" id="house-code" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="xxxxx-xxxxx-xxxxx-xxxxx-xxxxx">
+      <label for="house-name" id="house-name-label"></label>
+      <input type="text" id="house-name" maxlength="40" autocomplete="off">
+      <button class="primary" id="house-join-button" type="submit"></button>
+    </form>
+    <div id="house-on" hidden>
+      <p class="note" id="house-offline" hidden></p>
+      <div id="house-news"></div>
+      <div id="house-rekey" hidden>
+        <p id="house-rekey-text"></p>
+        <div class="row"><button class="primary" id="house-rekey-yes"></button><button id="house-rekey-no"></button></div>
+      </div>
+      <div id="house-items"></div>
+      <form id="house-add"><input type="text" id="house-add-text" maxlength="200" autocomplete="off"><button id="house-add-button" type="submit"></button></form>
+      <details><summary id="house-removed-label"></summary><div id="house-removed"></div></details>
+      <p><button id="house-leave"></button></p>
+    </div>
+  </section>
+
   <section>
     <h2 id="thought-label"></h2>
     <p id="thought"></p>

@@ -239,6 +239,23 @@ year** page), pets, reminders and everything else stay free. Keys come only
 from the official store, and hello-world never calls, texts or emails to sell
 or check one; the screen where you paste a key says so.
 
+### The household list
+
+With a household key, **My plans > Household list...** in the window (or
+`house` at the last prompt, or More settings) starts a shared list: things
+anyone in the household can add and tick, each on their own PC or phone. It
+gets its own 25-character code; give it to each adult in person, and they
+type it on their own device with their own name. Nobody can add someone else,
+and nobody can set reminders or send anything in another person's name.
+Everyone is told when someone joins or leaves. Each thing shows who added,
+ticked or removed it and on which day (not the minute), visible to everyone,
+and nothing counts who did what. Removed things can be restored for 30 days.
+When someone leaves, every other device asks until answered whether to make
+a new code so the old one stops working; the person who left keeps whatever
+was already on their device. The list is encrypted with its code before it
+leaves a device, padded so its size says little, and kept on the counts
+server like sync.
+
 hello-world collects nothing about anyone, adult or child: no account, no
 name, no age, and no plan text leaves a device unless you turn on sync,
 encrypted with a code only your devices have. That is why a household key
@@ -535,7 +552,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.60.0'
+$tag = 'v1.61.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
