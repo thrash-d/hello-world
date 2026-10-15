@@ -921,7 +921,12 @@
   "Your mail program could not be opened.": "تعذّر فتح برنامج بريدك.",
   "no one yet": "لا أحد بعد",
   "s to send it with your own mail, d to delete it, or Enter to go back > ": "s لإرسالها ببريدك، d لحذفها، أو Enter للرجوع > ",
-  "this computer": "هذا الكمبيوتر"
+  "this computer": "هذا الكمبيوتر",
+  "That household list is full.": "قائمة الأسرة هذه ممتلئة.",
+  "The household list can't be reached just now, so you haven't left yet. Try again when you're online.": "لا يمكن الوصول إلى قائمة الأسرة الآن، لذا لم تغادر بعد. حاول مرة أخرى عندما تكون متصلًا.",
+  "The household list can't be reached just now, or someone already made a new code. Nothing changed.": "لا يمكن الوصول إلى قائمة الأسرة الآن، أو أن شخصًا أنشأ رمزًا جديدًا بالفعل. لم يتغير شيء.",
+  "Type your name, as the others will see it, in the plan box first, then choose this again.": "اكتب اسمك أولًا كما سيراه الآخرون في مربع الخطة، ثم اختر هذا مرة أخرى.",
+  "Added to tomorrow's plan, with what you carried.": "أُضيف إلى خطة الغد، مع ما نقلته."
  },
  "tips_floor": [
   "التأكد من خلو الممر قبل أول مهمة في الوردية.",

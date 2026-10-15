@@ -921,7 +921,12 @@
   "Your mail program could not be opened.": "메일 프로그램을 열 수 없었어요.",
   "no one yet": "받는 사람 없음",
   "s to send it with your own mail, d to delete it, or Enter to go back > ": "s는 내 메일로 보내기, d는 삭제, Enter는 돌아가기 > ",
-  "this computer": "이 컴퓨터"
+  "this computer": "이 컴퓨터",
+  "That household list is full.": "이 가족 목록은 가득 찼어요.",
+  "The household list can't be reached just now, so you haven't left yet. Try again when you're online.": "지금은 가족 목록에 연결할 수 없어서 아직 나가지 않았어요. 온라인일 때 다시 해 보세요.",
+  "The household list can't be reached just now, or someone already made a new code. Nothing changed.": "지금은 가족 목록에 연결할 수 없거나, 누군가 이미 새 코드를 만들었어요. 바뀐 건 없어요.",
+  "Type your name, as the others will see it, in the plan box first, then choose this again.": "먼저 계획 칸에 다른 사람에게 보일 이름을 입력한 다음, 이걸 다시 고르세요.",
+  "Added to tomorrow's plan, with what you carried.": "넘긴 것과 함께 내일 계획에 추가했어요."
  },
  "tips_floor": [
   "첫 작업 전에 다니는 통로에 걸리는 게 없는지 확인하세요.",

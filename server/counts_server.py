@@ -125,8 +125,14 @@ class Counts:
         # writes in the current minute.
         self.labels_today = {}
         self.minute = (None, {})
+        # How many copies each folder holds, counted once and then kept up
+        # to date, so a new copy never lists a large folder under the lock.
+        self.stored = {}
         os.makedirs(folder, exist_ok=True)
         self.lock = threading.Lock()
+        # Held while a sync copy is checked and replaced, so two writers
+        # can't both pass the same If-Match.
+        self.write_lock = threading.Lock()
         self.salt_day = None
         self.salt = b""
         # Hash of who counted, mapped to the reaction they gave, or True.
@@ -155,14 +161,20 @@ class Counts:
         tips = [self.read((start + datetime.timedelta(days=n)).isoformat())["tip"]
                 for n in range(-7, 7)]
         hp = self.boss_hp or max(BOSS_FLOOR, round(sum(tips[:7]) * 0.7))
+        hp = max(5, self.min_group, 5 * round(hp / 5))
         total, defeated = 0, None
         for n, hits in enumerate(tips[7:]):
             total += hits
-            if defeated is None and total >= hp:
+            # The day it fell is judged on the rounded total, like the hits
+            # sent out, so the two always agree.
+            if defeated is None and self.week_hits(total) >= hp:
                 defeated = (start + datetime.timedelta(days=n)).isoformat()
-        # Rounded like the day counts, so a week's numbers can't single out a
-        # day's one tip either.
-        return {"hp": max(5, 5 * round(hp / 5)), "hits": 5 * round(total / 5), "defeated": defeated}
+        # Rounded like the day counts, and nothing below the minimum group,
+        # so a week's numbers can't single out a day's one tip either.
+        return {"hp": hp, "hits": self.week_hits(total), "defeated": defeated}
+
+    def week_hits(self, total):
+        return 0 if total < self.min_group else 5 * round(total / 5)
 
     def fresh_salt(self):
         """The daily key, made new at midnight UTC, which also forgets every
@@ -199,9 +211,11 @@ class Counts:
                 self.published[key] = make()
             return self.published[key]
 
-    def may_write(self, address, new):
+    def may_write(self, address, new, kind="sync"):
         """None when this address may write now, else why not: too many
-        writes this minute, too many new labels today, or the quota full."""
+        writes this minute, too many new labels today, or the quota full.
+        Call it only for a write that will happen, so a refused body costs
+        nothing; `kind` is the folder whose quota counts."""
         with self.lock:
             self.fresh_salt()
             key = hashlib.sha256(self.salt + f"write|{address}".encode()).digest()
@@ -214,18 +228,33 @@ class Counts:
             if new:
                 if self.labels_today.get(key, 0) >= NEW_LABELS_A_DAY:
                     return 429, "too many new copies from here today"
-                if self.sync_count() >= self.sync_quota:
+                if self.stored_count(kind) >= self.sync_quota:
                     return 507, "this server is full"
                 self.labels_today[key] = self.labels_today.get(key, 0) + 1
+                self.stored[kind] += 1
             writes[key] = writes.get(key, 0) + 1
             return None
 
+    def stored_count(self, kind="sync"):
+        """Copies in the folder. Call with the lock held."""
+        if kind not in self.stored:
+            try:
+                self.stored[kind] = sum(
+                    1 for n in os.listdir(os.path.join(self.folder, kind))
+                    if not n.endswith(".tmp"))
+            except OSError:
+                self.stored[kind] = 0
+        return self.stored[kind]
+
     def sync_count(self):
-        try:
-            return sum(1 for n in os.listdir(os.path.join(self.folder, "sync"))
-                       if not n.endswith(".tmp"))
-        except OSError:
-            return 0
+        with self.lock:
+            return self.stored_count("sync")
+
+    def removed(self, kind="sync", n=1):
+        """Copies deleted, so the quota frees up."""
+        with self.lock:
+            if kind in self.stored:
+                self.stored[kind] = max(0, self.stored[kind] - n)
 
     def sweep(self, now=None):
         """Remove encrypted copies untouched for a year, without waiting for
@@ -245,6 +274,10 @@ class Counts:
                     gone += 1
             except OSError:
                 pass
+        # Counted again next time, which also catches stray temporary files.
+        with self.lock:
+            self.stored.pop("sync", None)
+            self.stored.pop("push", None)
         return gone
 
     def run_sweep(self):
@@ -348,6 +381,11 @@ def es256_verify(public, message, signature):
     return point is not None and point[0] % P256_N == r
 
 
+def etag(raw):
+    """A sync copy's version, for If-Match."""
+    return '"' + hashlib.sha256(raw).hexdigest()[:32] + '"'
+
+
 def b64url(raw):
     return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
 
@@ -388,15 +426,21 @@ class Push:
     def path(self, token):
         return os.path.join(self.folder, token)
 
-    def save(self, token, data):
-        """Keep a phone's push address and times. False when they aren't
-        acceptable."""
+    @staticmethod
+    def acceptable(data):
+        """A push address on an allowed host and one or two times."""
         if not isinstance(data, dict) or not push_address_ok(data.get("endpoint", "")):
             return False
         times = data.get("times")
-        if (not isinstance(times, list) or not 1 <= len(times) <= MAX_PUSH_TIMES
-                or not all(isinstance(t, str) and PUSH_TIME.match(t) for t in times)):
+        return (isinstance(times, list) and 1 <= len(times) <= MAX_PUSH_TIMES
+                and all(isinstance(t, str) and PUSH_TIME.match(t) for t in times))
+
+    def save(self, token, data):
+        """Keep a phone's push address and times. False when they aren't
+        acceptable."""
+        if not self.acceptable(data):
             return False
+        times = data["times"]
         with self.lock:
             tmp = self.path(token) + ".tmp"
             with open(tmp, "w", encoding="utf-8") as f:
@@ -405,11 +449,13 @@ class Push:
         return True
 
     def forget(self, token):
+        """True when there was something to forget."""
         with self.lock:
             try:
                 os.remove(self.path(token))
+                return True
             except FileNotFoundError:
-                pass
+                return False
 
     def header(self, endpoint, now):
         """The Authorization header for one push service."""
@@ -565,6 +611,7 @@ def handler(counts, phone=None, push=None):
                 self.send_response(200)
                 self.send_header("Content-Type", "application/octet-stream")
                 self.send_header("Content-Length", str(len(raw)))
+                self.send_header("ETag", etag(raw))
                 self.send_header("Cache-Control", "no-store")
                 self.end_headers()
                 self.wfile.write(raw)
@@ -583,7 +630,9 @@ def handler(counts, phone=None, push=None):
             # address it passes on counts instead, when it is set to.
             address = self.client_address[0]
             if self.server.trust_proxy:
-                address = (self.headers.get("X-Forwarded-For") or address).split(",")[0].strip()
+                # The last entry is the one the proxy added; the ones before
+                # it are whatever the sender claimed.
+                address = (self.headers.get("X-Forwarded-For") or address).split(",")[-1].strip()
             return address
 
         def body(self):
@@ -605,43 +654,60 @@ def handler(counts, phone=None, push=None):
 
         def do_PUT(self):
             if (match := PUSH_PATH.match(self.path)) and push:
-                refused = counts.may_write(self.address(), not os.path.exists(push.path(match.group(1))))
-                if refused:
-                    return self.reply(refused[0], {"error": refused[1]})
                 raw = self.body()
                 try:
                     data = json.loads(raw or b"")
                 except ValueError:
                     data = None
-                if not push.save(match.group(1), data):
+                if not push.acceptable(data):
                     return self.reply(400, {"error": "not a push address and times"})
+                refused = counts.may_write(self.address(), not os.path.exists(push.path(match.group(1))),
+                                           "push")
+                if refused:
+                    return self.reply(refused[0], {"error": refused[1]})
+                push.save(match.group(1), data)
                 return self.reply(200, {"ok": True})
             path = self.sync_file()
             if path is None:
                 return self.reply(404, {"error": "not found"})
-            refused = counts.may_write(self.address(), not os.path.exists(path))
-            if refused:
-                return self.reply(refused[0], {"error": refused[1]})
+            # The body is checked first, so a refused one uses up no writes.
             raw = self.body()
             if not raw:
                 return self.reply(413, {"error": "too large or empty"})
-            tmp = path + ".tmp"
-            with open(tmp, "wb") as f:
-                f.write(raw)
-            os.replace(tmp, path)
+            with counts.write_lock:
+                try:
+                    with open(path, "rb") as f:
+                        current = etag(f.read(MAX_SYNC))
+                except OSError:
+                    current = None
+                # If-Match: only over the copy the writer last read, so two
+                # devices changing it at once can't lose each other's change.
+                wanted = self.headers.get("If-Match")
+                if wanted is not None and wanted != (current or "missing"):
+                    return self.reply(412, {"error": "changed since you read it"})
+                refused = counts.may_write(self.address(), current is None)
+                if refused:
+                    return self.reply(refused[0], {"error": refused[1]})
+                tmp = f"{path}.{secrets.token_hex(4)}.tmp"
+                with open(tmp, "wb") as f:
+                    f.write(raw)
+                os.replace(tmp, path)
             self.reply(200, {"ok": True})
 
         def do_DELETE(self):
             if (match := PUSH_PATH.match(self.path)) and push:
-                push.forget(match.group(1))
+                if push.forget(match.group(1)):
+                    counts.removed("push")
                 return self.reply(200, {"ok": True})
             path = self.sync_file()
             if path is None:
                 return self.reply(404, {"error": "not found"})
-            try:
-                os.remove(path)
-            except FileNotFoundError:
-                pass
+            with counts.write_lock:
+                try:
+                    os.remove(path)
+                    counts.removed("sync")
+                except FileNotFoundError:
+                    pass
             self.reply(200, {"ok": True})
 
         def do_POST(self):

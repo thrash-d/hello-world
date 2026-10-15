@@ -517,7 +517,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.62.0"
+VERSION = "1.62.1"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -872,20 +872,66 @@ def open_sync(enc, mac, blob):
 # joined or left; each thing keeps its own history, seen by everyone, and no
 # totals per person; removed things can be restored for 30 days; and the
 # list is encrypted with its own code, never shown in anything drafted.
+#
+# Everything read from the server was written by someone holding the code,
+# so it is checked before use: ids, names, times and history entries that
+# aren't well formed are dropped, text is tidied, and the sizes are capped.
+# The code is the only key: whoever holds it can write anything, including
+# in someone else's name, which is why a leaver means a new code. What this
+# device can still do is refuse to be told it left, and refuse to forget a
+# thing that is still on the list.
 HOUSE_SALT = b"hello-world household v1"
 HOUSE_KEEP_DAYS = 30
-MAX_HOUSE_ITEMS = 200
+HOUSE_GONE_DAYS = 366
+MAX_HOUSE_ITEMS = 100
+MAX_HOUSE_KEPT = 150
+MAX_HOUSE_MEMBERS = 20
 MAX_HOUSE_NAME = 40
+MAX_HOUSE_TEXT = 120
+MAX_HOUSE_HISTORY = 6
+MAX_HOUSE_GONE = 200
+# Under the server's limit with room for the encryption and the padding.
+HOUSE_BUDGET = 60_000
+HOUSE_WHATS = ("added", "ticked", "unticked", "removed", "restored")
+HOUSE_ID = re.compile(r"[0-9a-f]{12}")
+HOUSE_ENTRY = re.compile(r"[0-9a-f]{8}")
+# UTC to the second, so everyone's entries sort the same way everywhere.
+HOUSE_STAMP = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
 
 
 def house_keys(code):
     return sync_keys(code, HOUSE_SALT)
 
 
+def house_stamp(when=None):
+    """A time as the household list keeps it: UTC, to the second."""
+    when = (when or now()).astimezone(datetime.timezone.utc)
+    return when.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _house_when(stamp):
+    return datetime.datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%SZ").replace(
+        tzinfo=datetime.timezone.utc)
+
+
+def _house_time(value, latest):
+    """A well-formed time no later than a day from now, else None: a time
+    far ahead would win every later change."""
+    return value if isinstance(value, str) and HOUSE_STAMP.fullmatch(value) and value <= latest else None
+
+
+def _house_name(value, size):
+    return tidy(value)[:size] if isinstance(value, str) else ""
+
+
+def _house_order(entry):
+    return entry[2], entry[3]
+
+
 def _house_item(item):
     """Done and removed follow the newest entry in the thing's history."""
     done = removed = None
-    for what, _, at in sorted(item["history"], key=lambda h: h[2]):
+    for what, _, at, _ in sorted(item["history"], key=_house_order):
         if what in ("ticked", "unticked"):
             done = what == "ticked"
         elif what in ("removed", "restored"):
@@ -894,25 +940,42 @@ def _house_item(item):
     return item
 
 
-def house_new(me, name, at):
+def _house_trim(history, size):
+    """The newest entries, always keeping the newest tick and the newest
+    removal, so trimming never changes whether a thing is done or removed."""
+    history = sorted(history, key=_house_order)
+    keep = []
+    for group in (("ticked", "unticked"), ("removed", "restored")):
+        last = [h for h in history if h[0] in group][-1:]
+        keep += last
+    for h in reversed(history):
+        if len(keep) >= size:
+            break
+        if h not in keep:
+            keep.append(h)
+    return sorted(keep, key=_house_order)
+
+
+def house_new(me, name, at=None):
     """A new list with its first member."""
-    return {"members": {me: {"name": name[:MAX_HOUSE_NAME], "joined": at}},
-            "items": {}, "events": [["joined", me, at]]}
+    at = at or house_stamp()
+    return {"members": {me: {"name": _house_name(name, MAX_HOUSE_NAME), "joined": at}},
+            "items": {}, "gone": {}}
 
 
-def house_join(doc, me, name, at):
+def house_join(doc, me, name, at=None):
     """Join from this device under one's own name; nobody adds anyone else."""
     if me in doc["members"] and not doc["members"][me].get("left"):
         return doc
-    doc["members"][me] = {"name": name[:MAX_HOUSE_NAME], "joined": at}
-    doc["events"].append(["joined", me, at])
+    if len(doc["members"]) >= MAX_HOUSE_MEMBERS:
+        return doc
+    doc["members"][me] = {"name": _house_name(name, MAX_HOUSE_NAME), "joined": at or house_stamp()}
     return doc
 
 
-def house_leave(doc, me, at):
+def house_leave(doc, me, at=None):
     if me in doc["members"]:
-        doc["members"][me]["left"] = at
-        doc["events"].append(["left", me, at])
+        doc["members"][me]["left"] = at or house_stamp()
     return doc
 
 
@@ -920,64 +983,141 @@ def house_change(doc, me, what, item_id=None, text=None, at=None):
     """Add, tick, untick, remove or restore a thing, with who and when. Only
     a member who hasn't left can change anything. Returns the thing's id."""
     member = doc["members"].get(me)
-    if not member or member.get("left"):
+    if not member or member.get("left") or what not in HOUSE_WHATS:
         return None
     if what == "added":
+        text = _house_name(text, MAX_HOUSE_TEXT)
         live = [i for i in doc["items"].values() if not i.get("removed")]
         if len(live) >= MAX_HOUSE_ITEMS or not text:
             return None
         item_id = os.urandom(6).hex()
-        doc["items"][item_id] = {"text": text[:MAX_PLAN], "history": []}
+        doc["items"][item_id] = {"text": text, "history": []}
     item = doc["items"].get(item_id)
     if item is None:
         return None
-    item["history"].append([what, me, at])
+    at = at or house_stamp()
+    # Never before what this device already has, so a quick tick and untick
+    # in the same second keep their order everywhere.
+    last = max((h[2] for h in item["history"]), default="")
+    if at <= last:
+        at = house_stamp(_house_when(last) + datetime.timedelta(seconds=1))
+    item["history"].append([what, me, at, os.urandom(4).hex()])
+    item["history"] = _house_trim(item["history"], MAX_HOUSE_HISTORY)
     _house_item(item)
     return item_id
 
 
-def house_merge(doc, other):
-    """Both sides' members, things and histories, so nothing either side did
-    is lost, and nobody can quietly undo someone else's change."""
-    out = {"members": {}, "items": {}, "events": [], "gone": []}
-    # Things removed for good stay gone, so an old copy can't bring them
-    # back (Caligula).
-    gone = set()
-    for side in (doc, other):
-        gone |= {g for g in (side or {}).get("gone", []) if isinstance(g, str)}
-    out["gone"] = sorted(gone)
-    for side in (doc, other):
-        for mid, m in (side or {}).get("members", {}).items():
-            if not (isinstance(m, dict) and isinstance(m.get("name"), str)):
+def house_merge(doc, other, me=None):
+    """Both sides' members, things and histories, checked, so nothing either
+    side did is lost. `doc` is this device's own copy and `me` this device's
+    member: whether it left is only ever decided here."""
+    latest = house_stamp(now() + datetime.timedelta(days=1))
+    sides = [s if isinstance(s, dict) else {} for s in (doc, other)]
+    out = {"members": {}, "items": {}, "gone": {}}
+    for n, side in enumerate(sides):
+        members = side.get("members") if isinstance(side.get("members"), dict) else {}
+        for mid, m in members.items():
+            if not (isinstance(mid, str) and HOUSE_ID.fullmatch(mid) and isinstance(m, dict)):
                 continue
-            mine = out["members"].setdefault(mid, {"name": m["name"][:MAX_HOUSE_NAME],
-                                                   "joined": str(m.get("joined", ""))})
-            if m.get("left"):
-                mine["left"] = max(str(m["left"]), mine.get("left", ""))
-        for iid, item in (side or {}).get("items", {}).items():
-            if not (isinstance(item, dict) and isinstance(item.get("text"), str)) or iid in gone:
+            name, joined = _house_name(m.get("name"), MAX_HOUSE_NAME), _house_time(m.get("joined"), latest)
+            if not (name and joined):
                 continue
-            mine = out["items"].setdefault(iid, {"text": item["text"][:MAX_PLAN], "history": []})
-            for h in item.get("history", []):
-                if (isinstance(h, list) and len(h) == 3 and all(isinstance(x, str) for x in h)
-                        and h not in mine["history"]):
-                    mine["history"].append(h)
-        for e in (side or {}).get("events", []):
-            if isinstance(e, list) and len(e) == 3 and e not in out["events"]:
-                out["events"].append(e)
-    out["events"].sort(key=lambda e: e[2])
-    for item in out["items"].values():
-        item["history"].sort(key=lambda h: h[2])
+            # This device's members first, so a flood of made-up members
+            # can't push out real ones.
+            if mid not in out["members"] and len(out["members"]) >= MAX_HOUSE_MEMBERS:
+                continue
+            mine = out["members"].setdefault(mid, {"name": name, "joined": joined})
+            left = _house_time(m.get("left"), latest)
+            if left and not (mid == me and n == 1):
+                mine["left"] = max(left, mine.get("left", ""))
+    for n, side in enumerate(sides):
+        items = side.get("items") if isinstance(side.get("items"), dict) else {}
+        for iid, item in items.items():
+            if not (isinstance(iid, str) and HOUSE_ID.fullmatch(iid) and isinstance(item, dict)):
+                continue
+            text = _house_name(item.get("text"), MAX_HOUSE_TEXT)
+            history = item.get("history") if isinstance(item.get("history"), list) else []
+            if not text:
+                continue
+            if iid not in out["items"] and len(out["items"]) >= MAX_HOUSE_KEPT:
+                continue
+            mine = out["items"].setdefault(iid, {"text": text, "history": []})
+            seen = {h[3] for h in mine["history"]}
+            for h in history[:MAX_HOUSE_HISTORY * 4]:
+                if (isinstance(h, list) and len(h) == 4 and h[0] in HOUSE_WHATS
+                        and isinstance(h[1], str) and HOUSE_ID.fullmatch(h[1])
+                        and _house_time(h[2], latest)
+                        and isinstance(h[3], str) and HOUSE_ENTRY.fullmatch(h[3])
+                        and h[3] not in seen):
+                    mine["history"].append(list(h))
+                    seen.add(h[3])
+    for iid in list(out["items"]):
+        item = out["items"][iid]
+        if not item["history"]:
+            del out["items"][iid]
+            continue
+        item["history"] = _house_trim(item["history"], MAX_HOUSE_HISTORY)
         _house_item(item)
+    # A thing gone for good stays gone, so an old copy can't bring it back
+    # (Caligula); but only one removed over 30 days ago, and not added or
+    # restored since, so nobody can erase a thing still on the list.
+    cutoff = house_stamp(now() - datetime.timedelta(days=HOUSE_KEEP_DAYS))
+    for side in sides:
+        gone = side.get("gone") if isinstance(side.get("gone"), dict) else {}
+        for iid, at in gone.items():
+            at = _house_time(at, latest)
+            if not (isinstance(iid, str) and HOUSE_ID.fullmatch(iid) and at):
+                continue
+            item = out["items"].get(iid)
+            if item is not None and not item["removed"]:
+                lives = [h[2] for h in item["history"] if h[0] in ("added", "restored")]
+                if at > cutoff or (lives and max(lives) >= at):
+                    continue
+            out["gone"][iid] = max(at, out["gone"].get(iid, ""))
+            out["items"].pop(iid, None)
     return out
 
 
 def house_tidy(doc, now):
-    """Removed things go for good after 30 days."""
-    cutoff = (now - datetime.timedelta(days=HOUSE_KEEP_DAYS)).isoformat(timespec="minutes")
-    old = [k for k, v in doc["items"].items() if v.get("removed") and v["removed"] < cutoff]
-    doc["gone"] = sorted(set(doc.get("gone", [])) | set(old))
-    doc["items"] = {k: v for k, v in doc["items"].items() if k not in old}
+    """Removed things go for good after 30 days, or sooner when there are
+    too many; a thing gone for good is remembered for a year, so an old copy
+    can't bring it back."""
+    cutoff = house_stamp(now - datetime.timedelta(days=HOUSE_KEEP_DAYS))
+    removed = sorted((v["removed"], k) for k, v in doc["items"].items() if v.get("removed"))
+    extra = max(0, len(doc["items"]) - MAX_HOUSE_KEPT)
+    for n, (at, k) in enumerate(removed):
+        if at < cutoff or n < extra:
+            # Kept with when it was removed, which an old copy can't beat.
+            doc["gone"][k] = at
+            del doc["items"][k]
+    forget = house_stamp(now - datetime.timedelta(days=HOUSE_GONE_DAYS))
+    kept = sorted(((at, k) for k, at in doc["gone"].items() if at >= forget), reverse=True)
+    doc["gone"] = {k: at for at, k in kept[:MAX_HOUSE_GONE]}
+    return doc
+
+
+def house_size(doc):
+    return len(json.dumps(doc, ensure_ascii=False, separators=(",", ":")).encode())
+
+
+def house_fit(doc):
+    """Small enough for the server however busy the household is: removed
+    things go for good first, then older history, then the oldest of what
+    went for good."""
+    removed = sorted((v["removed"], k) for k, v in doc["items"].items() if v.get("removed"))
+    while house_size(doc) > HOUSE_BUDGET and removed:
+        at, k = removed.pop(0)
+        del doc["items"][k]
+        doc["gone"][k] = at
+    for size in (3, 2):
+        if house_size(doc) <= HOUSE_BUDGET:
+            break
+        for item in doc["items"].values():
+            item["history"] = _house_trim(item["history"], size)
+    for _, k in sorted((at, k) for k, at in doc["gone"].items()):
+        if house_size(doc) <= HOUSE_BUDGET:
+            break
+        del doc["gone"][k]
     return doc
 
 
@@ -985,8 +1125,8 @@ def house_seal(code, doc):
     """The list sealed with its own code, padded to whole kilobytes so its
     size says little about how much is in it (Noor)."""
     _, enc, mac = house_keys(code)
-    body = dict(doc, pad="")
-    size = len(json.dumps(body, ensure_ascii=False, separators=(",", ":")).encode())
+    body = dict(house_fit(doc), pad="")
+    size = house_size(body)
     body["pad"] = " " * (-size % 1024)
     return seal_sync(enc, mac, body)
 
@@ -1001,25 +1141,30 @@ def house_history(doc, item):
     words = {"added": tr("added by {name}, {when}"), "ticked": tr("ticked by {name}, {when}"),
              "unticked": tr("unticked by {name}, {when}"), "removed": tr("removed by {name}, {when}"),
              "restored": tr("restored by {name}, {when}")}
+    data = translation()
     out = []
-    for what, by, at in item["history"][-4:]:
-        when = datetime.datetime.fromisoformat(at).date()
-        data = translation()
+    for what, by, at, _ in item["history"][-4:]:
+        when = _house_when(at).astimezone().date()
         out.append(words[what].format(name=house_who(doc, by),
                                       when=(data["days"] if data else DAYS)[when.weekday()]))
     return "; ".join(out)
 
 
 def house_news(doc, me, seen):
-    """Who joined or left since this device last looked, other than itself.
-    Returns (lines, new seen)."""
-    lines = []
-    for what, by, at in doc["events"][seen:]:
-        if by == me:
+    """Who joined or left since this device last looked, other than itself:
+    worked out from the members themselves, so a join can't be hidden by
+    giving it an old time. Returns (lines, new seen)."""
+    seen = seen if isinstance(seen, dict) else {}
+    lines, now_seen = [], {}
+    for mid, m in doc["members"].items():
+        now_seen[mid] = "left" if m.get("left") else "in"
+        if mid == me or seen.get(mid) == now_seen[mid]:
             continue
-        lines.append((tr("{name} joined the household list.") if what == "joined" else
-                      tr("{name} left the household list.")).format(name=house_who(doc, by)))
-    return lines, len(doc["events"])
+        if mid not in seen:
+            lines.append(tr("{name} joined the household list.").format(name=house_who(doc, mid)))
+        if m.get("left"):
+            lines.append(tr("{name} left the household list.").format(name=house_who(doc, mid)))
+    return lines, now_seen
 
 
 def house_left_unasked(doc, me, asked):
@@ -1032,15 +1177,22 @@ def house_on(state):
     return bool(state.get("house")) and counts_server() is not None and not policy("TurnOffSync")
 
 
-def _house_put(code, doc):
+def _house_put(code, doc, tag=None):
+    """True when stored, "changed" when someone else wrote since `tag` was
+    read, else False."""
     label = house_keys(code)[0]
-    return net_bytes(f"/v1/sync/{label}", house_seal(code, doc), method="PUT") is not None
+    status, _, _ = net_sync(f"/v1/sync/{label}", house_seal(code, doc), "PUT", tag)
+    return True if status == 200 else "changed" if status == 412 else False
 
 
 def _house_get(code):
+    """(the list as stored, its version), or (None, None) when it isn't
+    there or can't be read."""
     label, enc, mac = house_keys(code)
-    raw = net_bytes(f"/v1/sync/{label}")
-    return open_sync(enc, mac, raw) if raw else None
+    status, raw, tag = net_sync(f"/v1/sync/{label}")
+    if status != 200 or not raw:
+        return None, None
+    return open_sync(enc, mac, raw), tag
 
 
 def _house_save(state, can_save, house, doc):
@@ -1056,17 +1208,31 @@ def _house_save(state, can_save, house, doc):
     return True
 
 
-def house_sync(state, can_save, change=None):
+def house_sync(state, can_save, change=None, need_server=False):
     """Fetch, merge with this device's copy, apply `change(doc)`, and put it
-    back. Returns (doc, reached): the copy held here when the server can't
-    be reached, so nothing done offline is lost."""
+    back, again if someone else wrote in between. Returns (doc, reached):
+    the copy held here when the server can't be reached, so nothing done
+    offline is lost; with `need_server`, nothing changes unless the server
+    took it."""
     house = dict(state["house"])
-    theirs = _house_get(house["code"])
-    doc = house_merge(state.get("house_list") or {}, theirs)
-    if change:
-        change(doc)
-    house_tidy(doc, now())
-    reached = theirs is not None and _house_put(house["code"], doc)
+    local = state.get("house_list") or {}
+    doc, reached = house_merge(local, {}, house["me"]), False
+    for _ in range(3):
+        theirs, tag = _house_get(house["code"])
+        if theirs is None and need_server:
+            return doc, False
+        doc = house_merge(local, theirs, house["me"])
+        if change:
+            change(doc)
+        house_fit(house_tidy(doc, now()))
+        if theirs is None:
+            break
+        put = _house_put(house["code"], doc, tag)
+        if put != "changed":
+            reached = put is True
+            break
+    if need_server and not reached:
+        return doc, False
     _house_save(state, can_save, house, doc)
     return doc, reached
 
@@ -1077,11 +1243,13 @@ def house_start(state, can_save, name):
         return tr("A household list comes with a household key ($8 once).")
     if not counts_server() or policy("TurnOffSync"):
         return tr("Sync isn't available on this computer.")
-    code, me, at = sync_code(), os.urandom(6).hex(), now().isoformat(timespec="minutes")
-    doc = house_new(me, name, at)
-    if not _house_put(code, doc):
+    if not _house_name(name, MAX_HOUSE_NAME):
+        return tr("Nothing changed.")
+    code, me = sync_code(), os.urandom(6).hex()
+    doc = house_new(me, name)
+    if _house_put(code, doc, "missing") is not True:
         return tr("The server can't be reached just now.")
-    _house_save(state, can_save, {"code": code, "me": me, "seen": 1, "asked": []}, doc)
+    _house_save(state, can_save, {"code": code, "me": me, "seen": {me: "in"}, "asked": []}, doc)
     return house_code_said(code)
 
 
@@ -1095,25 +1263,35 @@ def house_code_said(code):
 def house_join_with(state, can_save, code, name):
     """Join from this device, under one's own name. Returns what to say."""
     code = "".join(c for c in (code or "").lower() if c in SYNC_ALPHABET)
-    if len(code) != 25 or not name.strip():
+    if len(code) != 25 or not _house_name(name, MAX_HOUSE_NAME):
         return tr("That code doesn't look right. Check it with whoever started the list.")
     code = "-".join(code[i:i + 5] for i in range(0, 25, 5))
-    theirs = _house_get(code)
-    if theirs is None:
-        return tr("That code didn't find a household list. Check it, or ask for the new one.")
-    me, at = os.urandom(6).hex(), now().isoformat(timespec="minutes")
-    doc = house_join(house_merge({}, theirs), me, name.strip(), at)
-    if not _house_put(code, doc):
+    me = os.urandom(6).hex()
+    for _ in range(3):
+        theirs, tag = _house_get(code)
+        if theirs is None:
+            return tr("That code didn't find a household list. Check it, or ask for the new one.")
+        doc = house_join(house_merge({}, theirs), me, name)
+        if me not in doc["members"]:
+            return tr("That household list is full.")
+        put = _house_put(code, doc, tag)
+        if put != "changed":
+            break
+    if put is not True:
         return tr("The server can't be reached just now.")
-    _house_save(state, can_save, {"code": code, "me": me, "seen": len(doc["events"]),
-                                  "asked": []}, doc)
+    seen = house_news(doc, me, {})[1]
+    _house_save(state, can_save, {"code": code, "me": me, "seen": seen, "asked": []}, doc)
     return tr("You've joined the household list. Everyone on it is told.")
 
 
 def house_leave_now(state, can_save):
+    """Leave, only once the others can be told: offline, nothing changes."""
     house = state["house"]
-    doc, _ = house_sync(state, can_save, lambda d: house_leave(
-        d, house["me"], now().isoformat(timespec="minutes")))
+    _, reached = house_sync(state, can_save, lambda d: house_leave(d, house["me"]),
+                            need_server=True)
+    if not reached:
+        return tr("The household list can't be reached just now, so you haven't left "
+                  "yet. Try again when you're online.")
     _house_save(state, can_save, None, None)
     return tr("You've left the household list, and the others are told. What was "
               "already on this device stays here.")
@@ -1121,13 +1299,18 @@ def house_leave_now(state, can_save):
 
 def house_rekey(state, can_save):
     """A new code after someone left: the list, with this device's own
-    changes, moves to it and the old copy is deleted. Returns what to say."""
+    changes, moves to it and the old copy is deleted. Only from the newest
+    copy on the server, so two members doing it at once don't split the
+    household onto two codes. Returns what to say."""
     house = dict(state["house"])
-    doc, _ = house_sync(state, can_save)
+    doc, reached = house_sync(state, can_save, need_server=True)
+    if not reached:
+        return tr("The household list can't be reached just now, or someone already made "
+                  "a new code. Nothing changed.")
     old, code = house["code"], sync_code()
-    if not _house_put(code, doc):
+    if _house_put(code, doc, "missing") is not True:
         return tr("The server can't be reached just now.")
-    net_bytes(f"/v1/sync/{house_keys(old)[0]}", b"", method="DELETE")
+    net_sync(f"/v1/sync/{house_keys(old)[0]}", b"", "DELETE")
     house["code"] = code
     house["asked"] = sorted(set(house.get("asked", [])) | {
         mid for mid, m in doc["members"].items() if m.get("left")})
@@ -1143,11 +1326,16 @@ MAX_LETTER = 4000
 LETTER_WORDS = ("letters", "letter", "cartas", "carta", "lettres", "lettre", "briefe", "brief")
 
 
+MAIL_ADDRESS = r"[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+"
+
+
 def mail_letter(letter):
     """Open the person's own mail program with the letter filled in. True
     when it opened."""
     from urllib.parse import quote
-    to = letter["to"] if re.fullmatch(r"[^@\s<>?&]+@[^@\s<>?&]+\.[^@\s<>?&]+", letter["to"]) else ""
+    # Plain addresses only: anything that means something in a link (#, %,
+    # ?, &, a comma) would send the letter somewhere else, or nowhere.
+    to = letter["to"] if re.fullmatch(MAIL_ADDRESS, letter["to"]) else ""
     link = f"mailto:{to}?body={quote(letter['text'])}"
     if STARTED is not None:
         STARTED.append(link)
@@ -1250,7 +1438,7 @@ def household_prompt(state, can_save):
             para(tr("The household list can't be reached just now; this is the copy "
                     "on this computer. If someone made a new household code, ask them "
                     "for it."))
-        lines, seen = house_news(doc, house["me"], house.get("seen", 0))
+        lines, seen = house_news(doc, house["me"], house.get("seen"))
         for line in lines:
             para(line)
         if seen != house.get("seen"):
@@ -1265,7 +1453,10 @@ def household_prompt(state, can_save):
             if answer == "yes":
                 para(house_rekey(state, can_save))
                 doc = state["house_list"]
-            elif answer == "no":
+                # The new code covers everyone who left; asking again
+                # would replace the code just given out.
+                break
+            if answer == "no":
                 _house_save(state, can_save, dict(state["house"], asked=sorted(
                     set(state["house"].get("asked", [])) | {mid})), doc)
         live = [(k, v) for k, v in doc["items"].items() if not v.get("removed")]
@@ -1277,7 +1468,7 @@ def household_prompt(state, can_save):
                        "number to remove it, removed, leave, or Enter to go back > "))
         word = (typed or "").strip(TRIM)
         low = word.lower()
-        me, at = state["house"]["me"], now().isoformat(timespec="minutes")
+        me = state["house"]["me"]
         if not word:
             return
         if low in QUIT_WORDS:
@@ -1286,10 +1477,10 @@ def household_prompt(state, can_save):
         if low in numbers:
             iid, item = live[int(low) - 1]
             house_sync(state, can_save, lambda d: house_change(
-                d, me, "unticked" if item["done"] else "ticked", iid, at=at))
+                d, me, "unticked" if item["done"] else "ticked", iid))
         elif low[:1] == "r" and low[1:].strip() in numbers:
             iid = live[int(low[1:].strip()) - 1][0]
-            house_sync(state, can_save, lambda d: house_change(d, me, "removed", iid, at=at))
+            house_sync(state, can_save, lambda d: house_change(d, me, "removed", iid))
         elif low in ("removed", "recently removed"):
             gone = [(k, v) for k, v in doc["items"].items() if v.get("removed")]
             for n, (_, item) in enumerate(gone, 1):
@@ -1298,14 +1489,14 @@ def household_prompt(state, can_save):
             back = (ask(tr("Type a number to restore it, or Enter to go back > ")) or "").strip(TRIM)
             if back in [str(n) for n in range(1, len(gone) + 1)]:
                 iid = gone[int(back) - 1][0]
-                house_sync(state, can_save, lambda d: house_change(d, me, "restored", iid, at=at))
+                house_sync(state, can_save, lambda d: house_change(d, me, "restored", iid))
         elif low == "leave":
             if ask_choice(tr("Leave the household list? (y or n) > "), strict_yes(), NO_WORDS,
                           tr("Type y or n.")) == "yes":
                 para(house_leave_now(state, can_save))
                 return
         elif text := typed_plan(word):
-            house_sync(state, can_save, lambda d: house_change(d, me, "added", text=text, at=at))
+            house_sync(state, can_save, lambda d: house_change(d, me, "added", text=text))
 
 
 def sync_form(state):
@@ -1324,10 +1515,17 @@ def merge_devices(mine, theirs):
     out = {}
     for side in (mine, theirs):
         for did, dev in (side or {}).items() if isinstance(side, dict) else ():
-            if (isinstance(did, str) and re.fullmatch(r"[0-9a-f]{12}", did) and isinstance(dev, dict)
-                    and isinstance(dev.get("name"), str) and isinstance(dev.get("seen"), str)):
-                if did not in out or dev["seen"] > out[did]["seen"]:
-                    out[did] = {"name": dev["name"][:MAX_HOUSE_NAME], "seen": dev["seen"][:10]}
+            if not (isinstance(did, str) and re.fullmatch(r"[0-9a-f]{12}", did) and isinstance(dev, dict)):
+                continue
+            # Written by whoever holds the code, so checked: a real date and
+            # a name that prints as plain text.
+            name, seen = _house_name(dev.get("name"), MAX_HOUSE_NAME), dev.get("seen")
+            try:
+                datetime.date.fromisoformat(seen)
+            except (TypeError, ValueError):
+                continue
+            if name and len(seen) == 10 and (did not in out or seen > out[did]["seen"]):
+                out[did] = {"name": name, "seen": seen}
     newest = sorted(out.items(), key=lambda kv: kv[1]["seen"])[-MAX_DEVICES:]
     return dict(newest)
 
@@ -1342,7 +1540,10 @@ def note_device(state, others=None):
 
 
 def devices_line(state):
-    """'Devices syncing: Kitchen tablet, Tuesday; this computer, today.'"""
+    """'Devices syncing: Kitchen tablet, Tuesday; this computer, today.'
+    Anyone holding the code can write this list as well, so it catches a
+    careless intruder, not a careful one: it can show the code got out,
+    never that it didn't."""
     devices = state.get("devices") or {}
     if not devices:
         return ""
@@ -1364,6 +1565,18 @@ def devices_line(state):
     return said
 
 
+def sync_time(value):
+    """When a synced copy last changed, if it's a real time no more than a
+    day ahead, else "": one far ahead would win every later change."""
+    if not (isinstance(value, str) and re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d", value)):
+        return ""
+    try:
+        at = datetime.datetime.fromisoformat(value)
+    except ValueError:
+        return ""
+    return value if at <= now() + datetime.timedelta(days=1) else ""
+
+
 def merge_sync(state, other, d):
     """Fold the other device's copy in: finished things from both, and the
     plan from whichever side changed it last. Returns True when it changed
@@ -1383,7 +1596,7 @@ def merge_sync(state, other, d):
             continue
     if state.get("finished"):
         state["finished"] = sorted(state["finished"], key=lambda i: i["date"])[-finished_cap(state):]
-    theirs = other.get("updated") if isinstance(other.get("updated"), str) else ""
+    theirs = sync_time(other.get("updated"))
     if theirs > state.get("sync_updated", ""):
         intent = other.get("intent")
         try:
@@ -1493,6 +1706,27 @@ def set_sync(state, can_save, on):
         "Sync is on. On your phone, open hello-world, choose Sync, and type this "
         "code: {code}. With sync on, your plan and done list leave this computer, "
         "encrypted with that code.").format(code=state["sync"])
+
+
+def net_sync(path, body=None, method=None, if_match=None):
+    """(status, body, version) for a GET, PUT or DELETE at the counts
+    server; the status is 0 when it can't be reached. With `if_match`, a
+    PUT only lands over that version ("missing" for a new copy)."""
+    import urllib.error
+    import urllib.request
+    headers = {"Content-Type": "application/octet-stream", "User-Agent": "hello-world"}
+    if if_match:
+        headers["If-Match"] = if_match
+    request = urllib.request.Request(
+        counts_server() + path, data=body,
+        method=method or ("PUT" if body is not None else "GET"), headers=headers)
+    try:
+        with urllib.request.urlopen(request, timeout=COUNTS_TIMEOUT) as answer:
+            return answer.status, answer.read(MAX_SYNC + 1), answer.headers.get("ETag")
+    except urllib.error.HTTPError as e:
+        return e.code, None, None
+    except (OSError, ValueError):
+        return 0, None, None
 
 
 def net_bytes(path, body=None, method=None):
@@ -1697,16 +1931,30 @@ def pro_license(key):
     return data if isinstance(data, dict) else None
 
 
+# Each key is checked once a run: the signature check is slow arithmetic.
 _PRO_CHECKED = {}
 
 
-def pro_on(state):
+def pro_checked(state):
+    """The saved key's note, checked once, or None."""
     key = state.get("pro_key")
     if not key:
-        return False
+        return None
     if (key, PRO_PUBLIC_KEY) not in _PRO_CHECKED:
-        _PRO_CHECKED[key, PRO_PUBLIC_KEY] = pro_license(key) is not None
+        _PRO_CHECKED[key, PRO_PUBLIC_KEY] = pro_license(key)
     return _PRO_CHECKED[key, PRO_PUBLIC_KEY]
+
+
+def pro_on(state):
+    return pro_checked(state) is not None
+
+
+def pro_canonical(key):
+    """A key as saved: no padding and the URL-safe letters, however it was
+    pasted, so the check on loading always accepts it."""
+    _, note, signature = "".join((key or "").split()).split(".")
+    return ".".join(["HW1"] + [base64.urlsafe_b64encode(_b64(p)).rstrip(b"=").decode()
+                               for p in (note, signature)])
 
 
 def set_pro_key(state, can_save, key):
@@ -1717,7 +1965,7 @@ def set_pro_key(state, can_save, key):
         return tr("That isn't a hello-world Pro key. Nothing changed.")
     refresh(state, can_save)
     base = copy.deepcopy(state)
-    state["pro_key"] = key
+    state["pro_key"] = pro_canonical(key)
     if not commit(state, base, can_save):
         undo(state, base)
         return tr("Could not save that choice on this computer.")
@@ -1733,7 +1981,7 @@ def set_pro_key(state, can_save, key):
 
 def family_on(state):
     """A household key: Pro, plus the shared household list."""
-    return pro_on(state) and (pro_license(state["pro_key"]) or {}).get("kind") == "family"
+    return (pro_checked(state) or {}).get("kind") == "family"
 
 
 def month_name(month):
@@ -2653,12 +2901,14 @@ def load(repair=True):
     if (isinstance(house, dict) and isinstance(house.get("code"), str)
             and re.fullmatch(r"([%s]{5}-){4}[%s]{5}" % (SYNC_ALPHABET, SYNC_ALPHABET), house["code"])
             and isinstance(house.get("me"), str) and re.fullmatch(r"[0-9a-f]{12}", house["me"])):
+        seen = house.get("seen") if isinstance(house.get("seen"), dict) else {}
+        asked = house.get("asked") if isinstance(house.get("asked"), list) else []
         state["house"] = {"code": house["code"], "me": house["me"],
-                          "seen": house["seen"] if isinstance(house.get("seen"), int) else 0,
-                          "asked": [a for a in house.get("asked", []) if isinstance(a, str)]
-                          if isinstance(house.get("asked"), list) else []}
+                          "seen": {k: v for k, v in seen.items()
+                                   if HOUSE_ID.fullmatch(k) and v in ("in", "left")},
+                          "asked": [a for a in asked if isinstance(a, str) and HOUSE_ID.fullmatch(a)]}
         if isinstance(raw.get("house_list"), dict):
-            state["house_list"] = house_merge(raw["house_list"], {})
+            state["house_list"] = house_merge(raw["house_list"], {}, house["me"])
     letters = raw.get("letters")
     if isinstance(letters, list):
         kept = [{"to": l["to"][:100], "text": l["text"][:MAX_LETTER], "date": l["date"]}
@@ -2683,11 +2933,10 @@ def load(repair=True):
     code = raw.get("sync")
     if isinstance(code, str) and re.fullmatch(r"([%s]{5}-){4}[%s]{5}" % (SYNC_ALPHABET, SYNC_ALPHABET), code):
         state["sync"] = code
-        updated = raw.get("sync_updated")
-        if isinstance(updated, str) and re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d", updated):
+        if updated := sync_time(raw.get("sync_updated")):
             state["sync_updated"] = updated
     key = raw.get("pro_key")
-    if isinstance(key, str) and re.fullmatch(r"HW1\.[A-Za-z0-9_-]{1,400}\.[A-Za-z0-9_-]{86}", key):
+    if isinstance(key, str) and re.fullmatch(r"HW1\.[A-Za-z0-9_-]{1,4000}\.[A-Za-z0-9_-]{86}", key):
         state["pro_key"] = key
     if raw.get("theme") in THEMES:
         state["theme"] = raw["theme"]
@@ -3284,10 +3533,17 @@ def delete_everything(state):
         # The encrypted copy on the server goes too.
         net_bytes(f"/v1/sync/{sync_keys(state['sync'])[0]}", b"", method="DELETE")
     if state.get("house") and counts_server():
-        # Leaving the household list, so the others are told.
+        # Leaving the household list, so the others are told. Only onto the
+        # copy the server holds: when it's gone (someone made a new code),
+        # this device's copy is never put back under the old one.
         house = state["house"]
-        doc = house_merge(state.get("house_list") or {}, _house_get(house["code"]))
-        _house_put(house["code"], house_leave(doc, house["me"], now().isoformat(timespec="minutes")))
+        for _ in range(3):
+            theirs, tag = _house_get(house["code"])
+            if theirs is None:
+                break
+            doc = house_merge(state.get("house_list") or {}, theirs, house["me"])
+            if _house_put(house["code"], house_leave(doc, house["me"]), tag) != "changed":
+                break
     leftovers = [data_file()]
     failed = []
     listing_failed = False
@@ -3620,6 +3876,13 @@ def set_plan(state, can_save, iso=None, after_done=False, in_menu=False):
         if cut := shortened(raw, text):
             say(cut)
     base = copy.deepcopy(state)
+    if closed_day_add(state, text, iso):
+        if commit(state, base, can_save):
+            para(tr("Added to tomorrow's plan, with what you carried."))
+        else:
+            undo(state, base)
+            say(tr("Could not save that on this computer. Your plan is unchanged."))
+        return False
     # Changing today's plan is a correction, so only a plan carried over from
     # an earlier day is kept for same.
     if old and old["text"] != text and old["date"] != iso:
@@ -4204,9 +4467,10 @@ def last_change_line(state):
     """When the synced plan last changed, on any device, so a change nobody
     here made stands out if the code leaked (the red team's Mielke)."""
     when = state.get("sync_updated")
-    if not when:
+    try:
+        at = datetime.datetime.fromisoformat(when)
+    except (TypeError, ValueError):
         return ""
-    at = datetime.datetime.fromisoformat(when)
     return (tr("Last change to your synced plan: {when}.").format(
         when=f"{long_date(at.date())} {at.strftime('%H:%M')}") + " " + tr(
         "If you didn't make it, choose Change my sync code."))
@@ -5122,6 +5386,17 @@ def end_day(state, can_save, d, choose):
     # One plain line, no judgment words (Hank).
     return tr("Done {done}, carried {carried}, set aside {aside}. The day is closed.").format(
         done=len(done), carried=len(carried), aside=picks.count("aside"))
+
+
+def closed_day_add(state, text, iso):
+    """After End the day, what was carried is tomorrow's plan; a plan typed
+    the same day joins it rather than replacing it. True when it did."""
+    old = state["intent"]
+    if not (old and old["date"] > iso):
+        return False
+    if text not in plan_parts(old["text"]):
+        state["intent"] = dict(old, text=clean(old["text"] + "; " + text))
+    return True
 
 
 def end_day_prompt(state, can_save, d):
@@ -7383,6 +7658,13 @@ class Visit:
         text = clean(raw)
         base = copy.deepcopy(state)
         old = state["intent"]
+        if closed_day_add(state, text, self.iso):
+            saved, said = quietly(commit, state, base, self.can_save)
+            if not saved:
+                undo(state, base)
+                return False, said or tr("Could not save that on this computer. "
+                                         "Your plan is unchanged."), False
+            return False, tr("Added to tomorrow's plan, with what you carried."), True
         if old and old["text"] != text and old["date"] != self.iso:
             put_aside(state, old["text"])
         state["intent"] = {"text": text, "date": self.iso,
@@ -8592,18 +8874,28 @@ class Window:
         """The household list: the words come from the plan box, and the
         code from the clipboard, as with Pro."""
         v = self.visit
-        name = first_name() or tr("someone")
         if not v.state.get("house"):
             choice = self.popup([(0, 1, tr("Start one (needs a household key)")),
                                  (0, 2, tr("Join one: copy its code first"))])
+            if choice not in (1, 2):
+                return
+            # Asked for, never taken from the Windows account: off a domain
+            # that has no name, and on one it's the name work uses.
+            name = typed_plan(self.typed())
+            if not name:
+                self.inform(tr("Type your name, as the others will see it, in the plan box "
+                               "first, then choose this again."))
+                return
             if choice == 1:
                 self.inform(house_start(v.state, v.can_save, name))
-            elif choice == 2:
+            else:
                 self.inform(house_join_with(v.state, v.can_save, self.clipboard_text(), name))
+            if v.state.get("house"):
+                self.set_text(self.PLAN, v.plan())
             return
         doc, reached = house_sync(v.state, v.can_save)
         house = v.state["house"]
-        lines, seen = house_news(doc, house["me"], house.get("seen", 0))
+        lines, seen = house_news(doc, house["me"], house.get("seen"))
         if lines:
             self.inform("\n".join(lines))
             _house_save(v.state, v.can_save, dict(house, seen=seen), doc)
@@ -8613,10 +8905,11 @@ class Window:
                             .format(name=house_who(doc, mid))):
                 self.inform(house_rekey(v.state, v.can_save))
                 doc = v.state["house_list"]
+                break
             else:
                 _house_save(v.state, v.can_save, dict(v.state["house"], asked=sorted(
                     set(v.state["house"].get("asked", [])) | {mid})), doc)
-        me, at = v.state["house"]["me"], now().isoformat(timespec="minutes")
+        me = v.state["house"]["me"]
         live = [(k, i) for k, i in doc["items"].items() if not i.get("removed")]
         gone = [(k, i) for k, i in doc["items"].items() if i.get("removed")]
         entries = [] if reached else [(0x1, 0, tr("Not reached; the copy on this computer"))]
@@ -8632,24 +8925,24 @@ class Window:
         if 100 <= choice < 100 + len(live):
             iid, item = live[choice - 100]
             house_sync(v.state, v.can_save, lambda d: house_change(
-                d, me, "unticked" if item["done"] else "ticked", iid, at=at))
+                d, me, "unticked" if item["done"] else "ticked", iid))
         elif choice == 1:
             text = typed_plan(self.typed())
             if not text:
                 self.inform(tr("Type the thing in the plan box first, then choose this again."))
                 return
-            house_sync(v.state, v.can_save, lambda d: house_change(d, me, "added", text=text, at=at))
+            house_sync(v.state, v.can_save, lambda d: house_change(d, me, "added", text=text))
             self.set_text(self.PLAN, v.plan())
         elif choice == 2:
             picked = self.popup([(0, 200 + n, i["text"]) for n, (_, i) in enumerate(live)])
             if picked:
                 iid = live[picked - 200][0]
-                house_sync(v.state, v.can_save, lambda d: house_change(d, me, "removed", iid, at=at))
+                house_sync(v.state, v.can_save, lambda d: house_change(d, me, "removed", iid))
         elif choice == 3:
             picked = self.popup([(0, 300 + n, i["text"]) for n, (_, i) in enumerate(gone)])
             if picked:
                 iid = gone[picked - 300][0]
-                house_sync(v.state, v.can_save, lambda d: house_change(d, me, "restored", iid, at=at))
+                house_sync(v.state, v.can_save, lambda d: house_change(d, me, "restored", iid))
         elif choice == 5:
             self.inform("\n\n".join(i["text"] + "\n" + house_history(doc, i) for _, i in live))
         elif choice == 4 and self.confirm(tr("Leave the household list?")):

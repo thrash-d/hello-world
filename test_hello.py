@@ -4342,7 +4342,7 @@ def test_sync_round_trips_through_the_server_and_off_deletes_it():
         # The phone finishes something and changes the plan; the PC picks it up.
         phone = {"intent": {"text": "From the phone", "date": hello.today().isoformat()},
                  "finished": [{"text": "Bought milk", "date": hello.today().isoformat()}],
-                 "updated": "2999-01-01T00:00:00"}
+                 "updated": (hello.now() + hello.datetime.timedelta(minutes=5)).isoformat()}
         with open(os.path.join(folder, "sync", label), "wb") as f:
             f.write(hello.seal_sync(enc, mac, phone))
         hello.SYNCING = False
@@ -4350,6 +4350,21 @@ def test_sync_round_trips_through_the_server_and_off_deletes_it():
         saved = notes(first.home)
         assert saved["intent"]["text"] == "From the phone"
         assert any(i["text"] == "Bought milk" for i in saved["finished"])
+        # A copy claiming a change far ahead can't win every later change,
+        # and a bad time or device date can't break the sync menu.
+        far = dict(phone, intent={"text": "Far ahead", "date": hello.today().isoformat()},
+                   updated="2999-01-01T00:00:00",
+                   devices={"aaaaaaaaaaaa": {"name": "\x1b[2Jx", "seen": "zzzz"}})
+        assert hello.sync_time(far["updated"]) == "" and hello.sync_time("~") == ""
+        with open(os.path.join(folder, "sync", label), "wb") as f:
+            f.write(hello.seal_sync(enc, mac, far))
+        hello.SYNCING = False
+        hello.sync_now(state, can_save)
+        saved = notes(first.home)
+        assert saved["intent"]["text"] == "From the phone" and "aaaaaaaaaaaa" not in saved.get("devices", {})
+        assert hello.last_change_line({"sync_updated": "~"}) == ""
+        assert hello.merge_devices({"bbbbbbbbbbbb": {"name": "\x1b]52;c;x\x07Kitchen", "seen": "2026-10-05"}},
+                                   {})["bbbbbbbbbbbb"]["name"] == "]52;c;xKitchen"
         assert hello.set_sync(state, can_save, False).startswith("Sync is off")
         assert not os.path.exists(os.path.join(folder, "sync", label)) and "sync" not in notes(first.home)
         # An organization can turn it off.
@@ -4713,6 +4728,74 @@ def test_the_counts_server_limits_writes_and_sweeps_old_copies():
         server.shutdown()
 
 
+def test_the_counts_server_checks_versions_bodies_and_proxied_addresses():
+    import urllib.error
+    import urllib.request
+    server, url, folder = _counts_server()
+    counts = server.counts
+    try:
+        def call(label, body=None, method="PUT", headers=None):
+            request = urllib.request.Request(url + "/v1/sync/" + label, data=body, method=method,
+                                             headers=headers or {})
+            try:
+                with urllib.request.urlopen(request, timeout=5) as r:
+                    return r.status, r.headers.get("ETag")
+            except urllib.error.HTTPError as e:
+                return e.code, None
+        label = "a" * 64
+        # An empty or oversized body is refused before it uses up a write.
+        assert call(label, b"")[0] == 413
+        assert counts.labels_today == {} and counts.minute[1] == {}
+        # If-Match: a new copy only when missing, and an update only over
+        # the version last read, so two devices can't lose each other's change.
+        assert call(label, b"x" * 60, headers={"If-Match": "missing"})[0] == 200
+        assert call(label, b"y" * 60, headers={"If-Match": "missing"})[0] == 412
+        status, tag = call(label, method="GET")
+        assert status == 200 and tag
+        assert call(label, b"y" * 60, headers={"If-Match": tag})[0] == 200
+        assert call(label, b"z" * 60, headers={"If-Match": tag})[0] == 412
+        # The quota is counted as copies come and go, not by listing.
+        assert counts.sync_count() == 1
+        assert call(label, method="DELETE")[0] == 200 and counts.sync_count() == 0
+    finally:
+        server.shutdown()
+    # Behind a proxy, the address is the one the proxy added, last; one the
+    # sender wrote first can't dodge the limits.
+    server, url, folder = _counts_server()
+    server.trust_proxy = True
+    try:
+        def put(n, forwarded):
+            request = urllib.request.Request(url + "/v1/sync/" + f"{n:064x}", data=b"x" * 60, method="PUT",
+                                             headers={"X-Forwarded-For": forwarded})
+            try:
+                with urllib.request.urlopen(request, timeout=5) as r:
+                    return r.status
+            except urllib.error.HTTPError as e:
+                return e.code
+        limit = server.mod.NEW_LABELS_A_DAY
+        said = [put(n, f"10.0.0.{n}, 192.0.2.7") for n in range(limit + 1)]
+        assert said == [200] * limit + [429]
+    finally:
+        server.shutdown()
+
+
+def test_the_week_boss_keeps_small_groups_as_a_few():
+    import datetime
+    server, url, folder = _counts_server(min_group=10)
+    try:
+        counts = server.counts
+        today = datetime.date.fromisoformat(_utc_today())
+        monday = today - datetime.timedelta(days=today.weekday())
+        with open(os.path.join(folder, f"{monday}.json"), "w", encoding="utf-8") as f:
+            json.dump({"tip": 3}, f)
+        week = counts.week(monday.isoformat())
+        # Three tips in a small office show as none, and the boss's points
+        # are never below the minimum group.
+        assert week["hits"] == 0 and week["hp"] >= 10 and week["defeated"] is None
+    finally:
+        server.shutdown()
+
+
 def test_organization_content_is_labeled_and_sync_shows_the_last_change():
     p = run(text="\n", extra={"CONTENT": SAMPLE})
     assert "Try this today, from your organization:" in p.stdout
@@ -4872,7 +4955,14 @@ def test_the_phone_carries_starts_clean_shrinks_and_ends_the_day():
         out.push(app.answer(s, "no", "2026-10-04"), app.smaller(s, "Write one page", "2026-10-04"), s.intent.text,
                  s.aside.map((a) => a.text));
         app.setPlan(s, "Call Ana; buy milk; fix it", "2026-10-05");
-        out.push(app.endDay(s, ["done", "carry", "aside"], "2026-10-05"), s.intent);
+        out.push(app.endDay(s, ["done", "carry", "aside"], "2026-10-05"), Object.assign({}, s.intent));
+        // Typed the same day after ending it, a plan joins tomorrow's rather
+        // than replacing what was carried.
+        out.push(app.setPlan(s, "Water plants", "2026-10-05"), s.intent.text, s.intent.date);
+        // An empty box doesn't count as an answer to the smaller offer.
+        const e = app.blank();
+        app.setPlan(e, "Big thing", "2026-10-05");
+        out.push(app.smaller(e, "  ", "2026-10-05"), e.smallerAsked || null);
         const t = app.blank();
         app.setPlan(t, "Old", "2026-10-01");
         out.push(app.answer(t, "clean", "2026-10-05"), t.intent, t.sideways || null);
@@ -4884,18 +4974,20 @@ def test_the_phone_carries_starts_clean_shrinks_and_ends_the_day():
                    "carriedSaid", "smallerSaid", "Write one page", ["Write the report"],
                    {"done": 1, "carried": 1, "aside": 1},
                    {"text": "buy milk", "date": "2026-10-06", "skips": 0, "since": "2026-10-05"},
+                   "addedTomorrow", "buy milk; Water plants", "2026-10-06", "", None,
                    "cleanSaid", None, None, True]
 
 
 def test_the_household_list_merges_keeps_history_and_nobody_adds_anyone():
     hello = _load_hello()
-    doc = hello.house_new("aaaaaaaaaaaa", "Okiku", "2026-10-05T07:00")
-    hello.house_join(doc, "bbbbbbbbbbbb", "Taro", "2026-10-05T07:05")
-    rice = hello.house_change(doc, "aaaaaaaaaaaa", "added", text="Buy rice", at="2026-10-05T08:00")
+    A, B = "aaaaaaaaaaaa", "bbbbbbbbbbbb"
+    doc = hello.house_new(A, "Okiku", "2026-10-05T11:00:00Z")
+    hello.house_join(doc, B, "Taro", "2026-10-05T11:05:00Z")
+    rice = hello.house_change(doc, A, "added", text="Buy rice", at="2026-10-05T12:00:00Z")
     # Two devices change the same list offline; both changes survive.
     other = hello.house_merge(doc, {})
-    hello.house_change(doc, "bbbbbbbbbbbb", "ticked", rice, at="2026-10-05T09:00")
-    tea = hello.house_change(other, "aaaaaaaaaaaa", "added", text="Tea", at="2026-10-05T09:30")
+    hello.house_change(doc, B, "ticked", rice, at="2026-10-05T13:00:00Z")
+    tea = hello.house_change(other, A, "added", text="Tea", at="2026-10-05T13:30:00Z")
     both = hello.house_merge(doc, other)
     assert both["items"][rice]["done"] and tea in both["items"]
     # An old copy can't quietly undo a tick: history only grows.
@@ -4904,24 +4996,107 @@ def test_the_household_list_merges_keeps_history_and_nobody_adds_anyone():
     # History: who and which day, never a count or a time.
     line = hello.house_history(both, both["items"][rice])
     assert line == "added by Okiku, Monday; ticked by Taro, Monday"
+    # A quick untick and re-tick in the same second keep their order, and
+    # every device sorts entries from the same second the same way.
+    for what in ("unticked", "ticked"):
+        hello.house_change(both, A, what, rice, at="2026-10-05T13:00:00Z")
+    assert both["items"][rice]["done"]
+    assert hello.house_merge(other, both)["items"][rice]["done"]
     # Removed things come back for 30 days, then are gone for good, and an
     # old copy can't bring them back.
-    hello.house_change(both, "bbbbbbbbbbbb", "removed", tea, at="2026-10-05T10:00")
+    hello.house_change(both, B, "removed", tea, at="2026-10-05T14:00:00Z")
     assert both["items"][tea]["removed"]
-    hello.house_change(both, "aaaaaaaaaaaa", "restored", tea, at="2026-10-05T11:00")
+    hello.house_change(both, A, "restored", tea, at="2026-10-05T15:00:00Z")
     assert not both["items"][tea]["removed"]
-    hello.house_change(both, "aaaaaaaaaaaa", "removed", tea, at="2026-10-05T12:00")
-    hello.house_tidy(both, hello.datetime.datetime(2026, 11, 10))
+    hello.house_change(both, A, "removed", tea, at="2026-10-05T16:00:00Z")
+    hello.NOW = "2026-11-10T00:00"
+    hello.house_tidy(both, hello.now())
     assert tea not in both["items"] and tea in both["gone"]
     assert tea not in hello.house_merge(both, other)["items"]
     # Someone who left can't change anything; notices name who joined or left.
-    hello.house_leave(both, "bbbbbbbbbbbb", "2026-10-06T08:00")
-    assert hello.house_change(both, "bbbbbbbbbbbb", "added", text="x", at="2026-10-06T09:00") is None
-    lines, seen = hello.house_news(both, "aaaaaaaaaaaa", 1)
-    assert lines == ["Taro joined the household list.", "Taro left the household list."] and seen == 3
-    assert hello.house_left_unasked(both, "aaaaaaaaaaaa", []) == ["bbbbbbbbbbbb"]
+    hello.house_leave(both, B, "2026-10-06T08:00:00Z")
+    assert hello.house_change(both, B, "added", text="x", at="2026-10-06T09:00:00Z") is None
+    lines, seen = hello.house_news(both, A, {A: "in"})
+    assert lines == ["Taro joined the household list.", "Taro left the household list."]
+    assert hello.house_news(both, A, seen)[0] == []
+    assert hello.house_left_unasked(both, A, []) == ["bbbbbbbbbbbb"]
     # No function adds a member other than the one calling from its device.
     assert not [n for n in dir(hello) if n.startswith("house_") and "invite" in n]
+
+
+def test_the_household_list_checks_everything_a_code_holder_writes():
+    hello = _load_hello()
+    A, B, C = "aaaaaaaaaaaa", "bbbbbbbbbbbb", "cccccccccccc"
+    mine = hello.house_new(A, "Okiku", "2026-10-05T11:00:00Z")
+    hello.house_join(mine, B, "Taro", "2026-10-05T11:05:00Z")
+    rice = hello.house_change(mine, A, "added", text="Buy rice", at="2026-10-05T12:00:00Z")
+    bad = {"members": {
+        A: {"name": "Okiku", "joined": "2026-10-05T11:00:00Z", "left": "2026-10-06T00:00:00Z"},
+        C: {"name": "\x1b]52;c;aGk=\x07\x1b[2JMallory", "joined": "2000-01-01T00:00:00Z"},
+        "__proto__": {"name": "x", "joined": "2026-10-05T11:00:00Z"},
+        "dddddddddddd": {"name": "Bad date", "joined": "garbage"}},
+        "items": {
+            rice: {"text": "Buy rice", "history": [
+                ["foo", B, "2026-10-05T12:30:00Z", "00000001"],
+                ["ticked", B, "notadate", "00000002"],
+                ["unticked", B, "2999-01-01T00:00:00Z", "00000003"],
+                ["ticked", B, 5, "00000004"]]},
+            "eeeeeeeeeeee": {"text": "\x1b[31mRed\x1b[0m", "history": [
+                ["added", C, "2026-10-05T12:00:00Z", "00000005"]]}},
+        "gone": {rice: "2026-10-06T00:00:00Z", "zz": "x"}}
+    doc = hello.house_merge(mine, bad, A)
+    # This device decides alone whether it left.
+    assert not doc["members"][A].get("left") and hello.house_change(doc, A, "ticked", rice)
+    # Names and text print as plain text; malformed members are dropped.
+    assert "\x1b" not in doc["members"][C]["name"] and "\x07" not in doc["members"][C]["name"]
+    assert "__proto__" not in doc["members"] and "dddddddddddd" not in doc["members"]
+    assert "\x1b" not in doc["items"]["eeeeeeeeeeee"]["text"]
+    # Unknown, malformed and far-future entries are dropped, so nothing
+    # crashes and nobody wins every later change.
+    assert all(h[0] in hello.HOUSE_WHATS and h[2] < "2999" for h in doc["items"][rice]["history"])
+    assert hello.house_history(doc, doc["items"][rice])
+    # A thing still on the list can't be erased by a "gone" entry.
+    assert rice in doc["items"] and rice not in doc["gone"]
+    # A join given an old time is still announced.
+    lines, _ = hello.house_news(doc, A, {A: "in", B: "in"})
+    assert len(lines) == 1 and "Mallory joined" in lines[0] and "\x1b" not in lines[0]
+    # However busy, the list stays under the server's limit.
+    big = hello.house_new(A, "Okiku", "2026-10-05T11:00:00Z")
+    for n in range(300):
+        iid = hello.house_change(big, A, "added", text="水" * 200 + str(n))
+        for what in ("ticked", "unticked") * 5:
+            if iid:
+                hello.house_change(big, A, what, iid)
+    hello.house_fit(big)
+    assert len([i for i in big["items"].values() if not i["removed"]]) == hello.MAX_HOUSE_ITEMS
+    assert len(hello.house_seal("k7mqa-2p9xb-tz4wc-8hcdd-r3vne", big)) < 64_000
+
+
+def test_review_fixes_for_closing_the_day_pro_keys_and_letters():
+    hello = _load_hello()
+    # After End the day, a plan typed the same day joins tomorrow's.
+    state = {"intent": {"text": "buy milk", "date": "2026-10-06", "since": "2026-10-05"}}
+    assert hello.closed_day_add(state, "Water plants", "2026-10-05")
+    assert state["intent"]["text"] == "buy milk; Water plants" and state["intent"]["date"] == "2026-10-06"
+    assert not hello.closed_day_add({"intent": None}, "x", "2026-10-05")
+    # A mail address with anything that means something in a link is left out.
+    hello.STARTED = []
+    hello.mail_letter({"to": "a#b@c.de", "text": "Hi"})
+    hello.mail_letter({"to": "mum@example.com", "text": "Hi"})
+    assert hello.STARTED == ["mailto:?body=Hi", "mailto:mum@example.com?body=Hi"]
+    # A key for a long name, or pasted with + and /, still works after a restart.
+    pro_keys, secret, public = _pro()
+    first = run(text="Call Ana\n\n")
+    win = _window_hello(home=first.home)
+    win.PRO_PUBLIC_KEY = public
+    state, can_save = win.load()
+    key = pro_keys.issue(secret, "\u0639\u0627\u0626\u0644\u0629 " * 30, "2026-10-10", family=True)
+    head, note, sig = key.split(".")
+    pasted = ".".join([head, note.replace("-", "+").replace("_", "/"), sig.replace("-", "+").replace("_", "/")])
+    assert "household" in win.set_pro_key(state, can_save, pasted)
+    win._PRO_CHECKED.clear()
+    state, _ = win.load()
+    assert win.pro_on(state) and win.family_on(state) and state["pro_key"] == key
 
 
 def test_the_household_list_through_the_server_with_a_household_key():
@@ -4950,11 +5125,22 @@ def test_the_household_list_through_the_server_with_a_household_key():
         bstate, bsave = b.load()
         assert "joined" in b.house_join_with(bstate, bsave, code.upper().replace("-", " "), "Taro")
         b.house_sync(bstate, bsave, lambda d: b.house_change(
-            d, bstate["house"]["me"], "added", text="Buy rice", at="2026-10-05T08:00"))
+            d, bstate["house"]["me"], "added", text="Buy rice"))
         doc, reached = a.house_sync(state, can_save)
         assert reached and [i["text"] for i in doc["items"].values()] == ["Buy rice"]
         lines, _ = a.house_news(doc, state["house"]["me"], state["house"]["seen"])
         assert lines == ["Taro joined the household list."]
+        # A copy written in between isn't lost: the second write merges it.
+        _, tag = a._house_get(code)
+        b.house_sync(bstate, bsave, lambda d: b.house_change(d, bstate["house"]["me"], "added", text="Tea"))
+        assert a._house_put(code, doc, tag) == "changed"
+        doc, _ = a.house_sync(state, can_save, lambda d: a.house_change(
+            d, state["house"]["me"], "added", text="Milk"))
+        assert sorted(i["text"] for i in doc["items"].values()) == ["Buy rice", "Milk", "Tea"]
+        # Leaving while the server can't be reached changes nothing.
+        b.POLICY = {"SharedCountsServer": "http://127.0.0.1:9"}
+        assert "haven't left" in b.house_leave_now(bstate, bsave) and "house" in bstate
+        b.POLICY = {"SharedCountsServer": url}
         # Taro leaves; Okiku makes a new code and the old one stops working.
         assert "others are told" in b.house_leave_now(bstate, bsave) and "house" not in bstate
         doc, _ = a.house_sync(state, can_save)
@@ -4962,6 +5148,9 @@ def test_the_household_list_through_the_server_with_a_household_key():
         assert "old code no longer works" in a.house_rekey(state, can_save)
         assert state["house"]["code"] != code and not os.path.exists(os.path.join(folder, "sync", label))
         assert "didn't find" in b.house_join_with(bstate, bsave, code, "Taro")
+        # Making a new code needs the newest copy: from a dead code, nothing.
+        stale = dict(state, house=dict(state["house"], code=code))
+        assert "Nothing changed" in a.house_rekey(stale, can_save)
     finally:
         server.shutdown()
 
@@ -4970,29 +5159,40 @@ def test_the_household_list_is_the_same_on_the_pc_and_the_phone():
     import base64 as b64
     hello = _load_hello()
     code = "k7mqa-2p9xb-tz4wc-8hcdd-r3vne"
-    doc = hello.house_new("aaaaaaaaaaaa", "Okiku", "2026-10-05T07:00")
-    hello.house_change(doc, "aaaaaaaaaaaa", "added", text="Buy rice", at="2026-10-05T08:00")
+    doc = hello.house_new("aaaaaaaaaaaa", "Okiku", "2026-10-05T11:00:00Z")
+    hello.house_change(doc, "aaaaaaaaaaaa", "added", text="Buy rice", at="2026-10-05T12:00:00Z")
     sealed = hello.house_seal(code, doc)
     got = _node("""
         const app = require("./app.js");
         (async () => {
           const k = await app.houseKeys(%s);
           const doc = app.houseMerge(await app.openSync(k, Buffer.from(%s, "base64")), {});
-          app.houseJoin(doc, "bbbbbbbbbbbb", "Taro", "2026-10-05T09:00");
+          app.houseJoin(doc, "bbbbbbbbbbbb", "Taro", "2026-10-05T12:30:00Z");
           const rice = Object.keys(doc.items)[0];
-          app.houseChange(doc, "bbbbbbbbbbbb", "ticked", rice, null, "2026-10-05T09:05");
-          app.houseChange(doc, "bbbbbbbbbbbb", "added", null, "Tea", "2026-10-05T09:06");
+          app.houseChange(doc, "bbbbbbbbbbbb", "ticked", rice, null, "2026-10-05T13:05:00Z");
+          app.houseChange(doc, "bbbbbbbbbbbb", "added", null, "Tea", "2026-10-05T13:06:00Z");
           const sealed = await app.sealSync(k, app.houseBody(doc));
+          // Ids from the server never reach Object.prototype, and an unknown
+          // history entry is dropped instead of breaking the page.
+          const bad = JSON.parse('{"members": {"__proto__": {"name": "x", "joined": "2026-10-05T11:00:00Z", "left": "2026-10-06T00:00:00Z"}},' +
+            '"items": {"__proto__": {"text": "x", "history": [["added", "aaaaaaaaaaaa", "2026-10-05T11:00:00Z", "00000001"]]}, ' +
+            '"' + rice + '": {"text": "Buy rice", "history": [["foo", "aaaaaaaaaaaa", "2026-10-05T11:00:00Z", "00000002"]]}}}');
+          const merged = app.houseMerge(doc, bad, "bbbbbbbbbbbb");
           console.log(JSON.stringify({label: k.label, history: app.houseHistory(doc, doc.items[rice], "en"),
+                                      polluted: ({}).left !== undefined || ({}).history !== undefined,
+                                      after: app.houseHistory(merged, merged.items[rice], "en"),
+                                      code: app.newCode(),
                                       sealed: Buffer.from(sealed).toString("base64")}));
         })();""" % (json.dumps(code), json.dumps(b64.b64encode(sealed).decode())))
     assert got["label"] == hello.house_keys(code)[0]
-    assert got["history"] == "added by Okiku, Monday; ticked by Taro, Monday"
+    assert got["history"] == "added by Okiku, Monday; ticked by Taro, Monday" == got["after"]
+    assert not got["polluted"]
+    assert re.fullmatch(r"([%s]{5}-){4}[%s]{5}" % ((hello.SYNC_ALPHABET,) * 2), got["code"])
     _, enc, mac = hello.house_keys(code)
     back = hello.house_merge(doc, hello.open_sync(enc, mac, b64.b64decode(got["sealed"])))
     assert sorted(i["text"] for i in back["items"].values()) == ["Buy rice", "Tea"]
     assert [i["done"] for i in back["items"].values() if i["text"] == "Buy rice"] == [True]
-    assert hello.house_news(back, "aaaaaaaaaaaa", 1)[0] == ["Taro joined the household list."]
+    assert hello.house_news(back, "aaaaaaaaaaaa", {"aaaaaaaaaaaa": "in"})[0] == ["Taro joined the household list."]
     # A different salt from sync: the same code never opens the other.
     assert hello.house_keys(code)[0] != hello.sync_keys(code)[0]
 
@@ -5059,7 +5259,9 @@ def test_the_phone_lists_devices_and_makes_letter_links():
             app.mergeDevices({"aaaaaaaaaaaa": {name: "A", seen: "2026-10-01"}}, {"aaaaaaaaaaaa": {name: "A", seen: "2026-10-04"}}),
             app.letterLink({to: "mum@example.com", text: "Hi Mum"}, "mail"),
             app.letterLink({to: "?cc=x@y.z", text: "Hi"}, "mail"),
+            app.letterLink({to: "a#b@c.de", text: "Hi"}, "mail"),
             app.letterLink({to: "+1 555 0100", text: "Hi"}, "sms", false)]));""")
     assert got == [2, {"name": "Kitchen tablet", "seen": "2026-10-05"},
                    {"aaaaaaaaaaaa": {"name": "A", "seen": "2026-10-04"}},
-                   "mailto:mum@example.com?body=Hi%20Mum", "mailto:?body=Hi", "sms:+15550100?body=Hi"]
+                   "mailto:mum@example.com?body=Hi%20Mum", "mailto:?body=Hi", "mailto:?body=Hi",
+                   "sms:+15550100?body=Hi"]

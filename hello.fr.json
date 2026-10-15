@@ -922,7 +922,12 @@
   "Your mail program could not be opened.": "Votre messagerie n’a pas pu s’ouvrir.",
   "no one yet": "personne pour l’instant",
   "s to send it with your own mail, d to delete it, or Enter to go back > ": "s pour l’envoyer avec votre messagerie, d pour la supprimer, ou Entrée pour revenir > ",
-  "this computer": "cet ordinateur"
+  "this computer": "cet ordinateur",
+  "That household list is full.": "Cette liste du foyer est pleine.",
+  "The household list can't be reached just now, so you haven't left yet. Try again when you're online.": "La liste du foyer est injoignable pour l'instant, donc vous ne l'avez pas encore quittée. Réessayez une fois en ligne.",
+  "The household list can't be reached just now, or someone already made a new code. Nothing changed.": "La liste du foyer est injoignable pour l'instant, ou quelqu'un a déjà créé un nouveau code. Rien n'a changé.",
+  "Type your name, as the others will see it, in the plan box first, then choose this again.": "Tapez d'abord votre nom, tel que les autres le verront, dans la case du plan, puis choisissez ceci à nouveau.",
+  "Added to tomorrow's plan, with what you carried.": "Ajouté au plan de demain, avec ce que vous avez reporté."
  },
  "tips_floor": [
   "Vérifiez que votre allée est dégagée avant la première tâche du poste.",

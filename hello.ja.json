@@ -921,7 +921,12 @@
   "Your mail program could not be opened.": "メールソフトを開けませんでした。",
   "no one yet": "宛先なし",
   "s to send it with your own mail, d to delete it, or Enter to go back > ": "s で自分のメールで送る、d で削除、Enter で戻る > ",
-  "this computer": "このパソコン"
+  "this computer": "このパソコン",
+  "That household list is full.": "この家族リストはいっぱいです。",
+  "The household list can't be reached just now, so you haven't left yet. Try again when you're online.": "今は家族リストにつながらないので、まだ抜けていません。オンラインのときにもう一度試してください。",
+  "The household list can't be reached just now, or someone already made a new code. Nothing changed.": "今は家族リストにつながらないか、誰かがもう新しいコードを作りました。何も変わっていません。",
+  "Type your name, as the others will see it, in the plan box first, then choose this again.": "まず予定の欄に、他の人に表示される名前を入力してから、もう一度これを選んでください。",
+  "Added to tomorrow's plan, with what you carried.": "持ち越したものと一緒に、明日の予定に追加しました。"
  },
  "tips_floor": [
   "シフト最初の作業の前に、通路に物が置かれていないか確認しましょう。",

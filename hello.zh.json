@@ -921,7 +921,12 @@
   "Your mail program could not be opened.": "无法打开你的邮件程序。",
   "no one yet": "还没有收件人",
   "s to send it with your own mail, d to delete it, or Enter to go back > ": "输入 s 用你的邮件发送，d 删除，或按 Enter 返回 > ",
-  "this computer": "这台电脑"
+  "this computer": "这台电脑",
+  "That household list is full.": "这个家庭清单已满。",
+  "The household list can't be reached just now, so you haven't left yet. Try again when you're online.": "现在连不上家庭清单，所以你还没有离开。联网后再试一次。",
+  "The household list can't be reached just now, or someone already made a new code. Nothing changed.": "现在连不上家庭清单，或者有人已经生成了新代码。什么都没有改变。",
+  "Type your name, as the others will see it, in the plan box first, then choose this again.": "请先在计划框里输入你的名字（其他人会看到），然后再选一次这个。",
+  "Added to tomorrow's plan, with what you carried.": "已加到明天的计划里，和你带过去的一起。"
  },
  "tips_floor": [
   "开始第一单活之前，先确认您走的通道畅通。",
