@@ -5003,8 +5003,13 @@ def test_the_household_list_merges_keeps_history_and_nobody_adds_anyone():
     again = hello.house_merge(both, other)
     assert again["items"][rice]["done"]
     # History: who and which day, never a count or a time.
+    hello.NOW = "2026-10-06T12:00"
     line = hello.house_history(both, both["items"][rice])
     assert line == "added by Okiku, Monday; ticked by Taro, Monday"
+    # Older than a week, the date instead of a weekday.
+    hello.NOW = "2026-10-23T12:00"
+    assert hello.house_history(both, both["items"][rice]) == "added by Okiku, 5 October; ticked by Taro, 5 October"
+    hello.NOW = None
     # A quick untick and re-tick in the same second keep their order, and
     # every device sorts entries from the same second the same way.
     for what in ("unticked", "ticked"):
@@ -5202,6 +5207,50 @@ def test_round_92_sync_and_counts_on_the_pc():
         server.shutdown()
 
 
+def test_round_93_the_phone_keeps_what_people_typed_and_says_what_happened():
+    got = _node("""
+        const app = require("./app.js");
+        const out = [];
+        // The same finished thing in two spellings is one thing.
+        const s = app.blank();
+        s.finished = [{ text: "a; b", date: "2026-10-01" }];
+        app.mergeSync(s, { finished: [{ text: "a;b", date: "2026-10-01" }] }, "2026-10-05");
+        app.mergeSync(s, { finished: [{ text: "a;b", date: "2026-10-01" }] }, "2026-10-05");
+        out.push(s.finished.length);
+        // A plan that stopped asking is set aside by a new one, not lost.
+        const p = app.blank();
+        p.intent = { text: "Old thing", date: "2026-10-01", skips: 2 };
+        app.setPlan(p, "New thing", "2026-10-05");
+        out.push(p.aside.map((a) => a.text));
+        // Moving the day start earlier keeps today's plan today's.
+        const d = app.blank(), late = new Date(2026, 9, 6, 1, 0);
+        d.dayStart = 18;
+        const was = app.todayOf(d, late);
+        d.intent = { text: "Night plan", date: was, skips: 0 };
+        app.setDayStart(d, 0, late);
+        out.push(d.intent.date === app.todayOf(d, late), app.asks(d, app.todayOf(d, late)));
+        // A number that can't be dialled keeps the saved contact.
+        const saved = { name: "Mum", number: "5551234" };
+        out.push(app.familyFrom("Mum", "555.1234", saved), app.familyFrom("", "", saved));
+        // Stored keys are checked before use.
+        out.push(app.keysOk({}), app.keysOk({ label: "a".repeat(64), enc: Array(32).fill(1), mac: Array(32).fill(2) }));
+        // Two pushes close together show the repeat, then the check-in.
+        const prefs = { remind: "08:00", repeat: { text: "Pills", at: "08:00" } }, at = new Date(2026, 9, 6, 8, 0);
+        const [first, shown] = app.pushChoice(prefs, at);
+        const [second] = app.pushChoice(Object.assign({}, prefs, { shown }), at);
+        out.push(first, second);
+        // A long letter link is caught; the offer to shrink survives a reload.
+        out.push(app.letterTooLong("x".repeat(9000)), app.letterTooLong("mailto:?body=hi"));
+        out.push(app.parse(JSON.stringify({ offerSmaller: true })).offerSmaller === true);
+        // Older than a week: the date, not a weekday.
+        out.push(app.dayWord(new Date(2026, 9, 1), "en", new Date(2026, 9, 20)),
+                 app.dayWord(new Date(2026, 9, 19), "en", new Date(2026, 9, 20)));
+        console.log(JSON.stringify(out));""")
+    assert got == [1, ["Old thing"], True, False,
+                   [{"name": "Mum", "number": "5551234"}, "familyBad"], [None, "saved"],
+                   False, True, "repeat", "checkin", True, False, True, "October 1", "Monday"]
+
+
 def test_review_fixes_for_closing_the_day_pro_keys_and_letters():
     hello = _load_hello()
     # After End the day, a plan typed the same day joins tomorrow's.
@@ -5317,15 +5366,18 @@ def test_the_household_list_is_the_same_on_the_pc_and_the_phone():
             '"items": {"__proto__": {"text": "x", "history": [["added", "aaaaaaaaaaaa", "2026-10-05T11:00:00Z", "00000001"]]}, ' +
             '"' + rice + '": {"text": "Buy rice", "history": [["foo", "aaaaaaaaaaaa", "2026-10-05T11:00:00Z", "00000002"]]}}}');
           const merged = app.houseMerge(doc, bad, "bbbbbbbbbbbb");
-          console.log(JSON.stringify({label: k.label, history: app.houseHistory(doc, doc.items[rice], "en"),
+          console.log(JSON.stringify({label: k.label, history: app.houseHistory(doc, doc.items[rice], "en", new Date("2026-10-06T12:00:00Z")),
                                       polluted: ({}).left !== undefined || ({}).history !== undefined,
-                                      after: app.houseHistory(merged, merged.items[rice], "en"),
+                                      after: app.houseHistory(merged, merged.items[rice], "en", new Date("2026-10-06T12:00:00Z")),
+                                      older: app.houseHistory(doc, doc.items[rice], "en", new Date("2026-10-23T12:00:00Z")),
                                       code: app.newCode(),
                                       sealed: Buffer.from(sealed).toString("base64")}));
         })();""" % (json.dumps(code), json.dumps(b64.b64encode(sealed).decode())))
     assert got["label"] == hello.house_keys(code)[0]
     assert got["history"] == "added by Okiku, Monday; ticked by Taro, Monday" == got["after"]
     assert not got["polluted"]
+    # Older than a week, the date instead of a weekday.
+    assert got["older"] == "added by Okiku, October 5; ticked by Taro, October 5"
     assert re.fullmatch(r"([%s]{5}-){4}[%s]{5}" % ((hello.SYNC_ALPHABET,) * 2), got["code"])
     _, enc, mac = hello.house_keys(code)
     back = hello.house_merge(doc, hello.open_sync(enc, mac, b64.b64decode(got["sealed"])))

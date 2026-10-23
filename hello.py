@@ -517,7 +517,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.62.2"
+VERSION = "1.62.3"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -1162,8 +1162,11 @@ def house_history(doc, item):
     out = []
     for what, by, at, _ in item["history"][-4:]:
         when = _house_when(at).astimezone().date()
-        out.append(words[what].format(name=house_who(doc, by),
-                                      when=(data["days"] if data else DAYS)[when.weekday()]))
+        # A weekday within the last week, else the date, so nothing older
+        # reads as if it happened this week.
+        day = ((data["days"] if data else DAYS)[when.weekday()]
+               if (now().date() - when).days <= 6 else f"{when.day} {month_name(when.month)}")
+        out.append(words[what].format(name=house_who(doc, by), when=day))
     return "; ".join(out)
 
 
