@@ -35,6 +35,20 @@ if ($PSScriptRoot.StartsWith($SetupDir, [StringComparison]::OrdinalIgnoreCase)) 
     throw "Copy reinstall.ps1 out of $SetupDir first; this deletes that folder."
 }
 $git = (Get-ItemProperty HKLM:\SOFTWARE\GitForWindows).InstallPath + '\cmd\git.exe'
+# git runs as administrator here, before install.ps1's own checks, so it must
+# be the all-users Git in Program Files, which only administrators can change.
+$pf = [Environment]::GetFolderPath('ProgramFiles')
+if (-not $git.StartsWith("$pf\", [StringComparison]::OrdinalIgnoreCase) -or -not (Test-Path -LiteralPath $git -PathType Leaf)) {
+    throw "Git for Windows must be installed for all users in $pf. Found: '$git'"
+}
+# As install.ps1 does: nothing from this session or the admin's (possibly
+# redirected) home may point git at other config, hooks or filters.
+Get-ChildItem Env: | Where-Object Name -like 'GIT_*' | ForEach-Object { Remove-Item -LiteralPath "Env:$($_.Name)" }
+Remove-Item -LiteralPath 'Env:HOME' -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath 'Env:XDG_CONFIG_HOME' -ErrorAction SilentlyContinue
+$env:GIT_CONFIG_NOSYSTEM = '1'
+$env:GIT_CONFIG_GLOBAL = 'NUL'
+$env:GIT_ATTR_NOSYSTEM = '1'
 if (Test-Path -LiteralPath $SetupDir) {
     if ((Get-Item -LiteralPath $SetupDir -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "$SetupDir is a link." }
     # Windows won't delete the folder a window is in, and git leaves read-only files.
@@ -45,7 +59,7 @@ if (Test-Path -LiteralPath $SetupDir) {
 New-Item -ItemType Directory $SetupDir | Out-Null
 & (Join-Path $sys32 'icacls.exe') $SetupDir /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F' | Out-Null
 if ($LASTEXITCODE) { throw "icacls failed on $SetupDir" }
-& $git clone -b $Tag --depth 1 https://github.com/thrash-d/hello-world $SetupDir
+& $git -c core.hooksPath=NUL clone -b $Tag --depth 1 https://github.com/thrash-d/hello-world $SetupDir
 if ($LASTEXITCODE) { throw "git clone failed with exit $LASTEXITCODE" }
 & (Join-Path $sys32 'WindowsPowerShell\v1.0\powershell.exe') -NoProfile -ExecutionPolicy Bypass -File (Join-Path $SetupDir 'install.ps1') -Commit $Commit
 exit $LASTEXITCODE

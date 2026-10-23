@@ -4346,7 +4346,6 @@ def test_sync_round_trips_through_the_server_and_off_deletes_it():
                  "updated": (hello.now() + hello.datetime.timedelta(minutes=5)).isoformat()}
         with open(os.path.join(folder, "sync", label), "wb") as f:
             f.write(hello.seal_sync(enc, mac, phone))
-        hello.SYNCING = False
         assert hello.sync_now(state, can_save)
         saved = notes(first.home)
         assert saved["intent"]["text"] == "From the phone"
@@ -4359,7 +4358,6 @@ def test_sync_round_trips_through_the_server_and_off_deletes_it():
         assert hello.sync_time(far["updated"]) == "" and hello.sync_time("~") == ""
         with open(os.path.join(folder, "sync", label), "wb") as f:
             f.write(hello.seal_sync(enc, mac, far))
-        hello.SYNCING = False
         hello.sync_now(state, can_save)
         saved = notes(first.home)
         assert saved["intent"]["text"] == "From the phone" and "aaaaaaaaaaaa" not in saved.get("devices", {})
@@ -5251,6 +5249,91 @@ def test_round_93_the_phone_keeps_what_people_typed_and_says_what_happened():
                    False, True, "repeat", "checkin", True, False, True, "October 1", "Monday"]
 
 
+def test_round_94_files_dates_and_names_hold_up():
+    import datetime
+    import time
+    first = run(text="Call Ana\n\n")
+    hello = _window_hello(home=first.home)
+    # A list where a word belongs no longer stops every start.
+    path = os.path.join(first.home, "notes.json")
+    with open(path, encoding="utf-8") as f:
+        raw = json.load(f)
+    raw["lang"] = []
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(raw, f)
+    state, can_save = hello.load()
+    assert can_save and "lang" not in state
+    # A handoff note with a time zone is read as local time, not a crash.
+    folder = mkdtemp()
+    hello.POLICY, hello.NOW, hello.HANDOFF_DIR = {"ShiftHandoff": 1}, "2026-10-02T07:00", folder
+    with open(os.path.join(folder, "handoff.json"), "w", encoding="utf-8") as f:
+        json.dump({"notes": [{"text": "Bed 4 needs a check", "at": "2026-10-02T05:00+00:00"}]}, f)
+    assert [n["text"] for n in hello.shown_handoff()] == ["Bed 4 needs a check"]
+    hello.POLICY, hello.NOW = {}, None
+    # 29 February with no year, late in a leap year, isn't a crash.
+    assert hello.typed_due("report 29/2", datetime.date(2028, 9, 1)) is None
+    # Carried things keep their due dates.
+    state["intent"] = {"text": "invoice ACME; call Bo", "date": "2026-10-02",
+                       "due": "2026-10-09", "dues": {"invoice ACME": "2026-10-09"}}
+    assert hello.save(state)
+    hello.end_day(state, can_save, datetime.date(2026, 10, 2), lambda part: "carry")
+    assert notes(first.home)["intent"]["dues"] == {"invoice ACME": "2026-10-09"}
+    # A date pattern with a field long_date doesn't fill is refused.
+    assert hello.date_pattern_fits("{day}, {d} {month} {year}")
+    assert not hello.date_pattern_fits("{weekday}, {d} {month}")
+    # The given name comes after the comma in "Surname, Given Middle".
+    assert hello.name_from_display("Doe, John A.") == "John"
+    assert hello.name_from_display("Ana Lopez") == "Ana" and hello.name_from_display("") is None
+    # Delete everything takes every kind of backup, and pages left for
+    # printing, which hold plan text unlocked.
+    stamped = os.path.join(first.home, "notes.json.20261023-101010.bak")
+    for name in (stamped, os.path.join(first.home, "notes.json.bak2")):
+        with open(name, "w", encoding="utf-8") as f:
+            f.write("{}")
+    hello.STARTED = None
+    page = hello.print_file("plan text", ".txt", "utf-8")
+    assert os.path.dirname(page) == os.path.join(first.home, "printing")
+    hello.FORCE_INTERACTIVE = True
+    assert hello.delete_everything(state)
+    assert not os.path.exists(stamped) and not os.path.exists(page)
+    assert not os.path.exists(os.path.join(first.home, "notes.json.bak2"))
+    # MaxBackups never deletes the backup just made.
+    hello.POLICY = {"MaxBackups": 1}
+    older = os.path.join(first.home, "notes.json.bak")
+    with open(older, "w", encoding="utf-8") as f:
+        f.write("{}")
+    os.utime(older, (time.time() - 100,) * 2)
+    newest = os.path.join(first.home, "notes.json.bak2")
+    with open(newest, "w", encoding="utf-8") as f:
+        f.write("{}")
+    hello.prune_backups(os.path.join(first.home, "notes.json"), newest)
+    assert os.path.exists(newest) and not os.path.exists(older)
+    # git is found only in PATH's full folders, never the current one.
+    old_path = os.environ.get("PATH", "")
+    try:
+        os.environ["PATH"] = os.pathsep.join([".", ""])
+        assert hello.find_git() is None
+    finally:
+        os.environ["PATH"] = old_path
+
+
+def test_round_94_standup_matches_an_email_with_a_plus():
+    import datetime
+    import shutil
+    import subprocess
+    if not shutil.which("git"):
+        import unittest
+        raise unittest.SkipTest("needs git")
+    repo = mkdtemp()
+    env = dict(os.environ, GIT_AUTHOR_NAME="Jane", GIT_AUTHOR_EMAIL="jane+work@corp.com",
+               GIT_COMMITTER_NAME="Jane", GIT_COMMITTER_EMAIL="jane+work@corp.com")
+    for args in (["init", "-q"], ["commit", "-q", "--allow-empty", "-m", "Fix the login page"]):
+        subprocess.run(["git", "-C", repo, *args], check=True, env=env, capture_output=True)
+    hello = _load_hello()
+    lines, _ = hello.git_commits([repo], ["jane+work@corp.com"], datetime.date.today() - datetime.timedelta(days=2))
+    assert lines == ["Fix the login page"]
+
+
 def test_review_fixes_for_closing_the_day_pro_keys_and_letters():
     hello = _load_hello()
     # After End the day, a plan typed the same day joins tomorrow's.
@@ -5411,7 +5494,6 @@ def test_devices_syncing_are_listed_inside_the_encryption_with_short_ids():
         other["devices"] = dict(devices, cccccccccccc={"name": "Kitchen PC", "seen": hello.today().isoformat()})
         with open(os.path.join(folder, "sync", label), "wb") as f:
             f.write(hello.seal_sync(enc, mac, other))
-        hello.SYNCING = False
         hello.sync_now(state, can_save)
         line = hello.devices_line(state)
         assert "this computer (" + me[:4] + "), today" in line and "Kitchen PC (cccc), today" in line

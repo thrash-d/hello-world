@@ -230,7 +230,10 @@ and the settings in each `notes.json`. Use them where typed plan text or a
 history of visits would be a records, legal hold or works-council concern.
 
 The values live under `HKLM` or `HKCU\SOFTWARE\Policies\hello-world`, where
-only administrators and Group Policy can write.
+only administrators and Group Policy can write. As with Windows' own
+policies, a computer setting wins over a user one, Disabled included: a
+switch set to Disabled under Computer Configuration stays off whatever User
+Configuration says.
 
 ## Signing, execution policy and application control
 

@@ -29,7 +29,8 @@ try {
     }
     $run = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
     $value = (Get-ItemProperty -LiteralPath $run -Name 'hello-world' -ErrorAction SilentlyContinue).'hello-world'
-    if ($value -and $value -like "*$dir*") { Remove-ItemProperty -LiteralPath $run -Name 'hello-world' }
+    # Escaped, so brackets in a profile path aren't read as wildcards.
+    if ($value -and $value -like "*$([WildcardPattern]::Escape($dir))*") { Remove-ItemProperty -LiteralPath $run -Name 'hello-world' }
     # Through cmd: Windows PowerShell 5.1 stops on any stderr text from a
     # native command, and schtasks writes some when there is no task.
     # -join binds looser than +, so the join needs its own parentheses.

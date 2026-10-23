@@ -50,14 +50,17 @@ only administrators can read, and success and failure go to the Application
 event log under the source hello-world.
 
 .EXAMPLE
-$tag = 'v1.62.3'
+$tag = 'v1.62.4'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
 $icacls = "$([Environment]::SystemDirectory)\icacls.exe"
 $git = (Get-ItemProperty HKLM:\SOFTWARE\GitForWindows).InstallPath + '\cmd\git.exe'
 & $icacls $d /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F'
-& $git clone -b $tag --depth 1 https://github.com/thrash-d/hello-world $d
+# git runs as administrator: no config or hooks from this session or a redirected home.
+Get-ChildItem Env:GIT_* | Remove-Item; Remove-Item Env:HOME, Env:XDG_CONFIG_HOME -ErrorAction SilentlyContinue
+$env:GIT_CONFIG_NOSYSTEM = '1'; $env:GIT_CONFIG_GLOBAL = 'NUL'
+& $git -c core.hooksPath=NUL clone -b $tag --depth 1 https://github.com/thrash-d/hello-world $d
 cd $d; Set-ExecutionPolicy -Scope Process Bypass -Force
 .\install.ps1 -Commit $commit
 
@@ -553,7 +556,13 @@ finally {
 # it on needs no reinstall. Nothing is in it until someone leaves a note.
 $shared = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'hello-world'
 if (-not (Test-Path -LiteralPath $shared)) { New-Item -ItemType Directory -Path $shared | Out-Null }
-& $icacls $shared /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-545:(OI)(CI)M' | Out-Null
+# Users could once delete this folder and put a link in its place, which
+# icacls would follow; never change permissions through one.
+Assert-NotLink $shared
+# Users may add and change the notes inside, but not delete or replace the
+# folder itself: Modify for what's in it (inherit-only), and only list,
+# read, add files and add folders on the folder.
+& $icacls $shared /L /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-545:(OI)(CI)(IO)M' '*S-1-5-32-545:(RX,WD,AD)' | Out-Null
 if ($LASTEXITCODE) { throw "icacls failed on $shared" }
 
 Write-Step '[6/6] Adding the Start menu shortcut and the Settings > Apps entry'
