@@ -1,5 +1,56 @@
 # Changelog
 
+## 2026-10-23: round 93, the phone
+
+Version 1.62.3. The second review round, on the phone app. It found 32
+problems; all are fixed.
+
+- **Nothing typed is lost:**
+  - a plan that stopped asking (skipped twice) still shows, and a new plan
+    sets it aside;
+  - "End the day" choices survive a redraw;
+  - the "make it smaller" offer survives a reload;
+  - a number that can't be dialled no longer deletes the family contact;
+  - the household add box is cleared only once the thing is added;
+  - a letter stays until you say it went, and one too long for a link
+    stays with a message.
+- **Household list:**
+  - when someone makes a new code, the phone says so and offers to join
+    with the new one, instead of looking offline forever;
+  - "joined" and "left" notes, and a new code made here, stay until
+    "Got it";
+  - joining says plainly when the name is missing or the server can't be
+    reached, and never joins a moved copy;
+  - a new member isn't asked to re-key for people who left before they
+    joined;
+  - quick taps on a checkbox record what was tapped.
+- **Sync:**
+  - a mistyped code no longer makes a separate copy;
+  - a copy that can't be opened is never written over;
+  - broken stored keys are dropped;
+  - the same finished thing in two spellings no longer doubles;
+  - the phone's default name is in its own language.
+- **Dates:** anything older than a week shows its date, not a weekday that
+  reads as this week. This applies to household history, the last sync
+  change and the device list. The PC's household history does the same.
+- **Reminders:**
+  - a page whose service worker never starts no longer hangs;
+  - a blocked permission says no reminder is set;
+  - a subscription made with an old server key is made again;
+  - a check-in and a daily repeat close together both show.
+- **Day start:** moving the day start earlier no longer asks "Did you do
+  it?" about today's plan.
+- **Safety and access:**
+  - a Content-Security-Policy, so only the app's own files run and data
+    goes only to its own server;
+  - input labels for screen readers, and buttons that say what they act on;
+  - focus that moves to the status line when the pressed button goes
+    away;
+  - a quicker fall back to the cached app on a weak signal;
+  - a proper maskable icon, and an icon for the iPhone home screen;
+  - "Delete everything" leaves the household list first and clears every
+    box.
+
 ## 2026-10-23: round 92, the server, sync and the household list
 
 Version 1.62.2. The first of three review rounds, on the counts server and

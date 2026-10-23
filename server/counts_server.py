@@ -654,7 +654,8 @@ def allowed(day):
 
 PHONE_FILES = {"index.html": "text/html; charset=utf-8", "app.js": "text/javascript; charset=utf-8",
                "content.js": "text/javascript; charset=utf-8", "sw.js": "text/javascript; charset=utf-8",
-               "manifest.webmanifest": "application/manifest+json", "icon.svg": "image/svg+xml"}
+               "manifest.webmanifest": "application/manifest+json", "icon.svg": "image/svg+xml",
+               "icon-maskable.svg": "image/svg+xml", "icon-512.png": "image/png"}
 
 
 def handler(counts, phone=None, push=None):

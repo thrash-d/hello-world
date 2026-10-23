@@ -4,9 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#1f5f8b">
+<!-- Only this page's own files run, and data goes only to this server: a
+     slip that put synced text in as HTML couldn't run script or send keys. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>hello-world</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-512.png">
 <style>
   :root { --fg: #1b1b1b; --bg: #fbfaf7; --muted: #5d5d5d; --accent: #1f5f8b; --done: #2e7d32; --card: #ffffff; --line: #ddd8cf; }
   @media (prefers-color-scheme: dark) {
@@ -55,7 +59,7 @@
   <h1 id="hello">Hello, world!</h1>
   <p class="date" id="date"></p>
   <p><button class="small-button" id="large"></button></p>
-  <p class="status" id="status" role="status" aria-live="polite"></p>
+  <p class="status" id="status" role="status" aria-live="polite" tabindex="-1"></p>
 
   <section id="ask" hidden>
     <h2 id="ask-label"></h2>
@@ -74,7 +78,7 @@
 
   <section id="smaller-offer" hidden>
     <h2 id="coming-back"></h2>
-    <input type="text" id="smaller-input" maxlength="200" autocomplete="off">
+    <input type="text" id="smaller-input" maxlength="200" autocomplete="off" aria-labelledby="coming-back">
     <div class="buttons">
       <button class="primary" id="make-smaller"></button>
       <button id="aside-smaller"></button>
@@ -134,6 +138,11 @@
   <section id="house">
     <h2 id="house-label"></h2>
     <p class="note" id="house-intro"></p>
+    <p class="note" id="house-moved" hidden></p>
+    <div id="house-notes" hidden>
+      <div id="house-news"></div>
+      <p><button class="small-button" id="house-news-ok"></button></p>
+    </div>
     <form id="house-join" hidden>
       <label for="house-code" id="house-code-label"></label>
       <input type="text" id="house-code" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="xxxxx-xxxxx-xxxxx-xxxxx-xxxxx">
@@ -141,9 +150,9 @@
       <input type="text" id="house-name" maxlength="40" autocomplete="off">
       <button class="primary" id="house-join-button" type="submit"></button>
     </form>
+    <p><button class="small-button" id="house-moved-leave" hidden></button></p>
     <div id="house-on" hidden>
       <p class="note" id="house-offline" hidden></p>
-      <div id="house-news"></div>
       <div id="house-rekey" hidden>
         <p id="house-rekey-text"></p>
         <div class="row"><button class="primary" id="house-rekey-yes"></button><button id="house-rekey-no"></button></div>
