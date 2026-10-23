@@ -927,7 +927,12 @@
   "The household list can't be reached just now, so you haven't left yet. Try again when you're online.": "La liste du foyer est injoignable pour l'instant, donc vous ne l'avez pas encore quittée. Réessayez une fois en ligne.",
   "The household list can't be reached just now, or someone already made a new code. Nothing changed.": "La liste du foyer est injoignable pour l'instant, ou quelqu'un a déjà créé un nouveau code. Rien n'a changé.",
   "Type your name, as the others will see it, in the plan box first, then choose this again.": "Tapez d'abord votre nom, tel que les autres le verront, dans la case du plan, puis choisissez ceci à nouveau.",
-  "Added to tomorrow's plan, with what you carried.": "Ajouté au plan de demain, avec ce que vous avez reporté."
+  "Added to tomorrow's plan, with what you carried.": "Ajouté au plan de demain, avec ce que vous avez reporté.",
+  "Sync is off on this computer, but the server couldn't be reached to delete its encrypted copy. Turn sync on and off again later to delete it; otherwise it goes after a year untouched.": "La synchronisation est désactivée sur cet ordinateur, mais le serveur était injoignable pour supprimer sa copie chiffrée. Réactivez puis désactivez la synchronisation plus tard pour la supprimer ; sinon elle disparaît après un an sans usage.",
+  "The server can't be reached just now. Nothing changed.": "Le serveur est injoignable pour l'instant. Rien n'a changé.",
+  "This letter is too long to open in your mail program in one go. It stays here: copy its text into a new mail instead.": "Cette lettre est trop longue pour s'ouvrir d'un coup dans votre messagerie. Elle reste ici : copiez son texte dans un nouveau message.",
+  "You've left the household list, and the others are told, but this computer couldn't save that; it will show the list until it can.": "Vous avez quitté la liste du foyer, et les autres en sont informés, mais cet ordinateur n'a pas pu l'enregistrer ; il affichera la liste jusqu'à ce qu'il le puisse.",
+  "Your sync code was changed on another device, so this computer stopped syncing. Turn sync off and on here for a new code, and type it on your other devices.": "Votre code de synchronisation a été changé sur un autre appareil, donc cet ordinateur a arrêté de synchroniser. Désactivez puis réactivez la synchronisation ici pour un nouveau code, et tapez-le sur vos autres appareils."
  },
  "tips_floor": [
   "Vérifiez que votre allée est dégagée avant la première tâche du poste.",

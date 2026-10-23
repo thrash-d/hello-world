@@ -10,9 +10,11 @@ Group Policy, or COUNTS_SERVER in hello.py for a package of your own.
 
 It keeps one small JSON file per day holding only numbers. It never writes a
 network address to disk. To count each PC once per day it keeps, in memory
-only, a hash of the address with a random key made fresh each day, so the
-hashes can't be matched to addresses or across days, and are gone at a
-restart or at midnight UTC.
+only, a hash of the address (an IPv6 address by its /64) and of the PC's own
+token for that day, with a random key for each day. The hashes can't be
+matched to addresses or across days, and are gone at a restart or once the
+day can't be counted any more (a day after it ends in UTC). PCs behind one
+office address count separately, up to 250 from one address a day.
 
     GET  /v1/day/2026-10-05             {"tip": 212, "react": {"love": 4, ...}}
     POST /v1/day/2026-10-05/tip         counts one, then the same answer
@@ -76,6 +78,8 @@ import argparse
 import base64
 import datetime
 import hashlib
+import http.client
+import ipaddress
 import json
 import os
 import re
@@ -85,6 +89,8 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import sys
+import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 REACTIONS = ("love", "ha", "dead", "eyeroll")
@@ -106,6 +112,13 @@ SYNC_QUOTA = 100_000
 NEW_LABELS_A_DAY = 20
 WRITES_A_MINUTE = 60
 REFRESH = 3600
+# A PC's own daily token for counting, so PCs behind one office address each
+# count; at most this many tokens are taken from one address a day.
+PC_TOKEN = re.compile(r"^[0-9a-f]{32}$")
+PCS_PER_ADDRESS = 250
+# Seconds a request has to arrive in full, and the most handled at once.
+REQUEST_TIME = 20
+MAX_CONNECTIONS = 200
 DAY_PATH = re.compile(r"^/v1/day/(\d{4}-\d{2}-\d{2})(/tip|/react/(?:%s))?$" % "|".join(REACTIONS))
 
 
@@ -135,8 +148,15 @@ class Counts:
         self.write_lock = threading.Lock()
         self.salt_day = None
         self.salt = b""
-        # Hash of who counted, mapped to the reaction they gave, or True.
+        # For each day a count can still be written (yesterday, today and
+        # tomorrow in UTC): its own random key, and the hash of who counted
+        # mapped to the reaction they gave, or True. A day's key and hashes
+        # go once the day can't be written, so a PC can't count twice for a
+        # day across midnight, and nothing can be matched across days.
+        self.day_salts = {}
         self.seen = {}
+        # Per day and address hash: how many PC tokens were taken from it.
+        self.pcs = {}
 
     def path(self, day):
         return os.path.join(self.folder, f"{day}.json")
@@ -181,8 +201,13 @@ class Counts:
         address seen. Call with the lock held."""
         today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
         if self.salt_day != today:
-            self.salt_day, self.salt, self.seen = today, secrets.token_bytes(32), {}
+            self.salt_day, self.salt = today, secrets.token_bytes(32)
             self.labels_today = {}
+            for day in list(self.day_salts):
+                if not allowed(day):
+                    self.day_salts.pop(day, None)
+                    self.seen.pop(day, None)
+                    self.pcs.pop(day, None)
 
     def shown(self, n):
         """A count as it may leave the server: "few" below the minimum group,
@@ -268,12 +293,14 @@ class Counts:
             return 0
         for name in names:
             path = os.path.join(folder, name)
-            try:
-                if now - os.path.getmtime(path) > SYNC_DAYS * 86400:
-                    os.remove(path)
-                    gone += 1
-            except OSError:
-                pass
+            # Under the write lock, so a copy written just now isn't removed.
+            with self.write_lock:
+                try:
+                    if now - os.path.getmtime(path) > SYNC_DAYS * 86400:
+                        os.remove(path)
+                        gone += 1
+                except OSError:
+                    pass
         # Counted again next time, which also catches stray temporary files.
         with self.lock:
             self.stored.pop("sync", None)
@@ -282,19 +309,33 @@ class Counts:
 
     def run_sweep(self):
         while True:
-            self.sweep()
+            try:
+                self.sweep()
+            except Exception:
+                quiet_error()
             time.sleep(3600)
 
-    def add(self, day, what, address):
+    def add(self, day, what, address, pc=""):
         """Count the tip once a PC a day, or set its one reaction, moving it
-        when it changes. Returns the day's numbers."""
+        when it changes. A PC is its address and, when it sends one, its own
+        token for the day; a busy address can't add more than
+        PCS_PER_ADDRESS. Returns the day's numbers."""
         with self.lock:
-            # A fresh key each day forgets yesterday's hashes for good.
             self.fresh_salt()
+            salt = self.day_salts.setdefault(day, secrets.token_bytes(32))
+            if pc:
+                place = hashlib.sha256(salt + f"pcs|{address}".encode()).digest()
+                tokens = self.pcs.setdefault(day, {}).setdefault(place, set())
+                mark = hashlib.sha256(salt + pc.encode()).digest()
+                if mark not in tokens and len(tokens) >= PCS_PER_ADDRESS:
+                    pc = ""
+                else:
+                    tokens.add(mark)
             kind = "tip" if what == "tip" else "react"
-            key = hashlib.sha256(self.salt + f"{day}|{kind}|{address}".encode()).digest()
+            key = hashlib.sha256(salt + f"{kind}|{address}|{pc}".encode()).digest()
+            seen = self.seen.setdefault(day, {})
             data = self.read(day)
-            before = self.seen.get(key)
+            before = seen.get(key)
             if kind == "tip" and before is None:
                 data["tip"] += 1
             elif kind == "react" and before != what:
@@ -303,7 +344,7 @@ class Counts:
                 data["react"][what] += 1
             else:
                 return data
-            self.seen[key] = True if kind == "tip" else what
+            seen[key] = True if kind == "tip" else what
             tmp = self.path(day) + ".tmp"
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(data, f)
@@ -411,14 +452,27 @@ class Push:
         self.folder = os.path.join(folder, "push")
         os.makedirs(self.folder, exist_ok=True)
         self.lock = threading.Lock()
+        # Told when a phone's file goes, so the quota count stays right.
+        self.on_forget = None
         key = os.path.join(folder, "vapid.json")
-        try:
-            with open(key, encoding="utf-8") as f:
-                self.d = int(json.load(f)["d"], 16)
-        except (OSError, ValueError, KeyError, TypeError):
+        if os.path.exists(key):
+            # A key that can't be read stops the server rather than being
+            # replaced: a new one would quietly end every phone's reminders.
+            try:
+                with open(key, encoding="utf-8") as f:
+                    self.d = int(json.load(f)["d"], 16)
+            except (OSError, ValueError, KeyError, TypeError) as e:
+                raise SystemExit(f"Can't read {key} ({e}). Restore it from a backup; "
+                                 "deleting it makes a new key and every phone must "
+                                 "turn its reminder on again.")
+            if not 0 < self.d < P256_N:
+                raise SystemExit(f"{key} doesn't hold a valid key.")
+        else:
             self.d = secrets.randbelow(P256_N - 1) + 1
             tmp = key + ".tmp"
-            with open(tmp, "w", encoding="utf-8") as f:
+            # Readable by the server's own account only.
+            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
                 json.dump({"d": format(self.d, "064x")}, f)
             os.replace(tmp, key)
         self.public = p256_public(self.d)
@@ -453,15 +507,18 @@ class Push:
         with self.lock:
             try:
                 os.remove(self.path(token))
-                return True
             except FileNotFoundError:
                 return False
+        if self.on_forget:
+            self.on_forget()
+        return True
 
     def header(self, endpoint, now):
         """The Authorization header for one push service."""
         url = urllib.parse.urlsplit(endpoint)
         head = b64url(json.dumps({"typ": "JWT", "alg": "ES256"}).encode())
-        claims = b64url(json.dumps({"aud": f"{url.scheme}://{url.netloc}",
+        # The origin without a port: an address may spell out :443.
+        claims = b64url(json.dumps({"aud": f"https://{url.hostname}",
                                     "exp": int(now) + 12 * 3600,
                                     "sub": PUSH_CONTACT}).encode())
         signed = f"{head}.{claims}".encode()
@@ -474,11 +531,12 @@ class Push:
             "TTL": "3600", "Urgency": "normal", "Content-Length": "0",
             "Authorization": self.header(endpoint, now)})
         try:
-            with urllib.request.urlopen(request, timeout=10) as answer:
+            # Redirects aren't followed: only the push services are called.
+            with NO_REDIRECTS.open(request, timeout=10) as answer:
                 return answer.status
         except urllib.error.HTTPError as e:
             return e.code
-        except (OSError, ValueError):
+        except (OSError, ValueError, http.client.HTTPException):
             return 0
 
     def due(self, when, send=None):
@@ -508,27 +566,70 @@ class Push:
                 self.forget(token)
                 continue
             sent += 1
-            data["sent"] = stamp
             with self.lock:
-                if os.path.exists(path):
-                    tmp = path + ".tmp"
-                    with open(tmp, "w", encoding="utf-8") as f:
-                        json.dump(data, f)
-                    # The file's time stays the phone's last visit.
+                # Read again: the phone may have changed its address or
+                # times while this one was sent, and that change stays.
+                try:
+                    with open(path, encoding="utf-8") as f:
+                        data = json.load(f)
                     stat = os.stat(path)
-                    os.replace(tmp, path)
-                    os.utime(path, (stat.st_atime, stat.st_mtime))
+                except (OSError, ValueError):
+                    continue
+                data["sent"] = stamp
+                tmp = path + ".tmp"
+                with open(tmp, "w", encoding="utf-8") as f:
+                    json.dump(data, f)
+                # The file's time stays the phone's last visit.
+                os.replace(tmp, path)
+                os.utime(path, (stat.st_atime, stat.st_mtime))
         return sent
 
     def run(self):
-        """Check each minute, in a thread for as long as the server runs."""
+        """Check each minute, in a thread for as long as the server runs.
+        Minutes missed while sending (slow push services) are caught up, up
+        to ten, so a reminder isn't skipped; nothing stops the thread."""
+        last = None
         while True:
             now = datetime.datetime.now(datetime.timezone.utc).replace(second=0, microsecond=0)
-            try:
-                self.due(now)
-            except OSError:
-                pass
-            time.sleep(60 - datetime.datetime.now().second + 1)
+            minutes = [now] if last is None else [
+                last + datetime.timedelta(minutes=n)
+                for n in range(1, int((now - last).total_seconds() // 60) + 1)][-10:]
+            for minute in minutes:
+                try:
+                    self.due(minute)
+                except Exception:
+                    quiet_error()
+            last = now
+            time.sleep(max(1, 60 - datetime.datetime.now().second + 1))
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None
+
+
+NO_REDIRECTS = urllib.request.build_opener(_NoRedirect)
+
+
+def quiet_error():
+    """An unexpected error, without the client's address: Python's default
+    would print it, and this server keeps no record of addresses."""
+    print("hello-world counts: " + traceback.format_exc(limit=3).strip().splitlines()[-1],
+          file=sys.stderr)
+
+
+def address_of(raw):
+    """The address that counts: an IPv6 address by its /64, which one home
+    or phone holds, so cycling addresses within it doesn't count again."""
+    try:
+        ip = ipaddress.ip_address(raw.strip().strip("[]"))
+    except ValueError:
+        return raw.strip()
+    if ip.version == 6:
+        if ip.ipv4_mapped:
+            return str(ip.ipv4_mapped)
+        return str(ipaddress.ip_network(f"{ip}/64", strict=False))
+    return str(ip)
 
 
 def this_week(monday):
@@ -601,9 +702,10 @@ def handler(counts, phone=None, push=None):
                 return self.reply(200, {"key": b64url(push.public)})
             if SYNC_PATH.match(self.path):
                 path = self.sync_file()
+                # A copy past a year is gone; the sweep removes the file.
                 try:
                     if time.time() - os.path.getmtime(path) > SYNC_DAYS * 86400:
-                        os.remove(path)
+                        return self.reply(404, {"error": "not found"})
                     with open(path, "rb") as f:
                         raw = f.read(MAX_SYNC)
                 except OSError:
@@ -633,7 +735,7 @@ def handler(counts, phone=None, push=None):
                 # The last entry is the one the proxy added; the ones before
                 # it are whatever the sender claimed.
                 address = (self.headers.get("X-Forwarded-For") or address).split(",")[-1].strip()
-            return address
+            return address_of(address)
 
         def body(self):
             try:
@@ -642,7 +744,25 @@ def handler(counts, phone=None, push=None):
                 return None
             if not 0 <= length <= MAX_SYNC:
                 return None
-            return self.rfile.read(length)
+            return self.read_all(length)
+
+        def read_all(self, length):
+            """The body, or None when it doesn't arrive in full within
+            REQUEST_TIME seconds, so a sender dribbling bytes can't hold a
+            thread."""
+            deadline, parts, left = time.monotonic() + REQUEST_TIME, [], length
+            while left > 0:
+                if time.monotonic() > deadline:
+                    return None
+                try:
+                    chunk = self.rfile.read1(min(left, 65536))
+                except OSError:
+                    return None
+                if not chunk:
+                    return None
+                parts.append(chunk)
+                left -= len(chunk)
+            return b"".join(parts)
 
         def sync_file(self):
             match = SYNC_PATH.match(self.path)
@@ -661,11 +781,14 @@ def handler(counts, phone=None, push=None):
                     data = None
                 if not push.acceptable(data):
                     return self.reply(400, {"error": "not a push address and times"})
-                refused = counts.may_write(self.address(), not os.path.exists(push.path(match.group(1))),
-                                           "push")
-                if refused:
-                    return self.reply(refused[0], {"error": refused[1]})
-                push.save(match.group(1), data)
+                # Checked and saved together, so two first saves of one
+                # phone count as one new copy.
+                with counts.write_lock:
+                    refused = counts.may_write(
+                        self.address(), not os.path.exists(push.path(match.group(1))), "push")
+                    if refused:
+                        return self.reply(refused[0], {"error": refused[1]})
+                    push.save(match.group(1), data)
                 return self.reply(200, {"ok": True})
             path = self.sync_file()
             if path is None:
@@ -696,8 +819,7 @@ def handler(counts, phone=None, push=None):
 
         def do_DELETE(self):
             if (match := PUSH_PATH.match(self.path)) and push:
-                if push.forget(match.group(1)):
-                    counts.removed("push")
+                push.forget(match.group(1))
                 return self.reply(200, {"ok": True})
             path = self.sync_file()
             if path is None:
@@ -711,27 +833,65 @@ def handler(counts, phone=None, push=None):
             self.reply(200, {"ok": True})
 
         def do_POST(self):
-            # Bodies are ignored, and refused when large, so nothing else
-            # can be sent here.
+            # A body holds at most the PC's daily token; anything else in it
+            # is ignored, and a large one refused.
             try:
                 length = int(self.headers.get("Content-Length") or 0)
             except ValueError:
                 length = -1
             if not 0 <= length <= 1024:
                 return self.reply(413, {"error": "too large"})
-            self.rfile.read(length)
+            raw = self.read_all(length)
+            if raw is None:
+                return self.reply(400, {"error": "incomplete"})
             day, add = self.route()
             if day is None or not add:
                 return self.reply(404, {"error": "not found"})
+            try:
+                pc = json.loads(raw or b"{}").get("pc", "")
+            except (ValueError, AttributeError):
+                pc = ""
+            pc = pc if isinstance(pc, str) and PC_TOKEN.match(pc) else ""
             what = "tip" if add == "/tip" else add.rsplit("/", 1)[1]
-            counts.add(day, what, self.address())
+            counts.add(day, what, self.address(), pc)
             self.reply(200, counts.publish(day))
 
         def log_message(self, format, *args):
             # No access log: it would hold addresses.
             pass
 
+    # A connection that sends nothing for this long is closed.
+    Handler.timeout = REQUEST_TIME
     return Handler
+
+
+class CountsServer(ThreadingHTTPServer):
+    """At most MAX_CONNECTIONS at once, and errors reported without the
+    client's address."""
+    daemon_threads = True
+
+    def __init__(self, *args, **kwargs):
+        self.slots = threading.BoundedSemaphore(MAX_CONNECTIONS)
+        super().__init__(*args, **kwargs)
+
+    def process_request(self, request, client_address):
+        if not self.slots.acquire(blocking=False):
+            self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except Exception:
+            self.slots.release()
+            raise
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self.slots.release()
+
+    def handle_error(self, request, client_address):
+        quiet_error()
 
 
 def serve(port=8080, folder="counts", host="0.0.0.0", trust_proxy=False, boss_hp=None, phone=None,
@@ -739,7 +899,9 @@ def serve(port=8080, folder="counts", host="0.0.0.0", trust_proxy=False, boss_hp
     """The server. With remind, phones' reminders are kept and sent too."""
     push = Push(folder) if remind else None
     counts = Counts(folder, boss_hp, min_group, sync_quota, refresh)
-    server = ThreadingHTTPServer((host, port), handler(counts, phone, push))
+    server = CountsServer((host, port), handler(counts, phone, push))
+    if push:
+        push.on_forget = lambda: counts.removed("push")
     server.counts = counts
     server.trust_proxy = trust_proxy
     server.push = push

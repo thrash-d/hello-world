@@ -926,7 +926,12 @@
   "The household list can't be reached just now, so you haven't left yet. Try again when you're online.": "لا يمكن الوصول إلى قائمة الأسرة الآن، لذا لم تغادر بعد. حاول مرة أخرى عندما تكون متصلًا.",
   "The household list can't be reached just now, or someone already made a new code. Nothing changed.": "لا يمكن الوصول إلى قائمة الأسرة الآن، أو أن شخصًا أنشأ رمزًا جديدًا بالفعل. لم يتغير شيء.",
   "Type your name, as the others will see it, in the plan box first, then choose this again.": "اكتب اسمك أولًا كما سيراه الآخرون في مربع الخطة، ثم اختر هذا مرة أخرى.",
-  "Added to tomorrow's plan, with what you carried.": "أُضيف إلى خطة الغد، مع ما نقلته."
+  "Added to tomorrow's plan, with what you carried.": "أُضيف إلى خطة الغد، مع ما نقلته.",
+  "Sync is off on this computer, but the server couldn't be reached to delete its encrypted copy. Turn sync on and off again later to delete it; otherwise it goes after a year untouched.": "المزامنة متوقفة على هذا الكمبيوتر، لكن تعذّر الوصول إلى الخادم لحذف نسخته المشفّرة. شغّل المزامنة وأوقفها لاحقًا لحذفها؛ وإلا فستُحذف بعد عام دون استخدام.",
+  "The server can't be reached just now. Nothing changed.": "لا يمكن الوصول إلى الخادم الآن. لم يتغير شيء.",
+  "This letter is too long to open in your mail program in one go. It stays here: copy its text into a new mail instead.": "هذه الرسالة أطول من أن تُفتح دفعة واحدة في برنامج البريد. تبقى هنا: انسخ نصها في رسالة جديدة.",
+  "You've left the household list, and the others are told, but this computer couldn't save that; it will show the list until it can.": "غادرت قائمة الأسرة، وسيعلم الآخرون، لكن هذا الكمبيوتر لم يستطع حفظ ذلك؛ سيعرض القائمة حتى يستطيع.",
+  "Your sync code was changed on another device, so this computer stopped syncing. Turn sync off and on here for a new code, and type it on your other devices.": "تم تغيير رمز المزامنة على جهاز آخر، لذا توقف هذا الكمبيوتر عن المزامنة. أوقف المزامنة وشغّلها هنا للحصول على رمز جديد، واكتبه على أجهزتك الأخرى."
  },
  "tips_floor": [
   "التأكد من خلو الممر قبل أول مهمة في الوردية.",

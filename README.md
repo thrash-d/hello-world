@@ -411,8 +411,12 @@ server answers.
 Each count sends the date and nothing else: never a plan, a name or a
 computer name. The server sees your PC's network address, as any website
 does. The reference server, `server/counts_server.py`, doesn't write
-addresses anywhere. It keeps only a daily, in-memory hash of them, so each
-PC counts once a day. Turn the count on or off in the window under
+addresses anywhere. It keeps only an in-memory hash of them, with a random
+key for each day, so each PC counts once a day; a day's hashes go once the
+day can't be counted any more. Each PC also sends a token for the day, made
+from a random key kept on the PC and different every day, so PCs behind one
+office address each count without the server being able to tell them apart
+from one day to the next. Turn the count on or off in the window under
 **Options > What the window shows**, or with menu option 12 in the text
 screen, or `hello.cmd --set shared off`. Without a server, nothing is asked
 and nothing is sent.
@@ -580,7 +584,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.62.1'
+$tag = 'v1.62.2'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

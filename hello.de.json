@@ -926,7 +926,12 @@
   "The household list can't be reached just now, so you haven't left yet. Try again when you're online.": "Die Haushaltsliste ist gerade nicht erreichbar, also haben Sie sie noch nicht verlassen. Versuchen Sie es wieder, wenn Sie online sind.",
   "The household list can't be reached just now, or someone already made a new code. Nothing changed.": "Die Haushaltsliste ist gerade nicht erreichbar, oder jemand hat schon einen neuen Code gemacht. Nichts wurde geändert.",
   "Type your name, as the others will see it, in the plan box first, then choose this again.": "Tippen Sie zuerst Ihren Namen, wie die anderen ihn sehen, in das Planfeld und wählen Sie dies dann noch einmal.",
-  "Added to tomorrow's plan, with what you carried.": "Zum Plan für morgen hinzugefügt, mit dem, was Sie mitgenommen haben."
+  "Added to tomorrow's plan, with what you carried.": "Zum Plan für morgen hinzugefügt, mit dem, was Sie mitgenommen haben.",
+  "Sync is off on this computer, but the server couldn't be reached to delete its encrypted copy. Turn sync on and off again later to delete it; otherwise it goes after a year untouched.": "Die Synchronisierung ist auf diesem Computer aus, aber der Server war nicht erreichbar, um seine verschlüsselte Kopie zu löschen. Schalten Sie die Synchronisierung später ein und wieder aus, um sie zu löschen; sonst verschwindet sie nach einem Jahr ohne Nutzung.",
+  "The server can't be reached just now. Nothing changed.": "Der Server ist gerade nicht erreichbar. Nichts wurde geändert.",
+  "This letter is too long to open in your mail program in one go. It stays here: copy its text into a new mail instead.": "Dieser Brief ist zu lang, um ihn in einem Stück in Ihrem Mailprogramm zu öffnen. Er bleibt hier: Kopieren Sie seinen Text in eine neue Mail.",
+  "You've left the household list, and the others are told, but this computer couldn't save that; it will show the list until it can.": "Sie haben die Haushaltsliste verlassen, und die anderen erfahren es, aber dieser Computer konnte das nicht speichern; er zeigt die Liste, bis er es kann.",
+  "Your sync code was changed on another device, so this computer stopped syncing. Turn sync off and on here for a new code, and type it on your other devices.": "Ihr Synchronisierungscode wurde auf einem anderen Gerät geändert, deshalb synchronisiert dieser Computer nicht mehr. Schalten Sie die Synchronisierung hier aus und wieder ein, um einen neuen Code zu bekommen, und tippen Sie ihn auf Ihren anderen Geräten ein."
  },
  "tips_floor": [
   "Prüfen Sie vor der ersten Aufgabe der Schicht, ob Ihr Laufweg frei ist.",

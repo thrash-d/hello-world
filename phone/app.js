@@ -69,6 +69,7 @@ const UI = {
     syncChange: "Change code", syncChangeNote: "Type the new code the PC shows.",
     syncNote: "With sync on, your plan and done list leave this phone, encrypted with that code. The server keeps only the encrypted copy.",
     syncOn: "Sync is on.", syncOffDone: "Sync is off on this phone.", syncBad: "That code doesn't look right. Check it on the PC.", syncFail: "The PC's copy can't be reached just now.",
+    syncMoved: "The sync code was changed on the PC, so this phone stopped syncing. Type the new code from the PC.",
     scam: SCAM_EN,
     familyScam: "hello-world will never ask you for a code or key.",
     lastChange: "Last change to your synced plan: {when}. If you didn't make it, change the code on the PC.",
@@ -135,6 +136,7 @@ const UI = {
     syncChange: "Cambiar código", syncChangeNote: "Escribe el código nuevo que muestra el PC.",
     syncNote: "Con la sincronización activada, tu plan y tu lista de hechos salen de este teléfono, cifrados con ese código. El servidor solo guarda la copia cifrada.",
     syncOn: "La sincronización está activada.", syncOffDone: "La sincronización está desactivada en este teléfono.", syncBad: "Ese código no parece correcto. Revísalo en el PC.", syncFail: "Ahora no se puede llegar a la copia del PC.",
+    syncMoved: "El código de sincronización se cambió en el PC, así que este teléfono dejó de sincronizar. Escribe el código nuevo del PC.",
     scam: "hello-world no tiene línea telefónica ni personal de soporte. Nunca llamamos, ni enviamos correos ni mensajes. Nadie de verdad te pedirá nunca tu código de sincronización. Si alguien lo pide, cuelga.",
     familyScam: "hello-world nunca te pedirá un código ni una clave.",
     lastChange: "Último cambio en tu plan sincronizado: {when}. Si no lo hiciste tú, cambia el código en el PC.",
@@ -201,6 +203,7 @@ const UI = {
     syncChange: "غيّر الرمز", syncChangeNote: "اكتب الرمز الجديد الذي يظهره الكمبيوتر.",
     syncNote: "مع تشغيل المزامنة تغادر خطتك وقائمة ما أنجزته هذا الهاتف مشفّرة بذلك الرمز. لا يحتفظ الخادم إلا بالنسخة المشفّرة.",
     syncOn: "المزامنة تعمل.", syncOffDone: "المزامنة متوقفة على هذا الهاتف.", syncBad: "لا يبدو هذا الرمز صحيحًا. تحقق منه على الكمبيوتر.", syncFail: "لا يمكن الوصول إلى نسخة الكمبيوتر الآن.",
+    syncMoved: "تم تغيير رمز المزامنة على الكمبيوتر، لذا توقف هذا الهاتف عن المزامنة. اكتب الرمز الجديد من الكمبيوتر.",
     scam: "ليس لدى hello-world خط هاتف ولا فريق دعم. لا نتصل ولا نرسل بريدًا أو رسائل أبدًا. لن يطلب منك أي شخص حقيقي رمز المزامنة. إن طلبه أحد، أغلق الخط.",
     familyScam: "لن يطلب منك hello-world أبدًا رمزًا أو مفتاحًا.",
     lastChange: "آخر تغيير في خطتك المتزامنة: {when}. إن لم تقم به، غيّر الرمز على الكمبيوتر.",
@@ -737,6 +740,10 @@ function houseMerge(doc, other, me) {
     if (at > (out.gone[id] || "")) out.gone[id] = at;
     delete out.items[id];
   }));
+  // Set on the old copy by whoever made a new code, so nobody else makes
+  // another one, and every device stops writing here.
+  const moved = sides.map((side) => houseTime(side.rekeyed, latest)).filter(Boolean).sort();
+  if (moved.length) out.rekeyed = moved[moved.length - 1];
   return out;
 }
 
@@ -812,6 +819,16 @@ function houseNews(doc, me, seen, lang) {
 
 function houseLeftUnasked(doc, me, asked) {
   return Object.entries(doc.members).filter(([id, m]) => m.left && id !== me && !(asked || []).includes(id)).map(([id]) => id);
+}
+
+// What is sent, as hello.py's sync_body: the oldest finished things left out
+// when they wouldn't fit the server's limit, and padded to whole kilobytes.
+function syncBody(state) {
+  const form = syncForm(state);
+  let finished = form.finished.slice();
+  const size = () => enc8(JSON.stringify(Object.assign({}, form, { finished, pad: "" }))).length;
+  while (finished.length && size() > 60000) finished = finished.slice(Math.max(1, Math.floor(finished.length / 10)));
+  return Object.assign(form, { finished, pad: " ".repeat((1024 - (size() % 1024)) % 1024) });
 }
 
 function syncForm(state) {
@@ -892,7 +909,7 @@ if (typeof module !== "undefined") {
     phoneNumber, smsLink, utcTime, pushText, exportText, setDayStart, REMIND_TIMES, DAY_STARTS,
     fresh, smallerDue, comingBack, smaller, endDay, noteSideways, mergeDevices, noteDevice, letterLink,
     houseKeys, houseNew, houseJoin, houseLeave, houseChange, houseMerge, houseTidy, houseBody, houseHistory,
-    houseNews, houseLeftUnasked, newCode, houseFit, houseStamp, HOUSE };
+    houseNews, houseLeftUnasked, newCode, houseFit, houseStamp, HOUSE, syncBody };
 }
 
 if (typeof document !== "undefined") {
@@ -1120,19 +1137,35 @@ if (typeof document !== "undefined") {
   const asBytes = (k) => k && { label: k.label, enc: Uint8Array.from(k.enc), mac: Uint8Array.from(k.mac) };
 
   // Pull, merge and push; quiet unless something goes wrong while asked.
+  // Pull, merge and push, again if the PC wrote in between (If-Match), so
+  // neither side's change is lost.
   async function sync(loud) {
     if (!keys) return;
     const k = asBytes(keys), url = `${location.origin}/v1/sync/${k.label}`;
     try {
-      const got = await fetch(url, { cache: "no-store" });
-      if (got.ok) {
-        const other = await openSync(k, await got.arrayBuffer());
+      for (let n = 0; n < 3; n++) {
+        const got = await fetch(url, { cache: "no-store" });
+        if (!got.ok && got.status !== 404) throw new Error("unreachable");
+        const tag = got.ok ? got.headers.get("ETag") : "missing";
+        const other = got.ok ? await openSync(k, await got.arrayBuffer()) : null;
+        if (other && other.moved) {
+          // The code was changed on the PC: stop, and say so.
+          keys = null;
+          try { localStorage.removeItem(SYNC_KEY); } catch (e) { /* nothing saved */ }
+          delete state.devices; save(); drawSync(); say("syncMoved");
+          return;
+        }
         if (other) { mergeSync(state, other, today()); save(); draw(); }
+        noteDevice(state, null, today()); save();
+        const headers = { "Content-Type": "application/octet-stream" };
+        if (tag) headers["If-Match"] = tag;
+        const put = await fetch(url, { method: "PUT", body: await sealSync(k, syncBody(state)), headers });
+        if (put.status === 412) continue;
+        if (!put.ok) throw new Error("refused");
+        if (loud) say("syncOn");
+        return;
       }
-      noteDevice(state, null, today()); save();
-      await fetch(url, { method: "PUT", body: await sealSync(k, syncForm(state)),
-                         headers: { "Content-Type": "application/octet-stream" } });
-      if (loud) say("syncOn");
+      throw new Error("busy");
     } catch (e) {
       if (loud) say("syncFail");
     }
@@ -1404,6 +1437,8 @@ if (typeof document !== "undefined") {
         const [theirs, tag] = await houseFetch(house.keys);
         if (!theirs && needServer) break;
         doc = houseMerge(state.houseList || {}, theirs, house.me);
+        // Someone made a new code: this copy is closed.
+        if (doc.rekeyed) { houseReached = false; drawHouse(); return false; }
         if (change) change(doc);
         houseFit(houseTidy(doc, new Date()));
         if (!theirs) break;
@@ -1499,12 +1534,22 @@ if (typeof document !== "undefined") {
     // once don't split the household onto two codes.
     houseQueue = houseQueue.then(async () => {
       if (!state.house) return;
-      const [theirs] = await houseFetch(state.house.keys);
+      const [theirs, tag] = await houseFetch(state.house.keys);
       if (!theirs) { say("rekeyFail"); return; }
       const doc = houseMerge(state.houseList || {}, theirs, state.house.me);
+      if (doc.rekeyed) { say("rekeyFail"); return; }
       houseFit(houseTidy(doc, new Date()));
       const code = newCode(), stored = houseStore(await houseKeys(code));
       if (await housePut(stored, doc, "missing") !== true) { say("syncFail"); return; }
+      // Claim the old copy: only one member's claim lands over the version
+      // read, so two people saying yes at once don't split the household.
+      const mark = houseMerge(doc, theirs, state.house.me);
+      mark.rekeyed = houseStamp();
+      if (await housePut(state.house.keys, mark, tag) !== true) {
+        try { await fetch(houseUrl(asBytes(stored)), { method: "DELETE" }); } catch (e) { /* left to expire */ }
+        say("rekeyFail");
+        return;
+      }
       try { await fetch(houseUrl(asBytes(state.house.keys)), { method: "DELETE" }); } catch (e) { /* gone anyway */ }
       const left = Object.entries(doc.members).filter(([, m]) => m.left).map(([id]) => id);
       state.house = Object.assign({}, state.house, { keys: stored, asked: Array.from(new Set(state.house.asked.concat(left))) });

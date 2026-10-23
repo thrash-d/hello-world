@@ -1,5 +1,51 @@
 # Changelog
 
+## 2026-10-23: round 92, the server, sync and the household list
+
+Version 1.62.2. The first of three review rounds, on the counts server and
+everything that talks to it. It found 27 problems; all are fixed.
+
+- **Counting**: PCs behind one office address now each count. Each PC
+  sends a token for the day, made from a random key kept on the PC and
+  different every day, and up to 250 count from one address. A PC can no
+  longer count a day twice across UTC midnight: each day has its own key,
+  kept until the day can't be counted any more. An IPv6 address counts by
+  its /64. "Counted" works in a small office, where the server says "a
+  few".
+- **Sync** retries when the phone wrote in between, so neither side's change
+  is lost. A long history is trimmed to fit the server's limit (the oldest
+  finished things stay on each device), and every copy is padded to whole
+  kilobytes. A copy with nonsense in it no longer crashes the merge. Plan
+  changes are stamped to the second, like the phone's.
+- **Change my sync code** first pulls everything sent under the old code.
+  It goes back to the old code if the new copy can't be sent. The old copy
+  is replaced by a note that the code moved, so a device still on the old
+  code stops syncing and says so, instead of starting the old copy again.
+- **Turning sync off** says plainly when the server couldn't be reached to
+  delete its copy.
+- **The household list** follows the TurnOffSync policy. Making a new code
+  claims the old copy first, so two people saying yes at once can't split
+  the household. Starting, joining, leaving and new codes all check that
+  this computer saved the change.
+- **No server, or a broken answer**: nothing crashes any more. Every request
+  is built inside its error handling, and a truncated answer counts as
+  "can't be reached".
+- **Letters** too long for a mail link aren't sent cut short. They stay,
+  with their text shown to copy.
+- **The counts server**:
+  - closes connections that send too slowly, and handles at most 200 at
+    once;
+  - reports errors without the client's address;
+  - keeps the reminder thread running through any error, and catches up
+    minutes it missed;
+  - keeps a phone's change made while its reminder was being sent;
+  - follows no redirects;
+  - signs for the push service's plain origin;
+  - writes its push key readable by its own account only, and refuses to
+    start with a broken key instead of replacing it;
+  - expires old copies without racing a new write;
+  - keeps its copy counts right.
+
 ## 2026-10-10: fixes from a code review
 
 Version 1.62.1. A full review of 1.58.0 to 1.62.0, for features, the screens

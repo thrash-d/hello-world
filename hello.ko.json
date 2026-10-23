@@ -926,7 +926,12 @@
   "The household list can't be reached just now, so you haven't left yet. Try again when you're online.": "지금은 가족 목록에 연결할 수 없어서 아직 나가지 않았어요. 온라인일 때 다시 해 보세요.",
   "The household list can't be reached just now, or someone already made a new code. Nothing changed.": "지금은 가족 목록에 연결할 수 없거나, 누군가 이미 새 코드를 만들었어요. 바뀐 건 없어요.",
   "Type your name, as the others will see it, in the plan box first, then choose this again.": "먼저 계획 칸에 다른 사람에게 보일 이름을 입력한 다음, 이걸 다시 고르세요.",
-  "Added to tomorrow's plan, with what you carried.": "넘긴 것과 함께 내일 계획에 추가했어요."
+  "Added to tomorrow's plan, with what you carried.": "넘긴 것과 함께 내일 계획에 추가했어요.",
+  "Sync is off on this computer, but the server couldn't be reached to delete its encrypted copy. Turn sync on and off again later to delete it; otherwise it goes after a year untouched.": "이 컴퓨터의 동기화는 꺼졌지만, 서버에 연결되지 않아 암호화된 사본을 지우지 못했어요. 나중에 동기화를 켰다가 끄면 지워져요. 그렇지 않으면 1년 동안 쓰이지 않은 뒤 사라져요.",
+  "The server can't be reached just now. Nothing changed.": "지금은 서버에 연결할 수 없어요. 바뀐 건 없어요.",
+  "This letter is too long to open in your mail program in one go. It stays here: copy its text into a new mail instead.": "이 편지는 너무 길어서 메일 프로그램에서 한 번에 열 수 없어요. 여기에 남아 있으니, 내용을 새 메일에 복사하세요.",
+  "You've left the household list, and the others are told, but this computer couldn't save that; it will show the list until it can.": "가족 목록에서 나갔고 다른 사람들에게도 알려지지만, 이 컴퓨터에 저장하지 못했어요. 저장할 수 있을 때까지 목록이 보여요.",
+  "Your sync code was changed on another device, so this computer stopped syncing. Turn sync off and on here for a new code, and type it on your other devices.": "동기화 코드가 다른 기기에서 바뀌어서 이 컴퓨터는 동기화를 멈췄어요. 여기서 동기화를 껐다가 켜서 새 코드를 받고, 다른 기기에 입력하세요."
  },
  "tips_floor": [
   "첫 작업 전에 다니는 통로에 걸리는 게 없는지 확인하세요.",

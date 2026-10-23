@@ -517,7 +517,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.62.1"
+VERSION = "1.62.2"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -788,21 +788,33 @@ def shared_on(state):
     return bool(counts_server() and state.get("shared"))
 
 
-def net(path, send=False):
+NET_ERRORS = (OSError, ValueError)
+
+
+def _net_errors():
+    import http.client
+    return NET_ERRORS + (http.client.HTTPException,)
+
+
+def net(path, send=False, body=None):
     """Ask the counts server for a JSON object, or post to it. None when it
     can't be reached in COUNTS_TIMEOUT seconds or answers nonsense, so a
     missing server never gets in the way. Nothing about the person is sent:
-    the path holds only a date and what was done."""
+    the path holds only a date and what was done, and a post's body at most
+    this PC's token for that day."""
     import urllib.request
-    request = urllib.request.Request(
-        counts_server() + path, data=b"{}" if send else None,
-        method="POST" if send else "GET",
-        headers={"Content-Type": "application/json",
-                 "User-Agent": "hello-world"})
+    if not counts_server():
+        return None
     try:
+        request = urllib.request.Request(
+            counts_server() + path,
+            data=json.dumps(body or {}).encode() if send else None,
+            method="POST" if send else "GET",
+            headers={"Content-Type": "application/json",
+                     "User-Agent": "hello-world"})
         with urllib.request.urlopen(request, timeout=COUNTS_TIMEOUT) as answer:
             data = json.loads(answer.read(10_000) or b"{}")
-    except (OSError, ValueError):
+    except _net_errors():
         return None
     return data if isinstance(data, dict) else None
 
@@ -1075,6 +1087,11 @@ def house_merge(doc, other, me=None):
                     continue
             out["gone"][iid] = max(at, out["gone"].get(iid, ""))
             out["items"].pop(iid, None)
+    # Set on the old copy by whoever made a new code, so nobody else makes
+    # another one, and every device stops writing here.
+    moved = [t for t in (_house_time(side.get("rekeyed"), latest) for side in sides) if t]
+    if moved:
+        out["rekeyed"] = max(moved)
     return out
 
 
@@ -1174,7 +1191,9 @@ def house_left_unasked(doc, me, asked):
 
 
 def house_on(state):
-    return bool(state.get("house")) and counts_server() is not None and not policy("TurnOffSync")
+    """A household list this computer may use: the TurnOffSync policy and
+    a missing server stop it, as they stop sync."""
+    return bool(state.get("house")) and bool(counts_server()) and not policy("TurnOffSync")
 
 
 def _house_put(code, doc, tag=None):
@@ -1222,6 +1241,9 @@ def house_sync(state, can_save, change=None, need_server=False):
         if theirs is None and need_server:
             return doc, False
         doc = house_merge(local, theirs, house["me"])
+        if doc.get("rekeyed"):
+            # Someone made a new code: this copy is closed.
+            return doc, False
         if change:
             change(doc)
         house_fit(house_tidy(doc, now()))
@@ -1249,7 +1271,10 @@ def house_start(state, can_save, name):
     doc = house_new(me, name)
     if _house_put(code, doc, "missing") is not True:
         return tr("The server can't be reached just now.")
-    _house_save(state, can_save, {"code": code, "me": me, "seen": {me: "in"}, "asked": []}, doc)
+    if not _house_save(state, can_save, {"code": code, "me": me, "seen": {me: "in"},
+                                          "asked": []}, doc):
+        net_sync(f"/v1/sync/{house_keys(code)[0]}", b"", "DELETE")
+        return tr("Could not save that on this computer. Nothing changed.")
     return house_code_said(code)
 
 
@@ -1262,6 +1287,8 @@ def house_code_said(code):
 
 def house_join_with(state, can_save, code, name):
     """Join from this device, under one's own name. Returns what to say."""
+    if not counts_server() or policy("TurnOffSync"):
+        return tr("Sync isn't available on this computer.")
     code = "".join(c for c in (code or "").lower() if c in SYNC_ALPHABET)
     if len(code) != 25 or not _house_name(name, MAX_HOUSE_NAME):
         return tr("That code doesn't look right. Check it with whoever started the list.")
@@ -1280,7 +1307,12 @@ def house_join_with(state, can_save, code, name):
     if put is not True:
         return tr("The server can't be reached just now.")
     seen = house_news(doc, me, {})[1]
-    _house_save(state, can_save, {"code": code, "me": me, "seen": seen, "asked": []}, doc)
+    if not _house_save(state, can_save, {"code": code, "me": me, "seen": seen, "asked": []}, doc):
+        # Not kept here, so not on the list either.
+        theirs, tag = _house_get(code)
+        if theirs is not None:
+            _house_put(code, house_leave(house_merge({}, theirs), me), tag)
+        return tr("Could not save that on this computer. Nothing changed.")
     return tr("You've joined the household list. Everyone on it is told.")
 
 
@@ -1292,7 +1324,9 @@ def house_leave_now(state, can_save):
     if not reached:
         return tr("The household list can't be reached just now, so you haven't left "
                   "yet. Try again when you're online.")
-    _house_save(state, can_save, None, None)
+    if not _house_save(state, can_save, None, None):
+        return tr("You've left the household list, and the others are told, but this "
+                  "computer couldn't save that; it will show the list until it can.")
     return tr("You've left the household list, and the others are told. What was "
               "already on this device stays here.")
 
@@ -1303,18 +1337,29 @@ def house_rekey(state, can_save):
     copy on the server, so two members doing it at once don't split the
     household onto two codes. Returns what to say."""
     house = dict(state["house"])
+    refused = tr("The household list can't be reached just now, or someone already made "
+                 "a new code. Nothing changed.")
     doc, reached = house_sync(state, can_save, need_server=True)
     if not reached:
-        return tr("The household list can't be reached just now, or someone already made "
-                  "a new code. Nothing changed.")
+        return refused
     old, code = house["code"], sync_code()
     if _house_put(code, doc, "missing") is not True:
         return tr("The server can't be reached just now.")
+    # Claim the old copy: only one member's claim can land over the version
+    # read, so two people answering yes at once don't split the household.
+    theirs, tag = _house_get(old)
+    claimed = theirs is not None and not house_merge({}, theirs).get("rekeyed")
+    if claimed:
+        mark = house_merge(doc, theirs, house["me"])
+        mark["rekeyed"] = house_stamp()
+        claimed = _house_put(old, mark, tag) is True
+    new_house = dict(house, code=code, asked=sorted(set(house.get("asked", [])) | {
+        mid for mid, m in doc["members"].items() if m.get("left")}))
+    if not claimed or not _house_save(state, can_save, new_house, doc):
+        net_sync(f"/v1/sync/{house_keys(code)[0]}", b"", "DELETE")
+        return refused if not claimed else tr(
+            "Could not save that on this computer. Nothing changed.")
     net_sync(f"/v1/sync/{house_keys(old)[0]}", b"", "DELETE")
-    house["code"] = code
-    house["asked"] = sorted(set(house.get("asked", [])) | {
-        mid for mid, m in doc["members"].items() if m.get("left")})
-    _house_save(state, can_save, house, doc)
     return tr("The old code no longer works.") + " " + house_code_said(code)
 
 
@@ -1322,6 +1367,8 @@ def house_rekey(state, can_save):
 # handed to the person's own mail program to send. hello-world sends nothing
 # and is not a messaging service.
 MAX_LETTERS = 20
+LETTER_TOO_LONG = ("This letter is too long to open in your mail program in one go. "
+                   "It stays here: copy its text into a new mail instead.")
 MAX_LETTER = 4000
 LETTER_WORDS = ("letters", "letter", "cartas", "carta", "lettres", "lettre", "briefe", "brief")
 
@@ -1329,14 +1376,21 @@ LETTER_WORDS = ("letters", "letter", "cartas", "carta", "lettres", "lettre", "br
 MAIL_ADDRESS = r"[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+"
 
 
+# Longer mail links are cut short by Windows or the mail program.
+MAX_MAIL_LINK = 1800
+
+
 def mail_letter(letter):
     """Open the person's own mail program with the letter filled in. True
-    when it opened."""
+    when it opened, False when it couldn't, and "long" when the letter is
+    too long for a mail link, so it isn't sent cut short."""
     from urllib.parse import quote
     # Plain addresses only: anything that means something in a link (#, %,
     # ?, &, a comma) would send the letter somewhere else, or nowhere.
     to = letter["to"] if re.fullmatch(MAIL_ADDRESS, letter["to"]) else ""
     link = f"mailto:{to}?body={quote(letter['text'])}"
+    if len(link) > MAX_MAIL_LINK:
+        return "long"
     if STARTED is not None:
         STARTED.append(link)
         return True
@@ -1392,7 +1446,11 @@ def letters_prompt(state, can_save):
         what = (ask(tr("s to send it with your own mail, d to delete it, or Enter to go "
                        "back > ")) or "").lower().strip(TRIM)
         if what == "s":
-            if not mail_letter(letter):
+            sent = mail_letter(letter)
+            if sent == "long":
+                para(tr(LETTER_TOO_LONG))
+                return
+            if not sent:
                 say(tr("Your mail program could not be opened."))
                 return
             keep = ask_choice(tr("Keep a copy here? (y or n, Enter deletes it) > "),
@@ -1430,6 +1488,9 @@ def household_prompt(state, can_save):
             para(house_start(state, can_save, name))
         else:
             para(house_join_with(state, can_save, ask(tr("The household code > ")) or "", name))
+        return
+    if not house_on(state):
+        para(tr("Sync isn't available on this computer."))
         return
     while True:
         doc, reached = house_sync(state, can_save)
@@ -1583,7 +1644,8 @@ def merge_sync(state, other, d):
     anything here."""
     changed = False
     have = {(i["text"], i["date"]) for i in state.get("finished", [])}
-    for item in other.get("finished") or []:
+    finished = other.get("finished") if isinstance(other.get("finished"), list) else []
+    for item in finished:
         try:
             if (isinstance(item, dict) and isinstance(item.get("text"), str)
                     and (clean(item["text"]), day(item.get("date"))) not in have
@@ -1592,7 +1654,7 @@ def merge_sync(state, other, d):
                     {"text": clean(item["text"]), "date": day(item["date"])}]
                 have.add((clean(item["text"]), day(item["date"])))
                 changed = True
-        except ValueError:
+        except (ValueError, KeyError, TypeError):
             continue
     if state.get("finished"):
         state["finished"] = sorted(state["finished"], key=lambda i: i["date"])[-finished_cap(state):]
@@ -1603,7 +1665,7 @@ def merge_sync(state, other, d):
             new = ({"text": clean(intent["text"]), "date": day(intent["date"])}
                    if isinstance(intent, dict) and isinstance(intent.get("text"), str)
                    and clean(intent["text"]) else None)
-        except ValueError:
+        except (ValueError, KeyError, TypeError):
             new = state["intent"]
         if new != state["intent"]:
             state["intent"] = new
@@ -1616,28 +1678,70 @@ def sync_on(state):
     return bool(state.get("sync")) and not policy("TurnOffSync") and bool(counts_server())
 
 
+# Under the server's limit, with room for the encryption and the padding.
+SYNC_BUDGET = 60_000
+# Set when this code's copy says the code was changed on another device.
+SYNC_MOVED = False
+SYNC_MOVED_LINE = ("Your sync code was changed on another device, so this computer "
+                   "stopped syncing. Turn sync off and on here for a new code, and "
+                   "type it on your other devices.")
+
+
+def sync_body(state):
+    """What is sent: the oldest finished things left out when a long
+    history wouldn't fit the server's limit (they stay on each device), and
+    padded to whole kilobytes, so the size says little about how much was
+    done (Noor)."""
+    form = dict(sync_form(state))
+    finished = list(form["finished"])
+
+    def size():
+        return len(json.dumps(dict(form, finished=finished, pad=""), ensure_ascii=False,
+                              separators=(",", ":")).encode())
+    while finished and size() > SYNC_BUDGET:
+        finished = finished[max(1, len(finished) // 10):]
+    form["finished"] = finished
+    form["pad"] = " " * (-size() % 1024)
+    return form
+
+
 def sync_now(state, can_save):
-    """Pull the other device's copy, merge it in, and push the result.
-    Quiet: returns True when it worked, and does nothing without a server."""
+    """Pull the other device's copy, merge it in, and push the result, again
+    if the other device wrote in between. Quiet: returns True when it
+    worked, and does nothing without a server."""
+    global SYNC_MOVED
     if not sync_on(state):
         return False
     label, enc, mac = sync_keys(state["sync"])
-    blob = net_bytes(f"/v1/sync/{label}")
-    refresh(state, can_save)
-    base = copy.deepcopy(state)
-    other = open_sync(enc, mac, blob) if blob else None
-    if other is not None:
-        merge_sync(state, other, today())
-    note_device(state, (other or {}).get("devices"))
-    global SYNCING
-    was, SYNCING = SYNCING, True
-    try:
-        if state != base and not commit(state, base, can_save):
-            undo(state, base)
+    path = f"/v1/sync/{label}"
+    for _ in range(3):
+        status, blob, tag = net_sync(path)
+        if status not in (200, 404):
             return False
-    finally:
-        SYNCING = was
-    return net_bytes(f"/v1/sync/{label}", seal_sync(enc, mac, sync_form(state))) is not None
+        refresh(state, can_save)
+        base = copy.deepcopy(state)
+        other = open_sync(enc, mac, blob) if status == 200 and blob else None
+        if other is not None and other.get("moved"):
+            # The code was changed on another device: nothing more is sent
+            # under it.
+            SYNC_MOVED = True
+            return False
+        if other is not None:
+            merge_sync(state, other, today())
+        note_device(state, (other or {}).get("devices"))
+        global SYNCING
+        was, SYNCING = SYNCING, True
+        try:
+            if state != base and not commit(state, base, can_save):
+                undo(state, base)
+                return False
+        finally:
+            SYNCING = was
+        put, _, _ = net_sync(path, seal_sync(enc, mac, sync_body(state)), "PUT",
+                             tag if status == 200 else "missing")
+        if put != 412:
+            return put == 200
+    return False
 
 
 SYNCING = False
@@ -1673,10 +1777,17 @@ def commit_then_sync(state, base, can_save):
         SYNCING = was
 
 
+def now_exact():
+    """now() to the second: the phone stamps changes to the second, so a
+    stamp cut to the minute could lose to an older change there."""
+    return (datetime.datetime.fromisoformat(NOW) if NOW
+            else datetime.datetime.now().replace(microsecond=0))
+
+
 def mark_synced_change(state):
     """Stamp a change to the plan, so the newer side wins a merge."""
     if state.get("sync"):
-        state["sync_updated"] = now().isoformat(timespec="seconds")
+        state["sync_updated"] = now_exact().isoformat(timespec="seconds")
 
 
 def set_sync(state, can_save, on):
@@ -1698,8 +1809,15 @@ def set_sync(state, can_save, on):
         undo(state, base)
         return tr("Could not save that choice on this computer.")
     if not on:
-        if old:
-            net_bytes(f"/v1/sync/{sync_keys(old)[0]}", b"", method="DELETE")
+        if old and counts_server():
+            status, _, _ = net_sync(f"/v1/sync/{sync_keys(old)[0]}", b"", "DELETE")
+            if status == 200:
+                return tr("Sync is off, and the copy on the server is deleted.")
+            # Said as it is: the encrypted copy is still there, and goes on
+            # its own after a year untouched.
+            return tr("Sync is off on this computer, but the server couldn't be reached "
+                      "to delete its encrypted copy. Turn sync on and off again later "
+                      "to delete it; otherwise it goes after a year untouched.")
         return tr("Sync is off, and the copy on the server is deleted.")
     sync_now(state, can_save)
     return tr(SCAM_LINE) + " " + tr(
@@ -1714,33 +1832,27 @@ def net_sync(path, body=None, method=None, if_match=None):
     PUT only lands over that version ("missing" for a new copy)."""
     import urllib.error
     import urllib.request
+    if not counts_server():
+        return 0, None, None
     headers = {"Content-Type": "application/octet-stream", "User-Agent": "hello-world"}
     if if_match:
         headers["If-Match"] = if_match
-    request = urllib.request.Request(
-        counts_server() + path, data=body,
-        method=method or ("PUT" if body is not None else "GET"), headers=headers)
     try:
+        request = urllib.request.Request(
+            counts_server() + path, data=body,
+            method=method or ("PUT" if body is not None else "GET"), headers=headers)
         with urllib.request.urlopen(request, timeout=COUNTS_TIMEOUT) as answer:
             return answer.status, answer.read(MAX_SYNC + 1), answer.headers.get("ETag")
     except urllib.error.HTTPError as e:
         return e.code, None, None
-    except (OSError, ValueError):
+    except _net_errors():
         return 0, None, None
 
 
 def net_bytes(path, body=None, method=None):
     """GET, PUT or DELETE raw bytes at the counts server. None on failure."""
-    import urllib.request
-    request = urllib.request.Request(
-        counts_server() + path, data=body,
-        method=method or ("PUT" if body is not None else "GET"),
-        headers={"Content-Type": "application/octet-stream", "User-Agent": "hello-world"})
-    try:
-        with urllib.request.urlopen(request, timeout=COUNTS_TIMEOUT) as answer:
-            return answer.read(MAX_SYNC + 1)
-    except OSError:
-        return None
+    status, raw, _ = net_sync(path, body, method)
+    return raw if status == 200 else None
 
 
 # Reactions to the day's thought, from Skye's review: honest ones, so the
@@ -2355,27 +2467,41 @@ def award_trophy(state, can_save, boss):
     return True
 
 
+def count_token(state, d):
+    """This PC's token for day d, so PCs sharing one office address each
+    count once: made from a random key kept here, different every day, so
+    the server can't link one day's token to another's, or to the PC."""
+    key = state.get("count_key") or os.urandom(16).hex()
+    state["count_key"] = key
+    return hmac.new(bytes.fromhex(key), b"count|" + d.isoformat().encode(),
+                    hashlib.sha256).hexdigest()[:32]
+
+
 def react(state, can_save, d, kind):
     """This PC's one reaction to the day's thought; a second moves it. The
     server counts each PC once a day by a hash with a key made fresh each
     day, never an ID. Returns (what to say, the counts or None)."""
-    counts = counts_of(net(f"/v1/day/{d.isoformat()}/react/{kind}", send=True))
-    if counts is None:
-        return tr("The shared count can't be reached just now."), None
     refresh(state, can_save)
     base = copy.deepcopy(state)
+    token = count_token(state, d)
+    counts = counts_of(net(f"/v1/day/{d.isoformat()}/react/{kind}", send=True,
+                           body={"pc": token}))
+    if counts is None:
+        undo(state, base)
+        return tr("The shared count can't be reached just now."), None
     state["react_day"], state["react"] = d.isoformat(), kind
     if not commit(state, base, can_save):
         undo(state, base)
     return tr("Reactions so far: {list}").format(list=reaction_line(counts["react"])), counts
 
 
-def tip_count(d, add=False):
+def tip_count(d, add=False, token=None):
     """How many people did the day's tip, after counting this person when
-    add is set; None when the server can't say."""
-    data = net(f"/v1/day/{d.isoformat()}" + ("/tip" if add else ""), send=add)
+    add is set: a number or "few"; None when the server can't say."""
+    data = net(f"/v1/day/{d.isoformat()}" + ("/tip" if add else ""), send=add,
+               body={"pc": token} if token else None)
     n = (data or {}).get("tip")
-    return n if isinstance(n, int) and not isinstance(n, bool) and n >= 0 else None
+    return n if a_count(n) else None
 
 
 def feedback_address():
@@ -2893,6 +3019,8 @@ def load(repair=True):
         state["remind_at"] = raw["remind_at"]
     if isinstance(raw.get("device_id"), str) and re.fullmatch(r"[0-9a-f]{12}", raw["device_id"]):
         state["device_id"] = raw["device_id"]
+    if isinstance(raw.get("count_key"), str) and re.fullmatch(r"[0-9a-f]{32}", raw["count_key"]):
+        state["count_key"] = raw["count_key"]
     if isinstance(raw.get("device_name"), str) and raw["device_name"].strip():
         state["device_name"] = raw["device_name"].strip()[:MAX_HOUSE_NAME]
     if devices := merge_devices(raw.get("devices"), {}):
@@ -4344,6 +4472,10 @@ def change_sync_code(state, can_save):
     code someone else saw stops working. Returns what to say."""
     if not sync_on(state):
         return tr("Sync isn't on.")
+    # First everything the other devices sent under the old code, so the
+    # move loses nothing.
+    if not sync_now(state, can_save):
+        return tr("The server can't be reached just now. Nothing changed.")
     refresh(state, can_save)
     old = state.get("sync")
     base = copy.deepcopy(state)
@@ -4354,9 +4486,20 @@ def change_sync_code(state, can_save):
     if not commit_then_sync(state, base, can_save):
         undo(state, base)
         return tr("Could not save that choice on this computer.")
-    sync_now(state, can_save)
-    if old:
-        net_bytes(f"/v1/sync/{sync_keys(old)[0]}", b"", method="DELETE")
+    if not sync_now(state, can_save):
+        # Back to the old code, whose copy is untouched.
+        refresh(state, can_save)
+        base = copy.deepcopy(state)
+        state["sync"], state["devices"] = old, base.get("devices", {})
+        if not commit_then_sync(state, base, can_save):
+            undo(state, base)
+        return tr("The server can't be reached just now. Nothing changed.")
+    # The old copy is replaced by a note that the code moved, holding
+    # nothing else, so a device still on the old code stops syncing rather
+    # than starting the old copy again.
+    _, enc, mac = sync_keys(old)
+    net_sync(f"/v1/sync/{sync_keys(old)[0]}",
+             seal_sync(enc, mac, {"moved": True, "pad": " " * 900}), "PUT")
     return tr("The old code no longer works. Type the new code on your phone: "
               "choose Sync there, then Change code.")
 
@@ -4498,6 +4641,8 @@ def sync_prompt(state, can_save):
             para(tr("On your phone, open hello-world, choose Sync, and type it."))
         return
     para(tr(SCAM_LINE))
+    if SYNC_MOVED:
+        para(tr(SYNC_MOVED_LINE))
     if line := last_change_line(state):
         para(line)
     if line := devices_line(state):
@@ -5948,16 +6093,18 @@ def did_tip(state, can_save, d):
     if state.get("tip_day") == iso:
         n = tip_count(d)
     else:
-        n = tip_count(d, add=True)
-        if n is not None:
-            refresh(state, can_save)
-            base = copy.deepcopy(state)
+        refresh(state, can_save)
+        base = copy.deepcopy(state)
+        n = tip_count(d, add=True, token=count_token(state, d))
+        if n is None:
+            undo(state, base)
+        else:
             state["tip_day"] = iso
             if not commit(state, base, can_save):
                 undo(state, base)
     if n is None:
         return tr("The shared count can't be reached just now.")
-    return tr("Counted. People who did today's tip so far: {n}").format(n=n)
+    return tr("Counted. People who did today's tip so far: {n}").format(n=count_word(n))
 
 
 # Shift handoff: notes left on a shared PC for whoever uses it next. They are
@@ -8867,7 +9014,11 @@ class Window:
         elif 100 <= choice < 100 + len(letters):
             letter = letters[choice - 100]
             if self.confirm(letter["text"] + "\n\n" + tr("Send it with your own mail program?")):
-                if mail_letter(letter) and not self.confirm(tr("Keep a copy here?")):
+                sent = mail_letter(letter)
+                if sent == "long":
+                    # A message box's text can be copied with Ctrl+C.
+                    self.inform(tr(LETTER_TOO_LONG) + "\n\n" + letter["text"])
+                elif sent and not self.confirm(tr("Keep a copy here?")):
                     save_letters(v.state, v.can_save, [l for l in letters if l is not letter])
 
     def household_menu(self):
@@ -8892,6 +9043,9 @@ class Window:
                 self.inform(house_join_with(v.state, v.can_save, self.clipboard_text(), name))
             if v.state.get("house"):
                 self.set_text(self.PLAN, v.plan())
+            return
+        if not house_on(v.state):
+            self.inform(tr("Sync isn't available on this computer."))
             return
         doc, reached = house_sync(v.state, v.can_save)
         house = v.state["house"]
@@ -9128,7 +9282,8 @@ class Window:
                     tr("Your sync code: {code}").format(code=self.visit.state["sync"])
                     + "\n\n" + tr("On your phone, open hello-world, choose Sync, and type it.")
                     + ("\n\n" + last_change_line(self.visit.state)
-                       if last_change_line(self.visit.state) else ""))
+                       if last_change_line(self.visit.state) else "")
+                    + ("\n\n" + tr(SYNC_MOVED_LINE) if SYNC_MOVED else ""))
 
     def saved_menu(self):
         v = self.visit
