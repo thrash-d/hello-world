@@ -1,5 +1,64 @@
 # Changelog
 
+## 2026-10-23: round 94, the PC app and the installers
+
+Version 1.62.4. The last of three review rounds, on the PC app's core, the
+window, the scheduled tasks, Group Policy and the installers. It found 27
+problems; all are fixed.
+
+- **A local privilege escalation is closed.** Users could delete the shared
+  handoff folder in ProgramData and put a link in its place, which the next
+  install's permission change would follow. Users now get Modify only
+  inside the folder, and the installer refuses a link there.
+- **`tools/reinstall.ps1`** runs only the all-users Git in Program Files,
+  with no config, hooks or filters from the session or a redirected home,
+  as install.ps1 already did. The README's clone steps do the same.
+- **Saved notes:**
+  - a wrong value type in `notes.json` no longer stops every start;
+  - unlocking is tried again before a locked file is called unreadable,
+    which can happen briefly at sign-in;
+  - MaxBackups never deletes the backup just made, and only after it's
+    safe;
+  - Delete everything takes every kind of backup, and does its server work
+    before taking the lock, so other windows aren't kept waiting.
+- **Printed pages** are kept in your own data folder and removed after ten
+  minutes, and by Delete everything, instead of staying in the temp folder
+  with plan text unlocked.
+- **The night shift:** your day start now applies from the first moment in
+  every process: the text screen, the sign-in run, reminder answers, the
+  tray and the window.
+- **Shift handoff:** a note whose time carries a zone no longer crashes
+  every PC that reads it.
+- **Plans:**
+  - "29/2" late in a leap year no longer crashes;
+  - End the day keeps the due dates of what it carries.
+- **Group Policy:** a computer setting of Disabled now wins over a user's
+  Enabled, as with Windows' own policies.
+- **Translations:** a date pattern with a misspelt field is refused instead
+  of breaking every date.
+- **The window and tray:**
+  - the clipboard is never read past the end of what another program put
+    there;
+  - the tray icon comes back after Explorer restarts;
+  - high contrast takes effect at once, and colour brushes no longer leak;
+  - the second check-in setting goes back when its task can't be made.
+- **Reminders:** a folder whose path holds % or a quote gets no scheduled
+  task or answer links, which would point at the wrong place.
+- **Background sync** no longer holds up the next save's sync, and its
+  messages no longer land in the window.
+- **`hello standup --git`:**
+  - uses git from PATH's full folders only, never one in the current
+    folder;
+  - can't be made to run a repository's own programs;
+  - matches emails with a +.
+- **Smaller fixes:**
+  - the greeting takes the given name from "Surname, Given";
+  - the organization's content file is read once, not once a day of a long
+    gap;
+  - per-user upgrades put the old install back if the new one can't move
+    in;
+  - uninstalling handles brackets in a profile path.
+
 ## 2026-10-23: round 93, the phone
 
 Version 1.62.3. The second review round, on the phone app. It found 32

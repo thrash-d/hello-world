@@ -94,8 +94,15 @@ $shim = @(
 [IO.File]::WriteAllText((Join-Path $new 'hello'), ($shim -join "`n") + "`n")
 $out = & (Join-Path $new 'python\python.exe') -I (Join-Path $new 'hello.py') --plain
 if ($LASTEXITCODE -or "$out" -ne 'Hello, world!') { throw "Test run failed with exit $LASTEXITCODE`: $out" }
-if (Test-Path -LiteralPath $dir) { Rename-Item -LiteralPath $dir -NewName (Split-Path $old -Leaf) }
-Rename-Item -LiteralPath $new -NewName (Split-Path $dir -Leaf)
+$hadOld = Test-Path -LiteralPath $dir
+if ($hadOld) { Rename-Item -LiteralPath $dir -NewName (Split-Path $old -Leaf) }
+# If the new folder can't move into place (antivirus holding a file), the
+# old install goes back, so the shortcut and sign-in launcher still work.
+try { Rename-Item -LiteralPath $new -NewName (Split-Path $dir -Leaf) }
+catch {
+    if ($hadOld) { Rename-Item -LiteralPath $old -NewName (Split-Path $dir -Leaf) }
+    throw
+}
 if (Test-Path -LiteralPath $old) { & (Join-Path $sys32 'cmd.exe') /d /c rmdir /s /q "`"$old`"" }
 
 $pythonw = Join-Path $dir 'python\pythonw.exe'

@@ -584,14 +584,17 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.62.3'
+$tag = 'v1.62.4'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
 $icacls = "$([Environment]::SystemDirectory)\icacls.exe"
 $git = (Get-ItemProperty HKLM:\SOFTWARE\GitForWindows).InstallPath + '\cmd\git.exe'
 & $icacls $d /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F'
-& $git clone -b $tag --depth 1 https://github.com/thrash-d/hello-world $d
+# git runs as administrator: no config or hooks from this session or a redirected home.
+Get-ChildItem Env:GIT_* | Remove-Item; Remove-Item Env:HOME, Env:XDG_CONFIG_HOME -ErrorAction SilentlyContinue
+$env:GIT_CONFIG_NOSYSTEM = '1'; $env:GIT_CONFIG_GLOBAL = 'NUL'
+& $git -c core.hooksPath=NUL clone -b $tag --depth 1 https://github.com/thrash-d/hello-world $d
 cd $d; Set-ExecutionPolicy -Scope Process Bypass -Force
 .\install.ps1 -Commit $commit
 ```

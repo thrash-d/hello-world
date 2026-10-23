@@ -122,13 +122,13 @@ function Remove-UserReminders {
         $run = "Registry::HKEY_USERS\$sid\Software\Microsoft\Windows\CurrentVersion\Run"
         $value = (Get-ItemProperty -LiteralPath $run -Name 'hello-world' -ErrorAction SilentlyContinue).'hello-world'
         # Only this install's: a per-user install keeps its own.
-        if ($value -and $value -match 'hello\.(py|cmd)"? --startup$' -and $value -like "*$dir\*") {
+        if ($value -and $value -match 'hello\.(py|cmd)"? --startup$' -and $value -like "*$([WildcardPattern]::Escape($dir))\*") {
             Remove-ItemProperty -LiteralPath $run -Name 'hello-world' -ErrorAction SilentlyContinue
         }
         # The notification's answer links and name, when they point here.
         $classes = "Registry::HKEY_USERS\$sid\Software\Classes"
         $link = (Get-ItemProperty -LiteralPath "$classes\hello-world\shell\open\command" -ErrorAction SilentlyContinue).'(default)'
-        if ($link -and $link -like "*$dir\*") {
+        if ($link -and $link -like "*$([WildcardPattern]::Escape($dir))\*") {
             foreach ($k in "$classes\hello-world", "$classes\AppUserModelId\hello-world") {
                 Remove-Item -LiteralPath $k -Recurse -Force -ErrorAction SilentlyContinue
             }
@@ -139,7 +139,7 @@ function Remove-UserReminders {
     # command, and one bad task must not leave the rest.
     $cmd = Join-Path $sys32 'cmd.exe'
     $names = @(& $cmd /d /c "`"$schtasks`" /Query /FO CSV /NH /V 2>nul" | ConvertFrom-Csv -Header @(1..30) |
-        Where-Object { $_.'2' -like '\hello-world reminder*' -and $_.'9' -like "*$dir\*" } | ForEach-Object { $_.'2' } | Sort-Object -Unique)
+        Where-Object { $_.'2' -like '\hello-world reminder*' -and $_.'9' -like "*$([WildcardPattern]::Escape($dir))\*" } | ForEach-Object { $_.'2' } | Sort-Object -Unique)
     foreach ($name in $names) { & $cmd /d /c "`"$schtasks`" /Delete /F /TN `"$name`" >nul 2>&1" }
 }
 
@@ -193,7 +193,7 @@ try {
             # A file held open without delete sharing blocks the rename. That
             # passes, so the exit code asks the deployment tool to retry later.
             $exitCode = 1618
-            $open = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path -like "$dir\*" })
+            $open = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path -like "$([WildcardPattern]::Escape($dir))\*" })
             $names = ($open | ForEach-Object { "$($_.ProcessName) (process $($_.Id))" }) -join ', '
             $hint = if ($open) { " These hello-world programs are open: $names. Closing them may help." } else { '' }
             throw "A file in $dir is in use.$hint Nothing was changed. Try again later."

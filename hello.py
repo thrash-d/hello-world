@@ -25,6 +25,7 @@ import re
 import shutil
 import sys
 import textwrap
+import threading
 import unicodedata
 import time
 
@@ -442,6 +443,11 @@ def content_problems(data, t=lambda text: text):
     return problems
 
 
+# The last org_content() answer, kept while its files are unchanged: it's
+# asked once for every day a long gap walks over.
+ORG_CONTENT_CACHE = {}
+
+
 def org_content():
     """The organization's content for the person's language: content.<code>.json,
     then the base language's for a regional one, then content.json. A file
@@ -449,7 +455,24 @@ def org_content():
     folder = os.path.dirname(os.path.abspath(__file__))
     code = language()
     names = [f"content.{code}.json", f"content.{code.split('-')[0]}.json", "content.json"]
-    for path in [CONTENT] if CONTENT else [os.path.join(folder, n) for n in dict.fromkeys(names)]:
+    paths = [CONTENT] if CONTENT else [os.path.join(folder, n) for n in dict.fromkeys(names)]
+    stamp = []
+    for path in paths:
+        try:
+            info = os.stat(path)
+            stamp.append((path, info.st_mtime_ns, info.st_size))
+        except OSError:
+            stamp.append((path, None, None))
+    key = tuple(stamp)
+    if key not in ORG_CONTENT_CACHE:
+        ORG_CONTENT_CACHE.clear()
+        ORG_CONTENT_CACHE[key] = _read_org_content(paths)
+    # Read only by every caller, so shared rather than copied.
+    return ORG_CONTENT_CACHE[key]
+
+
+def _read_org_content(paths):
+    for path in paths:
         try:
             with open(path, encoding="utf-8-sig") as f:
                 data = json.loads(f.read(200_000))
@@ -489,10 +512,15 @@ def first_name():
             return None
     except (AttributeError, OSError):
         return None
-    words = tidy(buffer.value).replace(",", " ").split()
-    # "Surname, Given" is a common directory order.
-    name = words[-1] if "," in buffer.value and len(words) > 1 else (words or [None])[0]
-    return name[:30] if name else None
+    return name_from_display(buffer.value)
+
+
+def name_from_display(display):
+    """The given name in a directory display name: the first word, or in
+    "Surname, Given Middle" order the first word after the comma."""
+    surname, comma, given = tidy(display).partition(",")
+    words = (given if comma and given.split() else surname).split()
+    return words[0][:30] if words else None
 
 
 def greeting(state):
@@ -517,7 +545,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.62.3"
+VERSION = "1.62.4"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -739,10 +767,12 @@ def policy(name):
         try:
             with winreg.OpenKey(hive, POLICY_KEY) as key:
                 value, kind = winreg.QueryValueEx(key, name)
-            if kind == winreg.REG_DWORD and value == 1:
-                return True
         except OSError:
-            pass
+            continue
+        # The computer's setting wins, Disabled (0) included, as with
+        # Windows' own policies: a user's Enabled can't override it.
+        if kind == winreg.REG_DWORD:
+            return value == 1
     return False
 
 
@@ -1732,14 +1762,13 @@ def sync_now(state, can_save):
         if other is not None:
             merge_sync(state, other, today())
         note_device(state, (other or {}).get("devices"))
-        global SYNCING
-        was, SYNCING = SYNCING, True
+        was, LOCAL.no_sync = getattr(LOCAL, "no_sync", False), True
         try:
             if state != base and not commit(state, base, can_save):
                 undo(state, base)
                 return False
         finally:
-            SYNCING = was
+            LOCAL.no_sync = was
         put, _, _ = net_sync(path, seal_sync(enc, mac, sync_body(state)), "PUT",
                              tag if status == 200 else "missing")
         if put != 412:
@@ -1747,37 +1776,46 @@ def sync_now(state, can_save):
     return False
 
 
-SYNCING = False
+# One background sync at a time; a save made while one runs asks for
+# another round, so it isn't left for the next unrelated save.
+BACKGROUND = {"running": False, "again": False}
+BACKGROUND_LOCK = threading.Lock()
 
 
 def sync_in_background(can_save):
     """Push a change to the other device without making anyone wait. Not a
     daemon thread, so it finishes, within the server timeout, before exit."""
-    import threading
+    with BACKGROUND_LOCK:
+        if BACKGROUND["running"]:
+            BACKGROUND["again"] = True
+            return
+        BACKGROUND["running"] = True
 
     def run():
-        global SYNCING
-        SYNCING = True
-        try:
-            state, ok = load(repair=False)
-            if ok:
-                sync_now(state, can_save)
-        except Exception as e:
-            log_error(e)
-        finally:
-            SYNCING = False
+        LOCAL.mute = LOCAL.no_sync = True
+        while True:
+            try:
+                state, ok = load(repair=False)
+                if ok:
+                    sync_now(state, can_save)
+            except Exception as e:
+                log_error(e)
+            with BACKGROUND_LOCK:
+                if not BACKGROUND["again"]:
+                    BACKGROUND["running"] = False
+                    return
+                BACKGROUND["again"] = False
     threading.Thread(target=run).start()
 
 
 def commit_then_sync(state, base, can_save):
     """Save without a background sync, for callers that sync right after:
     two at once could write the server's copy over each other."""
-    global SYNCING
-    was, SYNCING = SYNCING, True
+    was, LOCAL.no_sync = getattr(LOCAL, "no_sync", False), True
     try:
         return commit(state, base, can_save)
     finally:
-        SYNCING = was
+        LOCAL.no_sync = was
 
 
 def now_exact():
@@ -1958,6 +1996,8 @@ PRO_FINISHED = 1000
 # afternoon or evening, off unless chosen.
 AFTERNOON_TIMES = ("15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00")
 THEMES = ("sea", "sand", "night")
+# The window's background brush for each theme, made once a run.
+THEME_BRUSHES = {}
 
 _P = 2 ** 255 - 19
 _L = 2 ** 252 + 27742317777372353535851937790883648493
@@ -2159,6 +2199,14 @@ def set_afternoon(state, can_save, at):
         undo(state, base)
         return tr("Could not save that choice on this computer.")
     if not reminder_task(at, afternoon=True):
+        # The saved choice goes back, so it never says on while no task is.
+        refresh(state, can_save)
+        undone = copy.deepcopy(state)
+        state.pop("afternoon_at", None)
+        if base.get("afternoon_at"):
+            state["afternoon_at"] = base["afternoon_at"]
+        if not commit(state, undone, can_save):
+            undo(state, undone)
         return tr("Could not set the second check-in on this computer.")
     return (tr("The second check-in comes at {at} on days with an open plan.").format(
         at=at.lstrip("0")) if at else tr("The second check-in is off."))
@@ -2808,24 +2856,37 @@ def day(value):
     return datetime.date.fromisoformat(value).isoformat()
 
 
+# What backup_name makes: notes.json.bak, .bak2 and on, or .<date-time>.bak.
+BACKUP_NAME = re.compile(r"\.(bak\d*|\d{8}-\d{6}(-\d+)?\.bak)")
+
+
+def is_backup(name, base="notes.json"):
+    return name.startswith(base) and bool(BACKUP_NAME.fullmatch(name[len(base):]))
+
+
+def prune_backups(path, newest):
+    """The MaxBackups policy: the oldest backups beyond that many go, never
+    the one just made."""
+    keep = policy_value("MaxBackups", "number")
+    if not keep:
+        return
+    folder, base = os.path.split(path)
+    try:
+        old = sorted((os.path.getmtime(os.path.join(folder, n)), n)
+                     for n in os.listdir(folder)
+                     if is_backup(n, base) and n != os.path.basename(newest))
+    except OSError:
+        return
+    for _, n in old[:max(0, len(old) - keep + 1)]:
+        try:
+            os.remove(os.path.join(folder, n))
+        except OSError:
+            pass
+
+
 def backup_name(path):
     """notes.json.bak, or a numbered name when an earlier backup exists. Under
-    the TimestampBackups policy, notes.json.<date-time>.bak instead. The
-    MaxBackups policy deletes the oldest beyond that many first."""
-    keep = policy_value("MaxBackups", "number")
-    if keep:
-        folder, base = os.path.split(path)
-        try:
-            old = sorted((os.path.getmtime(os.path.join(folder, n)), n)
-                         for n in os.listdir(folder)
-                         if n.startswith(base + ".") and ".bak" in n)
-        except OSError:
-            old = []
-        for _, n in old[:max(0, len(old) - keep + 1)]:
-            try:
-                os.remove(os.path.join(folder, n))
-            except OSError:
-                pass
+    the TimestampBackups policy, notes.json.<date-time>.bak instead."""
     if policy("TimestampBackups"):
         stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         name, n = f"{path}.{stamp}.bak", 1
@@ -2966,7 +3027,18 @@ def load(repair=True):
         if not isinstance(raw, dict):
             raise ValueError("not an object")
         locked = set(raw) == {"locked", "data"}
-        raw = unseal(raw)
+        sealed = raw
+        # Unlocking can fail for a moment at sign-in, before Windows has the
+        # account's keys ready, so it's tried again before the file is
+        # called unreadable.
+        for attempt in range(3):
+            try:
+                raw = unseal(sealed)
+                break
+            except ValueError:
+                if not locked or attempt == 2:
+                    raise
+                time.sleep(0.5)
     except (ValueError, RecursionError, MemoryError):
         if not repair:
             return state, False
@@ -2975,6 +3047,8 @@ def load(repair=True):
             os.replace(path, backup)
         except OSError:
             return state, False
+        # Older backups beyond MaxBackups go only once this one is safe.
+        prune_backups(path, backup)
         if locked:
             para(tr("Your saved notes are locked to a Windows account that "
                     "can't open them here, so hello-world set them aside as a "
@@ -3087,7 +3161,7 @@ def load(repair=True):
     except ValueError:
         pass
     global CHOSEN_LANGUAGE, LANGUAGE_READ
-    if raw.get("lang") in LANGUAGE_NAMES:
+    if isinstance(raw.get("lang"), str) and raw["lang"] in LANGUAGE_NAMES:
         state["lang"] = raw["lang"]
     # Read once per run, so a choice made now shows from the next open and a
     # window never changes language half-way.
@@ -3313,7 +3387,14 @@ def save(state):
         return False
 
 
+# Per thread: mute stops a background sync's words from landing in whatever
+# the window is showing; no_sync stops a save from starting another sync.
+LOCAL = threading.local()
+
+
 def say(text=""):
+    if getattr(LOCAL, "mute", False):
+        return
     try:
         print(text, flush=True)
     except (OSError, ValueError) as e:
@@ -3654,12 +3735,15 @@ def reset(state):
         if word in QUIT_WORDS:
             raise Quit
         return None
+    # The server first, outside the lock: a slow server must not keep other
+    # windows waiting until they give up and write without it.
+    forget_server_copies(state)
     with file_lock():
-        return delete_everything(state)
+        return delete_everything(state, server=False)
 
 
-def delete_everything(state):
-    """The body of reset() once confirmed, run while holding the lock."""
+def forget_server_copies(state):
+    """The encrypted sync copy deleted, and the household list left."""
     if state.get("sync") and counts_server():
         # The encrypted copy on the server goes too.
         net_bytes(f"/v1/sync/{sync_keys(state['sync'])[0]}", b"", method="DELETE")
@@ -3675,14 +3759,21 @@ def delete_everything(state):
             doc = house_merge(state.get("house_list") or {}, theirs, house["me"])
             if _house_put(house["code"], house_leave(doc, house["me"]), tag) != "changed":
                 break
+
+
+def delete_everything(state, server=True):
+    """The body of reset() once confirmed, run while holding the lock. With
+    server, the server's copies too; reset() does that before the lock."""
+    if server:
+        forget_server_copies(state)
+    tidy_prints(every=True)
     leftovers = [data_file()]
     failed = []
     listing_failed = False
     try:
         leftovers += [os.path.join(data_dir(), n)
                       for n in os.listdir(data_dir())
-                      if n.startswith("notes.json.")
-                      and (n.endswith(".tmp") or n.startswith("notes.json.bak"))]
+                      if n.startswith("notes.json.") and (n.endswith(".tmp") or is_backup(n))]
     except FileNotFoundError:
         pass
     except OSError:
@@ -3820,7 +3911,7 @@ def commit(state, base, can_save, soft=()):
         mark_synced_change(state)
     with file_lock():
         saved = merge_and_save(state, base, soft)
-    if saved and not SYNCING and sync_on(state):
+    if saved and not getattr(LOCAL, "no_sync", False) and sync_on(state):
         sync_in_background(can_save)
     return saved
 
@@ -4560,7 +4651,8 @@ def set_repeat(state, can_save, text, at=None):
 
 def show_repeat():
     """The daily repeat's notification, from its task."""
-    state, _ = load()
+    # Nobody is at the screen, so a damaged file waits under the policy.
+    state, _ = load(repair=not policy("LeaveDamagedFile"))
     every = state.get("repeat")
     if not every:
         return 0
@@ -4578,7 +4670,6 @@ def fridge_page(state, d):
     the daily repeat, opened in the browser to print. Never the sync code.
     Returns what to say."""
     import html
-    import tempfile
     intent = state.get("intent")
     lines = [(tr("Today: {date}").format(date=long_date(d)), "h")]
     if intent and not plans_off():
@@ -4600,10 +4691,7 @@ def fridge_page(state, d):
         STARTED.append(page)
         return tr("The page opened in your browser. Print it from there.")
     try:
-        with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False,
-                                         encoding="utf-8") as f:
-            f.write(page)
-        os.startfile(f.name)
+        os.startfile(print_file(page, ".html", "utf-8"))
     except (OSError, AttributeError):
         return tr("Could not print just now.")
     return tr("The page opened in your browser. Print it from there.")
@@ -5076,7 +5164,11 @@ def typed_due(text, d):
         except ValueError:
             continue
         if y is None and (d - when).days > 180:
-            when = when.replace(year=d.year + 1)
+            try:
+                when = when.replace(year=d.year + 1)
+            except ValueError:
+                # 29 February, with no 29 February next year.
+                continue
         # A date with no year months away is more likely a number, such as
         # chapters 3/4; the due dates offered are the next ten workdays.
         if y is None and (when - d).days > MAX_GUESSED_DAYS:
@@ -5525,9 +5617,11 @@ def end_day(state, can_save, d, choose):
         if c == "aside":
             put_aside(state, part)
     carried = [part for part, c in zip(parts, picks) if c == "carry"]
+    # Due dates go with the things carried, as with every other carry.
     state["intent"] = {"text": "; ".join(carried),
                        "date": (d + datetime.timedelta(days=1)).isoformat(),
-                       "since": intent.get("since", intent["date"])} if carried else None
+                       "since": intent.get("since", intent["date"]),
+                       **carried_due(intent, "; ".join(carried))} if carried else None
     if not commit(state, base, can_save):
         undo(state, base)
         return tr("Could not save that on this computer. Nothing changed.")
@@ -5693,14 +5787,43 @@ def print_page(lines):
         PRINTED.append(text)
         return tr("Sent to the printer.")
     try:
-        import tempfile
-        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False,
-                                         encoding="utf-8-sig") as f:
-            f.write(text)
-        os.startfile(f.name, "print")
+        os.startfile(print_file(text, ".txt", "utf-8-sig"), "print")
     except (OSError, AttributeError):
         return tr("Could not print just now.")
     return tr("Sent to the printer.")
+
+
+PRINT_FOLDER = "printing"
+PRINT_MINUTES = 10
+
+
+def tidy_prints(every=False):
+    """Pages handed to the printer or browser hold plan text unlocked, so
+    they go once printed: after PRINT_MINUTES, or all at once."""
+    folder = os.path.join(data_dir(), PRINT_FOLDER)
+    try:
+        names = os.listdir(folder)
+    except OSError:
+        return
+    for name in names:
+        path = os.path.join(folder, name)
+        try:
+            if every or time.time() - os.path.getmtime(path) > PRINT_MINUTES * 60:
+                os.remove(path)
+        except OSError:
+            pass
+
+
+def print_file(text, suffix, encoding):
+    """A page for printing, in this person's own data folder rather than
+    the temp folder, so it is found and removed later."""
+    tidy_prints()
+    folder = os.path.join(data_dir(), PRINT_FOLDER)
+    os.makedirs(folder, exist_ok=True)
+    path = os.path.join(folder, f"hello-world-{os.urandom(4).hex()}{suffix}")
+    with open(path, "w", encoding=encoding) as f:
+        f.write(text)
+    return path
 
 
 def take_back(state, can_save, item, d):
@@ -5732,11 +5855,12 @@ def take_back(state, can_save, item, d):
 
 
 def daily(startup):
-    d = today()
-    iso = d.isoformat()
     person = interactive()
     # Repairing sets the file aside with a notice nobody might read.
     state, can_save = load(repair=person or not policy("LeaveDamagedFile"))
+    # After load(), which sets the person's day start.
+    d = today()
+    iso = d.isoformat()
     base = copy.deepcopy(state)
     seen_today = iso in state["visits"]
     typed_new = False
@@ -5747,6 +5871,7 @@ def daily(startup):
         # The phone's done list and plan, before anything is shown.
         quietly(sync_now, state, can_save)
     tidy_launcher()
+    tidy_prints()
     policy_reminder(state)
     if not seen_today:
         count_visit(state, d)
@@ -6162,6 +6287,10 @@ def read_handoff():
             text = clean(note["text"])
         except (TypeError, KeyError, ValueError):
             continue
+        # Anyone who can write the file could give a time with a zone; it's
+        # compared with this PC's local time, so it becomes one.
+        if at.tzinfo is not None:
+            at = at.astimezone().replace(tzinfo=None)
         if text:
             notes.append({"text": text, "at": at.isoformat(timespec="minutes"),
                           "keep": note.get("keep") is True})
@@ -6800,13 +6929,27 @@ def last_workday(state, d):
     return when
 
 
+def find_git():
+    """git from PATH's full folders only. shutil.which on Windows looks in
+    the current folder first, so a git.bat in a cloned repository would run
+    instead."""
+    names = ["git.exe"] if os.name == "nt" else ["git"]
+    for folder in os.environ.get("PATH", "").split(os.pathsep):
+        if not folder or not os.path.isabs(folder):
+            continue
+        for name in names:
+            path = os.path.join(folder, name)
+            if os.path.isfile(path) and os.access(path, os.X_OK):
+                return path
+    return None
+
+
 def git_commits(repos, authors, since):
     """The subjects of the person's commits since that day, from local
     repositories only. Returns (lines, problem or "")."""
     import glob
-    import shutil
     import subprocess
-    git = shutil.which("git")
+    git = find_git()
     if not git:
         return [], tr("git wasn't found, so no commits are listed.")
     folders = []
@@ -6817,7 +6960,9 @@ def git_commits(repos, authors, since):
 
     def out(folder, *args):
         try:
-            done = subprocess.run([git, "-C", folder, *args], capture_output=True,
+            # A repository's own config can't run a program here.
+            done = subprocess.run([git, "-c", "core.fsmonitor=false", "-c", "core.hooksPath=",
+                                   "-C", folder, *args], capture_output=True,
                                   text=True, encoding="utf-8", errors="replace",
                                   timeout=10, stdin=subprocess.DEVNULL)
         except (OSError, subprocess.SubprocessError):
@@ -6831,8 +6976,8 @@ def git_commits(repos, authors, since):
         if not who:
             continue
         log = out(folder, "log", "--all", "--no-merges", f"--since={since.isoformat()} 00:00",
-                  "--format=%s", f"-{MAX_COMMITS}",
-                  *[f"--author={re.escape(a)}" for a in who])
+                  "--format=%s", f"-{MAX_COMMITS}", "--fixed-strings",
+                  *[f"--author={a}" for a in who])
         name = os.path.basename(os.path.abspath(folder))
         for subject in (log or "").splitlines():
             if subject := tidy(subject):
@@ -7192,6 +7337,10 @@ def reminder_task(at, repeat=False, afternoon=False):
         r = subprocess.run(["schtasks", "/Delete", "/F", "/TN", name],
                            capture_output=True, creationflags=flags)
         return r.returncode == 0 or not task_on(name)
+    # Task Scheduler expands %VAR% in the command, and a quote would end
+    # it, so a folder with either can't hold a task that works.
+    if launcher_command() is None:
+        return False
     # StartWhenAvailable runs it at the next sign-in when the PC was off at
     # the time, which schtasks /Create can only set from XML.
     xml = ('<?xml version="1.0" encoding="UTF-16"?>'
@@ -7257,7 +7406,9 @@ def reminder_keys(on):
              classes + "\\" + APP_ID + r"\shell\open",
              classes + "\\" + APP_ID + r"\shell", classes + "\\" + APP_ID,
              classes + r"\AppUserModelId" + "\\" + APP_ID)
-    if not on:
+    # The shell expands %VAR% in the command too, so a folder that can't be
+    # quoted gets no answer links, as it gets no launcher.
+    if not on or launcher_command() is None:
         for name in names:
             try:
                 winreg.DeleteKey(winreg.HKEY_CURRENT_USER, name)
@@ -7297,9 +7448,10 @@ def reminder_due(state, d):
 
 def sign_in():
     """The launcher's run at sign-in, in pythonw.exe."""
-    d = today()
     # Nobody is at the screen yet, so a damaged file waits under the policy.
     state, can_save = load(repair=not policy("LeaveDamagedFile"))
+    # After load(), which sets the person's day start.
+    d = today()
     if policy("DisableSignInLauncher"):
         quietly(tidy_launcher)
         return 0
@@ -7469,6 +7621,11 @@ def run_tray():
 
     shell.Shell_NotifyIconW.argtypes = [wt.DWORD, ctypes.POINTER(NOTIFYICONDATAW)]
     callback = 0x0400 + 20  # WM_USER + 20
+    # Sent to every top-level window when Explorer starts again after a
+    # crash or restart; the icon must then be added again.
+    user.RegisterWindowMessageW.argtypes = [wt.LPCWSTR]
+    user.RegisterWindowMessageW.restype = wt.UINT
+    taskbar_created = user.RegisterWindowMessageW("TaskbarCreated")
     plain = user.LoadIconW(None, ctypes.c_void_p(32512))    # IDI_APPLICATION
     waiting = user.LoadIconW(None, ctypes.c_void_p(32516))  # IDI_INFORMATION, the dot
     data = NOTIFYICONDATAW()
@@ -7478,8 +7635,8 @@ def run_tray():
     data.uCallbackMessage = callback
 
     def refresh_icon(add=False):
-        d = today()
         state, _ = load(repair=False)
+        d = today()
         if not state.get("tray"):
             user.PostMessageW(data.hWnd, 0x0010, 0, 0)  # WM_CLOSE: turned off
             return
@@ -7516,6 +7673,8 @@ def run_tray():
                     user.PostMessageW(hwnd, 0x0010, 0, 0)
             elif msg == 0x0113:  # WM_TIMER: a new day, or an answer elsewhere
                 refresh_icon()
+            elif taskbar_created and msg == taskbar_created:
+                refresh_icon(add=True)
             elif msg == 0x0010:  # WM_CLOSE
                 shell.Shell_NotifyIconW(2, ctypes.byref(data))  # NIM_DELETE
                 user.PostQuitMessage(0)
@@ -7636,8 +7795,9 @@ def answer_reminder(link):
         return show_window()
     if word not in ("done", "notyet", "skip") or not key:
         return 2
-    d = today()
     state, can_save = load(repair=not policy("LeaveDamagedFile"))
+    # After load(), which sets the person's day start.
+    d = today()
     intent = state["intent"]
     # An old notification, or a link from anywhere else, names another plan.
     if asks_followup(intent, d) and plan_key(intent["text"], intent["date"]) == key:
@@ -7667,9 +7827,10 @@ class Visit:
         return visit
 
     def __init__(self, redraw=False):
+        (self.state, self.can_save), said = quietly(load)
+        # After load(), which sets the person's day start.
         self.d = today()
         self.iso = self.d.isoformat()
-        (self.state, self.can_save), said = quietly(load)
         if sync_on(self.state):
             quietly(sync_now, self.state, self.can_save)
         state, d = self.state, self.d
@@ -7858,8 +8019,9 @@ class Visit:
     def delete_all(self):
         """Delete everything saved, as menu option 4 does. Returns the message."""
         def delete():
+            forget_server_copies(self.state)
             with file_lock():
-                return delete_everything(self.state)
+                return delete_everything(self.state, server=False)
         _, said = quietly(delete)
         self.followup = None
         return said
@@ -8142,26 +8304,28 @@ class Window:
 
     def theme_colours(self):
         """Pro's window colours, or None: none with high contrast on, which
-        always wins."""
+        always wins, checked each time so turning it on takes effect at once.
+        One brush per colour for the whole run, so reopening leaks none."""
         state = self.visit.state
         if not (pro_on(state) and state.get("theme") in THEME_COLOURS):
             return None
-        if getattr(self, "theme_brush", None) is None:
-            import ctypes
-            from ctypes import wintypes as wt
+        import ctypes
+        from ctypes import wintypes as wt
 
-            class HIGHCONTRASTW(ctypes.Structure):
-                _fields_ = [("cbSize", wt.UINT), ("dwFlags", wt.DWORD),
-                            ("lpszDefaultScheme", wt.LPWSTR)]
-            contrast = HIGHCONTRASTW(ctypes.sizeof(HIGHCONTRASTW), 0, None)
-            self.user.SystemParametersInfoW(0x42, ctypes.sizeof(contrast),
-                                            ctypes.byref(contrast), 0)
-            if contrast.dwFlags & 1:
-                self.theme_brush = False
-                return None
+        class HIGHCONTRASTW(ctypes.Structure):
+            _fields_ = [("cbSize", wt.UINT), ("dwFlags", wt.DWORD),
+                        ("lpszDefaultScheme", wt.LPWSTR)]
+        contrast = HIGHCONTRASTW(ctypes.sizeof(HIGHCONTRASTW), 0, None)
+        self.user.SystemParametersInfoW(0x42, ctypes.sizeof(contrast),
+                                        ctypes.byref(contrast), 0)
+        if contrast.dwFlags & 1:
+            return None
+        theme = state["theme"]
+        if theme not in THEME_BRUSHES:
             self.gdi.CreateSolidBrush.restype = wt.HBRUSH
-            self.theme_brush = self.gdi.CreateSolidBrush(THEME_COLOURS[state["theme"]][1])
-        return THEME_COLOURS[state["theme"]] if self.theme_brush else None
+            THEME_BRUSHES[theme] = self.gdi.CreateSolidBrush(THEME_COLOURS[theme][1])
+        self.theme_brush = THEME_BRUSHES[theme]
+        return THEME_COLOURS[theme] if self.theme_brush else None
 
     def react_label(self, kind):
         """A reaction's button: its count once this PC has reacted, so the
@@ -8976,6 +9140,8 @@ class Window:
         kernel = ctypes.WinDLL("kernel32")
         kernel.GlobalLock.restype = ctypes.c_void_p
         kernel.GlobalLock.argtypes = kernel.GlobalUnlock.argtypes = [wt.HGLOBAL]
+        kernel.GlobalSize.restype = ctypes.c_size_t
+        kernel.GlobalSize.argtypes = [wt.HGLOBAL]
         self.user.GetClipboardData.restype = wt.HANDLE
         if not self.user.OpenClipboard(self.hwnd):
             return ""
@@ -8985,7 +9151,10 @@ class Window:
             if not pointer:
                 return ""
             try:
-                return ctypes.wstring_at(pointer)[:2000]
+                # Never past the end of what another program put there,
+                # whether or not it ended its text.
+                chars = min(kernel.GlobalSize(handle) // 2, 2000)
+                return ctypes.wstring_at(pointer, chars).split("\0", 1)[0]
             finally:
                 kernel.GlobalUnlock(handle)
         finally:
@@ -9381,7 +9550,18 @@ def language_fits(data):
             and data.get("tips_floor", ("",)) != ()
             # The same {names} as the English, or showing it raises KeyError.
             and all(set(PLACEHOLDER.findall(k)) == set(PLACEHOLDER.findall(v))
-                    for k, v in data["text"].items()))
+                    for k, v in data["text"].items())
+            and date_pattern_fits(data["date"]))
+
+
+def date_pattern_fits(pattern):
+    """A date pattern long_date can fill: only {day}, {d}, {month} and
+    {year}, so a misspelt field can't break every date shown."""
+    try:
+        pattern.format(day="", d="", month="", year="")
+        return True
+    except (KeyError, IndexError, ValueError, AttributeError):
+        return False
 
 
 def load_languages(folder=None):
