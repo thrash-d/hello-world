@@ -926,7 +926,12 @@
   "The household list can't be reached just now, so you haven't left yet. Try again when you're online.": "现在连不上家庭清单，所以你还没有离开。联网后再试一次。",
   "The household list can't be reached just now, or someone already made a new code. Nothing changed.": "现在连不上家庭清单，或者有人已经生成了新代码。什么都没有改变。",
   "Type your name, as the others will see it, in the plan box first, then choose this again.": "请先在计划框里输入你的名字（其他人会看到），然后再选一次这个。",
-  "Added to tomorrow's plan, with what you carried.": "已加到明天的计划里，和你带过去的一起。"
+  "Added to tomorrow's plan, with what you carried.": "已加到明天的计划里，和你带过去的一起。",
+  "Sync is off on this computer, but the server couldn't be reached to delete its encrypted copy. Turn sync on and off again later to delete it; otherwise it goes after a year untouched.": "这台电脑已关闭同步，但连不上服务器，无法删除它的加密副本。稍后再打开并关闭同步即可删除；否则它会在一年不用后自动删除。",
+  "The server can't be reached just now. Nothing changed.": "现在连不上服务器。什么都没有改变。",
+  "This letter is too long to open in your mail program in one go. It stays here: copy its text into a new mail instead.": "这封信太长，无法在邮件程序里一次打开。它会留在这里：请把内容复制到新邮件里。",
+  "You've left the household list, and the others are told, but this computer couldn't save that; it will show the list until it can.": "你已离开家庭清单，其他人会知道，但这台电脑没能保存这一点；在能保存之前它会继续显示清单。",
+  "Your sync code was changed on another device, so this computer stopped syncing. Turn sync off and on here for a new code, and type it on your other devices.": "你的同步代码已在另一台设备上更改，所以这台电脑停止了同步。在这里关闭再打开同步以获得新代码，并在其他设备上输入它。"
  },
  "tips_floor": [
   "开始第一单活之前，先确认您走的通道畅通。",

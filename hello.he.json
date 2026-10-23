@@ -926,7 +926,12 @@
   "The household list can't be reached just now, so you haven't left yet. Try again when you're online.": "אי אפשר להגיע לרשימת הבית כרגע, אז עוד לא יצאת. נסה שוב כשתהיה מחובר.",
   "The household list can't be reached just now, or someone already made a new code. Nothing changed.": "אי אפשר להגיע לרשימת הבית כרגע, או שמישהו כבר יצר קוד חדש. שום דבר לא השתנה.",
   "Type your name, as the others will see it, in the plan box first, then choose this again.": "הקלד קודם את שמך, כפי שהאחרים יראו, בתיבת התוכנית, ואז בחר בזה שוב.",
-  "Added to tomorrow's plan, with what you carried.": "נוסף לתוכנית של מחר, יחד עם מה שהעברת."
+  "Added to tomorrow's plan, with what you carried.": "נוסף לתוכנית של מחר, יחד עם מה שהעברת.",
+  "Sync is off on this computer, but the server couldn't be reached to delete its encrypted copy. Turn sync on and off again later to delete it; otherwise it goes after a year untouched.": "הסנכרון כבוי במחשב הזה, אבל לא היה אפשר להגיע לשרת כדי למחוק את העותק המוצפן. הפעל וכבה את הסנכרון מאוחר יותר כדי למחוק אותו; אחרת הוא יימחק אחרי שנה בלי שימוש.",
+  "The server can't be reached just now. Nothing changed.": "אי אפשר להגיע לשרת כרגע. שום דבר לא השתנה.",
+  "This letter is too long to open in your mail program in one go. It stays here: copy its text into a new mail instead.": "המכתב הזה ארוך מדי כדי להיפתח בבת אחת בתוכנת הדואר. הוא נשאר כאן: העתק את הטקסט שלו להודעה חדשה.",
+  "You've left the household list, and the others are told, but this computer couldn't save that; it will show the list until it can.": "יצאת מרשימת הבית, והאחרים יידעו, אבל המחשב הזה לא הצליח לשמור את זה; הוא יציג את הרשימה עד שיצליח.",
+  "Your sync code was changed on another device, so this computer stopped syncing. Turn sync off and on here for a new code, and type it on your other devices.": "קוד הסנכרון שלך שונה במכשיר אחר, ולכן המחשב הזה הפסיק לסנכרן. כבה והפעל את הסנכרון כאן כדי לקבל קוד חדש, והקלד אותו במכשירים האחרים שלך."
  },
  "tips_floor": [
   "לבדוק שהמעבר פנוי לפני המשימה הראשונה במשמרת.",

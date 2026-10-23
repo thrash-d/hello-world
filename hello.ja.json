@@ -926,7 +926,12 @@
   "The household list can't be reached just now, so you haven't left yet. Try again when you're online.": "今は家族リストにつながらないので、まだ抜けていません。オンラインのときにもう一度試してください。",
   "The household list can't be reached just now, or someone already made a new code. Nothing changed.": "今は家族リストにつながらないか、誰かがもう新しいコードを作りました。何も変わっていません。",
   "Type your name, as the others will see it, in the plan box first, then choose this again.": "まず予定の欄に、他の人に表示される名前を入力してから、もう一度これを選んでください。",
-  "Added to tomorrow's plan, with what you carried.": "持ち越したものと一緒に、明日の予定に追加しました。"
+  "Added to tomorrow's plan, with what you carried.": "持ち越したものと一緒に、明日の予定に追加しました。",
+  "Sync is off on this computer, but the server couldn't be reached to delete its encrypted copy. Turn sync on and off again later to delete it; otherwise it goes after a year untouched.": "このパソコンの同期はオフになりましたが、サーバーにつながらず、暗号化されたコピーを削除できませんでした。後で同期をオンにしてからオフにすると削除されます。そのままでも、使われないまま1年たつと消えます。",
+  "The server can't be reached just now. Nothing changed.": "今はサーバーにつながりません。何も変わっていません。",
+  "This letter is too long to open in your mail program in one go. It stays here: copy its text into a new mail instead.": "この手紙は長すぎて、メールソフトで一度に開けません。ここに残ります。文章を新しいメールにコピーしてください。",
+  "You've left the household list, and the others are told, but this computer couldn't save that; it will show the list until it can.": "家族リストを抜け、他の人にも知らされましたが、このパソコンに保存できませんでした。保存できるまでリストは表示されます。",
+  "Your sync code was changed on another device, so this computer stopped syncing. Turn sync off and on here for a new code, and type it on your other devices.": "同期コードが別の端末で変更されたため、このパソコンは同期をやめました。ここで同期をオフにしてからオンにすると新しいコードが出るので、他の端末に入力してください。"
  },
  "tips_floor": [
   "シフト最初の作業の前に、通路に物が置かれていないか確認しましょう。",

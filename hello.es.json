@@ -926,7 +926,12 @@
   "The household list can't be reached just now, so you haven't left yet. Try again when you're online.": "Ahora no se puede llegar a la lista del hogar, así que aún no saliste. Inténtalo de nuevo cuando tengas conexión.",
   "The household list can't be reached just now, or someone already made a new code. Nothing changed.": "Ahora no se puede llegar a la lista del hogar, o alguien ya hizo un código nuevo. No cambió nada.",
   "Type your name, as the others will see it, in the plan box first, then choose this again.": "Escribe primero tu nombre, como lo verán los demás, en el cuadro del plan, y luego elige esto otra vez.",
-  "Added to tomorrow's plan, with what you carried.": "Añadido al plan de mañana, con lo que llevaste."
+  "Added to tomorrow's plan, with what you carried.": "Añadido al plan de mañana, con lo que llevaste.",
+  "Sync is off on this computer, but the server couldn't be reached to delete its encrypted copy. Turn sync on and off again later to delete it; otherwise it goes after a year untouched.": "La sincronización está desactivada en este ordenador, pero no se pudo llegar al servidor para borrar su copia cifrada. Activa y desactiva la sincronización más tarde para borrarla; si no, se borra sola tras un año sin uso.",
+  "The server can't be reached just now. Nothing changed.": "Ahora no se puede llegar al servidor. No cambió nada.",
+  "This letter is too long to open in your mail program in one go. It stays here: copy its text into a new mail instead.": "Esta carta es demasiado larga para abrirla de una vez en tu programa de correo. Se queda aquí: copia su texto en un correo nuevo.",
+  "You've left the household list, and the others are told, but this computer couldn't save that; it will show the list until it can.": "Saliste de la lista del hogar, y los demás lo verán, pero este ordenador no pudo guardarlo; mostrará la lista hasta que pueda.",
+  "Your sync code was changed on another device, so this computer stopped syncing. Turn sync off and on here for a new code, and type it on your other devices.": "Tu código de sincronización se cambió en otro dispositivo, así que este ordenador dejó de sincronizar. Desactiva y activa la sincronización aquí para tener un código nuevo, y escríbelo en tus otros dispositivos."
  },
  "tips_floor": [
   "Comprueba que tu zona de paso está despejada antes de la primera tarea del turno.",

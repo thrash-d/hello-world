@@ -1999,7 +1999,8 @@ def _screen_keys():
             and n.args and isinstance(n.args[0], ast.Constant)]
     keys += [hello.HELP, hello.MENU_HELP, hello.SAVED_PLAN, hello.GREETING,
              hello.SCAM_LINE, hello.SHIELD_QUESTION, hello.SHIELD_STOP, hello.SIDEWAYS_SAID,
-             hello.KEY_SCAM_LINE, hello.PRO_PITCH, hello.CARRIED_SAID]
+             hello.KEY_SCAM_LINE, hello.PRO_PITCH, hello.CARRIED_SAID, hello.LETTER_TOO_LONG,
+             hello.SYNC_MOVED_LINE]
     # say() doesn't wrap, so what it prints as is must fit 72 columns, less
     # the "  2  " in front of a menu line.
     raw = {n.args[0].value: isinstance(call.args[0], ast.BinOp)
@@ -4399,8 +4400,16 @@ def test_the_sync_code_stays_hidden_when_someone_is_on_the_phone():
         said = hello.change_sync_code(state, can_save)
         new = notes(first.home)["sync"]
         assert new != code and "old code no longer works" in said
-        assert not os.path.exists(os.path.join(folder, "sync", old_label))
+        # The old copy holds only a note that the code moved, so a device
+        # still on the old code stops syncing instead of starting it again.
+        _, enc, mac = hello.sync_keys(code)
+        with open(os.path.join(folder, "sync", old_label), "rb") as f:
+            moved = hello.open_sync(enc, mac, f.read())
+        assert set(moved) == {"moved", "pad"}
         assert os.path.exists(os.path.join(folder, "sync", hello.sync_keys(new)[0]))
+        stale = dict(state, sync=code)
+        assert not hello.sync_now(stale, can_save) and hello.SYNC_MOVED
+        hello.SYNC_MOVED = False
         # The command line prints the warning with the code.
         p = run(["sync", "code"], home=first.home, policy={"SharedCountsServer": url})
         assert "never call" in p.stdout and new in p.stdout
@@ -5072,6 +5081,127 @@ def test_the_household_list_checks_everything_a_code_holder_writes():
     assert len(hello.house_seal("k7mqa-2p9xb-tz4wc-8hcdd-r3vne", big)) < 64_000
 
 
+def test_round_92_the_counts_server_counts_each_pc_once_across_midnight():
+    import datetime
+    import urllib.error
+    import urllib.request
+    server, url, folder = _counts_server()
+    counts, mod = server.counts, server.mod
+    try:
+        day = _utc_today()
+        # PCs behind one office address each count, by their own token; one
+        # PC counts once however often it sends.
+        for pc in ("a" * 32, "b" * 32, "a" * 32, ""):
+            counts.add(day, "tip", "203.0.113.5", pc)
+        assert counts.read(day)["tip"] == 3
+        # After UTC midnight the same PC still can't count the day again.
+        counts.salt_day = "2000-01-01"
+        counts.add(day, "tip", "203.0.113.5", "a" * 32)
+        assert counts.read(day)["tip"] == 3
+        # One address can't add more than PCS_PER_ADDRESS tokens.
+        mod.PCS_PER_ADDRESS = 2
+        for n in range(5):
+            counts.add(day, "react/love".split("/")[1], "198.51.100.9", f"{n:032x}")
+        assert counts.read(day)["react"]["love"] == 3
+        # IPv6 addresses count by their /64; mapped IPv4 as itself.
+        assert mod.address_of("2001:db8::1") == mod.address_of("2001:db8::ffff") == "2001:db8::/64"
+        assert mod.address_of("::ffff:192.0.2.1") == "192.0.2.1"
+        # A post's body carries only the token; a bad one is ignored.
+        request = urllib.request.Request(f"{url}/v1/day/{day}/tip", data=b'{"pc": "zz"}', method="POST")
+        with urllib.request.urlopen(request, timeout=5) as r:
+            assert r.status == 200
+        # The weekly push key: an unreadable one stops the server instead of
+        # being replaced, and a new one is readable by its owner only.
+        key = os.path.join(folder, "vapid.json")
+        mod.Push(folder)
+        if os.name != "nt":
+            assert os.stat(key).st_mode & 0o077 == 0
+        with open(key, "w", encoding="utf-8") as f:
+            f.write("{")
+        try:
+            mod.Push(folder)
+            raise AssertionError("a broken key was replaced")
+        except SystemExit as e:
+            assert "Restore it" in str(e)
+        os.remove(key)
+        push = mod.Push(folder)
+        assert '"aud": "https://fcm.googleapis.com"' in base64.urlsafe_b64decode(
+            push.header("https://fcm.googleapis.com:443/x", 0).split(".")[1] + "==").decode()
+        # A send that changes the phone's times while its reminder goes out
+        # keeps the change.
+        token = "c" * 32
+        push.save(token, {"endpoint": "https://fcm.googleapis.com/x", "times": ["07:00"]})
+        when = datetime.datetime(2026, 10, 10, 7, 0, tzinfo=datetime.timezone.utc)
+
+        def send(endpoint, now):
+            push.save(token, {"endpoint": "https://fcm.googleapis.com/y", "times": ["08:00"]})
+            return 201
+        assert push.due(when, send) == 1
+        with open(push.path(token), encoding="utf-8") as f:
+            saved = json.load(f)
+        assert saved["times"] == ["08:00"] and saved["endpoint"].endswith("/y")
+        # Errors are reported without the client's address.
+        import contextlib
+        import io
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            try:
+                raise ValueError("boom")
+            except ValueError:
+                server.handle_error(None, ("192.0.2.77", 1234))
+        assert "boom" in err.getvalue() and "192.0.2.77" not in err.getvalue()
+    finally:
+        server.shutdown()
+
+
+def test_round_92_sync_and_counts_on_the_pc():
+    server, url, folder = _counts_server(min_group=10)
+    try:
+        first = run(text="n\nCall Ana\n\n", policy={"SharedCountsServer": url})
+        hello = _window_hello(home=first.home)
+        hello.POLICY = {"SharedCountsServer": url}
+        state, can_save = hello.load()
+        # Below the minimum group the server says "few", which is a count.
+        import datetime
+        assert "a few" in hello.did_tip(state, can_save, datetime.date.fromisoformat(_utc_today()))
+        assert notes(first.home)["tip_day"] == _utc_today()
+        assert len(notes(first.home)["count_key"]) == 32
+        # A copy with nonsense in it doesn't crash the merge.
+        assert hello.merge_sync(state, {"finished": 5, "intent": {"text": "x"},
+                                        "updated": hello.now_exact().isoformat()}, hello.today()) in (True, False)
+        # A long history still fits the server, padded to whole kilobytes.
+        big = dict(state, finished=[{"text": "水" * 120, "date": "2026-01-01"}] * 1000)
+        _, enc, mac = hello.sync_keys("k7mqa-2p9xb-tz4wc-8hcdd-r3vne")
+        body = hello.sync_body(big)
+        sealed = hello.seal_sync(enc, mac, body)
+        assert len(sealed) < 64_000 and (len(sealed) - 50) % 1024 == 0 and body["finished"]
+        # Changing the code first pulls what the phone sent under the old one.
+        hello.set_sync(state, can_save, True)
+        code = state["sync"]
+        label, enc, mac = hello.sync_keys(code)
+        with open(os.path.join(folder, "sync", label), "rb") as f:
+            copy = hello.open_sync(enc, mac, f.read())
+        copy["finished"].append({"text": "Phone thing", "date": hello.today().isoformat()})
+        with open(os.path.join(folder, "sync", label), "wb") as f:
+            f.write(hello.seal_sync(enc, mac, copy))
+        assert "no longer works" in hello.change_sync_code(state, can_save)
+        assert any(i["text"] == "Phone thing" for i in notes(first.home)["finished"])
+        # Turning sync off says so plainly when the copy couldn't be deleted.
+        hello.POLICY = {"SharedCountsServer": "http://127.0.0.1:9"}
+        assert "couldn't be reached" in hello.set_sync(state, can_save, False)
+        # No server at all: nothing crashes, nothing is sent.
+        hello.POLICY = {}
+        assert hello.net("/v1/day/x") is None and hello.net_sync("/v1/sync/x")[0] == 0
+        assert not hello.house_on({"house": {"code": "x"}})
+        hello.POLICY = {"SharedCountsServer": url, "TurnOffSync": 1}
+        assert not hello.house_on({"house": {"code": "x"}})
+        # A letter too long for a mail link isn't sent cut short.
+        hello.STARTED = []
+        assert hello.mail_letter({"to": "", "text": "水" * 400}) == "long" and hello.STARTED == []
+    finally:
+        server.shutdown()
+
+
 def test_review_fixes_for_closing_the_day_pro_keys_and_letters():
     hello = _load_hello()
     # After End the day, a plan typed the same day joins tomorrow's.
@@ -5151,6 +5281,15 @@ def test_the_household_list_through_the_server_with_a_household_key():
         # Making a new code needs the newest copy: from a dead code, nothing.
         stale = dict(state, house=dict(state["house"], code=code))
         assert "Nothing changed" in a.house_rekey(stale, can_save)
+        # A copy someone already moved is closed: no second new code, and
+        # nothing more is written to it.
+        current = state["house"]["code"]
+        theirs, tag = a._house_get(current)
+        claimed = a.house_merge({}, theirs)
+        claimed["rekeyed"] = a.house_stamp()
+        assert a._house_put(current, claimed, tag) is True
+        assert a.house_sync(state, can_save)[1] is False
+        assert "Nothing changed" in a.house_rekey(state, can_save) and state["house"]["code"] == current
     finally:
         server.shutdown()
 
