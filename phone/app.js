@@ -480,9 +480,11 @@ function utcTime(at, now) {
 function pushText(prefs, now) {
   now = now || new Date();
   const minutes = now.getHours() * 60 + now.getMinutes();
+  // The server retries a missed push for 15 minutes, including past midnight.
   const near = (at) => {
     const [h, m] = at.split(":").map(Number);
-    return Math.abs(h * 60 + m - minutes) <= 10;
+    const diff = Math.abs(h * 60 + m - minutes);
+    return Math.min(diff, 1440 - diff) <= 15;
   };
   if (prefs && prefs.repeat && near(prefs.repeat.at)) return prefs.repeat.text;
   return (prefs && prefs.checkin) || UI.en.remindShown;
@@ -611,7 +613,18 @@ function newCode() {
 }
 
 const houseStamp = (d) => (d || new Date()).toISOString().slice(0, 19) + "Z";
-const houseTime = (v, latest) => (typeof v === "string" && HOUSE_STAMP.test(v) && v <= latest ? v : null);
+// A real UTC time, not only the shape. 99:99:99 matches the shape and then
+// crashes the next tick.
+function houseTime(v, latest) {
+  if (typeof v !== "string" || !HOUSE_STAMP.test(v) || v > latest) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})Z$/.exec(v);
+  if (!m) return null;
+  const y = +m[1], mo = +m[2], d = +m[3], h = +m[4], mi = +m[5], s = +m[6];
+  const at = new Date(Date.UTC(y, mo - 1, d, h, mi, s));
+  if (at.getUTCFullYear() !== y || at.getUTCMonth() !== mo - 1 || at.getUTCDate() !== d
+      || at.getUTCHours() !== h || at.getUTCMinutes() !== mi || at.getUTCSeconds() !== s) return null;
+  return v;
+}
 function houseText(v, n) {
   if (typeof v !== "string") return "";
   return v.replace(/[‌-‏]|[\p{Cc}\p{Cf}\p{Co}\p{Cs}\p{Zl}\p{Zp}]/gu, (c) => (/[‌-‏]/.test(c) ? c : " "))
@@ -706,22 +719,30 @@ function houseMerge(doc, other, me) {
   const latest = houseStamp(new Date(Date.now() + 86400000));
   const sides = [doc, other].map((s) => (s && typeof s === "object" ? s : {}));
   const out = { members: bare(), items: bare(), gone: bare() };
-  sides.forEach((side, n) => entries(side.members).forEach(([id, m]) => {
-    if (!HOUSE_ID.test(id) || !m || typeof m !== "object") return;
-    const name = houseText(m.name, HOUSE.name), joined = houseTime(m.joined, latest);
-    if (!name || !joined) return;
-    // This device's members first, so made-up members can't push out real
-    // ones. Someone who left doesn't take a place.
-    if (!own(out.members, id)) {
-      const gone = houseTime(m.left, latest);
-      if (gone) {
+  sides.forEach((side, n) => {
+    const fresh = [];
+    entries(side.members).forEach(([id, m]) => {
+      if (!HOUSE_ID.test(id) || !m || typeof m !== "object") return;
+      const name = houseText(m.name, HOUSE.name), joined = houseTime(m.joined, latest);
+      if (!name || !joined) return;
+      const left = houseTime(m.left, latest);
+      // A leave on someone already kept frees a place before new people are
+      // added. This device's members come first, so made-up ones can't push
+      // real ones out. Someone who left doesn't take a place.
+      if (own(out.members, id)) {
+        if (left && !(id === me && n === 1) && left > (out.members[id].left || "")) out.members[id].left = left;
+        return;
+      }
+      fresh.push([id, name, joined, left]);
+    });
+    fresh.forEach(([id, name, joined, left]) => {
+      if (left) {
         if (Object.keys(out.members).length >= HOUSE.members * 2) return;
       } else if (houseActive(out.members) >= HOUSE.members) return;
       out.members[id] = { name, joined };
-    }
-    const left = houseTime(m.left, latest);
-    if (left && !(id === me && n === 1) && left > (out.members[id].left || "")) out.members[id].left = left;
-  }));
+      if (left && !(id === me && n === 1)) out.members[id].left = left;
+    });
+  });
   houseTrimMembers(out.members);
   sides.forEach((side) => entries(side.items).forEach(([id, item]) => {
     if (!HOUSE_ID.test(id) || !item || typeof item !== "object") return;
@@ -1431,8 +1452,10 @@ if (typeof document !== "undefined") {
   }
   // True, "changed" when someone else wrote since `tag` was read, or false.
   async function housePut(stored, doc, tag) {
-    const k = asBytes(stored), headers = { "Content-Type": "application/octet-stream" };
-    if (tag) headers["If-Match"] = tag;
+    // No version, no write. A missing tag used to omit If-Match, and the
+    // server then replaced whatever was stored.
+    if (!tag) return false;
+    const k = asBytes(stored), headers = { "Content-Type": "application/octet-stream", "If-Match": tag };
     try {
       const put = await fetch(houseUrl(k), { method: "PUT", redirect: "error", body: await sealSync(k, houseBody(doc)), headers });
       return put.ok ? true : put.status === 412 ? "changed" : false;
