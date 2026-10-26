@@ -517,7 +517,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.62.2"
+VERSION = "1.62.3"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -948,9 +948,18 @@ def _house_when(stamp):
 
 
 def _house_time(value, latest):
-    """A well-formed time no later than a day from now, else None: a time
-    far ahead would win every later change."""
-    return value if isinstance(value, str) and HOUSE_STAMP.fullmatch(value) and value <= latest else None
+    """A real UTC time no later than a day from now, else None.
+
+    The shape alone is not enough: 99:99:99 matches it and then crashes
+    the history line. A time far ahead would win every later change.
+    """
+    if not (isinstance(value, str) and HOUSE_STAMP.fullmatch(value) and value <= latest):
+        return None
+    try:
+        datetime.datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError:
+        return None
+    return value
 
 
 def _house_name(value, size):
@@ -1066,24 +1075,33 @@ def house_merge(doc, other, me=None):
     out = {"members": {}, "items": {}, "gone": {}}
     for n, side in enumerate(sides):
         members = side.get("members") if isinstance(side.get("members"), dict) else {}
+        fresh = []
         for mid, m in members.items():
             if not (isinstance(mid, str) and HOUSE_ID.fullmatch(mid) and isinstance(m, dict)):
                 continue
             name, joined = _house_name(m.get("name"), MAX_HOUSE_NAME), _house_time(m.get("joined"), latest)
             if not (name and joined):
                 continue
-            # This device's members first, so a flood of made-up members
-            # can't push out real ones. Someone who left doesn't take a place.
-            if mid not in out["members"]:
-                if _house_time(m.get("left"), latest):
-                    if len(out["members"]) >= MAX_HOUSE_MEMBERS * 2:
-                        continue
-                elif _house_active(out["members"]) >= MAX_HOUSE_MEMBERS:
-                    continue
-            mine = out["members"].setdefault(mid, {"name": name, "joined": joined})
             left = _house_time(m.get("left"), latest)
+            # Someone already kept: a leave frees a place before new people
+            # are added, so one merge can both see a person go and take the
+            # seat. This device's members come first, so a flood of made-up
+            # ones can't push real ones out. Someone who left takes no place.
+            if mid in out["members"]:
+                if left and not (mid == me and n == 1):
+                    mine = out["members"][mid]
+                    mine["left"] = max(left, mine.get("left", ""))
+                continue
+            fresh.append((mid, name, joined, left))
+        for mid, name, joined, left in fresh:
+            if left:
+                if len(out["members"]) >= MAX_HOUSE_MEMBERS * 2:
+                    continue
+            elif _house_active(out["members"]) >= MAX_HOUSE_MEMBERS:
+                continue
+            mine = out["members"].setdefault(mid, {"name": name, "joined": joined})
             if left and not (mid == me and n == 1):
-                mine["left"] = max(left, mine.get("left", ""))
+                mine["left"] = left
     _house_trim_members(out["members"])
     for n, side in enumerate(sides):
         items = side.get("items") if isinstance(side.get("items"), dict) else {}
@@ -1238,7 +1256,10 @@ def house_on(state):
 
 def _house_put(code, doc, tag=None):
     """True when stored, "changed" when someone else wrote since `tag` was
-    read, else False."""
+    read, else False. No version means no write: a missing tag used to put
+    with no If-Match, and the server then replaced whatever was there."""
+    if not tag:
+        return False
     label = house_keys(code)[0]
     status, _, _ = net_sync(f"/v1/sync/{label}", house_seal(code, doc), "PUT", tag)
     return True if status == 200 else "changed" if status == 412 else False

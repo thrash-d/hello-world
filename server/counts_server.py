@@ -411,7 +411,11 @@ def push_address_ok(endpoint):
     except (ValueError, TypeError):
         return False
     host = (url.hostname or "").lower()
-    return (url.scheme == "https" and len(endpoint) <= 1000 and not url.username
+    # An empty user name is still a user name. `not url.username` would
+    # let https://:secret@host/ through.
+    if url.username is not None or url.password is not None:
+        return False
+    return (url.scheme == "https" and len(endpoint) <= 1000
             and port in (None, 443)
             and any(host == h or host.endswith("." + h) for h in PUSH_HOSTS))
 
@@ -450,15 +454,33 @@ class Push:
 
     def save(self, token, data):
         """Keep a phone's push address and times. False when they aren't
-        acceptable."""
+        acceptable. The same times keep the record of what was already sent,
+        so opening the app during the retry window does not send it again."""
         if not self.acceptable(data):
             return False
-        times = data["times"]
+        times = sorted(set(data["times"]))
         with self.lock:
-            tmp = self.path(token) + ".tmp"
+            sent = []
+            path = self.path(token)
+            try:
+                with open(path, encoding="utf-8") as f:
+                    old = json.load(f)
+                old_times = old.get("times")
+                if isinstance(old_times, list) and sorted(set(old_times)) == times:
+                    marks = old.get("sent")
+                    if isinstance(marks, str):
+                        marks = [marks]
+                    if isinstance(marks, list):
+                        sent = [m for m in marks if isinstance(m, str)]
+            except (OSError, ValueError):
+                pass
+            body = {"endpoint": data["endpoint"], "times": times}
+            if sent:
+                body["sent"] = sent
+            tmp = path + ".tmp"
             with open(tmp, "w", encoding="utf-8") as f:
-                json.dump({"endpoint": data["endpoint"], "times": sorted(set(times))}, f)
-            os.replace(tmp, self.path(token))
+                json.dump(body, f)
+            os.replace(tmp, path)
         return True
 
     def forget(self, token):
@@ -541,26 +563,82 @@ class Push:
                     stamps.append(stamp)
             if not stamps:
                 continue
-            status = send(endpoint, when.timestamp())
-            if status in (404, 410):
-                # The phone unsubscribed or the browser dropped it.
-                self.forget(token)
-                continue
-            if not 200 <= status < 300:
-                continue
-            sent += 1
-            cutoff = (when - datetime.timedelta(days=2)).strftime("%Y-%m-%dT%H:%M")
-            data["sent"] = [m for m in marks + stamps if m >= cutoff]
-            with self.lock:
-                if os.path.exists(path):
-                    tmp = path + ".tmp"
-                    with open(tmp, "w", encoding="utf-8") as f:
-                        json.dump(data, f)
-                    # The file's time stays the phone's last visit.
-                    stat = os.stat(path)
-                    os.replace(tmp, path)
-                    os.utime(path, (stat.st_atime, stat.st_mtime))
+            # One call per time. A single success used to mark every time
+            # that had fallen inside the window, so the later one never went.
+            times = [t for t in (data.get("times") or []) if isinstance(t, str)]
+            accepted = []
+            for stamp in stamps:
+                status = send(endpoint, when.timestamp())
+                if status in (404, 410):
+                    # The phone unsubscribed or the browser dropped it.
+                    # Only if this file still names the address we called:
+                    # a newer registration may have replaced it while we waited.
+                    self._forget_if_same(path, endpoint)
+                    accepted = []
+                    break
+                if not 200 <= status < 300:
+                    break
+                sent += 1
+                accepted.append(stamp)
+            if accepted:
+                cutoff = (when - datetime.timedelta(days=2)).strftime("%Y-%m-%dT%H:%M")
+                self._mark_sent(path, endpoint, times, marks + accepted, cutoff)
         return sent
+
+    def _registration(self, path, endpoint, times):
+        """The file as stored, when it still names this address and these times."""
+        try:
+            with open(path, encoding="utf-8") as f:
+                current = json.load(f)
+        except (OSError, ValueError):
+            return None
+        current_times = current.get("times")
+        if current.get("endpoint") != endpoint or not isinstance(current_times, list):
+            return None
+        if sorted(set(t for t in current_times if isinstance(t, str))) != sorted(set(times)):
+            return None
+        return current
+
+    def _mark_sent(self, path, endpoint, times, marks, cutoff):
+        """Record the times that went out. A check-in that landed while the
+        push was in flight keeps its own address and times."""
+        with self.lock:
+            current = self._registration(path, endpoint, times)
+            if current is None:
+                return
+            kept = []
+            for mark in marks:
+                if isinstance(mark, str) and mark >= cutoff and mark not in kept:
+                    kept.append(mark)
+            current["sent"] = kept
+            tmp = path + ".tmp"
+            try:
+                # The file's time stays the phone's last visit.
+                stat = os.stat(path)
+                with open(tmp, "w", encoding="utf-8") as f:
+                    json.dump(current, f)
+                os.replace(tmp, path)
+                os.utime(path, (stat.st_atime, stat.st_mtime))
+            except OSError:
+                try:
+                    os.remove(tmp)
+                except OSError:
+                    pass
+
+    def _forget_if_same(self, path, endpoint):
+        """Drop the registration only when it is still the one we called."""
+        with self.lock:
+            try:
+                with open(path, encoding="utf-8") as f:
+                    current = json.load(f)
+            except (OSError, ValueError):
+                return
+            if current.get("endpoint") != endpoint:
+                return
+            try:
+                os.remove(path)
+            except FileNotFoundError:
+                pass
 
     def run(self):
         """Check each minute, in a thread for as long as the server runs."""

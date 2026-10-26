@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-10-26: fixes from review round 45
+
+Version 1.62.3. Opening the phone page during the fifteen minutes after a
+reminder cleared the note that it had been sent, so the same nudge went out
+again. A reminder that was in flight could also write an old push address
+back over a newer one, or delete the new one when the old address answered
+that it was gone. Two reminder times inside that window became one push, and
+both were marked sent. A household write with no version replaced whatever
+the server held. A household time that was not a real time, such as 99:99:99,
+matched the pattern and then crashed the list. A leave and a join in one
+merge could drop the join when the new person was listed first. An empty
+user name on a push address was treated as no user name.
+
 ## 2026-10-26: fixes from review round 44
 
 Version 1.62.2. A failed sync read was replacing the other device. The put
