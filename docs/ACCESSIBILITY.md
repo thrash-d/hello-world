@@ -28,6 +28,7 @@ everyone. Web criteria apply only where they carry over.
 - One top-to-bottom flow of plain text: no colors, no art, no cursor
   movement, nothing redrawn, so a screen reader reads it in order.
 - Every prompt ends by saying what Enter does, such as "Enter to close".
+  From 1.63.0 the prompt itself ends in a colon, unless `colon_prompts` is off.
 - Long prompts and paragraphs wrap to the window width, down to 30 columns,
   so nothing runs off a magnified screen.
 - No time limits: no prompt times out and nothing closes by itself.

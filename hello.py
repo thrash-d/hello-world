@@ -517,7 +517,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.62.3"
+VERSION = "1.63.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -601,8 +601,8 @@ HANDOFF_DIR = None
 WINDOW = False
 # When Ctrl+C last skipped a question, for "twice in a row closes".
 INTERRUPTED = 0.0
-# "colon_prompts": prompts end in ":" instead of " >".
-PROMPT_COLON = False
+# "colon_prompts": prompts end in ":". On unless stored as false.
+PROMPT_COLON = True
 # "floor_tips": the tips for floor and shift work, read from the file.
 FLOOR_TIPS = False
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
@@ -1213,17 +1213,19 @@ def house_who(doc, mid):
 
 
 def house_history(doc, item):
-    """'added by Ana, Tuesday; ticked by Omar, Wednesday', for everyone to
-    see: the day only, not the minute (Rasputin), and never a count."""
+    """'added by Ana, Monday, 06:40', on this device's clock. The list still
+    stores UTC. Everyone who opens the list sees the weekday and the time,
+    and nothing counts who did what."""
     words = {"added": tr("added by {name}, {when}"), "ticked": tr("ticked by {name}, {when}"),
              "unticked": tr("unticked by {name}, {when}"), "removed": tr("removed by {name}, {when}"),
              "restored": tr("restored by {name}, {when}")}
     data = translation()
     out = []
     for what, by, at, _ in item["history"][-4:]:
-        when = _house_when(at).astimezone().date()
+        when = _house_when(at).astimezone()
+        day_name = (data["days"] if data else DAYS)[when.weekday()]
         out.append(words[what].format(name=house_who(doc, by),
-                                      when=(data["days"] if data else DAYS)[when.weekday()]))
+                                      when=f"{day_name}, {when.strftime('%H:%M')}"))
     return "; ".join(out)
 
 
@@ -1337,7 +1339,9 @@ def house_code_said(code):
     return (tr("The household list's code: {code}").format(code=code) + " " + tr(
         "Give it to each adult in person; they type it on their own device, with "
         "their own name. hello-world never puts it in a message. The list is "
-        "encrypted with it; the scheme has had no outside audit.") + " " + tr(SCAM_LINE))
+        "encrypted with it; the scheme has had no outside audit.") + " " + tr(
+        "Each line shows the weekday and the time, and everyone who opens the list "
+        "can see them.") + " " + tr(SCAM_LINE))
 
 
 def house_join_with(state, can_save, code, name):
@@ -1361,7 +1365,9 @@ def house_join_with(state, can_save, code, name):
         return tr("The server can't be reached just now.")
     seen = house_news(doc, me, {})[1]
     _house_save(state, can_save, {"code": code, "me": me, "seen": seen, "asked": []}, doc)
-    return tr("You've joined the household list. Everyone on it is told.")
+    return (tr("You've joined the household list. Everyone on it is told.") + " " + tr(
+        "Each line shows the weekday and the time, and everyone who opens the list "
+        "can see them."))
 
 
 def house_leave_now(state, can_save):
@@ -1492,7 +1498,9 @@ def household_prompt(state, can_save):
     if not state.get("house"):
         para(tr("A household list: things anyone in the household can add and tick, "
                 "on everyone's own device. Each thing shows who added, ticked or "
-                "removed it, and nothing counts who did what."))
+                "removed it, and nothing counts who did what.") + " " + tr(
+                "Each line shows the weekday and the time, and everyone who opens the list "
+                "can see them."))
         entries = [tr("Start one (needs a household key)"), tr("Join one with its code")]
         for n, label in enumerate(entries, 1):
             say(wrapped(f" {n:>2}  ", label))
@@ -1939,7 +1947,7 @@ PRO_FINISHED = 1000
 # The second check-in (the round-7 evening bell, Hank's go/no-go):
 # afternoon or evening, off unless chosen.
 AFTERNOON_TIMES = ("15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00")
-THEMES = ("sea", "sand", "night")
+THEMES = ("sea", "sand", "night", "linen")
 
 _P = 2 ** 255 - 19
 _L = 2 ** 252 + 27742317777372353535851937790883648493
@@ -2163,12 +2171,14 @@ def set_theme(state, can_save, theme):
 
 
 def theme_names():
-    return {"sea": tr("Sea"), "sand": tr("Sand"), "night": tr("Night")}
+    return {"sea": tr("Sea"), "sand": tr("Sand"), "night": tr("Night"),
+            "linen": tr("Linen")}
 
 
 # (text, background) as Windows COLORREF, 0x00BBGGRR.
+# Linen is #2C2416 on #F6F1E7. It is one of the colours, not the default.
 THEME_COLOURS = {"sea": (0x3F2A10, 0xF4ECE1), "sand": (0x1F3A4A, 0xDCEFF8),
-                 "night": (0xE8E8E8, 0x2A2420)}
+                 "night": (0xE8E8E8, 0x2A2420), "linen": (0x0016242C, 0x00E7F1F6)}
 
 
 def pet_items():
@@ -2968,10 +2978,16 @@ def load(repair=True):
     if raw.get("text") is True:
         state["text"] = True
     for key in SWITCHES:
-        if raw.get(key) is True:
+        if key == "colon_prompts":
+            # Absent means on. Off is stored, or the next open would turn it back on.
+            if raw.get(key) is False:
+                state[key] = False
+            elif raw.get(key) is True:
+                state[key] = True
+        elif raw.get(key) is True:
             state[key] = True
     global PROMPT_COLON, FLOOR_TIPS
-    PROMPT_COLON = bool(state.get("colon_prompts"))
+    PROMPT_COLON = state.get("colon_prompts") is not False
     FLOOR_TIPS = bool(state.get("floor_tips"))
     for key in ("opens", "run", "best_run"):
         n = raw.get(key)
@@ -4525,9 +4541,9 @@ def show_repeat():
 
 
 def fridge_page(state, d):
-    """A big-print page for the fridge (Walt, Dolores): the day, the plan and
-    the daily repeat, opened in the browser to print. Never the sync code.
-    Returns what to say."""
+    """A big-print page for the fridge (Walt, Dolores): the day, the plan, the
+    daily repeat and the household lines, opened in the browser to print.
+    Never the sync code or the household code. Returns what to say."""
     import html
     import tempfile
     intent = state.get("intent")
@@ -4537,8 +4553,20 @@ def fridge_page(state, d):
     if every := state.get("repeat"):
         lines.append((tr("Every day at {at}: {text}").format(
             at=every["at"].lstrip("0"), text=every["text"]), "big"))
+    doc = state.get("house_list") if isinstance(state.get("house_list"), dict) else {}
+    for item in (doc.get("items") or {}).values():
+        if not isinstance(item, dict) or item.get("removed") or not isinstance(item.get("text"), str):
+            continue
+        lines.append((item["text"], "big"))
+        try:
+            hist = house_history(doc, item)
+        except (KeyError, TypeError, ValueError):
+            hist = ""
+        if hist:
+            lines.append((hist, "note"))
     lines.append((tr("Anyone in the room can read a printed page. The sync code is "
                      "never on it."), "note"))
+    lines.append((tr("The household code is never on it."), "note"))
     rtl = language() in RIGHT_TO_LEFT
     page = ('<!doctype html><meta charset="utf-8"><title>hello-world</title>'
             '<style>body{font-family:Segoe UI,sans-serif;margin:2cm}'
@@ -6395,7 +6423,10 @@ def run(argv):
     if len(argv) == 3 and argv[0] == "--set" and argv[1] in SWITCHES and argv[2] in ("on", "off"):
         state, can_save = load()
         base = copy.deepcopy(state)
-        if argv[2] == "on":
+        if argv[1] == "colon_prompts":
+            # Off has to be written down. Popping the key would turn the colon back on.
+            state["colon_prompts"] = argv[2] == "on"
+        elif argv[2] == "on":
             state[argv[1]] = True
         else:
             state.pop(argv[1], None)
@@ -7972,6 +8003,11 @@ class Visit:
                 self.state.pop("tips", None)
         elif key == "streak":
             self.state["streak"] = not self.state["streak"]
+        elif key == "colon_prompts":
+            # Absent means on, so the flip stores false to turn the colon off.
+            self.state["colon_prompts"] = self.state.get("colon_prompts") is False
+            global PROMPT_COLON
+            PROMPT_COLON = self.state["colon_prompts"] is not False
         elif key in SWITCHES:
             if self.state.pop(key, None) is None:
                 self.state[key] = True
@@ -8086,6 +8122,7 @@ class Window:
         self.fonts = []
         self.finished = False  # a plan was finished in this window
         self.asking = bool(visit.followup)
+        self._hear = False  # a status line is waiting to be read before focus moves
 
     def theme_colours(self):
         """Pro's window colours, or None: none with high contrast on, which
@@ -8388,6 +8425,8 @@ class Window:
     def set_text(self, cid, text):
         self.user.SetWindowTextW(self.item(cid), text)
         if cid in (self.STATUS, self.PLANNED) and text:
+            # Hold the plan box until this line has had a moment to be read.
+            self._hear = True
             # UIA_LiveRegionChangedEventId through MSAA: screen readers read
             # the new text without the person moving to it.
             try:
@@ -8421,6 +8460,11 @@ class Window:
             if not (self.visit.counts_thread and self.visit.counts_thread.is_alive()):
                 user.KillTimer(hwnd, 2)
                 self.show_counts()
+            return 1
+        if msg == 0x113 and wparam == 3:  # the status line has been up; now the plan box
+            user.KillTimer(hwnd, 3)
+            self._hear = False
+            self.focus_plan()
             return 1
         if msg == 0x113:  # WM_TIMER, from CLOSE_WINDOW_AFTER
             user.EndDialog(hwnd, 2)
@@ -8459,12 +8503,15 @@ class Window:
                 live_region(self.item(cid))
         # One Done at a time: while it asks about an earlier plan, its own.
         self.show(self.DID_IT, bool(self.visit.plan()) and not self.asking)
+        # The status line goes up before focus, so Saved or Kept can be read
+        # before the plan box takes the cursor.
+        if self.message:
+            self.set_text(self.STATUS, self.message)
         if self.visit.followup:
+            self._hear = False
             self.focus(self.DONE)
         else:
             self.focus_plan()
-        if self.message:
-            self.set_text(self.STATUS, self.message)
         if self.keep:
             typed, ticked = self.keep
             if typed and self.item(self.PLAN):
@@ -8657,7 +8704,17 @@ class Window:
 
     def focus_plan(self):
         """Focus the plan box with the cursor at the end, so a stray key adds
-        to the plan instead of replacing it."""
+        to the plan instead of replacing it.
+
+        A status line just set waits about 400ms, so the live region can be
+        read before this box takes the cursor. Timer 3 is not the closer.
+        """
+        if self._hear and getattr(self, "hwnd", None):
+            try:
+                self.user.SetTimer(self.hwnd, 3, 400, None)
+                return
+            except (AttributeError, OSError):
+                self._hear = False
         if not self.item(self.PLAN):
             self.focus(self.CLOSE)
             return

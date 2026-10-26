@@ -6,7 +6,9 @@ the owner's signing key, so hello-world never contacts anyone to unlock it.
 Businesses keep their own per-seat terms, outside this file.
 
 What Pro adds: a second check-in in the afternoon or evening on days with an
-open plan, and window colours. A household key adds the shared household
+open plan, and window colours (Sea, Sand, Night and Linen). Linen is one of
+those colours, checked on this computer, and it is not the morning default.
+A household key adds the shared household
 list. History and the This year page, pets, reminders, and everything the
 free version did before Pro existed, stay free. That split came from the
 simulated rounds: the Gen Z and pessimist panels said history only matters
