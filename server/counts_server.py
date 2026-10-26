@@ -94,6 +94,8 @@ SYNC_DAYS = 366
 PUSH_PATH = re.compile(r"^/v1/push/([0-9a-f]{32})$")
 PUSH_TIME = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 MAX_PUSH_TIMES = 2
+# A failed push is tried again through this many minutes, then dropped.
+PUSH_GRACE_MINUTES = 15
 # The browser makers' push services; nothing else is ever called.
 PUSH_HOSTS = ("fcm.googleapis.com", "push.services.mozilla.com", "push.apple.com",
               "notify.windows.com")
@@ -390,6 +392,17 @@ def b64url(raw):
     return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
 
 
+def push_slot(when, clock):
+    """The scheduled minute at or before `when`, while the retry window is open."""
+    hour, minute = (int(part) for part in clock.split(":"))
+    slot = when.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if slot > when:
+        slot -= datetime.timedelta(days=1)
+    if (when - slot).total_seconds() > PUSH_GRACE_MINUTES * 60:
+        return ""
+    return slot.strftime("%Y-%m-%dT%H:%M")
+
+
 def push_address_ok(endpoint):
     """An https address at a browser maker's push service, and nothing else."""
     try:
@@ -469,12 +482,23 @@ class Push:
         return f"vapid t={jwt}, k={b64url(self.public)}"
 
     def send(self, endpoint, now):
-        """One push with no content. The push service's status, or 0."""
+        """One push with no content. The push service's status, or 0.
+
+        A redirect comes back as that status. The next host is not called,
+        so the VAPID header stays on the address that was stored.
+        """
         request = urllib.request.Request(endpoint, data=b"", method="POST", headers={
             "TTL": "3600", "Urgency": "normal", "Content-Length": "0",
             "Authorization": self.header(endpoint, now)})
+
+        class Halt(urllib.request.HTTPRedirectHandler):
+            def http_error_302(self, req, fp, code, msg, headers):
+                raise urllib.error.HTTPError(req.full_url, code, msg, headers, fp)
+
+            http_error_301 = http_error_303 = http_error_307 = http_error_308 = http_error_302
+
         try:
-            with urllib.request.urlopen(request, timeout=10) as answer:
+            with urllib.request.build_opener(Halt).open(request, timeout=10) as answer:
                 return answer.status
         except urllib.error.HTTPError as e:
             return e.code
@@ -482,11 +506,10 @@ class Push:
             return 0
 
     def due(self, when, send=None):
-        """Send every reminder set for the UTC minute `when`, once each.
-        Returns how many were sent."""
+        """Send reminders whose UTC minute is `when`, or missed it by a few
+        minutes. A push the service did not accept is tried again. Returns
+        how many went out."""
         send = send or self.send
-        minute = when.strftime("%H:%M")
-        stamp = when.strftime("%Y-%m-%dT%H:%M")
         sent = 0
         for token in os.listdir(self.folder):
             if not re.fullmatch(r"[0-9a-f]{32}", token):
@@ -500,15 +523,34 @@ class Push:
                     data = json.load(f)
             except (OSError, ValueError):
                 continue
-            if minute not in data.get("times", []) or data.get("sent") == stamp:
+            endpoint = data.get("endpoint", "")
+            if not push_address_ok(endpoint):
                 continue
-            status = send(data["endpoint"], when.timestamp())
+            marks = data.get("sent")
+            if isinstance(marks, str):
+                marks = [marks]
+            elif not isinstance(marks, list):
+                marks = []
+            marks = [m for m in marks if isinstance(m, str)]
+            stamps = []
+            for clock in data.get("times") or []:
+                if not isinstance(clock, str) or not PUSH_TIME.match(clock):
+                    continue
+                stamp = push_slot(when, clock)
+                if stamp and stamp not in marks and stamp not in stamps:
+                    stamps.append(stamp)
+            if not stamps:
+                continue
+            status = send(endpoint, when.timestamp())
             if status in (404, 410):
                 # The phone unsubscribed or the browser dropped it.
                 self.forget(token)
                 continue
+            if not 200 <= status < 300:
+                continue
             sent += 1
-            data["sent"] = stamp
+            cutoff = (when - datetime.timedelta(days=2)).strftime("%Y-%m-%dT%H:%M")
+            data["sent"] = [m for m in marks + stamps if m >= cutoff]
             with self.lock:
                 if os.path.exists(path):
                     tmp = path + ".tmp"

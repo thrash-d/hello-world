@@ -4545,7 +4545,8 @@ def test_the_counts_server_sends_contentless_pushes_only_to_push_services():
                 return e.code
         # Only a browser maker's push service, so the server calls nowhere else.
         for bad in ("http://127.0.0.1/x", "https://evil.example/x", "https://fcm.googleapis.com.evil.example/x",
-                    "https://user@fcm.googleapis.com/x", "https://fcm.googleapis.com:8443/x"):
+                    "https://user@fcm.googleapis.com/x", "https://fcm.googleapis.com:8443/x",
+                    "https://fcm.googleapis.com\\@evil.com/x"):
             assert put({"endpoint": bad, "times": ["07:00"]}) == 400, bad
         assert put({"endpoint": "https://fcm.googleapis.com/fcm/send/abc", "times": ["07:00", "8:00"]}) == 400
         assert put({"endpoint": "https://fcm.googleapis.com/fcm/send/abc", "times": ["07:00", "19:30"]}) == 200
@@ -5265,3 +5266,223 @@ def test_the_phone_lists_devices_and_makes_letter_links():
                    {"aaaaaaaaaaaa": {"name": "A", "seen": "2026-10-04"}},
                    "mailto:mum@example.com?body=Hi%20Mum", "mailto:?body=Hi", "mailto:?body=Hi",
                    "sms:+15550100?body=Hi"]
+
+
+def test_finishing_several_things_at_once_says_how_many():
+    first = run(text="Call Ana; buy milk\n\n", day="2026-10-26")
+    p = run(text="y\n\n\n", day="2026-10-27", home=first.home)
+    assert "Good. 2 things are off your list." in p.stdout
+    assert "That one is finished." not in p.stdout
+    assert notes(first.home)["done"] == 2 and notes(first.home)["intent"] is None
+
+
+def test_a_counts_address_is_the_host_and_a_redirect_stops():
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    hello = _load_hello()
+    for address in ("http://127.0.0.1:9@evil.example", "https://user:pass@counts.example.com",
+                    "https://counts.example.com#frag", "http://localhost:80.evil.com",
+                    "http://counts.example.com"):
+        hello.POLICY = {"SharedCountsServer": address}
+        assert hello.counts_server() == "", address
+    hello.POLICY = {"SharedCountsServer": "http://127.0.0.1:9"}
+    assert hello.counts_server() == "http://127.0.0.1:9"
+    seen = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def _answer(self):
+            seen.append(self.path)
+            self.send_response(302)
+            self.send_header("Location", "/land")
+            self.end_headers()
+
+        do_GET = do_POST = _answer
+
+        def log_message(self, *args):
+            pass
+
+    httpd = HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        port = httpd.server_address[1]
+        hello.POLICY = {"SharedCountsServer": f"http://127.0.0.1:{port}"}
+        assert hello.net("/v1/day/2026-10-26") is None
+        status, _, _ = hello.net_sync("/v1/sync/" + "ab" * 32)
+        assert status == 302
+        assert seen == ["/v1/day/2026-10-26", "/v1/sync/" + "ab" * 32]
+        assert "/land" not in seen
+    finally:
+        httpd.shutdown()
+
+
+def test_a_failed_sync_read_does_not_replace_the_other_device():
+    server, url, folder = _counts_server()
+    try:
+        first = run(text="n\nCall Ana\n\n", policy={"SharedCountsServer": url})
+        hello = _window_hello(home=first.home)
+        hello.POLICY = {"SharedCountsServer": url}
+        state, can_save = hello.load()
+        hello.set_sync(state, can_save, True)
+        label, enc, mac = hello.sync_keys(state["sync"])
+        path = os.path.join(folder, "sync", label)
+        with open(path, "rb") as f:
+            original = f.read()
+        real = hello.net_sync
+        hello.net_sync = lambda *args, **kwargs: (500, None, None)
+        hello.SYNCING = False
+        assert hello.sync_now(state, can_save) is False
+        hello.net_sync = real
+        with open(path, "rb") as f:
+            assert f.read() == original
+        assert notes(first.home)["intent"]["text"] == "Call Ana"
+        with open(path, "wb") as f:
+            f.write(b"not a sealed copy at all!!")
+        hello.SYNCING = False
+        assert hello.sync_now(state, can_save) is False
+        with open(path, "rb") as f:
+            assert f.read() == b"not a sealed copy at all!!"
+        day = hello.today().isoformat()
+        phone = {"intent": {"text": "From the phone", "date": day},
+                 "finished": [{"text": "Bought milk", "date": day}],
+                 "updated": (hello.now() + hello.datetime.timedelta(minutes=5)).isoformat(timespec="seconds")}
+        with open(path, "wb") as f:
+            f.write(hello.seal_sync(enc, mac, phone))
+        state["finished"] = [{"text": "Called the bank", "date": day}]
+        assert hello.save(state)
+        state, can_save = hello.load()
+        calls = {"get": 0}
+
+        def wrapped(spath, body=None, method=None, if_match=None):
+            if body is None and method in (None, "GET"):
+                calls["get"] += 1
+                if calls["get"] == 1:
+                    return 200, original, '"stale"'
+            return real(spath, body, method, if_match)
+
+        hello.net_sync = wrapped
+        hello.SYNCING = False
+        assert hello.sync_now(state, can_save) is True
+        assert calls["get"] >= 2
+        saved = notes(first.home)
+        assert saved["intent"]["text"] == "From the phone"
+        assert {i["text"] for i in saved["finished"]} == {"Called the bank", "Bought milk"}
+        with open(path, "rb") as f:
+            stored = hello.open_sync(enc, mac, f.read())
+        assert {i["text"] for i in stored["finished"]} == {"Called the bank", "Bought milk"}
+    finally:
+        server.shutdown()
+
+
+def test_a_failed_push_is_retried_and_a_redirect_is_not_followed():
+    import datetime
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    server, _, folder = _counts_server(remind=True)
+    push = server.push
+    try:
+        token = "cd" * 16
+        path = os.path.join(folder, "push", token)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"endpoint": "https://fcm.googleapis.com/fcm/send/abc", "times": ["07:00"]}, f)
+        when = datetime.datetime(2026, 10, 6, 7, 0, tzinfo=datetime.timezone.utc)
+        assert push.due(when, send=lambda endpoint, now: 0) == 0
+        assert push.due(when, send=lambda endpoint, now: 500) == 0
+        later = when + datetime.timedelta(minutes=10)
+        calls = []
+        assert push.due(later, send=lambda endpoint, now: calls.append(endpoint) or 201) == 1
+        assert calls == ["https://fcm.googleapis.com/fcm/send/abc"]
+        assert push.due(later, send=lambda endpoint, now: calls.append(endpoint) or 201) == 0
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"endpoint": "http://127.0.0.1/x", "times": ["07:00"]}, f)
+        assert push.due(when, send=lambda endpoint, now: calls.append("bad") or 201) == 0
+        assert calls == ["https://fcm.googleapis.com/fcm/send/abc"]
+        seen = []
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                seen.append(("POST", self.path))
+                self.send_response(302)
+                self.send_header("Location", "/land")
+                self.end_headers()
+
+            def do_GET(self):
+                seen.append(("GET", self.path))
+                self.send_response(200)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+
+        httpd = HTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        try:
+            port = httpd.server_address[1]
+            assert push.send(f"http://127.0.0.1:{port}/push", when.timestamp()) == 302
+            assert seen == [("POST", "/push")]
+        finally:
+            httpd.shutdown()
+    finally:
+        server.shutdown()
+
+
+def test_leavers_do_not_fill_the_household_and_an_old_gone_stamp_keeps_a_live_thing():
+    hello = _load_hello()
+    A = "a" * 12
+    crowded = hello.house_new(A, "Okiku", "2026-10-05T11:00:00Z")
+    for n in range(25):
+        mid = f"{n + 1:012x}"
+        hello.house_join(crowded, mid, "Left", f"2026-10-05T11:{n:02d}:00Z")
+        hello.house_leave(crowded, mid, f"2026-10-06T11:{n:02d}:00Z")
+    hello.house_join(crowded, "b" * 12, "Taro", "2026-10-07T11:00:00Z")
+    assert "b" * 12 in crowded["members"] and not crowded["members"]["b" * 12].get("left")
+    assert sum(1 for m in crowded["members"].values() if m.get("left")) <= hello.MAX_HOUSE_MEMBERS
+    full = hello.house_new(A, "Okiku", "2026-10-05T11:00:00Z")
+    for n in range(19):
+        hello.house_join(full, f"{n + 1:012x}", "Pat", "2026-10-05T11:00:00Z")
+    assert hello._house_active(full["members"]) == 20
+    assert "c" * 12 not in hello.house_join(full, "c" * 12, "No", "2026-10-08T11:00:00Z")["members"]
+    item = hello.house_new(A, "Okiku", "2026-10-05T11:00:00Z")
+    tea = hello.house_change(item, A, "added", text="Tea", at="2026-10-05T12:00:00Z")
+    for n, what in enumerate(("ticked", "unticked") * 3):
+        hello.house_change(item, A, what, tea, at=f"2026-10-05T13:{n:02d}:00Z")
+    assert all(h[0] != "added" for h in item["items"][tea]["history"])
+    assert not item["items"][tea].get("removed")
+    stale = {"members": {}, "items": {}, "gone": {tea: "2020-01-01T00:00:00Z"}}
+    hello.NOW = "2026-11-10T00:00:00"
+    merged = hello.house_merge(item, stale, A)
+    assert tea in merged["items"] and tea not in merged["gone"]
+
+
+def test_the_phone_keeps_a_place_for_people_still_here_and_stops_a_bad_sync_read():
+    got = _node("""
+        const app = require("./app.js");
+        const doc = app.houseNew("aaaaaaaaaaaa", "Okiku", "2026-10-05T11:00:00Z");
+        for (let n = 0; n < 25; n++) {
+          const id = (n + 1).toString(16).padStart(12, "0");
+          app.houseJoin(doc, id, "Left", "2026-10-05T12:00:00Z");
+          app.houseLeave(doc, id, "2026-10-06T12:00:00Z");
+        }
+        app.houseJoin(doc, "bbbbbbbbbbbb", "Taro", "2026-10-07T11:00:00Z");
+        const item = app.houseNew("aaaaaaaaaaaa", "Okiku", "2026-10-05T11:00:00Z");
+        const tea = app.houseChange(item, "aaaaaaaaaaaa", "added", null, "Tea", "2026-10-05T12:00:00Z");
+        for (let n = 0; n < 6; n++) {
+          const what = n % 2 ? "unticked" : "ticked";
+          app.houseChange(item, "aaaaaaaaaaaa", what, tea, null, "2026-10-05T13:" + String(n).padStart(2, "0") + ":00Z");
+        }
+        const stale = { members: {}, items: {}, gone: {} };
+        stale.gone[tea] = "2020-01-01T00:00:00Z";
+        const merged = app.houseMerge(item, stale, "aaaaaaaaaaaa");
+        const full = app.houseNew("aaaaaaaaaaaa", "Okiku", "2026-10-05T11:00:00Z");
+        for (let n = 0; n < 19; n++) app.houseJoin(full, (n + 1).toString(16).padStart(12, "0"), "Pat", "2026-10-05T11:00:00Z");
+        app.houseJoin(full, "cccccccccccc", "No", "2026-10-08T11:00:00Z");
+        console.log(JSON.stringify({
+          joined: Boolean(doc.members["bbbbbbbbbbbb"]),
+          left: Object.values(doc.members).filter((m) => m.left).length,
+          addedGone: item.items[tea].history.every((h) => h[0] !== "added"),
+          kept: Boolean(merged.items[tea]),
+          blocked: !full.members["cccccccccccc"],
+          sync: [app.syncAction(404, false), app.syncAction(200, true), app.syncAction(200, false), app.syncAction(500, false)]
+        }));""")
+    assert got["joined"] and got["left"] <= 20 and got["addedGone"] and got["kept"] and got["blocked"]
+    assert got["sync"] == ["create", "update", "stop", "stop"]

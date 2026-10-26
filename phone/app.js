@@ -651,10 +651,24 @@ function houseNew(me, name, at) {
   return doc;
 }
 
+function houseActive(members) {
+  return Object.values(members).filter((m) => !m.left).length;
+}
+
+// Someone who left is still announced. They don't take a place, and the
+// oldest departure is dropped once there are too many.
+function houseTrimMembers(members) {
+  const left = Object.entries(members).filter(([, m]) => m.left)
+    .sort((a, b) => (a[1].left < b[1].left ? -1 : a[1].left > b[1].left ? 1 : 0));
+  left.slice(0, Math.max(0, left.length - HOUSE.members)).forEach(([id]) => { delete members[id]; });
+  return members;
+}
+
 function houseJoin(doc, me, name, at) {
   if (own(doc.members, me) && !doc.members[me].left) return doc;
-  if (Object.keys(doc.members).length >= HOUSE.members) return doc;
+  if (houseActive(doc.members) >= HOUSE.members) return doc;
   doc.members[me] = { name: houseText(name, HOUSE.name), joined: at || houseStamp() };
+  houseTrimMembers(doc.members);
   return doc;
 }
 
@@ -696,11 +710,19 @@ function houseMerge(doc, other, me) {
     if (!HOUSE_ID.test(id) || !m || typeof m !== "object") return;
     const name = houseText(m.name, HOUSE.name), joined = houseTime(m.joined, latest);
     if (!name || !joined) return;
-    if (!own(out.members, id) && Object.keys(out.members).length >= HOUSE.members) return;
-    if (!own(out.members, id)) out.members[id] = { name, joined };
+    // This device's members first, so made-up members can't push out real
+    // ones. Someone who left doesn't take a place.
+    if (!own(out.members, id)) {
+      const gone = houseTime(m.left, latest);
+      if (gone) {
+        if (Object.keys(out.members).length >= HOUSE.members * 2) return;
+      } else if (houseActive(out.members) >= HOUSE.members) return;
+      out.members[id] = { name, joined };
+    }
     const left = houseTime(m.left, latest);
     if (left && !(id === me && n === 1) && left > (out.members[id].left || "")) out.members[id].left = left;
   }));
+  houseTrimMembers(out.members);
   sides.forEach((side) => entries(side.items).forEach(([id, item]) => {
     if (!HOUSE_ID.test(id) || !item || typeof item !== "object") return;
     const text = houseText(item.text, HOUSE.text);
@@ -731,8 +753,12 @@ function houseMerge(doc, other, me) {
     at = houseTime(at, latest);
     if (!HOUSE_ID.test(id) || !at) return;
     if (own(out.items, id) && !out.items[id].removed) {
-      const lives = out.items[id].history.filter((h) => h[0] === "added" || h[0] === "restored").map((h) => h[2]);
-      if (at > cutoff || lives.some((l) => l >= at)) return;
+      const hist = out.items[id].history;
+      const lives = hist.filter((h) => h[0] === "added" || h[0] === "restored").map((h) => h[2]);
+      const newest = hist.reduce((m, h) => (h[2] > m ? h[2] : m), "");
+      // A later tick means the thing is still here. Trimmed history may
+      // no longer contain the line that added it.
+      if (at > cutoff || newest >= at || lives.some((l) => l >= at)) return;
     }
     if (at > (out.gone[id] || "")) out.gone[id] = at;
     delete out.items[id];
@@ -754,6 +780,7 @@ function houseTidy(doc, now) {
   const gone = bare();
   kept.forEach((k) => { gone[k] = doc.gone[k]; });
   doc.gone = gone;
+  if (doc.members) houseTrimMembers(doc.members);
   return doc;
 }
 
@@ -886,13 +913,21 @@ function stamp(state) {
   state.updated = `${iso(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
+// What a sync read is allowed to do. A failed read, or a copy that does
+// not open, must not replace the other device.
+function syncAction(status, opened) {
+  if (status === 404) return "create";
+  if (status === 200 && opened) return "update";
+  return "stop";
+}
+
 if (typeof module !== "undefined") {
   module.exports = { UI, ordinal, todaysPair, clean, parse, asks, answer, setPlan, finishToday, language, blank,
     syncKeys, sealSync, openSync, mergeSync, syncForm, normalCode, todayOf, clearToday, picks, bringBack,
     phoneNumber, smsLink, utcTime, pushText, exportText, setDayStart, REMIND_TIMES, DAY_STARTS,
     fresh, smallerDue, comingBack, smaller, endDay, noteSideways, mergeDevices, noteDevice, letterLink,
     houseKeys, houseNew, houseJoin, houseLeave, houseChange, houseMerge, houseTidy, houseBody, houseHistory,
-    houseNews, houseLeftUnasked, newCode, houseFit, houseStamp, HOUSE };
+    houseNews, houseLeftUnasked, newCode, houseFit, houseStamp, syncAction, HOUSE };
 }
 
 if (typeof document !== "undefined") {
@@ -938,11 +973,11 @@ if (typeof document !== "undefined") {
       if (!wanted.length) {
         const sub = await reg.pushManager.getSubscription();
         if (sub) await sub.unsubscribe();
-        if (state.pushToken) await fetch(url(state.pushToken), { method: "DELETE" });
+        if (state.pushToken) await fetch(url(state.pushToken), { method: "DELETE", redirect: "error" });
         delete state.pushToken; save();
         return true;
       }
-      const got = await fetch(`${location.origin}/v1/push/key`, { cache: "no-store" });
+      const got = await fetch(`${location.origin}/v1/push/key`, { cache: "no-store", redirect: "error" });
       if (!got.ok) return false;
       const key = (await got.json()).key.replace(/-/g, "+").replace(/_/g, "/");
       const raw = Uint8Array.from(atob(key + "===".slice((key.length + 3) % 4)), (c) => c.charCodeAt(0));
@@ -952,7 +987,7 @@ if (typeof document !== "undefined") {
         state.pushToken = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
         save();
       }
-      const put = await fetch(url(state.pushToken), { method: "PUT", headers: { "Content-Type": "application/json" },
+      const put = await fetch(url(state.pushToken), { method: "PUT", redirect: "error", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ endpoint: sub.endpoint, times: wanted.map((at) => utcTime(at)) }) });
       return put.ok;
     } catch (e) {
@@ -1120,19 +1155,30 @@ if (typeof document !== "undefined") {
   const asBytes = (k) => k && { label: k.label, enc: Uint8Array.from(k.enc), mac: Uint8Array.from(k.mac) };
 
   // Pull, merge and push; quiet unless something goes wrong while asked.
+  // A failed read is left as it is. The put names the version just read.
   async function sync(loud) {
     if (!keys) return;
     const k = asBytes(keys), url = `${location.origin}/v1/sync/${k.label}`;
     try {
-      const got = await fetch(url, { cache: "no-store" });
-      if (got.ok) {
-        const other = await openSync(k, await got.arrayBuffer());
-        if (other) { mergeSync(state, other, today()); save(); draw(); }
+      let done = false;
+      for (let n = 0; n < 3 && !done; n++) {
+        const got = await fetch(url, { cache: "no-store", redirect: "error" });
+        let other = null;
+        if (got.status === 200) other = await openSync(k, await got.arrayBuffer());
+        const action = syncAction(got.status, Boolean(other));
+        if (action === "stop") throw new Error("sync");
+        if (action === "update") { mergeSync(state, other, today()); save(); draw(); }
+        noteDevice(state, other && other.devices, today());
+        save();
+        const tag = action === "update" ? (got.headers.get("ETag") || "") : "missing";
+        if (!tag) throw new Error("sync");
+        const put = await fetch(url, { method: "PUT", redirect: "error", body: await sealSync(k, syncForm(state)),
+          headers: { "Content-Type": "application/octet-stream", "If-Match": tag } });
+        if (put.status === 412) continue;
+        if (!put.ok) throw new Error("sync");
+        done = true;
       }
-      noteDevice(state, null, today()); save();
-      await fetch(url, { method: "PUT", body: await sealSync(k, syncForm(state)),
-                         headers: { "Content-Type": "application/octet-stream" } });
-      if (loud) say("syncOn");
+      if (loud) say(done ? "syncOn" : "syncFail");
     } catch (e) {
       if (loud) say("syncFail");
     }
@@ -1378,7 +1424,7 @@ if (typeof document !== "undefined") {
   async function houseFetch(stored) {
     const k = asBytes(stored);
     try {
-      const got = await fetch(houseUrl(k), { cache: "no-store" });
+      const got = await fetch(houseUrl(k), { cache: "no-store", redirect: "error" });
       if (!got.ok) return [null, null];
       return [await openSync(k, await got.arrayBuffer()), got.headers.get("ETag")];
     } catch (e) { return [null, null]; }
@@ -1388,7 +1434,7 @@ if (typeof document !== "undefined") {
     const k = asBytes(stored), headers = { "Content-Type": "application/octet-stream" };
     if (tag) headers["If-Match"] = tag;
     try {
-      const put = await fetch(houseUrl(k), { method: "PUT", body: await sealSync(k, houseBody(doc)), headers });
+      const put = await fetch(houseUrl(k), { method: "PUT", redirect: "error", body: await sealSync(k, houseBody(doc)), headers });
       return put.ok ? true : put.status === 412 ? "changed" : false;
     } catch (e) { return false; }
   }
@@ -1505,7 +1551,7 @@ if (typeof document !== "undefined") {
       houseFit(houseTidy(doc, new Date()));
       const code = newCode(), stored = houseStore(await houseKeys(code));
       if (await housePut(stored, doc, "missing") !== true) { say("syncFail"); return; }
-      try { await fetch(houseUrl(asBytes(state.house.keys)), { method: "DELETE" }); } catch (e) { /* gone anyway */ }
+      try { await fetch(houseUrl(asBytes(state.house.keys)), { method: "DELETE", redirect: "error" }); } catch (e) { /* gone anyway */ }
       const left = Object.entries(doc.members).filter(([, m]) => m.left).map(([id]) => id);
       state.house = Object.assign({}, state.house, { keys: stored, asked: Array.from(new Set(state.house.asked.concat(left))) });
       state.houseList = doc;
