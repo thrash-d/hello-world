@@ -93,6 +93,7 @@ MAX_SYNC = 64_000
 SYNC_DAYS = 366
 PUSH_PATH = re.compile(r"^/v1/push/([0-9a-f]{32})$")
 PUSH_TIME = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+PUSH_SENT = re.compile(r"^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$")
 MAX_PUSH_TIMES = 2
 # A failed push is tried again through this many minutes, then dropped.
 PUSH_GRACE_MINUTES = 15
@@ -383,6 +384,26 @@ def es256_verify(public, message, signature):
     return point is not None and point[0] % P256_N == r
 
 
+def write_private(path, text):
+    """Write `text` so a shared machine cannot read it (mode 0600).
+
+    The VAPID private key and a phone's push address are secrets. Windows
+    ignores the Unix mode; the notes file has the same limit.
+    """
+    tmp = path + ".tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+    except Exception:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
+    os.replace(tmp, path)
+
+
 def etag(raw):
     """A sync copy's version, for If-Match."""
     return '"' + hashlib.sha256(raw).hexdigest()[:32] + '"'
@@ -434,10 +455,7 @@ class Push:
                 self.d = int(json.load(f)["d"], 16)
         except (OSError, ValueError, KeyError, TypeError):
             self.d = secrets.randbelow(P256_N - 1) + 1
-            tmp = key + ".tmp"
-            with open(tmp, "w", encoding="utf-8") as f:
-                json.dump({"d": format(self.d, "064x")}, f)
-            os.replace(tmp, key)
+            write_private(key, json.dumps({"d": format(self.d, "064x")}))
         self.public = p256_public(self.d)
 
     def path(self, token):
@@ -465,22 +483,25 @@ class Push:
             try:
                 with open(path, encoding="utf-8") as f:
                     old = json.load(f)
-                old_times = old.get("times")
-                if isinstance(old_times, list) and sorted(set(old_times)) == times:
+                # The same address and the same times keep what was already
+                # sent. A new address is a new subscription, and a file whose
+                # times are not strings must not stop the phone updating it.
+                old_times = old.get("times") if isinstance(old, dict) else None
+                same_address = isinstance(old, dict) and old.get("endpoint") == data["endpoint"]
+                if (same_address and isinstance(old_times, list)
+                        and sorted(t for t in old_times if isinstance(t, str)) == times
+                        and all(isinstance(t, str) for t in old_times)):
                     marks = old.get("sent")
                     if isinstance(marks, str):
                         marks = [marks]
                     if isinstance(marks, list):
-                        sent = [m for m in marks if isinstance(m, str)]
-            except (OSError, ValueError):
-                pass
+                        sent = [m for m in marks if isinstance(m, str) and PUSH_SENT.fullmatch(m)]
+            except (OSError, ValueError, TypeError):
+                sent = []
             body = {"endpoint": data["endpoint"], "times": times}
             if sent:
                 body["sent"] = sent
-            tmp = path + ".tmp"
-            with open(tmp, "w", encoding="utf-8") as f:
-                json.dump(body, f)
-            os.replace(tmp, path)
+            write_private(path, json.dumps(body))
         return True
 
     def forget(self, token):
@@ -611,19 +632,13 @@ class Push:
                 if isinstance(mark, str) and mark >= cutoff and mark not in kept:
                     kept.append(mark)
             current["sent"] = kept
-            tmp = path + ".tmp"
             try:
                 # The file's time stays the phone's last visit.
                 stat = os.stat(path)
-                with open(tmp, "w", encoding="utf-8") as f:
-                    json.dump(current, f)
-                os.replace(tmp, path)
+                write_private(path, json.dumps(current))
                 os.utime(path, (stat.st_atime, stat.st_mtime))
             except OSError:
-                try:
-                    os.remove(tmp)
-                except OSError:
-                    pass
+                pass
 
     def _forget_if_same(self, path, endpoint):
         """Drop the registration only when it is still the one we called."""

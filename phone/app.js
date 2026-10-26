@@ -9,7 +9,7 @@ const SCAM_EN = "hello-world has no phone line and no support staff. We never ca
 const UI = {
   en: {
     hello: "Hello, world!", ask: "Did you do it?", yesterday: "Yesterday you planned:",
-    on: "On {date} you planned:", yes: "Done", no: "Not yet", skip: "Skip",
+    on: "On {date} you planned:", yes: "Done", no: "Not yet", unsure: "Not sure", skip: "Skip",
     sideways: "The day went sideways", sidewaysSaid: "That's okay. It's set aside, and tomorrow is new.",
     carryIt: "Carry it over", asideIt: "Set it aside", carriedSaid: "That's okay. It's carried over to today.",
     fresh: "Fresh day. Bring it over, or start clean?", bring: "Bring it over", startClean: "Start clean",
@@ -28,7 +28,7 @@ const UI = {
     letterMail: "Send with my own mail", letterSms: "Send with my own messages", letterKeep: "Keep a copy after sending",
     letterOpen: "Open", letterDelete: "Delete", lettersClear: "Delete every letter", lettersClearAsk: "Delete every letter on this phone?",
     letterSaved: "Saved on this phone.", lettersCleared: "Every letter is deleted.",
-    house: "Household list", houseIntro: "Things anyone in the household can add and tick, each on their own phone or PC. Each thing shows who added, ticked or removed it, and nothing counts who did what. Someone with a household key starts one on a PC.",
+    house: "Household list", houseIntro: "Things anyone in the household can add and tick, each on their own phone or PC. Each thing shows who added, ticked or removed it, and nothing counts who did what. Each line shows the weekday and the time, and everyone who opens the list can see them. Someone with a household key starts one on a PC.",
     houseCode: "The household code", houseName: "Your name, as the others will see it", houseJoin: "Join", houseJoined: "You've joined the household list. Everyone on it is told.",
     houseNotFound: "That code didn't find a household list. Check it, or ask for the new one.", houseAdd: "Add",
     houseRemove: "Remove", houseRemoved: "Recently removed", houseRestore: "Restore", houseLeave: "Leave the household list",
@@ -57,13 +57,15 @@ const UI = {
     family: "Family", familyName: "Their name", familyNumber: "Their phone number",
     familyNote: "Kept only on this phone. The buttons open your phone's own text or call screen; nothing is sent unless you press send there.",
     familySave: "Save", draft: "Draft text to {name}", call: "Call {name}", okayText: "I'm okay today.",
-    print: "Print a big page", printNote: "Anyone in the room can read a printed page. The sync code is never on it.",
+    print: "Print a big page", printNote: "Anyone in the room can read a printed page. The sync code and the household code are never on it.",
     printTitle: "Today", printRepeat: "Every day at {at}:",
     export: "Save my plans to a file", exported: "Saved to a file.",
     forget: "Delete everything on this phone", forgetAsk: "Delete your plans and settings from this phone?",
     forgotten: "Everything on this phone was deleted.",
     privacy: "Your plans stay on this phone, in this browser. They leave it only if you turn on sync.",
-    good: "Good. That one is off your list.", kept: "Kept for today.", skipped: "Skipped. It asks again next time.",
+    good: "Good. That one is off your list.", goodMany: "Good. {n} things are off your list.",
+    unsureSaid: "That's fine. It's kept for today.",
+    kept: "Kept for today.", skipped: "Skipped. It asks again next time.",
     saved: "Saved.", cleared: "Set aside. Tap it below to bring it back.", nothing: "Type a word or two first.",
     sync: "Sync with a PC", syncCode: "Code from the PC (Sync with my phone, in the PC's menu)", syncSave: "Turn on sync", syncOff: "Turn off sync",
     syncChange: "Change code", syncChangeNote: "Type the new code the PC shows.",
@@ -75,7 +77,7 @@ const UI = {
   },
   es: {
     hello: "¡Hola, mundo!", ask: "¿Lo hiciste?", yesterday: "Ayer planeaste:",
-    on: "El {date} planeaste:", yes: "Hecho", no: "Todavía no", skip: "Saltar",
+    on: "El {date} planeaste:", yes: "Hecho", no: "Todavía no", unsure: "No estoy seguro", skip: "Saltar",
     sideways: "El día salió de lado", sidewaysSaid: "No pasa nada. Queda apartado, y mañana es un día nuevo.",
     carryIt: "Llevarlo a hoy", asideIt: "Apartarlo", carriedSaid: "No pasa nada. Pasa a hoy.",
     fresh: "Día nuevo. ¿Lo traes o empiezas de cero?", bring: "Traerlo", startClean: "Empezar de cero",
@@ -94,7 +96,7 @@ const UI = {
     letterMail: "Enviar con mi correo", letterSms: "Enviar con mis mensajes", letterKeep: "Guardar una copia después de enviar",
     letterOpen: "Abrir", letterDelete: "Borrar", lettersClear: "Borrar todas las cartas", lettersClearAsk: "¿Borrar todas las cartas de este teléfono?",
     letterSaved: "Guardada en este teléfono.", lettersCleared: "Todas las cartas están borradas.",
-    house: "Lista del hogar", houseIntro: "Cosas que cualquiera del hogar puede añadir y marcar, cada uno en su propio teléfono o PC. Cada cosa muestra quién la añadió, marcó o quitó, y nada cuenta quién hizo qué. Alguien con una clave de hogar la empieza en un PC.",
+    house: "Lista del hogar", houseIntro: "Cosas que cualquiera del hogar puede añadir y marcar, cada uno en su propio teléfono o PC. Cada cosa muestra quién la añadió, marcó o quitó, y nada cuenta quién hizo qué. Cada línea muestra el día de la semana y la hora, y quien abre la lista puede verlos. Alguien con una clave de hogar la empieza en un PC.",
     houseCode: "El código del hogar", houseName: "Tu nombre, como lo verán los demás", houseJoin: "Unirme", houseJoined: "Te uniste a la lista del hogar. Todos los demás lo verán.",
     houseNotFound: "Ese código no encontró ninguna lista del hogar. Revísalo, o pide el nuevo.", houseAdd: "Añadir",
     houseRemove: "Quitar", houseRemoved: "Quitado hace poco", houseRestore: "Recuperar", houseLeave: "Salir de la lista del hogar",
@@ -123,13 +125,15 @@ const UI = {
     family: "Familia", familyName: "Su nombre", familyNumber: "Su número de teléfono",
     familyNote: "Se guarda solo en este teléfono. Los botones abren la pantalla de mensajes o llamadas de tu teléfono; no se envía nada si no pulsas enviar allí.",
     familySave: "Guardar", draft: "Escribir mensaje a {name}", call: "Llamar a {name}", okayText: "Hoy estoy bien.",
-    print: "Imprimir una página grande", printNote: "Cualquiera en la habitación puede leer una página impresa. El código de sincronización nunca aparece en ella.",
+    print: "Imprimir una página grande", printNote: "Cualquiera en la habitación puede leer una página impresa. El código de sincronización y el código del hogar nunca aparecen en ella.",
     printTitle: "Hoy", printRepeat: "Cada día a las {at}:",
     export: "Guardar mis planes en un archivo", exported: "Guardado en un archivo.",
     forget: "Borrar todo en este teléfono", forgetAsk: "¿Borrar tus planes y ajustes de este teléfono?",
     forgotten: "Se borró todo en este teléfono.",
     privacy: "Tus planes se quedan en este teléfono, en este navegador. Solo salen de él si activas la sincronización.",
-    good: "Bien. Una cosa menos en tu lista.", kept: "Se queda para hoy.", skipped: "Saltado. Volverá a preguntar la próxima vez.",
+    good: "Bien. Una cosa menos en tu lista.", goodMany: "Bien. {n} cosas menos en tu lista.",
+    unsureSaid: "No pasa nada. Se queda para hoy.",
+    kept: "Se queda para hoy.", skipped: "Saltado. Volverá a preguntar la próxima vez.",
     saved: "Guardado.", cleared: "Apartado. Tócalo abajo para recuperarlo.", nothing: "Escribe una o dos palabras primero.",
     sync: "Sincronizar con un PC", syncCode: "Código del PC (Sincronizar con mi teléfono, en el menú del PC)", syncSave: "Activar sincronización", syncOff: "Desactivar sincronización",
     syncChange: "Cambiar código", syncChangeNote: "Escribe el código nuevo que muestra el PC.",
@@ -141,7 +145,7 @@ const UI = {
   },
   ar: {
     hello: "مرحبًا بالعالم!", ask: "هل فعلتها؟", yesterday: "خططت أمس:",
-    on: "خططت يوم {date}:", yes: "تم", no: "ليس بعد", skip: "تخطَّ",
+    on: "خططت يوم {date}:", yes: "تم", no: "ليس بعد", unsure: "لست متأكدًا", skip: "تخطَّ",
     sideways: "اليوم لم يسر كما يجب", sidewaysSaid: "لا بأس. أُجّلت، والغد يوم جديد.",
     carryIt: "انقلها إلى اليوم", asideIt: "أجّلها", carriedSaid: "لا بأس. نُقلت إلى اليوم.",
     fresh: "يوم جديد. تنقلها أم تبدأ من جديد؟", bring: "انقلها", startClean: "ابدأ من جديد",
@@ -160,7 +164,7 @@ const UI = {
     letterMail: "أرسل ببريدي", letterSms: "أرسل برسائلي", letterKeep: "احتفظ بنسخة بعد الإرسال",
     letterOpen: "افتح", letterDelete: "احذف", lettersClear: "احذف كل الرسائل", lettersClearAsk: "حذف كل الرسائل من هذا الهاتف؟",
     letterSaved: "حُفظت على هذا الهاتف.", lettersCleared: "حُذفت كل الرسائل.",
-    house: "قائمة الأسرة", houseIntro: "أشياء يمكن لأي فرد في الأسرة إضافتها وتعليمها، كلٌّ على هاتفه أو حاسوبه. يُظهر كل شيء من أضافه أو علّمه أو حذفه، ولا شيء يحسب من فعل ماذا. يبدأها شخص لديه مفتاح الأسرة على حاسوب.",
+    house: "قائمة الأسرة", houseIntro: "أشياء يمكن لأي فرد في الأسرة إضافتها وتعليمها، كلٌّ على هاتفه أو حاسوبه. يُظهر كل شيء من أضافه أو علّمه أو حذفه، ولا شيء يحسب من فعل ماذا. يُظهر كل سطر يوم الأسبوع والوقت، ويراه كل من يفتح القائمة. يبدأها شخص لديه مفتاح الأسرة على حاسوب.",
     houseCode: "رمز الأسرة", houseName: "اسمك كما سيراه الآخرون", houseJoin: "انضم", houseJoined: "انضممت إلى قائمة الأسرة. سيعلم الجميع.",
     houseNotFound: "لم يجد هذا الرمز قائمة أسرة. تحقق منه أو اطلب الرمز الجديد.", houseAdd: "أضف",
     houseRemove: "احذف", houseRemoved: "حُذف مؤخرًا", houseRestore: "استعد", houseLeave: "غادر قائمة الأسرة",
@@ -189,13 +193,15 @@ const UI = {
     family: "العائلة", familyName: "الاسم", familyNumber: "رقم الهاتف",
     familyNote: "يُحفظ على هذا الهاتف فقط. تفتح الأزرار شاشة الرسائل أو الاتصال في هاتفك؛ لا يُرسل شيء ما لم تضغط إرسال هناك.",
     familySave: "احفظ", draft: "اكتب رسالة إلى {name}", call: "اتصل بـ{name}", okayText: "أنا بخير اليوم.",
-    print: "اطبع صفحة كبيرة", printNote: "يستطيع أي شخص في الغرفة قراءة الصفحة المطبوعة. رمز المزامنة لا يظهر عليها أبدًا.",
+    print: "اطبع صفحة كبيرة", printNote: "يستطيع أي شخص في الغرفة قراءة الصفحة المطبوعة. رمز المزامنة ورمز الأسرة لا يظهران عليها أبدًا.",
     printTitle: "اليوم", printRepeat: "كل يوم في {at}:",
     export: "احفظ خططي في ملف", exported: "حُفظت في ملف.",
     forget: "احذف كل شيء على هذا الهاتف", forgetAsk: "حذف خططك وإعداداتك من هذا الهاتف؟",
     forgotten: "حُذف كل شيء على هذا الهاتف.",
     privacy: "تبقى خططك على هذا الهاتف، في هذا المتصفح. لا تغادره إلا إذا شغّلت المزامنة.",
-    good: "جيد. شيء أقل في قائمتك.", kept: "تبقى لليوم.", skipped: "تم التخطي. سيسأل مرة أخرى في المرة القادمة.",
+    good: "جيد. شيء أقل في قائمتك.", goodMany: "رائع. عدد المهام التي شُطبت من قائمتك: {n}.",
+    unsureSaid: "لا بأس. أُبقيت لليوم.",
+    kept: "تبقى لليوم.", skipped: "تم التخطي. سيسأل مرة أخرى في المرة القادمة.",
     saved: "تم الحفظ.", cleared: "أُجّلت. المسها في الأسفل لإعادتها.", nothing: "اكتب كلمة أو كلمتين أولًا.",
     sync: "المزامنة مع كمبيوتر", syncCode: "الرمز من الكمبيوتر (المزامنة مع هاتفي، في قائمة الكمبيوتر)", syncSave: "شغّل المزامنة", syncOff: "أوقف المزامنة",
     syncChange: "غيّر الرمز", syncChangeNote: "اكتب الرمز الجديد الذي يظهره الكمبيوتر.",
@@ -383,9 +389,10 @@ function answer(state, choice, today) {
   const intent = state.intent;
   if (!asks(state, today)) return "";
   if (choice === "yes") {
+    const n = intent.text.split(";").map((p) => p.trim()).filter(Boolean).length;
     state.finished.push({ text: intent.text, date: intent.date });
     state.intent = null;
-    return "good";
+    return n > 1 ? "goodMany:" + n : "good";
   }
   if (choice === "no" || choice === "carry") {
     const wasFresh = fresh(state, today);
@@ -399,6 +406,11 @@ function answer(state, choice, today) {
     putAside(state, intent.text, today);
     state.intent = null;
     return choice === "clean" ? "cleanSaid" : "sidewaysSaid";
+  }
+  if (choice === "unsure") {
+    // Kept for today, and it does not count as a skip.
+    state.intent = { text: intent.text, date: today, skips: 0, since: intent.since || intent.date };
+    return "unsureSaid";
   }
   intent.skips = (intent.skips || 0) + 1;
   return "skipped";
@@ -421,9 +433,10 @@ function setPlan(state, text, today) {
 
 function finishToday(state, today) {
   if (!state.intent) return "";
+  const n = state.intent.text.split(";").map((p) => p.trim()).filter(Boolean).length;
   state.finished.push({ text: state.intent.text, date: today });
   state.intent = null;
-  return "good";
+  return n > 1 ? "goodMany:" + n : "good";
 }
 
 function clearToday(state, today) {
@@ -481,8 +494,11 @@ function pushText(prefs, now) {
   now = now || new Date();
   const minutes = now.getHours() * 60 + now.getMinutes();
   // The server retries a missed push for 15 minutes, including past midnight.
+  // The same window as sw.js, including across midnight.
   const near = (at) => {
+    if (typeof at !== "string" || !at.includes(":")) return false;
     const [h, m] = at.split(":").map(Number);
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return false;
     const diff = Math.abs(h * 60 + m - minutes);
     return Math.min(diff, 1440 - diff) <= 15;
   };
@@ -839,10 +855,15 @@ const who = (doc, id) => (own(doc.members, id) ? doc.members[id].name : "") || "
 
 function houseHistory(doc, item, lang) {
   const words = UI[lang] || UI.en;
+  // Weekday and clock time on this device. The list still stores UTC, and
+  // everyone who opens it can see both.
   return item.history.slice(-4).map(([what, by, at]) => {
-    const day = new Date(at).toLocaleDateString(lang, { weekday: "long" });
-    return (words["h_" + what] || UI.en["h_" + what]).replace("{name}", who(doc, by)).replace("{when}", day);
-  }).join("; ");
+    const when = new Date(at);
+    if (Number.isNaN(when.getTime())) return "";
+    const day = when.toLocaleDateString(lang, { weekday: "long" });
+    const clock = when.toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+    return (words["h_" + what] || UI.en["h_" + what]).replace("{name}", who(doc, by)).replace("{when}", day + ", " + clock);
+  }).filter(Boolean).join("; ");
 }
 
 // Worked out from the members themselves, so a join can't be hidden by
@@ -898,9 +919,15 @@ function letterLink(letter, how, apple) {
 }
 
 function syncTime(v) {
-  if (typeof v !== "string" || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d$/.test(v)) return "";
-  const at = Date.parse(v);
-  return !Number.isNaN(at) && at <= Date.now() + 86400000 ? v : "";
+  // A real local time, not only the shape. 2026-02-31 matches the shape,
+  // and Date.parse turns it into March, which would then beat a real February.
+  const m = typeof v === "string" && /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})$/.exec(v);
+  if (!m) return "";
+  const y = +m[1], mo = +m[2], d = +m[3], h = +m[4], mi = +m[5], s = +m[6];
+  const at = new Date(y, mo - 1, d, h, mi, s);
+  if (at.getFullYear() !== y || at.getMonth() !== mo - 1 || at.getDate() !== d
+      || at.getHours() !== h || at.getMinutes() !== mi || at.getSeconds() !== s) return "";
+  return at.getTime() <= Date.now() + 86400000 ? v : "";
 }
 
 // Finished things from both sides, and the plan from whichever side changed
@@ -948,17 +975,39 @@ if (typeof module !== "undefined") {
     phoneNumber, smsLink, utcTime, pushText, exportText, setDayStart, REMIND_TIMES, DAY_STARTS,
     fresh, smallerDue, comingBack, smaller, endDay, noteSideways, mergeDevices, noteDevice, letterLink,
     houseKeys, houseNew, houseJoin, houseLeave, houseChange, houseMerge, houseTidy, houseBody, houseHistory,
-    houseNews, houseLeftUnasked, newCode, houseFit, houseStamp, syncAction, HOUSE };
+    houseNews, houseLeftUnasked, newCode, houseFit, houseStamp, syncAction, syncTime, HOUSE };
 }
 
 if (typeof document !== "undefined") {
   const $ = (id) => document.getElementById(id);
   let state = parse(localStorage.getItem(KEY) || "{}");
-  let timer = null;
+  let timer = null, hearTimer = null;
   const t = () => UI[language(state, navigator.languages)];
   const today = () => todayOf(state);
   const say = (key) => {
-    $("status").textContent = key === "endTally" ? $("status").dataset.tally : key ? t()[key] : "";
+    const words = t();
+    let text = "";
+    if (typeof key === "string" && key.startsWith("goodMany:")) {
+      text = (words.goodMany || UI.en.goodMany).replace("{n}", key.slice(9));
+    } else if (key === "endTally") {
+      text = $("status").dataset.tally || "";
+    } else if (key) {
+      text = words[key] || "";
+    }
+    const status = $("status");
+    status.textContent = text;
+    // Saved, Kept, and the done line stay where a screen reader can land
+    // before the plan box takes the cursor.
+    if (!text || (key !== "saved" && key !== "kept" && key !== "good" && key !== "unsureSaid"
+        && !(typeof key === "string" && key.startsWith("goodMany:")))) return;
+    status.tabIndex = -1;
+    status.focus();
+    clearTimeout(hearTimer);
+    hearTimer = setTimeout(() => {
+      if (document.activeElement !== status) return;
+      const form = $("plan-form"), plan = $("plan-input");
+      if (plan && form && !form.hidden) plan.focus();
+    }, 400);
   };
 
   // What the service worker shows for a push, kept where it can read it.
@@ -1056,7 +1105,7 @@ if (typeof document !== "undefined") {
       $("ask-label").textContent = s.ask + " " + (state.intent.date === yesterday ? s.yesterday : s.on.replace("{date}", longDate(state.intent.date, lang)));
       $("ask-plan").textContent = state.intent.text;
     }
-    ["yes", "no", "skip", "sideways", "did", "clear", "save"].forEach((id) => { $(id).textContent = s[id]; });
+    ["yes", "no", "unsure", "skip", "sideways", "did", "clear", "save"].forEach((id) => { $(id).textContent = s[id]; });
     document.body.classList.toggle("large", Boolean(state.large));
     $("large").textContent = state.large ? s.usual : s.large;
     const isFresh = asking && fresh(state, day);
@@ -1162,6 +1211,16 @@ if (typeof document !== "undefined") {
     $("fridge-title").textContent = s.printTitle + ": " + longDate(day, lang);
     $("fridge-plan").textContent = planned ? state.intent.text : "";
     $("fridge-repeat").textContent = state.repeat ? s.printRepeat.replace("{at}", state.repeat.at) + " " + state.repeat.text : "";
+    const houseBox = $("fridge-house");
+    houseBox.replaceChildren();
+    const listed = state.houseList && state.houseList.items;
+    if (listed) {
+      Object.values(listed).filter((item) => item && !item.removed && item.text).forEach((item) => {
+        houseBox.append(Object.assign(document.createElement("p"), { className: "big", textContent: item.text }));
+        const hist = houseHistory(state.houseList, item, lang);
+        if (hist) houseBox.append(Object.assign(document.createElement("p"), { className: "note", textContent: hist }));
+      });
+    }
     $("fridge-note").textContent = s.printNote;
     drawSync();
     if (typeof drawHouse === "function") drawHouse();
@@ -1338,6 +1397,7 @@ if (typeof document !== "undefined") {
   }
   $("yes").addEventListener("click", act(() => answer(state, "yes", today())));
   $("no").addEventListener("click", act(() => afterCarry(answer(state, "no", today()))));
+  $("unsure").addEventListener("click", act(() => answer(state, "unsure", today())));
   $("skip").addEventListener("click", act(() => answer(state, "skip", today())));
   // Sideways asks carry or set aside, two equal buttons (Mary); a fresh
   // day's "Start clean" sets it aside at once.

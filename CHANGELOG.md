@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-26: fixes from review round 46
+
+Version 1.63.0. The notification the phone shows for a push was still using a ten-minute window, so a reminder eleven to fifteen minutes late, or one just after midnight, showed the check-in line instead of the daily repeat's words. A saved push registration whose times were not all text made the next save fail, and a new push address kept the old "already sent" marks, so that phone missed today's reminder. The phone treated 31 February as a real sync time and could let it beat a real February. The VAPID key and the push registration were written with the process's file mode.
+
+The household line now shows the weekday and the time of day on the device's clock, and everyone who opens the list can see them. The printed page includes those lines and says the household code is never on it. The phone has a Not sure button, and a plan of several things says how many are done. Prompts end in a colon unless that is turned off. After a save, the window leaves the status line up briefly before the plan box takes the cursor. Pro's colours include Linen.
+
 ## 2026-10-26: fixes from review round 45
 
 Version 1.62.3. Opening the phone page during the fifteen minutes after a

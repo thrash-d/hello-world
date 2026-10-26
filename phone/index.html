@@ -21,6 +21,7 @@
   h2 { font-size: 1.05rem; margin: 0 0 .5rem; }
   .plan { font-size: 1.15rem; font-weight: 600; margin: 0 0 .8rem; overflow-wrap: anywhere; }
   .buttons { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  #ask .buttons { grid-template-columns: 1fr 1fr; }
   button { font: inherit; font-weight: 700; min-height: 64px; border-radius: 12px; border: 2px solid var(--accent); background: transparent; color: var(--accent); padding: 8px; cursor: pointer; }
   button.primary { background: var(--accent); color: var(--bg); }
   button.done { border-color: var(--done); background: var(--done); color: var(--bg); }
@@ -39,7 +40,7 @@
   body.large button, body.large a.button { min-height: 80px; }
   .small-button { min-height: 44px; font-size: .95rem; }
   [hidden] { display: none !important; }
-  /* The fridge page: only the day, the plan and the daily repeat, big. */
+  /* The fridge page: the day, the plan, the daily repeat and the household lines, big. */
   @media print {
     main > *:not(#fridge) { display: none !important; }
     body { background: #fff; color: #000; }
@@ -55,7 +56,7 @@
   <h1 id="hello">Hello, world!</h1>
   <p class="date" id="date"></p>
   <p><button class="small-button" id="large"></button></p>
-  <p class="status" id="status" role="status" aria-live="polite"></p>
+  <p class="status" id="status" role="status" aria-live="polite" tabindex="-1"></p>
 
   <section id="ask" hidden>
     <h2 id="ask-label"></h2>
@@ -63,6 +64,7 @@
     <div class="buttons">
       <button class="done" id="yes"></button>
       <button id="no"></button>
+      <button id="unsure"></button>
       <button id="skip"></button>
     </div>
     <button class="wide" id="sideways"></button>
@@ -215,6 +217,7 @@
     <h2 id="fridge-title"></h2>
     <p class="big" id="fridge-plan"></p>
     <p class="big" id="fridge-repeat"></p>
+    <div id="fridge-house"></div>
     <p class="note" id="fridge-note"></p>
   </section>
 </main>

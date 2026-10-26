@@ -88,9 +88,9 @@ as taking pills, with its own reminder at one of those times (type the words
 in the plan box first; in the text screen it's **Every day...**). It's a
 reminder only, not a medical device, and its notification leaves the words
 out unless **Show my plan in the reminder** is on. **My plans > Print a big
-page for the fridge** opens today's plan and the daily repeat in big print in
-the browser, to print; it says anyone in the room can read it, and never has
-the sync code. Days your organization
+page for the fridge** opens today's plan, the daily repeat and the household
+lines in big print in the browser, to print; it says anyone in the room can
+read it, and never has the sync code or the household code. Days your organization
 lists as holidays are quiet too. **Options > Greet me by name** puts your
 first name at the top. Turning off **What the window shows > Also show the
 thought** hides the thought and keeps the tip.
@@ -110,7 +110,7 @@ Every on-or-off choice also works from the command line, for example
 (no finished list in the text screen), `expire_same` (`same` forgets an
 earlier plan after 30 days), `no_count` (no done count kept), `numbers`,
 `close_after_done` (the text screen closes after `done` and the next plan)
-`colon_prompts` (prompts end in `:` instead of `>`), `floor_tips`,
+`colon_prompts` (prompts end in a colon unless `--set colon_prompts off`), `floor_tips`,
 `private_reminder` and `hide_thought`. `--week`,
 `--numbers` and `--export` print or save the same as the window, and
 `--plain-local` prints the greeting in your language. **Options** in the window
@@ -233,7 +233,7 @@ itself; for one nudge at a time you pick, use **Options > Reminder...**.
 
 Pro is $5 once, or $8 once for a household: a second check-in in the
 afternoon or evening (15:00 to 21:00) on days your plan is still open, and
-window colours; a household key is used on everyone's devices and also opens
+window colours (Sea, Sand, Night and Linen); a household key is used on everyone's devices and also opens
 the shared household list when it ships. History (a year, with a **This
 year** page), pets, reminders and everything else stay free. Keys come only
 from the official store, and hello-world never calls, texts or emails to sell
@@ -267,8 +267,10 @@ gets its own 25-character code; give it to each adult in person, and they
 type it on their own device with their own name. Nobody can add someone else,
 and nobody can set reminders or send anything in another person's name.
 Everyone is told when someone joins or leaves. Each thing shows who added,
-ticked or removed it and on which day (not the minute), visible to everyone,
-and nothing counts who did what. Removed things can be restored for 30 days.
+ticked or removed it, the weekday, and the time of day on the device's clock.
+Everyone who opens the list can see them, and nothing counts who did what.
+The time is not uploaded as a new field: it is already in the list. Removed
+things can be restored for 30 days.
 When someone leaves, every other device asks until answered whether to make
 a new code so the old one stops working; the person who left keeps whatever
 was already on their device. The list is encrypted with its code before it
@@ -580,7 +582,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.62.3'
+$tag = 'v1.63.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
