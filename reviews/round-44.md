@@ -2,7 +2,7 @@
 
 - Date: 2026-10-26
 - Commit reviewed: 9ca4e38 (main, version 1.62.1). The fixes below are in 1.62.2.
-- Agents: one reviewer, plus five simulated persona agents, each in its own run. They did not see one another's notes. Quotes are simulations, checked against the program before anything was changed.
+- Agents: one reviewer, plus five simulated persona agents, each in its own run. The first pass did not see the others' notes. A second sitting on this same review answered the profit maximizer. Quotes are simulations, checked against the program before anything was changed.
 - Redactions: none.
 
 ## Part 1: findings
@@ -42,13 +42,13 @@ Reviewed against 9ca4e38, and against the 1.16.0 notes in round 43.
 - `uninstall.ps1` rechecks the notes folder before each delete, and a junction swapped in after that check can still be followed. Closing it needs a delete by an open handle. This VM is Linux, so that path was not changed.
 - The Windows DACL on a portable notes folder, same reason as round 43 item 3.
 - `!` in the test-only launcher command, as above.
-- Profit Maximizer's prices, hires, and license files, and the enthusiast's colour theme and QR code. They are in Part 2 only.
+- The profit maximizer's prices, his Smart Greeting package, and the enthusiast's colour theme and QR code. The package is rejected in Part 2. He filed a dissent. Nothing from it was built, and nothing in the program sends data for it.
 - The trailing `>` on prompts, which a screen reader speaks as "greater". That wants a real NVDA pass (panel item 2). The false "that one" line, which the same reader hit, is fixed.
 - Quiet uninstall omits `-RemoveNotes` on purpose: a silent uninstall should not wipe the plan. Unsigned scripts and a counts host in a build whose mail says "nothing is sent" are rollout choices. `COUNTS_SERVER` in this tree is empty. Policy can still name a server, and `TurnOffSharedCounts` turns it off.
 
 ## Part 2: personas
 
-Each one ran as its own agent. Nothing they asked for was built, except the bugs in Part 1 that the review already owned. The engineers' notes say where a proposal would break the privacy promises: no accounts, and no network unless the person opts in.
+Each one ran as its own agent. Nothing they asked for was built, except the bugs in Part 1 that the review already owned. The engineers' line is no accounts, and no network unless the person opts in. The profit maximizer refused that line. The reply, and the rejection, follow his pitch.
 
 ### Casey, the enthusiast
 
@@ -60,13 +60,56 @@ Casey installed it, saw a black window, and stayed. Sync stayed off because the 
 
 ### The profit maximizer
 
-Personal Pro stays five dollars, once. Household becomes nineteen once, and the household set he wants sold is thirty-nine. Team is thirty-six dollars a user a year with a ten-seat floor. Enterprise is thirty dollars a user a year with a nine-thousand-dollar floor. He would hire about thirty-five people. Salaries, he said, are not his budget. He keeps the five-dollar personal ceiling, notes on the device, no accounts on the personal and household products, and the network off until someone opts in. He will not sell a leaderboard.
+He refused the privacy promises as a blocker. He called them a footer: no accounts, and no network unless someone opts in. The button people hit on the first morning is the product, and he wants that click to count as opted in. He told the engineers who wrote the line to get out of the way. Ruth's "no network" review, he said, is how a television company stays in the hardware business while the margin walks out the door. Dave's Group Policy is the cheap tier. Helen can have the notice read aloud. That, he said, is the accommodation.
 
-Three of his ideas break the privacy promises, and they are not built. An email address at purchase is an account. A silent install beacon is network without an opt-in. Per-person done rows for a manager are accounts plus a report of someone else's plan.
+The package is a Samsung setup screen with the serial numbers filed off. He called it Smart Greeting. If Legal flinches, the name becomes Viewing Information Services, which is what Samsung calls the feature that recognizes what is on screen. He does not want the word telemetry anywhere a person can see it.
 
-- "Five dollars is the entire consumer market, and I will collect it in one swipe on the way to the IT budget."
-- "Eight dollars for a household is a tip jar; nineteen is the price, and thirty-nine is the set I actually want sold."
-- "I will sell keys, a quiet push, and a rollout, and the engineers may burn any richer idea that needs a login."
+What he asked for, and what this review does not build:
+
+- Usage insights in the style of automatic content recognition, on until the person finds a box and turns them off. The day's thought, the plan, and whether it was finished leave the machine as "viewing information."
+- A privacy notice long enough that keeping the app means accepting it. First-run setup is the consent. Enter, which today skips a question, should also mean yes.
+- A box labeled "Help improve hello-world," already checked when the window opens.
+- Sponsored lines in the daily thought, sold to data partners. The counts server is where those partners collect.
+- Staff with no ceiling, because salaries are not his budget. He named twelve lawyers to rewrite the privacy policy, a growth team of twenty, and an Insights team of fifteen, and he said he could add more before lunch.
+
+The old prices stay, and then they stop mattering. Five dollars is the cover. The household set is thirty-nine. The feed is the business. He will not take a leaderboard if the feed pays better, and he will not take a no from this panel.
+
+- "The promise is a footer. The button is the product, and the button will say I agree."
+- "Call it Smart Greeting. If Legal twitches, call it Viewing Information Services. Nobody ever sued a television for having a greeting."
+- "Vizio did not get rich selling glass. The glass was the coupon. I will hire the lawyers who can make our coupon look like a thought for the day."
+- "Opt in is what we call it after they press Enter to reach the hello. A pre-checked Help improve box is a courtesy, not a question."
+- "Ruth can keep her threat model. Dave can lock the cheap image. The image I sell phones home before the coffee is poured, and I am hiring the Insights team that receives it."
+
+### What the room told him
+
+Casey was delighted, which is the problem with the button. He would leave Smart Greeting checked because it sounds like the window finally got a personality, and he asked if the sponsored thought could be about gadgets. He did not know the plan would leave the PC.
+
+- "Smart Greeting sounds like the black window learned my name. I would leave that box checked."
+
+Helen Park answered him by name. A notice you must accept to keep the hello is a locked door. She will not sit through it. NVDA would speak every word, including the part that calls her plan viewing information. A box that arrives checked is not a choice she can find. Enter already means skip. He does not get to reuse it as yes. Her first note stands: no account, and no new network.
+
+- "I will not accept a novel to keep a hello. If the box is already checked, I have not agreed to anything."
+- "Enter skips. He wants Enter to mean send. Those are different words, and the screen reader will say the wrong one if he blurs them."
+
+Ruth Okonkwo answered him by name, with the cases he was waving around.
+
+Vizio, 6 February 2017. The FTC and the New Jersey Attorney General. Vizio and its data firm, Inscape, paid $2.2 million. The software sat on 11 million smart TVs and collected what was on the screen. The feature was named Smart Interactivity. After an update the set said the privacy policy had changed, that Smart Interactivity was enabled, and that you could turn it off in a menu. The message timed out after a minute. It did not say the viewing history was passed on. The order tells them to state what is collected, who receives it, and why, in a disclosure separate from any privacy policy or terms of use, to get affirmative express consent, and to say how to take that consent back.
+
+Samsung's name for the same idea is Viewing Information Services. The Texas Attorney General's petition against Samsung, written for Christmas 2025, says the setup screen offers one obvious control, "I Agree to all," and that reading the notices behind it takes more than 200 clicks across four or more menus. The petition's charge is that the friendly name hides automatic content recognition.
+
+A footer, a pre-checked "Help improve hello-world" box, and a first-run Enter are that pattern on a smaller screen. A new name does not change what leaves the machine. A policy rewritten so it disagrees with the screen is the misrepresentation the Vizio order forbids. She will not sign off on an Insights team whose job is to receive plans. The dissent can be filed. The proposal is rejected.
+
+- "Smart Interactivity was the alias. The FTC still called it a viewing history and sent a bill for $2.2 million."
+- "He can hire twelve lawyers. They cannot make a checked box into the consent that order describes."
+
+Dave Pell answered him by name. Computer policy is on the machine before the app is assigned. He already sets TurnOffSharedCounts and TurnOffSync. A first-run beacon ignores both, and then the rollout mail, which says nothing is sent, is false. He pulls that assignment. Group Policy does not read a EULA. A kiosk and a night-shift PC never see the checkbox. A sponsored line in the thought lands on a shared screen. His privacy officer already has to clear a room number in the handoff notes. An ad in the thought does not get that far. An Insights vendor is a processor he did not put on the ticket, and he does not want that headcount on the image.
+
+- "The mail says nothing is sent. His Smart Greeting sends the plan before anyone reads the mail. That image does not ship."
+- "Group Policy does not click I agree. If the binary phones home anyway, I take the assignment back."
+
+### Outcome
+
+Rejected. The profit maximizer filed a dissent. Smart Greeting, the partnerships, the ads in the thought, and the bundled notice are not in the program. The engineers' line stands: no accounts, and no network unless the person turns a share on. His prices, and Casey's colour theme and QR code, stay in this review only.
 
 ### Ruth on security
 
