@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-10-26: fixes from review round 44
+
+Version 1.62.2. A failed sync read was replacing the other device. The put
+went out when the get failed or the copy would not open, and it did not name
+the version it had just read. The phone did the same, and a redirect could
+carry that put somewhere else. A reminder the push service did not accept was
+marked sent, so it never tried again, and a 302 took the push signature with
+it. The local-server check trusted a prefix, so an address with a user name
+counted as this computer. People who had left still filled the 20 household
+places. An old gone stamp could delete a live thing after its history was
+trimmed. Saying yes to several things on the text screen said only one was
+finished.
+
 ## 2026-10-10: fixes from a code review
 
 Version 1.62.1. A full review of 1.58.0 to 1.62.0, for features, the screens

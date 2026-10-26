@@ -517,7 +517,7 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
 
-VERSION = "1.62.1"
+VERSION = "1.62.2"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -780,8 +780,41 @@ def counts_server():
     if policy("TurnOffSharedCounts"):
         return ""
     url = (policy_value("SharedCountsServer", "text") or COUNTS_SERVER).strip().rstrip("/")
-    local = url.startswith(("http://localhost:", "http://127.0.0.1:"))
-    return url if url.startswith("https://") or local else ""
+    return url if _server_url_ok(url) else ""
+
+
+def _server_url_ok(url):
+    """True for https, or http to this computer on a numbered port.
+
+    The host is parsed. A prefix such as http://127.0.0.1:9@other is a
+    different machine, so it is not allowed.
+    """
+    import urllib.parse
+    try:
+        parts = urllib.parse.urlsplit(url)
+        host = (parts.hostname or "").lower()
+        port = parts.port
+    except ValueError:
+        return False
+    if not host or parts.username or parts.password or parts.fragment:
+        return False
+    if any(c in url for c in "\\\r\n\t "):
+        return False
+    if parts.scheme == "https":
+        return True
+    return parts.scheme == "http" and host in ("localhost", "127.0.0.1") and port is not None
+
+
+def _opener():
+    """Open a URL and stop at a redirect, so only the chosen host is called."""
+    import urllib.error
+    import urllib.request
+
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            raise urllib.error.HTTPError(req.full_url, code, msg, headers, fp)
+
+    return urllib.request.build_opener(NoRedirect)
 
 
 def shared_on(state):
@@ -800,7 +833,7 @@ def net(path, send=False):
         headers={"Content-Type": "application/json",
                  "User-Agent": "hello-world"})
     try:
-        with urllib.request.urlopen(request, timeout=COUNTS_TIMEOUT) as answer:
+        with _opener().open(request, timeout=COUNTS_TIMEOUT) as answer:
             data = json.loads(answer.read(10_000) or b"{}")
     except (OSError, ValueError):
         return None
@@ -963,13 +996,30 @@ def house_new(me, name, at=None):
             "items": {}, "gone": {}}
 
 
+def _house_active(members):
+    return sum(1 for m in members.values() if not m.get("left"))
+
+
+def _house_trim_members(members):
+    """Keep the current people, and only as many departures as that.
+
+    Someone who left is still announced. They don't take a place, and the
+    oldest departure is dropped once there are too many.
+    """
+    left = sorted((m.get("left") or "", mid) for mid, m in members.items() if m.get("left"))
+    for _, mid in left[:max(0, len(left) - MAX_HOUSE_MEMBERS)]:
+        members.pop(mid, None)
+    return members
+
+
 def house_join(doc, me, name, at=None):
     """Join from this device under one's own name; nobody adds anyone else."""
     if me in doc["members"] and not doc["members"][me].get("left"):
         return doc
-    if len(doc["members"]) >= MAX_HOUSE_MEMBERS:
+    if _house_active(doc["members"]) >= MAX_HOUSE_MEMBERS:
         return doc
     doc["members"][me] = {"name": _house_name(name, MAX_HOUSE_NAME), "joined": at or house_stamp()}
+    _house_trim_members(doc["members"])
     return doc
 
 
@@ -1023,13 +1073,18 @@ def house_merge(doc, other, me=None):
             if not (name and joined):
                 continue
             # This device's members first, so a flood of made-up members
-            # can't push out real ones.
-            if mid not in out["members"] and len(out["members"]) >= MAX_HOUSE_MEMBERS:
-                continue
+            # can't push out real ones. Someone who left doesn't take a place.
+            if mid not in out["members"]:
+                if _house_time(m.get("left"), latest):
+                    if len(out["members"]) >= MAX_HOUSE_MEMBERS * 2:
+                        continue
+                elif _house_active(out["members"]) >= MAX_HOUSE_MEMBERS:
+                    continue
             mine = out["members"].setdefault(mid, {"name": name, "joined": joined})
             left = _house_time(m.get("left"), latest)
             if left and not (mid == me and n == 1):
                 mine["left"] = max(left, mine.get("left", ""))
+    _house_trim_members(out["members"])
     for n, side in enumerate(sides):
         items = side.get("items") if isinstance(side.get("items"), dict) else {}
         for iid, item in items.items():
@@ -1071,7 +1126,10 @@ def house_merge(doc, other, me=None):
             item = out["items"].get(iid)
             if item is not None and not item["removed"]:
                 lives = [h[2] for h in item["history"] if h[0] in ("added", "restored")]
-                if at > cutoff or (lives and max(lives) >= at):
+                newest = max((h[2] for h in item["history"]), default="")
+                # A later tick means the thing is still here. Trimmed history
+                # may no longer contain the line that added it.
+                if at > cutoff or newest >= at or (lives and max(lives) >= at):
                     continue
             out["gone"][iid] = max(at, out["gone"].get(iid, ""))
             out["items"].pop(iid, None)
@@ -1093,6 +1151,7 @@ def house_tidy(doc, now):
     forget = house_stamp(now - datetime.timedelta(days=HOUSE_GONE_DAYS))
     kept = sorted(((at, k) for k, at in doc["gone"].items() if at >= forget), reverse=True)
     doc["gone"] = {k: at for at, k in kept[:MAX_HOUSE_GONE]}
+    _house_trim_members(doc["members"])
     return doc
 
 
@@ -1618,26 +1677,43 @@ def sync_on(state):
 
 def sync_now(state, can_save):
     """Pull the other device's copy, merge it in, and push the result.
-    Quiet: returns True when it worked, and does nothing without a server."""
+
+    Quiet: True when it worked, and nothing without a server. A failed
+    read, or a copy that doesn't open, is left as it is. The put names
+    the version just read, and a lost race merges and tries again.
+    """
     if not sync_on(state):
         return False
     label, enc, mac = sync_keys(state["sync"])
-    blob = net_bytes(f"/v1/sync/{label}")
-    refresh(state, can_save)
-    base = copy.deepcopy(state)
-    other = open_sync(enc, mac, blob) if blob else None
-    if other is not None:
-        merge_sync(state, other, today())
-    note_device(state, (other or {}).get("devices"))
+    path = f"/v1/sync/{label}"
     global SYNCING
     was, SYNCING = SYNCING, True
     try:
-        if state != base and not commit(state, base, can_save):
-            undo(state, base)
-            return False
+        for _ in range(3):
+            status, blob, tag = net_sync(path)
+            if status not in (200, 404):
+                return False
+            other = open_sync(enc, mac, blob) if status == 200 and blob else None
+            if status == 200 and (other is None or not tag):
+                return False
+            refresh(state, can_save)
+            base = copy.deepcopy(state)
+            if other is not None:
+                merge_sync(state, other, today())
+            note_device(state, (other or {}).get("devices"))
+            if state != base and not commit(state, base, can_save):
+                undo(state, base)
+                return False
+            put, _, _ = net_sync(
+                path, seal_sync(enc, mac, sync_form(state)), "PUT",
+                tag if status == 200 else "missing")
+            if put == 200:
+                return True
+            if put != 412:
+                return False
+        return False
     finally:
         SYNCING = was
-    return net_bytes(f"/v1/sync/{label}", seal_sync(enc, mac, sync_form(state))) is not None
 
 
 SYNCING = False
@@ -1721,7 +1797,7 @@ def net_sync(path, body=None, method=None, if_match=None):
         counts_server() + path, data=body,
         method=method or ("PUT" if body is not None else "GET"), headers=headers)
     try:
-        with urllib.request.urlopen(request, timeout=COUNTS_TIMEOUT) as answer:
+        with _opener().open(request, timeout=COUNTS_TIMEOUT) as answer:
             return answer.status, answer.read(MAX_SYNC + 1), answer.headers.get("ETag")
     except urllib.error.HTTPError as e:
         return e.code, None, None
@@ -1737,7 +1813,7 @@ def net_bytes(path, body=None, method=None):
         method=method or ("PUT" if body is not None else "GET"),
         headers={"Content-Type": "application/octet-stream", "User-Agent": "hello-world"})
     try:
-        with urllib.request.urlopen(request, timeout=COUNTS_TIMEOUT) as answer:
+        with _opener().open(request, timeout=COUNTS_TIMEOUT) as answer:
             return answer.read(MAX_SYNC + 1)
     except OSError:
         return None
@@ -5687,6 +5763,7 @@ def daily(startup):
                 answered = True
                 when = finish_day(datetime.date.fromisoformat(intent["date"]), d)
                 # Saved now, so the answer is heard now.
+                finished_n = len(set(some)) if some else len(parts)
                 rest = finish_plan(state, intent["text"], when, some)
                 state["intent"] = rest and {
                     "text": rest, "date": iso,
@@ -5694,8 +5771,7 @@ def daily(startup):
                 if commit(state, base, can_save):
                     base = copy.deepcopy(state)
                     intent = state["intent"]
-                    for line in done_lines(state, d):
-                        say(line)
+                    say(done_message(state, d, finished_n))
                     if rest:
                         say(tr("The rest is kept for today."))
                 else:
