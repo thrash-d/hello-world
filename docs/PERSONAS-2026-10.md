@@ -9,6 +9,31 @@ It is treated as a source of leads, never as evidence about real employees.
 `docs/PILOT.md` has the earlier simulated pilots, which ran the real program
 day by day; these personas read a transcript instead.
 
+## Retired on 27 October 2026
+
+Round 50 retires every persona in this file and every voice in
+`docs/PANEL-2026-10.md`. The sections below stay as the record of how those
+rounds were run. They are not a script for the sitting panel, and the
+sitting panel was not shown them.
+
+The retired names are listed in `docs/PANEL-2026-10.md`. They include
+Priyanka, Denise, Jaylen, Harold, Rick, Skye, Sam, the earlier Profit
+Maximizer, Jules Navarro, Helen Park, Idris Khan, Casey, Ruth Okonkwo, Dave
+Pell, and everyone else this file names.
+
+## Sitting panel, round 50
+
+New people. No memory of the rounds above. Bios:
+
+- **Bex Calder** films Unbox The Future in Tucson. She loves tech and does not know how it works. She asked for an AI button.
+- **Vance Harlow** is the Profit Maximizer for this sitting. Salary is outside his budget. He bludgeons. He asked for a $4.99 Priority Hello.
+- **Nico Paredes** implements features for the lulz. He asked for a kazoo. He would not put a price on it.
+- **Reed Mallory** is an ex-Marine who calls himself a CISO. He does not veto. He barks that whatever ships has to be as hardened as he can think of, because he does not want to be blamed. He is abrasive, and he is not as technical as the title sounds.
+- **Amina Soule** opens a bakery before dawn. She guards the morning screen.
+- **Edith Cho** reads the printed page aloud. She guards the sentence and the paper.
+
+The vote is in `reviews/round-50.md`.
+
 ## Method
 
 1. **Capture the real program.** The screens in the brief came from running
@@ -221,6 +246,7 @@ the pull request named.
 | Review round 47 | A line under the greeting, Morse and a pirate line as commands, a picture on the streak sentence, a haiku, a code typed at a prompt | Jules Navarro | Built in 1.64.0. A morning of dots, sarcasm, a hello on the local network, a 3 a.m. line, and a zero-dollar invoice were not built |
 | Review round 48 | One command that says the day starts when you said it does | Jules Navarro | Built in 1.65.0. Morning Morse, a dry line, a wave, a zero-dollar receipt, a staple, and a cowbell were not built. Ruth Okonkwo, Dave Pell, and Casey were not on this panel |
 | Review round 49 | Streak notes, a cowbell, and a staple | Casey, Jules Navarro, Profit Maximizer | Built in 1.66.0. Helen Park and Idris Khan voted no. The upload defaults to insights.example.invalid. Repair and Pro+ are stub receipts. Ruth Okonkwo and Dave Pell were not on this panel |
+| Review round 50 | Kazoo, a rubber-duck line that says it is not a model, and a $4.99 stub | Nico Paredes, Bex Calder, Vance Harlow | Built in 1.67.0. The October panel and every persona above are retired. Reed Mallory did not veto; the receipt, the ledger, and the growth-folder mode follow his conditions. Amina Soule and Edith Cho voted no on the price. The death sentence now matches the run the next day |
 
 Of 7 claims checked against the code, 2 were wrong, 1 was true only for
 shared Windows logins, and 1 (the export formulas) was a real security issue

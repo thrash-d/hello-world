@@ -60,3 +60,10 @@ processor. The flag does not unlock Pro, a second reminder, a colour, or the
 household list. The streak nag does not stop. `hello repair` is the same kind
 of receipt for $2.99, and it only puts the local streak number back. Neither
 one is a license.
+
+## Priority Hello is not a key
+
+`hello priority`, and the phone's Priority Hello button in Settings, write a
+local receipt for $4.99. The receipt says nothing was charged. The flag does
+not unlock Pro. It does not add a line to the morning screen, and it does
+not remove the sponsored line. It is not a license.

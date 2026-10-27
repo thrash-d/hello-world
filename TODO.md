@@ -25,7 +25,11 @@ phone a reminder that arrives, the family buttons, a daily repeat and a
 fridge page; 1.57.0 brought the daily repeat and the fridge page to
 Windows. 1.66.0 adds streak notes, offered to a placeholder address until an
 operator points them at their own counts server, and stub receipts that do
-not bill. The reminder was already
+not bill. The October panel and the personas in `docs/PERSONAS-2026-10.md`
+are retired as of round 50. The sitting panel is Bex Calder, Vance Harlow,
+Nico Paredes, Reed Mallory, Amina Soule, and Edith Cho. 1.67.0 adds `hello
+kazoo`, `hello ai` (it says it is not a model), and a $4.99 Priority Hello
+stub that does not bill. The reminder was already
 offered on the first day, right after the first plan. Running a public
 counts server for the individual package is the owner's step; the README says
 how.
