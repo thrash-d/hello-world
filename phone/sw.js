@@ -1,7 +1,7 @@
 // Keeps the app working with no signal: every file is cached on first open.
 // With a signal the newest files are fetched and cached, so updates arrive;
 // without one, the cached copy is used. Sync requests are never cached.
-const CACHE = "hello-world-phone-v13";
+const CACHE = "hello-world-phone-v14";
 const FILES = ["./", "./index.html", "./app.js", "./content.js", "./manifest.webmanifest", "./icon.svg"];
 
 // Fifteen minutes either side of a real HH:MM, including across midnight.
@@ -22,11 +22,23 @@ self.addEventListener("activate", (event) => {
     keys.filter((key) => key !== CACHE && key !== "hello-world-prefs").map((key) => caches.delete(key)))).then(() => self.clients.claim()));
 });
 
+// Only this app's own files. A redirect used to be stored under the
+// address that was asked for, and served again with no signal.
+function appFile(url) {
+  if (url.origin !== self.location.origin || url.search) return false;
+  const name = url.pathname.split("/").pop();
+  return name === "" || ["index.html", "app.js", "content.js", "sw.js",
+    "manifest.webmanifest", "icon.svg"].includes(name);
+}
+
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
-  if (event.request.method !== "GET" || url.pathname.includes("/v1/")) return;
+  if (event.request.method !== "GET" || url.pathname.includes("/v1/") || !appFile(url)) return;
   event.respondWith(fetch(event.request).then((answer) => {
-    if (answer.ok) {
+    let finalUrl = null;
+    try { finalUrl = new URL(answer.url); } catch (e) { finalUrl = null; }
+    if (answer.ok && answer.type === "basic" && !answer.redirected
+        && finalUrl && appFile(finalUrl)) {
       const copy = answer.clone();
       caches.open(CACHE).then((cache) => cache.put(event.request, copy));
     }

@@ -29,7 +29,12 @@ not bill. The October panel and the personas in `docs/PERSONAS-2026-10.md`
 are retired as of round 50. The sitting panel is Bex Calder, Vance Harlow,
 Nico Paredes, Reed Mallory, Amina Soule, and Edith Cho. 1.67.0 adds `hello
 kazoo`, `hello ai` (it says it is not a model), and a $4.99 Priority Hello
-stub that does not bill. The reminder was already
+stub that does not bill. 1.68.0 is Reed Mallory's security pass: the
+reminder thread survives a bad push address, a stored sync copy requires
+`If-Match`, the counts files are not left to the umask, and a symlink is not
+treated as the notes, the handoff file, or a sync copy. The ledger records
+an upload without the plan. Nothing was removed. The outside review of the
+sync encryption is still open. The reminder was already
 offered on the first day, right after the first plan. Running a public
 counts server for the individual package is the owner's step; the README says
 how.

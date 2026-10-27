@@ -631,7 +631,7 @@ def help_text():
                           "hello growth off stops streak notes. "
                           "hello priority writes a local stub receipt and does not bill."))
 
-VERSION = "1.67.0"
+VERSION = "1.68.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -1007,14 +1007,30 @@ def growth_needs_ask(state):
 
 def _growth_private(path, text, append=False):
     """Write a local streak-note file. A symlink is not followed."""
+    fd = None
     try:
         if os.path.islink(path):
             return False
-        os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
+        parent = os.path.dirname(path)
+        if os.path.islink(parent):
+            return False
+        os.makedirs(parent, mode=0o700, exist_ok=True)
+        if not os.path.islink(parent):
+            try:
+                os.chmod(parent, 0o700)
+            except OSError:
+                pass
         flags = os.O_WRONLY | os.O_CREAT | (os.O_APPEND if append else os.O_TRUNC)
         flags |= getattr(os, "O_NOFOLLOW", 0)
         fd = os.open(path, flags, 0o600)
+        if hasattr(os, "fchmod"):
+            os.fchmod(fd, 0o600)
     except OSError:
+        if fd is not None:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
         return False
     try:
         with os.fdopen(fd, "a" if append else "w", encoding="utf-8") as f:
@@ -1253,6 +1269,9 @@ def growth_flush(state, rounds=3):
             if result == "retry":
                 for item in batch:
                     item["attempts"] = _growth_attempts(item) + 1
+        # The ledger says this left the machine. The plan text does not.
+        feature_audit("growth_upload", network=True, host=growth_host(),
+                      result=result, n=len(batch))
         if result == "ok":
             growth_save_queue(rest)
             if not rest:
@@ -1314,25 +1333,32 @@ def growth_sentence(state):
     return line
 
 
-def feature_audit(feature, stub=False):
+def feature_audit(feature, stub=False, network=False, host="", result="", n=None):
     """One local ledger line. No plan text and no client id.
 
     A joke does not create the notes folder. A stub writes, because the
     receipt has already made the folder, and only after that save worked.
+    An upload sets network and the host name. The plan is not copied in.
     """
     folder = data_dir()
-    if not os.path.isdir(folder):
+    if not os.path.isdir(folder) or os.path.islink(folder):
         return False
     path = os.path.join(folder, "feature-audit.jsonl")
     _rotate_log(path)
-    line = json.dumps({
+    row = {
         "at": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat(),
         "feature": str(feature)[:40],
         "v": VERSION,
-        "network": False,
+        "network": bool(network),
         "charged": False,
         "stub": bool(stub),
-    }, ensure_ascii=False) + "\n"
+    }
+    if network:
+        row["host"] = str(host or "")[:200]
+        row["result"] = str(result or "")[:20]
+        if isinstance(n, int) and not isinstance(n, bool) and 0 <= n <= 1000:
+            row["n"] = n
+    line = json.dumps(row, ensure_ascii=False) + "\n"
     return _growth_private(path, line, append=True)
 
 
@@ -3211,12 +3237,30 @@ def log_error(error):
     line = (f"{datetime.datetime.now().isoformat(timespec='seconds')} "
             f"{VERSION} {type(error).__name__}: {', '.join(where[-3:])}\n")
     path = os.path.join(data_dir(), "errors.log")
+    # Appending follows a symlink. A link is not this log.
+    if os.path.islink(path) or os.path.islink(data_dir()):
+        return
     try:
         os.makedirs(data_dir(), mode=0o700, exist_ok=True)
-        if os.path.exists(path) and os.path.getsize(path) > 100_000:
-            os.replace(path, path + ".old")
-        with open(path, "a", encoding="utf-8") as f:
-            f.write(line)
+        if not os.path.islink(data_dir()):
+            try:
+                os.chmod(data_dir(), 0o700)
+            except OSError:
+                pass
+        if os.path.islink(path):
+            return
+        old = path + ".old"
+        if (os.path.isfile(path) and not os.path.islink(path)
+                and os.path.getsize(path) > 100_000 and not os.path.islink(old)):
+            os.replace(path, old)
+        flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(path, flags, 0o600)
+        try:
+            if hasattr(os, "fchmod"):
+                os.fchmod(fd, 0o600)
+            os.write(fd, line.encode("utf-8"))
+        finally:
+            os.close(fd)
     except OSError:
         pass
 
@@ -3601,6 +3645,10 @@ def load(repair=True):
     state = new_state()
     path = data_file()
     locked = False
+    # open() would read whatever a symlink points at and, on a bad file,
+    # move that link aside. The notes are the file, or they are not read.
+    if os.path.islink(path):
+        return state, False
     try:
         with open(path, encoding="utf-8-sig") as f:
             text = f.read(MAX_FILE + 1)
@@ -3962,6 +4010,14 @@ def save(state):
     sweep_tmp()
     try:
         os.makedirs(data_dir(), mode=0o700, exist_ok=True)
+        if os.path.islink(data_dir()):
+            return False
+        try:
+            os.chmod(data_dir(), 0o700)
+        except OSError:
+            pass
+        if os.path.islink(data_file()):
+            return False
         tmp = f"{data_file()}.{os.getpid()}.tmp"
         try:
             os.remove(tmp)
@@ -3970,7 +4026,10 @@ def save(state):
         # Created private, never through a link, and flushed to disk before it
         # replaces the real file, so a power cut can't leave a half-written one.
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
-        with os.fdopen(os.open(tmp, flags, 0o600), "w", encoding="utf-8") as f:
+        fd = os.open(tmp, flags, 0o600)
+        if hasattr(os, "fchmod"):
+            os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(seal(json.dumps(file_form(state), indent=2)))
             f.flush()
             os.fsync(f.fileno())
@@ -4446,13 +4505,37 @@ def file_lock(folder=None, name="notes.lock"):
     Without it, a delete in one window could land between another window's
     read and write, and that write would bring the deleted notes back.
     """
+    fd = None
     try:
         if folder is None:
             folder = data_dir()
-            os.makedirs(folder, mode=0o700, exist_ok=True)
-        fd = os.open(os.path.join(folder, name),
-                     os.O_RDWR | os.O_CREAT, 0o600 if folder == data_dir() else 0o666)
+        if os.path.islink(folder):
+            yield
+            return
+        os.makedirs(folder, mode=0o700, exist_ok=True)
+        mode = 0o600 if os.path.abspath(folder) == os.path.abspath(data_dir()) else 0o666
+        if mode == 0o600 and not os.path.islink(folder):
+            try:
+                os.chmod(folder, 0o700)
+            except OSError:
+                pass
+        lock_path = os.path.join(folder, name)
+        # A lock that is a symlink is locked on the file it points at.
+        if os.path.islink(lock_path):
+            try:
+                os.unlink(lock_path)
+            except OSError:
+                yield
+                return
+        fd = os.open(lock_path, os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), mode)
+        if hasattr(os, "fchmod"):
+            os.fchmod(fd, mode)
     except OSError:
+        if fd is not None:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
         yield
         return
     locked = False
@@ -6900,8 +6983,13 @@ def handoff_hours():
 
 def read_handoff():
     """Every handoff note saved on this PC or unit, oldest first."""
+    path = os.path.join(handoff_dir(), "handoff.json")
+    # The shared folder is writable by everyone who uses that PC. A link
+    # would be read as the notes. It is not.
+    if os.path.islink(path):
+        return []
     try:
-        with open(os.path.join(handoff_dir(), "handoff.json"), encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             raw = json.loads(f.read(100_000))
         raw = unseal(raw) if isinstance(raw, dict) else {}
     except (OSError, ValueError, RecursionError):
@@ -6925,15 +7013,29 @@ def write_handoff(notes):
     folder = handoff_dir()
     text = json.dumps({"notes": notes}, ensure_ascii=False)
     try:
+        if os.path.islink(folder):
+            return False
         os.makedirs(folder, exist_ok=True)
         if not handoff_shared_folder():
             text = seal(text, machine=True)
-        tmp = os.path.join(folder, f"handoff.json.{os.getpid()}.tmp")
-        with open(tmp, "w", encoding="utf-8") as f:
-            f.write(text)
-        os.replace(tmp, os.path.join(folder, "handoff.json"))
+        # The pid in the temp name was guessable on a shared folder.
+        tmp = os.path.join(folder, f"handoff.json.{os.urandom(4).hex()}.tmp")
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(tmp, flags, 0o666)
+        try:
+            os.write(fd, text.encode("utf-8"))
+        finally:
+            os.close(fd)
+        dest = os.path.join(folder, "handoff.json")
+        if os.path.islink(dest):
+            os.unlink(dest)
+        os.replace(tmp, dest)
         return True
     except OSError:
+        try:
+            os.remove(tmp)
+        except (OSError, UnboundLocalError):
+            pass
         return False
 
 

@@ -86,6 +86,7 @@ import json
 import os
 import re
 import secrets
+import stat
 import threading
 import time
 import urllib.error
@@ -137,7 +138,13 @@ class Counts:
         # How many copies each folder holds, counted once and then kept up
         # to date, so a new copy never lists a large folder under the lock.
         self.stored = {}
-        os.makedirs(folder, exist_ok=True)
+        # 0777 masked by a 022 umask is 0755, so another account could list
+        # the day files. Those files hold the exact counts. The published
+        # numbers are the rounded ones. A symlink is not chmod'd: chmod
+        # would follow it onto whatever it points at.
+        if not os.path.islink(folder):
+            os.makedirs(folder, exist_ok=True)
+            tighten(folder, 0o700)
         self.lock = threading.Lock()
         # Held while a sync copy is checked and replaced, so two writers
         # can't both pass the same If-Match.
@@ -152,11 +159,16 @@ class Counts:
 
     def read(self, day):
         """The day's numbers: {"tip": n, "react": {reaction: n}}."""
-        try:
-            with open(self.path(day), encoding="utf-8") as f:
-                data = json.load(f)
-        except (OSError, ValueError):
+        path = self.path(day)
+        # open() would follow a symlink and parse whatever it points at.
+        if os.path.islink(path):
             data = {}
+        else:
+            try:
+                with open(path, encoding="utf-8") as f:
+                    data = json.load(f)
+            except (OSError, ValueError, RecursionError):
+                data = {}
         tip = data.get("tip")
         react = data.get("react") if isinstance(data.get("react"), dict) else {}
         return {"tip": tip if isinstance(tip, int) and tip >= 0 else 0,
@@ -278,7 +290,14 @@ class Counts:
         for name in names:
             path = os.path.join(folder, name)
             try:
-                if now - os.path.getmtime(path) > SYNC_DAYS * 86400:
+                st = os.lstat(path)
+                # getmtime follows a link. A link is removed as a link.
+                # The file it pointed at is left where it was.
+                if stat.S_ISLNK(st.st_mode):
+                    os.unlink(path)
+                    gone += 1
+                    continue
+                if now - st.st_mtime > SYNC_DAYS * 86400:
                     os.remove(path)
                     gone += 1
             except OSError:
@@ -313,10 +332,14 @@ class Counts:
             else:
                 return data
             self.seen[key] = True if kind == "tip" else what
-            tmp = self.path(day) + ".tmp"
-            with open(tmp, "w", encoding="utf-8") as f:
-                json.dump(data, f)
-            os.replace(tmp, self.path(day))
+            # A symlink named for this day is not opened. write_private
+            # replaces the link. The file it pointed at is not written.
+            if os.path.islink(self.path(day)):
+                try:
+                    os.unlink(self.path(day))
+                except OSError:
+                    return data
+            write_private(self.path(day), json.dumps(data))
             return data
 
 
@@ -373,6 +396,11 @@ def es256_sign(d, message):
         k = secrets.randbelow(P256_N - 1) + 1
         r = _mul(k, P256_G)[0] % P256_N
         s = pow(k, -1, P256_N) * (e + r * d) % P256_N
+        # The low form. A verifier that rejects the high form would drop
+        # about half of these signatures, and the high form is the same
+        # signature written the other way.
+        if s > P256_N // 2:
+            s = P256_N - s
         if r and s:
             return r.to_bytes(32, "big") + s.to_bytes(32, "big")
 
@@ -404,6 +432,71 @@ def tighten(path, mode):
         os.chmod(path, mode)
     except OSError:
         pass
+
+
+def private_dir(path, unlink_link=False):
+    """A real directory at mode 0700. A symlink is not a directory.
+
+    With unlink_link, a symlink of this name is removed (the link only)
+    and a real directory is made. The data folder itself is not unlinked:
+    that path is the operator's. sync, push and growth are.
+    """
+    if os.path.islink(path):
+        if not unlink_link:
+            return False
+        try:
+            os.unlink(path)
+        except OSError:
+            return False
+    if os.path.islink(path):
+        return False
+    try:
+        os.makedirs(path, exist_ok=True)
+    except OSError:
+        return False
+    if os.path.islink(path):
+        return False
+    tighten(path, 0o700)
+    return True
+
+
+def security_note(folder, event, **fields):
+    """One local line. No network address, no plan text, no push URL.
+
+    The file stops growing at 100 KB. A symlink is not written through.
+    """
+    if not folder or os.path.islink(folder):
+        return
+    path = os.path.join(folder, "security-audit.jsonl")
+    if os.path.islink(path):
+        return
+    safe = {}
+    for key, value in fields.items():
+        if isinstance(value, bool) or not isinstance(value, (str, int)):
+            continue
+        if isinstance(value, str):
+            value = "".join(ch for ch in value if ch >= " " and ch != "\x7f")[:80]
+        safe[str(key)[:20]] = value
+    line = json.dumps({
+        "at": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat(),
+        "event": "".join(ch for ch in str(event) if ch >= " " and ch != "\x7f")[:40],
+        **safe,
+    }, ensure_ascii=False) + "\n"
+    try:
+        if os.path.isfile(path) and not os.path.islink(path) and os.path.getsize(path) > 100_000:
+            return
+        flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(path, flags, 0o600)
+    except OSError:
+        return
+    try:
+        if hasattr(os, "fchmod"):
+            os.fchmod(fd, 0o600)
+        os.write(fd, line.encode("utf-8"))
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
 
 
 def write_private(path, text):
@@ -461,7 +554,18 @@ def push_slot(when, clock):
 
 
 def push_address_ok(endpoint):
-    """An https address at a browser maker's push service, and nothing else."""
+    """An https address at a browser maker's push service, and nothing else.
+
+    A space or a control character in the path still parses as that host.
+    urllib then refuses to send it (InvalidURL), and that exception is not
+    an OSError. One such registration used to kill the reminder thread,
+    which is the only thread sending every phone's reminder. Those
+    characters are refused here, before anything is stored.
+    """
+    if not isinstance(endpoint, str) or not endpoint or len(endpoint) > 1000:
+        return False
+    if any(ord(c) < 33 or ord(c) == 127 or c in "\\#" for c in endpoint):
+        return False
     try:
         url = urllib.parse.urlsplit(endpoint)
         port = url.port
@@ -470,9 +574,11 @@ def push_address_ok(endpoint):
     host = (url.hostname or "").lower()
     # An empty user name is still a user name. `not url.username` would
     # let https://:secret@host/ through.
-    if url.username is not None or url.password is not None:
+    if url.username is not None or url.password is not None or url.fragment:
         return False
-    return (url.scheme == "https" and len(endpoint) <= 1000
+    if not re.fullmatch(r"[a-z0-9.-]+", host or ""):
+        return False
+    return (url.scheme == "https"
             and port in (None, 443)
             and any(host == h or host.endswith("." + h) for h in PUSH_HOSTS))
 
@@ -509,10 +615,12 @@ class Push:
             try:
                 with open(key, encoding="utf-8") as f:
                     self.d = int(json.load(f)["d"], 16)
+                if not 1 <= self.d < P256_N:
+                    raise ValueError("scalar")
                 # A key written before 1.64.0 can still be mode 0644. Creating
                 # a new file at 0600 does not change the one already on disk.
                 tighten(key, 0o600)
-            except (OSError, ValueError, KeyError, TypeError):
+            except (OSError, ValueError, KeyError, TypeError, RecursionError):
                 self.d = secrets.randbelow(P256_N - 1) + 1
                 write_private(key, json.dumps({"d": format(self.d, "064x")}))
         names = []
@@ -618,7 +726,8 @@ class Push:
                 return answer.status
         except urllib.error.HTTPError as e:
             return e.code
-        except (OSError, ValueError):
+        except Exception:
+            # InvalidURL is not an OSError. It must not leave this function.
             return 0
 
     def due(self, when, send=None):
@@ -645,6 +754,9 @@ class Push:
                 continue
             endpoint = data.get("endpoint", "")
             if not push_address_ok(endpoint):
+                # Still the bad address, not a newer registration that
+                # replaced it while this loop was running.
+                self._forget_if_same(path, endpoint if isinstance(endpoint, str) else "")
                 continue
             marks = data.get("sent")
             if isinstance(marks, str):
@@ -737,12 +849,16 @@ class Push:
                 pass
 
     def run(self):
-        """Check each minute, in a thread for as long as the server runs."""
+        """Check each minute, in a thread for as long as the server runs.
+
+        One bad registration must not end the thread. Every phone's
+        reminder is sent from here.
+        """
         while True:
             now = datetime.datetime.now(datetime.timezone.utc).replace(second=0, microsecond=0)
             try:
                 self.due(now)
-            except OSError:
+            except Exception:
                 pass
             time.sleep(60 - datetime.datetime.now().second + 1)
 
@@ -860,6 +976,10 @@ class Growth:
             except OSError:
                 return 500, "not stored"
             try:
+                # The mode passed to open is masked by umask. 0600 has no
+                # group bits, so a normal umask leaves it. fchmod sets it.
+                if hasattr(os, "fchmod"):
+                    os.fchmod(fd, 0o600)
                 os.write(fd, line)
             finally:
                 os.close(fd)
@@ -878,6 +998,10 @@ class Growth:
                 continue
             path = os.path.join(self.folder, name)
             if os.path.islink(path):
+                try:
+                    os.unlink(path)
+                except OSError:
+                    pass
                 continue
             try:
                 os.remove(path)
@@ -888,6 +1012,14 @@ class Growth:
 PHONE_FILES = {"index.html": "text/html; charset=utf-8", "app.js": "text/javascript; charset=utf-8",
                "content.js": "text/javascript; charset=utf-8", "sw.js": "text/javascript; charset=utf-8",
                "manifest.webmanifest": "application/manifest+json", "icon.svg": "image/svg+xml"}
+# The page is static. blob: is the plans export. https: is a growth address
+# the person typed. http is only this computer, which is what the page allows.
+PHONE_CSP = (
+    "default-src 'self' blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+    "img-src 'self'; connect-src 'self' https: http://127.0.0.1:* http://localhost:*; "
+    "worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; "
+    "frame-ancestors 'none'"
+)
 
 
 def handler(counts, phone=None, push=None, growth=None, growth_page=False):
@@ -895,12 +1027,19 @@ def handler(counts, phone=None, push=None, growth=None, growth_page=False):
         server_version = "hello-world-counts"
         sys_version = ""
 
+        def shield(self):
+            """Headers on every answer. The sync label is in the URL, so a
+            referrer must not carry this page anywhere else."""
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Referrer-Policy", "no-referrer")
+
         def reply(self, status, body=None):
             raw = json.dumps(body).encode() if body is not None else b""
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(raw)))
             self.send_header("Cache-Control", "no-store")
+            self.shield()
             self.end_headers()
             self.wfile.write(raw)
 
@@ -920,9 +1059,14 @@ def handler(counts, phone=None, push=None, growth=None, growth_page=False):
                     self.send_response(301)
                     self.send_header("Location", "/phone/")
                     self.send_header("Content-Length", "0")
+                    self.shield()
                     self.end_headers()
                     return
-                with open(os.path.join(phone, name), "rb") as f:
+                full = os.path.join(phone, name)
+                # A symlink named app.js would be sent as the script.
+                if os.path.islink(full):
+                    return self.reply(404, {"error": "not found"})
+                with open(full, "rb") as f:
                     raw = f.read()
                 # --growth tells this page to upload to the server that
                 # served it. Otherwise the placeholder in the file stays.
@@ -935,6 +1079,10 @@ def handler(counts, phone=None, push=None, growth=None, growth_page=False):
                 self.send_header("Content-Type", PHONE_FILES[name])
                 self.send_header("Content-Length", str(len(raw)))
                 self.send_header("Cache-Control", "no-cache")
+                self.shield()
+                if name == "index.html":
+                    self.send_header("Content-Security-Policy", PHONE_CSP)
+                    self.send_header("X-Frame-Options", "DENY")
                 self.end_headers()
                 self.wfile.write(raw)
                 return
@@ -942,9 +1090,18 @@ def handler(counts, phone=None, push=None, growth=None, growth_page=False):
                 return self.reply(200, {"key": b64url(push.public)})
             if SYNC_PATH.match(self.path):
                 path = self.sync_file()
+                if not path or os.path.islink(path):
+                    if path and os.path.islink(path):
+                        security_note(counts.folder, "symlink", where="sync")
+                    return self.reply(404, {"error": "not found"})
                 try:
-                    if time.time() - os.path.getmtime(path) > SYNC_DAYS * 86400:
+                    st = os.lstat(path)
+                    if stat.S_ISLNK(st.st_mode):
+                        security_note(counts.folder, "symlink", where="sync")
+                        return self.reply(404, {"error": "not found"})
+                    if time.time() - st.st_mtime > SYNC_DAYS * 86400:
                         os.remove(path)
+                        return self.reply(404, {"error": "not found"})
                     with open(path, "rb") as f:
                         raw = f.read(MAX_SYNC)
                 except OSError:
@@ -954,6 +1111,7 @@ def handler(counts, phone=None, push=None, growth=None, growth_page=False):
                 self.send_header("Content-Length", str(len(raw)))
                 self.send_header("ETag", etag(raw))
                 self.send_header("Cache-Control", "no-store")
+                self.shield()
                 self.end_headers()
                 self.wfile.write(raw)
                 return
@@ -990,7 +1148,10 @@ def handler(counts, phone=None, push=None, growth=None, growth_page=False):
             if not match:
                 return None
             folder = os.path.join(counts.folder, "sync")
-            os.makedirs(folder, exist_ok=True)
+            # A symlink named sync is the directory the next write would
+            # follow. The link is removed. The directory it pointed at stays.
+            if not private_dir(folder, unlink_link=True):
+                return None
             return os.path.join(folder, match.group(1))
 
         def do_PUT(self):
@@ -998,7 +1159,7 @@ def handler(counts, phone=None, push=None, growth=None, growth_page=False):
                 raw = self.body()
                 try:
                     data = json.loads(raw or b"")
-                except ValueError:
+                except (ValueError, RecursionError):
                     data = None
                 if not push.acceptable(data):
                     return self.reply(400, {"error": "not a push address and times"})
@@ -1016,23 +1177,57 @@ def handler(counts, phone=None, push=None, growth=None, growth_page=False):
             if not raw:
                 return self.reply(413, {"error": "too large or empty"})
             with counts.write_lock:
-                try:
-                    with open(path, "rb") as f:
-                        current = etag(f.read(MAX_SYNC))
-                except OSError:
-                    current = None
-                # If-Match: only over the copy the writer last read, so two
-                # devices changing it at once can't lose each other's change.
+                link = os.path.islink(path)
+                current = None
+                if not link:
+                    try:
+                        with open(path, "rb") as f:
+                            current = etag(f.read(MAX_SYNC))
+                    except OSError:
+                        current = None
+                # If-Match names the copy the writer last read. A missing
+                # header used to replace whatever was already stored.
+                # Creating still allows no header, or "missing".
                 wanted = self.headers.get("If-Match")
-                if wanted is not None and wanted != (current or "missing"):
-                    return self.reply(412, {"error": "changed since you read it"})
-                refused = counts.may_write(self.address(), current is None)
+                if isinstance(wanted, str):
+                    wanted = wanted.strip()
+                if link or current is None:
+                    if wanted not in (None, "missing"):
+                        return self.reply(412, {"error": "changed since you read it"})
+                else:
+                    if not wanted:
+                        security_note(counts.folder, "sync_precondition")
+                        return self.reply(428, {"error": "If-Match required"})
+                    if wanted != current:
+                        return self.reply(412, {"error": "changed since you read it"})
+                refused = counts.may_write(self.address(), current is None and not link)
                 if refused:
                     return self.reply(refused[0], {"error": refused[1]})
+                if link:
+                    try:
+                        os.unlink(path)
+                    except OSError:
+                        return self.reply(500, {"error": "not stored"})
                 tmp = f"{path}.{secrets.token_hex(4)}.tmp"
-                with open(tmp, "wb") as f:
-                    f.write(raw)
+                flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+                try:
+                    fd = os.open(tmp, flags, 0o600)
+                except OSError:
+                    return self.reply(500, {"error": "not stored"})
+                try:
+                    if hasattr(os, "fchmod"):
+                        os.fchmod(fd, 0o600)
+                    os.write(fd, raw)
+                except OSError:
+                    try:
+                        os.remove(tmp)
+                    except OSError:
+                        pass
+                    return self.reply(500, {"error": "not stored"})
+                finally:
+                    os.close(fd)
                 os.replace(tmp, path)
+                tighten(path, 0o600)
             self.reply(200, {"ok": True})
 
         def do_DELETE(self):
@@ -1061,7 +1256,7 @@ def handler(counts, phone=None, push=None, growth=None, growth_page=False):
                     return self.reply(413, {"error": "too large or empty"})
                 try:
                     payload = json.loads(raw or b"")
-                except ValueError:
+                except (ValueError, RecursionError):
                     return self.reply(400, {"error": "events"})
                 # A refused body does not count as a write.
                 if not isinstance(payload, dict) or payload.get("consent") is not True:
