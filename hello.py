@@ -36,6 +36,24 @@ DAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
 MONTHS = ("January", "February", "March", "April", "May", "June", "July",
           "August", "September", "October", "November", "December")
 GREETING = "Hello, world!"
+# A made-up line, off until it is turned on. Not a translation.
+KLINGON_LINE = "qo' vIquv."
+KLINGON_NOTE = "Made up for fun. Not checked by a linguist."
+# HELLO, WORLD! A command, never the line said every morning.
+MORSE_LINE = ".... . .-.. .-.. --- --..-- / .-- --- .-. .-.. -.. -.-.--"
+KONAMI_LINE = "Konami mode, this visit only. Nothing was saved."
+PIRATE_LINE = "Ahoy, world. The greeting be plain above."
+# A still picture on a day the streak line already prints. No colour, no bell.
+FIREWORKS = (
+    "    *",
+    "   * *",
+    "  * * *",
+    "   \\|/",
+    " *--*--*",
+    "   /|\\",
+    "  * * *",
+    "    *",
+)
 
 # Chosen by date, so everyone sees the same line on the same day and the
 # lists repeat every 100 days (the pairing much later).
@@ -505,6 +523,34 @@ def greeting(state):
     return tidy(title) if title else tr(GREETING)
 
 
+def greet(state):
+    """The heading, and a joke line under it only when that switch is on.
+
+    The plain words stay first. A name or a title does not hide them.
+    """
+    line = greeting(state)
+    say(line)
+    if not state.get("klingon"):
+        return
+    say(KLINGON_LINE)
+    if line != tr(GREETING):
+        say(tr(GREETING))
+
+
+def haiku_lines(d):
+    """Three English lines. The breaks stay put; they are not translated."""
+    return ("The screen says hello",
+            f"Day {d.day:02d} still fits on one line",
+            "Hello, world, still here")
+
+
+def say_haiku(d):
+    for line in haiku_lines(d):
+        say(line)
+    say()
+    say(GREETING)
+
+
 def built_in_lists():
     data = translation()
     thoughts = data["thoughts"] if data else THOUGHTS
@@ -515,9 +561,12 @@ def built_in_lists():
 
 def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
-    return tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
+    return (tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
+            + "\n\n" + tr("For fun, and nothing is saved: hello morse, hello haiku, "
+                          "hello klingon, and hello --pirate. --set klingon on keeps "
+                          "the Klingon line under the greeting."))
 
-VERSION = "1.63.0"
+VERSION = "1.64.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -1210,6 +1259,31 @@ def house_seal(code, doc):
 
 def house_who(doc, mid):
     return (doc["members"].get(mid) or {}).get("name") or tr("someone")
+
+
+def house_latest_when(item):
+    """Weekday and clock time of the newest line, on this device, or ""."""
+    history = item.get("history") if isinstance(item, dict) else None
+    if not history:
+        return ""
+    try:
+        when = _house_when(history[-1][2]).astimezone()
+        data = translation()
+        day_name = (data["days"] if data else DAYS)[when.weekday()]
+    except (ValueError, TypeError, IndexError, KeyError, OSError):
+        return ""
+    return f"{day_name}, {when.strftime('%H:%M')}"
+
+
+def house_menu_label(item):
+    """The window's line: the words, then the time, cut so the time stays."""
+    text = item.get("text") if isinstance(item, dict) else ""
+    text = text if isinstance(text, str) else ""
+    when = house_latest_when(item)
+    if not when:
+        return text[:80]
+    suffix = " \u2014 " + when
+    return text[:max(0, 80 - len(suffix))].rstrip() + suffix
 
 
 def house_history(doc, item):
@@ -2625,7 +2699,7 @@ SWITCHES = ("nudge", "open_after", "weekends", "name", "no_startup_visits",
             "numbers", "close_after_done", "colon_prompts", "floor_tips",
             "private_reminder", "hide_thought", "shared", "shared_asked",
             "plan_in_reminder", "gentle", "gentle_offered", "large_text",
-            "farewells", "tray")
+            "farewells", "tray", "klingon")
 SETTINGS = ("streak", "tips", "text", "offered", "offer_skips", "lang",
             "remind_at", "standup", "pet", "day_start", "pro_key", "theme",
             "afternoon_at") + SWITCHES
@@ -3350,6 +3424,20 @@ def interactive():
         return True
 
 
+def colon_prompt(prompt):
+    """A prompt's trailing > becomes a colon, including with no space before it.
+
+    Chinese and Japanese cues often end in ）> with no space. A sentence that
+    is not a prompt is not passed here.
+    """
+    if not PROMPT_COLON:
+        return prompt
+    body = prompt.rstrip()
+    if body.endswith(">"):
+        return body[:-1].rstrip() + ": "
+    return prompt
+
+
 def ask(prompt):
     """Return the typed text, or None when nobody can answer.
 
@@ -3358,8 +3446,7 @@ def ask(prompt):
     """
     if not interactive():
         return None
-    if PROMPT_COLON and prompt.endswith(" > "):
-        prompt = prompt[:-3] + ": "
+    prompt = colon_prompt(prompt)
     lines = []
     for part in prompt.split("\n"):
         lines += textwrap.wrap(part, width(), break_on_hyphens=False,
@@ -4417,6 +4504,12 @@ def more_settings(state, can_save):
         entries.append((tr("My day starts at..."), lambda: pick([
             (marked(day_start_label(h), state.get("day_start", 0) == h),
              lambda h=h: para(set_day_start(state, can_save, h))) for h in DAY_STARTS])))
+
+    entries.append((marked(tr("Klingon hello"), state.get("klingon")), flip(
+        "klingon",
+        tr("Klingon hello is on. Made up for fun. Not checked by a linguist."),
+        tr("Klingon hello is off."))))
+    entries.append((tr("A haiku"), lambda: say_haiku(today())))
 
     pick(entries)
 
@@ -5730,7 +5823,7 @@ def daily(startup):
     first = not state["visits"] and not ever_used(state)
     intent, expired = plan_on_open(state, d)
 
-    say(greeting(state))
+    greet(state)
     header = long_date(d)
     say(header[0].upper() + header[1:])
     say()
@@ -5770,6 +5863,8 @@ def daily(startup):
               and (row in (3, 7, 14) or row % 30 == 0)):
             say(tr("You have opened this {row} days in a row. Nice to see "
                    "you.").format(row=row))
+            if person:
+                show_fireworks()
             say()
 
     quitting = False
@@ -5937,6 +6032,10 @@ def daily(startup):
                 state["smaller_offered"] = iso
             question = tr("Anything for today? Small is fine.") + "\n" + skip + " > "
             text = ask(question)
+            # A joke word is not a plan. plan uuddlrlrba still saves: that
+            # goes through the plan command, not this prompt.
+            if toy_reply(text):
+                text = ""
             if picks and (text or "").strip(TRIM) in [str(n) for n in range(1, len(picks) + 1)]:
                 row = picks[int(text.strip(TRIM)) - 1]
                 state["put_aside"] = [r for r in state["put_aside"] if r != row]
@@ -6379,6 +6478,8 @@ def last_prompt(state, can_save, intent, person, d, iso, open_menu=False):
         elif answer in QUIT_WORDS:
             pass
         elif answer:
+            if toy_reply(answer):
+                continue
             not_a_choice(answer, tr("Type done, plan or menu, or press "
                                     "Enter to close.")
                          if planned else
@@ -6387,12 +6488,79 @@ def last_prompt(state, can_save, intent, person, d, iso, open_menu=False):
         break
 
 
+def show_fireworks():
+    """A still picture, only if the person asks, on a day the streak line
+    already prints. Enter skips it, the same as every other question."""
+    picture = (ask(tr("A picture is here. Type pic, or press Enter > ")) or "").strip().lower()
+    if picture != "pic":
+        return
+    for line in FIREWORKS:
+        say(line)
+    ask(tr("Enter to continue > "))
+
+
+def toy_reply(text):
+    """A joke typed at a prompt. Nothing is saved. True when it was one."""
+    low = (text or "").strip().lower()
+    if low == "uuddlrlrba":
+        say(GREETING)
+        say(tr(KONAMI_LINE))
+        return True
+    if low == "haiku":
+        say_haiku(today())
+        return True
+    return False
+
+
+def fun_command(argv):
+    """A joke that prints and exits. None when these words are not a joke.
+
+    These do not open the day and do not save, so a workplace that turned
+    plans off can still have them. --set klingon is the switch that stays.
+    """
+    if not argv:
+        return None
+    name = argv[0].lower()
+    if name not in ("morse", "klingon", "haiku"):
+        return None
+    if name == "morse" and len(argv) == 1:
+        say(GREETING)
+        say(MORSE_LINE)
+        say(GREETING)
+        return 0
+    if name == "klingon" and len(argv) == 1:
+        say(GREETING)
+        say(KLINGON_LINE)
+        say(tr(KLINGON_NOTE))
+        return 0
+    if name == "haiku" and len(argv) == 1:
+        say_haiku(today())
+        return 0
+    if name == "haiku" and len(argv) == 3 and argv[1].lower() == "--date":
+        try:
+            when = datetime.date.fromisoformat(argv[2])
+        except ValueError:
+            say(tr("That date doesn't look right."))
+            return 2
+        say_haiku(when)
+        return 0
+    say(tr("Try hello morse, hello klingon, or hello haiku. "
+           "A date is hello haiku --date YYYY-MM-DD."))
+    return 2
+
+
 def run(argv):
     # Before lowercasing, so a path keeps its case.
     if len(argv) == 2 and argv[0].lower() == "--check-content":
         return check_content(argv[1])
     if len(argv) == 3 and argv[0].lower() == "--check-content" and argv[2].lower() == "--local":
         return check_content(argv[1], local=True)
+    # Jokes are not plans. plans_off must not block them, and they must not
+    # go through command(), which saves.
+    head = argv[1:] if argv and argv[0].lower() == "--console" else argv
+    played = fun_command(head)
+    if played is not None:
+        return played
     if argv and argv[0].lower() in COMMANDS:
         return command(argv[0].lower(), argv[1:])
     argv = [a.lower() for a in argv]
@@ -6416,6 +6584,10 @@ def run(argv):
         return 0
     if argv == ["--plain-local"]:
         say(tr(GREETING))
+        return 0
+    if argv == ["--pirate"]:
+        say(GREETING)
+        say(tr(PIRATE_LINE))
         return 0
     if argv[:2] == ["--set", "no_weekends"] and len(argv) == 3:
         # The 1.39.0 name, kept so scripts written for it still work.
@@ -8005,9 +8177,8 @@ class Visit:
             self.state["streak"] = not self.state["streak"]
         elif key == "colon_prompts":
             # Absent means on, so the flip stores false to turn the colon off.
+            # The prompts for this visit change only after the save lands.
             self.state["colon_prompts"] = self.state.get("colon_prompts") is False
-            global PROMPT_COLON
-            PROMPT_COLON = self.state["colon_prompts"] is not False
         elif key in SWITCHES:
             if self.state.pop(key, None) is None:
                 self.state[key] = True
@@ -8020,6 +8191,9 @@ class Visit:
         saved, _ = quietly(commit, self.state, base, self.can_save)
         if not saved:
             undo(self.state, base)
+        elif key == "colon_prompts":
+            global PROMPT_COLON
+            PROMPT_COLON = self.state.get("colon_prompts") is not False
         return saved
 
     def did_tip(self):
@@ -8197,8 +8371,16 @@ class Window:
             add(static, cid, text, text_style, m, h)
             y += h + gap
 
-        add(static, self.TITLE, greeting(v.state), text_style, m, 20)
-        y += 24
+        title = greeting(v.state)
+        title_h = 20
+        if v.state.get("klingon"):
+            extra = KLINGON_LINE
+            if title != tr(GREETING):
+                extra += "\n" + tr(GREETING)
+            title = title + "\n" + extra
+            title_h = 22 * (title.count("\n") + 1)
+        add(static, self.TITLE, title, text_style, m, title_h)
+        y += title_h + 4 if v.state.get("klingon") else 24
         header = long_date(v.d)
         para(self.DATE, header[0].upper() + header[1:], 8)
         if v.note:
@@ -8446,7 +8628,7 @@ class Window:
             self.hwnd = hwnd
             self.init_dialog()
             return 0
-        if msg in (0x136, 0x138, 0x135):  # WM_CTLCOLORDLG, STATIC, BTN
+        if msg in (0x136, 0x138, 0x135, 0x133):  # DLG, STATIC, BTN, EDIT
             colours = self.theme_colours()
             if colours:
                 self.gdi.SetTextColor(wparam, colours[0])
@@ -8945,7 +9127,17 @@ class Window:
         entries.append((checked if pet_on(v.state) else 0, 21, tr("Desk pet...")))
         entries.append((checked if v.state.get("tray") else 0, 22,
                         tr("Keep hello-world in the tray")))
+        entries.append((checked if v.state.get("klingon") else 0, 30, tr("Klingon hello")))
+        entries.append((0, 31, tr("A haiku")))
         choice = self.popup(entries)
+        if choice == 30:
+            self.toggled("klingon",
+                         tr("Klingon hello is on. Made up for fun. Not checked by a linguist."),
+                         tr("Klingon hello is off."))
+            return
+        if choice == 31:
+            self.inform("\n".join(haiku_lines(v.d)) + "\n\n" + GREETING)
+            return
         if choice == 22:
             self.set_text(self.STATUS, set_tray(v.state, v.can_save, not v.state.get("tray")))
             return
@@ -9067,7 +9259,8 @@ class Window:
         live = [(k, i) for k, i in doc["items"].items() if not i.get("removed")]
         gone = [(k, i) for k, i in doc["items"].items() if i.get("removed")]
         entries = [] if reached else [(0x1, 0, tr("Not reached; the copy on this computer"))]
-        entries += [(0x8 if i["done"] else 0, 100 + n, i["text"]) for n, (_, i) in enumerate(live)]
+        entries += [(0x8 if i["done"] else 0, 100 + n, house_menu_label(i))
+                    for n, (_, i) in enumerate(live)]
         entries += [(0x800, 0, None), (0, 1, tr("Add what's typed in the plan box"))]
         if live:
             entries.append((0, 2, tr("Remove a thing...")))
@@ -9088,12 +9281,14 @@ class Window:
             house_sync(v.state, v.can_save, lambda d: house_change(d, me, "added", text=text))
             self.set_text(self.PLAN, v.plan())
         elif choice == 2:
-            picked = self.popup([(0, 200 + n, i["text"]) for n, (_, i) in enumerate(live)])
+            picked = self.popup([(0, 200 + n, house_menu_label(i))
+                                 for n, (_, i) in enumerate(live)])
             if picked:
                 iid = live[picked - 200][0]
                 house_sync(v.state, v.can_save, lambda d: house_change(d, me, "removed", iid))
         elif choice == 3:
-            picked = self.popup([(0, 300 + n, i["text"]) for n, (_, i) in enumerate(gone)])
+            picked = self.popup([(0, 300 + n, house_menu_label(i))
+                                 for n, (_, i) in enumerate(gone)])
             if picked:
                 iid = gone[picked - 300][0]
                 house_sync(v.state, v.can_save, lambda d: house_change(d, me, "restored", iid))

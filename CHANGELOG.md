@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-26: fixes from review round 47
+
+Version 1.64.0. A push key that was already on disk stayed readable by everyone else on the machine, and so did the folder of phone registrations. Prompts in Chinese and Japanese that had no space before the greater-than sign still ended that way. The plan box and the handoff box kept the system's colours when a Pro colour was on. After a second Skip, focus could sit on a button that was no longer on screen. Turning the colon off and failing to save could still change the prompts for that visit. A reminder time that was not a clock time, such as 99:99, made every push look near. The window's household menu showed the words and not the weekday and the time.
+
+A Klingon line can sit under the greeting, off until it is turned on. `hello morse`, `hello haiku`, and `hello --pirate` print a joke and save nothing. Typing pic after the days-in-a-row line shows a picture. Typing a long code, or haiku, at a prompt answers and does not save it as a plan.
+
 ## 2026-10-26: fixes from review round 46
 
 Version 1.63.0. The notification the phone shows for a push was still using a ten-minute window, so a reminder eleven to fifteen minutes late, or one just after midnight, showed the check-in line instead of the daily repeat's words. A saved push registration whose times were not all text made the next save fail, and a new push address kept the old "already sent" marks, so that phone missed today's reminder. The phone treated 31 February as a real sync time and could let it beat a real February. The VAPID key and the push registration were written with the process's file mode.

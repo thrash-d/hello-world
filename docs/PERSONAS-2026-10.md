@@ -218,6 +218,7 @@ the pull request named.
 | Red team, 1.57.0 | Anonymous household list invites silent erasing (Caligula) vs. strict self-joining (Rasputin) | Both | Queued together for the household list (TODO): per-item history, no per-person totals, self-join only, re-key on leave |
 | Personas, 1.43.0 | Formulas run in the spreadsheet export | Skye, confirmed in code | Fixed in 1.46.1 |
 | Personas, 1.43.0 | Forklift horns, bakery orders, badge login, a supply locator, an email "lie detector" | Rick, Harold, Denise | Not buildable here: they need hardware or outside services |
+| Review round 47 | A line under the greeting, Morse and a pirate line as commands, a picture on the streak sentence, a haiku, a code typed at a prompt | Jules Navarro | Built in 1.64.0. A morning of dots, sarcasm, a hello on the local network, a 3 a.m. line, and a zero-dollar invoice were not built |
 
 Of 7 claims checked against the code, 2 were wrong, 1 was true only for
 shared Windows logins, and 1 (the export formulas) was a real security issue

@@ -111,7 +111,8 @@ Every on-or-off choice also works from the command line, for example
 earlier plan after 30 days), `no_count` (no done count kept), `numbers`,
 `close_after_done` (the text screen closes after `done` and the next plan)
 `colon_prompts` (prompts end in a colon unless `--set colon_prompts off`), `floor_tips`,
-`private_reminder` and `hide_thought`. `--week`,
+`private_reminder`, `hide_thought`, and `klingon` (a made-up line under the
+greeting, off until `--set klingon on`). `--week`,
 `--numbers` and `--export` print or save the same as the window, and
 `--plain-local` prints the greeting in your language. **Options** in the window
 turns the reminder off, hides the thought and tip, turns on the days-in-a-row
@@ -120,6 +121,12 @@ deletes everything (your settings stay), or switches to the text screen. In
 the text screen, menu option 10 picks the language, option 12 has the
 reminder times and the window's other settings, and pressing Ctrl+C twice
 closes it.
+
+`hello morse`, `hello haiku`, `hello klingon`, and `hello --pirate` print a
+joke and save nothing. `hello haiku --date YYYY-MM-DD` puts that day in the
+middle line. None of these is part of Pro, and none of them sends anything.
+Typing `pic` after the days-in-a-row line shows a picture. Typing `haiku`,
+or the letters `uuddlrlrba`, at a prompt answers and does not save a plan.
 
 ### The text screen
 
@@ -582,7 +589,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.63.0'
+$tag = 'v1.64.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

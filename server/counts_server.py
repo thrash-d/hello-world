@@ -384,14 +384,43 @@ def es256_verify(public, message, signature):
     return point is not None and point[0] % P256_N == r
 
 
+def tighten(path, mode):
+    """Best-effort mode on a path that already exists.
+
+    Windows only toggles the read-only bit, and 0600 still includes write,
+    so a key stays writable there. A symlink is left alone, so a link
+    planted in the push folder cannot change some other file. A refusal
+    is left as it is.
+    """
+    if os.path.islink(path):
+        return
+    try:
+        os.chmod(path, mode)
+    except OSError:
+        pass
+
+
 def write_private(path, text):
     """Write `text` so a shared machine cannot read it (mode 0600).
 
     The VAPID private key and a phone's push address are secrets. Windows
-    ignores the Unix mode; the notes file has the same limit.
+    ignores the Unix mode; the notes file has the same limit. A file that
+    was already on disk is tightened when it is loaded, not only when it
+    is created. A symlink sitting on the temp name is removed once and the
+    write is tried again.
     """
     tmp = path + ".tmp"
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    flags |= nofollow
+    try:
+        fd = os.open(tmp, flags, 0o600)
+    except OSError:
+        if nofollow and os.path.islink(tmp):
+            os.unlink(tmp)
+            fd = os.open(tmp, flags, 0o600)
+        else:
+            raise
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(text)
@@ -402,6 +431,7 @@ def write_private(path, text):
             pass
         raise
     os.replace(tmp, path)
+    tighten(path, 0o600)
 
 
 def etag(raw):
@@ -448,14 +478,27 @@ class Push:
     def __init__(self, folder):
         self.folder = os.path.join(folder, "push")
         os.makedirs(self.folder, exist_ok=True)
+        # 0755 from a 022 umask would let anyone on the machine list the
+        # tokens. The token in the file name is what authorizes a change.
+        tighten(self.folder, 0o700)
         self.lock = threading.Lock()
         key = os.path.join(folder, "vapid.json")
         try:
             with open(key, encoding="utf-8") as f:
                 self.d = int(json.load(f)["d"], 16)
+            # A key written before 1.64.0 can still be mode 0644. Creating
+            # a new file at 0600 does not change the one already on disk.
+            tighten(key, 0o600)
         except (OSError, ValueError, KeyError, TypeError):
             self.d = secrets.randbelow(P256_N - 1) + 1
             write_private(key, json.dumps({"d": format(self.d, "064x")}))
+        try:
+            names = os.listdir(self.folder)
+        except OSError:
+            names = []
+        for name in names:
+            if re.fullmatch(r"[0-9a-f]{32}", name):
+                tighten(os.path.join(self.folder, name), 0o600)
         self.public = p256_public(self.d)
 
     def path(self, token):

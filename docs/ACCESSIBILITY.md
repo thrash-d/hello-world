@@ -25,10 +25,17 @@ everyone. Web criteria apply only where they carry over.
 
 - Keyboard only: everything works with typed words and Enter, and Enter alone
   gets through every screen.
-- One top-to-bottom flow of plain text: no colors, no art, no cursor
-  movement, nothing redrawn, so a screen reader reads it in order.
+- One top-to-bottom flow of plain text: no colors, no cursor movement,
+  nothing redrawn, so a screen reader reads it in order. A picture of
+  characters can follow the days-in-a-row line, and only if the person types
+  pic. Enter skips it.
 - Every prompt ends by saying what Enter does, such as "Enter to close".
   From 1.63.0 the prompt itself ends in a colon, unless `colon_prompts` is off.
+  From 1.64.0 that includes a cue with no space before the greater-than sign,
+  which is how some Chinese and Japanese prompts are written. The sentence
+  "Prefer no follow-up questions? Options > What the window shows." is not a
+  prompt, and it still says greater. A joke line never replaces Hello, world!. Morse is a command,
+  not the morning.
 - Long prompts and paragraphs wrap to the window width, down to 30 columns,
   so nothing runs off a magnified screen.
 - No time limits: no prompt times out and nothing closes by itself.
