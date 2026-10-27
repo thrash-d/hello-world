@@ -124,6 +124,9 @@
       <string id="TurnOffSync_Help">כאשר מופעל, hello-world לא יכול לסנכרן תוכניות עם טלפון וההגדרה לא מוצגת. הסנכרון כבוי עד שאדם מפעיל אותו; כשהוא פועל, התוכנית ורשימת הדברים שבוצעו יוצאות מהמחשב מוצפנות בקוד שיש רק למכשירים של אותו אדם, ונשמרות בשרת הספירה המשותפת.
 
 כאשר מושבת או לא מוגדר, כל אחד יכול להפעיל אותו כשמוגדר שרת ספירה משותפת.</string>
+      <string id="SUPPORTED_1_66">hello-world 1.66.0 ואילך</string>
+      <string id="GrowthServer">שרת הערות רצף</string>
+      <string id="GrowthServer_Help">כשהערך מוגדר, הערות רצף שאדם קיבל מוצעות לכתובת הזו. השתמשו ב-https, או ב-http רק לשרת על המחשב הזה עם מספר פורט. כשהשדה ריק הכתובת היא מציין המקום https://insights.example.invalid, שאינו נפתר. כוונו אותו לשרת הספירות שלכם. השרת שומר אצווה ב-POST /v1/growth ואינו כותב כתובת רשת. זה אינו שירות ניתוח של צד שלישי, ושום דבר אינו מחויב. ערך שאינו עומד בכללים האלה מתעלמים ממנו.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -143,6 +146,9 @@
       </presentation>
       <presentation id="SupportLine">
         <textBox refId="SupportLine"><label>טקסט:</label></textBox>
+      </presentation>
+      <presentation id="GrowthServer">
+        <textBox refId="GrowthServer"><label>כתובת השרת:</label></textBox>
       </presentation>
     </presentationTable>
   </resources>

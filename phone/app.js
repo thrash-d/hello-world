@@ -67,6 +67,20 @@ const UI = {
     klingonOn: "Klingon hello is on. Made up for fun. Not checked by a linguist.",
     klingonOff: "Klingon hello is off.",
     haiku: "A haiku",
+    cowbell: "Cowbell", cowbellSaid: "More cowbell.",
+    eulaTitle: "Streak notes",
+    eulaCheck: "Share streak notes (selected)",
+    eulaYes: "Continue", eulaNo: "No thanks",
+    growthKeep: "Keep my streak", growthLater: "Not now",
+    growthRepair: "Repair streak $2.99", growthPlus: "Pro+ $9.99/mo",
+    growthOn: "Streak notes are on", growthOff: "Streak notes are off",
+    growthServer: "Upload address", growthServerSave: "Save upload address",
+    growthServerBad: "That address doesn't look right. Nothing was changed.",
+    growthRepairSaid: "Streak repair. Amount due: $2.99. STUB: nothing was charged. No card was asked for.",
+    growthPlusSaid: "Pro+ is $9.99 a month. STUB: nothing was charged. No card was asked for. The streak notes stay.",
+    growthKeepSaid: "The streak stays. Open again tomorrow or it dies.",
+    skipNag: "The streak noticed.",
+    sponsored: "Sponsored: Pro+ is $9.99 a month. Nothing is billed.",
     good: "Good. That one is off your list.", goodMany: "Good. {n} things are off your list.",
     unsureSaid: "That's fine. It's kept for today.",
     kept: "Kept for today.", skipped: "Skipped. It asks again next time.",
@@ -283,11 +297,33 @@ function parse(raw) {
     const data = JSON.parse(raw);
     const state = blank();
     if (data && data.intent && typeof data.intent.text === "string" && isDate(data.intent.date)) {
-      state.intent = { text: clean(data.intent.text), date: data.intent.date, skips: Number(data.intent.skips) || 0 };
+      const text = clean(data.intent.text);
+      // ";;;" cleans to nothing. It is not a plan, and it must not be asked about.
+      if (text) state.intent = { text, date: data.intent.date, skips: Number(data.intent.skips) || 0 };
     }
     if (Array.isArray(data.finished)) {
-      state.finished = data.finished.filter((f) => f && typeof f.text === "string").slice(-100);
+      state.finished = data.finished.filter((f) => f && typeof f.text === "string" && f.text.trim()
+        && isDate(f.date)).map((f) => ({ text: String(f.text).trim().slice(0, MAX_PLAN), date: f.date })).slice(-100);
     }
+    if (data.growthConsent === true) state.growthConsent = true;
+    else if (data.growthConsent === false) state.growthConsent = false;
+    if (data.growth === false) state.growth = false;
+    if (typeof data.growthRun === "number" && data.growthRun > 0 && data.growthRun < 100000) {
+      state.growthRun = Math.floor(data.growthRun);
+    }
+    if (typeof data.growthBest === "number" && data.growthBest > 0 && data.growthBest < 100000) {
+      state.growthBest = Math.floor(data.growthBest);
+    }
+    if (isDate(data.growthLast)) state.growthLast = data.growthLast;
+    if (typeof data.growthId === "string" && /^[0-9a-f]{32}$/.test(data.growthId)) state.growthId = data.growthId;
+    if (typeof data.growthSession === "string" && /^[0-9a-f]{32}$/.test(data.growthSession)) {
+      state.growthSession = data.growthSession;
+    }
+    if (typeof data.growthSessionAt === "number" && data.growthSessionAt > 0) {
+      state.growthSessionAt = data.growthSessionAt;
+    }
+    if (data.growthDied === true) state.growthDied = true;
+    if (data.plusStub === true) state.plusStub = true;
     if (Array.isArray(data.aside)) {
       state.aside = data.aside.filter((a) => a && typeof a.text === "string" && clean(a.text) && isDate(a.date))
         .map((a) => ({ text: clean(a.text), date: a.date })).slice(-MAX_ASIDE);
@@ -398,15 +434,22 @@ function endDay(state, choices, today) {
   return tally;
 }
 
+function planParts(text) {
+  return String(text || "").split(";").map((p) => p.trim()).filter(Boolean);
+}
+
+// One finished row per thing, matching the count the button announces.
+function finishListed(state, text, date) {
+  const parts = planParts(text);
+  parts.forEach((part) => state.finished.push({ text: part, date }));
+  state.intent = null;
+  return parts.length > 1 ? "goodMany:" + parts.length : "good";
+}
+
 function answer(state, choice, today) {
   const intent = state.intent;
   if (!asks(state, today)) return "";
-  if (choice === "yes") {
-    const n = intent.text.split(";").map((p) => p.trim()).filter(Boolean).length;
-    state.finished.push({ text: intent.text, date: intent.date });
-    state.intent = null;
-    return n > 1 ? "goodMany:" + n : "good";
-  }
+  if (choice === "yes") return finishListed(state, intent.text, intent.date);
   if (choice === "no" || choice === "carry") {
     const wasFresh = fresh(state, today);
     if (choice === "carry") noteSideways(state, today);
@@ -446,10 +489,7 @@ function setPlan(state, text, today) {
 
 function finishToday(state, today) {
   if (!state.intent) return "";
-  const n = state.intent.text.split(";").map((p) => p.trim()).filter(Boolean).length;
-  state.finished.push({ text: state.intent.text, date: today });
-  state.intent = null;
-  return n > 1 ? "goodMany:" + n : "good";
+  return finishListed(state, state.intent.text, today);
 }
 
 function clearToday(state, today) {
@@ -989,13 +1029,209 @@ function syncAction(status, opened) {
   return "stop";
 }
 
+const GROWTH_URL_DEFAULT = "https://insights.example.invalid/v1/growth";
+const GROWTH_BATCH = 20;
+const GROWTH_TRIES = 8;
+const SESSION_GAP_MS = 30 * 60 * 1000;
+const APP_VERSION = "1.66.0";
+
+function growthUrlOk(url) {
+  try {
+    const u = new URL(url);
+    if (u.username || u.password || u.hash) return false;
+    if (/[\s\\]/.test(url)) return false;
+    if (u.protocol === "https:") return true;
+    return u.protocol === "http:" && (u.hostname === "localhost" || u.hostname === "127.0.0.1") && Boolean(u.port);
+  } catch (e) {
+    return false;
+  }
+}
+
+function growthTarget() {
+  let chosen = "";
+  try { chosen = localStorage.getItem("hello-world-growth-server") || ""; } catch (e) { chosen = ""; }
+  if (!chosen && typeof document !== "undefined") {
+    const meta = document.querySelector('meta[name="growth-server"]');
+    chosen = meta && meta.content ? meta.content.trim() : "";
+  }
+  if (chosen === "same-origin" && typeof location !== "undefined" && /^https?:$/.test(location.protocol)) {
+    return location.origin + "/v1/growth";
+  }
+  if (chosen && growthUrlOk(chosen)) {
+    const bare = chosen.replace(/\/$/, "");
+    return bare.endsWith("/v1/growth") ? bare : bare + "/v1/growth";
+  }
+  return GROWTH_URL_DEFAULT;
+}
+
+function growthHost() {
+  try { return new URL(growthTarget()).hostname; } catch (e) { return "insights.example.invalid"; }
+}
+
+function growthQueue() {
+  try {
+    const data = JSON.parse(localStorage.getItem("hello-world-growth-queue") || "[]");
+    return Array.isArray(data) ? data.filter((item) => item && typeof item.event === "string").slice(-200) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function growthSaveQueue(events) {
+  try { localStorage.setItem("hello-world-growth-queue", JSON.stringify(events.slice(-200))); } catch (e) { /* private mode */ }
+}
+
+function growthConsentOn(state) {
+  return state.growthConsent === true && state.growth !== false;
+}
+
+function growthLog(state, event, plan) {
+  if (typeof localStorage === "undefined") return;
+  try {
+    const data = JSON.parse(localStorage.getItem("hello-world-growth-log") || "[]");
+    const rows = Array.isArray(data) ? data : [];
+    rows.push({
+      at: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
+      event: String(event).slice(0, 40),
+      id: state.growthId || "",
+      session: state.growthSession || "",
+      streak: state.growthRun || 0,
+      plan: plan ? String(plan).slice(0, 400) : null,
+    });
+    localStorage.setItem("hello-world-growth-log", JSON.stringify(rows.slice(-80)));
+  } catch (e) { /* private mode */ }
+}
+
+function growthTouch(state, today) {
+  if (state.growthLast === today) return state.growthRun || 1;
+  let died = false;
+  let run = 1;
+  if (isDate(state.growthLast)) {
+    const gap = daysBetween(state.growthLast, today);
+    if (gap <= 0) run = state.growthRun || 1;
+    else if (gap <= 4) run = Math.min((state.growthRun || 1) + 1, 99999);
+    else {
+      died = (state.growthRun || 0) > 1 || (state.growthBest || 0) > 1;
+      run = 1;
+    }
+  }
+  state.growthRun = run;
+  state.growthBest = Math.max(state.growthBest || 0, run);
+  state.growthLast = today;
+  if (died) state.growthDied = true;
+  return run;
+}
+
+function growthSession(state) {
+  const now = Date.now();
+  const fresh = !(typeof state.growthSession === "string" && /^[0-9a-f]{32}$/.test(state.growthSession)
+    && typeof state.growthSessionAt === "number" && now - state.growthSessionAt <= SESSION_GAP_MS);
+  if (fresh) state.growthSession = randomHex(16);
+  state.growthSessionAt = now;
+  return fresh;
+}
+
+function growthCapture(state, event, today) {
+  const plan = state.intent && state.intent.text ? String(state.intent.text).slice(0, 400) : null;
+  if (!growthConsentOn(state)) {
+    growthLog(state, event, plan);
+    return;
+  }
+  if (!state.growthId) state.growthId = randomHex(16);
+  const started = growthSession(state);
+  if (today) growthTouch(state, today);
+  const now = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+  const queue = growthQueue();
+  const one = (name) => ({
+    event: String(name).slice(0, 40), at: now, id: state.growthId, session: state.growthSession,
+    streak: state.growthRun || 0, best: state.growthBest || 0, plan, v: APP_VERSION,
+    lang: language(state, (typeof navigator !== "undefined" && navigator.languages) || []), attempts: 0,
+  });
+  if (started) {
+    queue.push(one("session_start"));
+    growthLog(state, "session_start", plan);
+  }
+  queue.push(one(event));
+  growthSaveQueue(queue);
+  growthLog(state, event, plan);
+}
+
+function growthBody(state, batch) {
+  return {
+    id: state.growthId, session: state.growthSession || "", consent: true, v: APP_VERSION,
+    events: batch.map((item) => ({
+      event: item.event, at: item.at || "", session: item.session || "",
+      streak: item.streak || 0, best: item.best || 0, plan: item.plan || null,
+      v: item.v || APP_VERSION, lang: item.lang || "",
+    })),
+  };
+}
+
+async function growthPost(url, body) {
+  if (!growthUrlOk(url) || typeof fetch !== "function") return "drop";
+  try {
+    const answer = await fetch(url, {
+      method: "POST", redirect: "error", mode: "cors",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (answer.status >= 200 && answer.status < 300) return "ok";
+    if (answer.status >= 300 && answer.status < 500) return "drop";
+    return "retry";
+  } catch (e) {
+    return "retry";
+  }
+}
+
+async function growthFlush(state) {
+  if (!growthConsentOn(state)) return false;
+  const url = growthTarget();
+  for (let round = 0; round < 3; round++) {
+    let queue = growthQueue().filter((item) => (item.attempts || 0) < GROWTH_TRIES);
+    if (!queue.length) { growthSaveQueue([]); return true; }
+    const batch = queue.slice(0, GROWTH_BATCH);
+    const rest = queue.slice(GROWTH_BATCH);
+    let result = await growthPost(url, growthBody(state, batch));
+    if (result === "retry") {
+      batch.forEach((item) => { item.attempts = (item.attempts || 0) + 1; });
+      result = await growthPost(url, growthBody(state, batch));
+      if (result === "retry") batch.forEach((item) => { item.attempts = (item.attempts || 0) + 1; });
+    }
+    if (result === "ok") {
+      growthSaveQueue(rest);
+      if (!rest.length) return true;
+      continue;
+    }
+    if (result === "drop") batch.forEach((item) => { item.attempts = GROWTH_TRIES; });
+    growthSaveQueue(batch.concat(rest));
+    return false;
+  }
+  return true;
+}
+
+function growthLine(state) {
+  const host = growthHost();
+  const n = state.growthRun || 1;
+  let line = state.growthDied
+    ? "Your streak died. It was " + (state.growthBest || 0) + ". Repair is $2.99. Nothing is charged."
+    : "Your streak is " + n + ". Open again tomorrow or it dies. A note was offered to " + host + ".";
+  if (state.plusStub) line += " Pro+ member. Your streak is still watching.";
+  return line;
+}
+
+function growthEula(host) {
+  return "Streak notes are selected. This phone keeps a client id, a session id, and this visit, including the words of a plan, and offers a batch to "
+    + host + ". Household lists, letters, and sync codes are not included. Nothing is billed.";
+}
+
 if (typeof module !== "undefined") {
   module.exports = { UI, ordinal, todaysPair, clean, parse, asks, answer, setPlan, finishToday, language, blank,
     syncKeys, sealSync, openSync, mergeSync, syncForm, normalCode, todayOf, clearToday, picks, bringBack,
     phoneNumber, smsLink, utcTime, pushText, nearClock, haikuText, exportText, setDayStart, REMIND_TIMES, DAY_STARTS,
     fresh, smallerDue, comingBack, smaller, endDay, noteSideways, mergeDevices, noteDevice, letterLink,
     houseKeys, houseNew, houseJoin, houseLeave, houseChange, houseMerge, houseTidy, houseBody, houseHistory,
-    houseNews, houseLeftUnasked, newCode, houseFit, houseStamp, syncAction, syncTime, HOUSE };
+    houseNews, houseLeftUnasked, newCode, houseFit, houseStamp, syncAction, syncTime, HOUSE,
+    planParts, finishListed, growthUrlOk, growthTarget, growthTouch, growthConsentOn };
 }
 
 if (typeof document !== "undefined") {
@@ -1031,6 +1267,9 @@ if (typeof document !== "undefined") {
       text = $("status").dataset.tally || "";
     } else if (key) {
       text = words[key] || "";
+    }
+    if (key === "skipped" && growthConsentOn(state)) {
+      text = (text + " " + (words.skipNag || UI.en.skipNag)).trim();
     }
     const status = $("status");
     status.style.whiteSpace = "";
@@ -1274,6 +1513,7 @@ if (typeof document !== "undefined") {
     }
     if ($("klingon")) $("klingon").textContent = s.klingon;
     if ($("haiku")) $("haiku").textContent = s.haiku;
+    drawGrowth();
     // A second Skip hides the question while focus is still on that button.
     if (buried()) hearSoon();
   }
@@ -1449,7 +1689,11 @@ if (typeof document !== "undefined") {
   $("yes").addEventListener("click", act(() => answer(state, "yes", today())));
   $("no").addEventListener("click", act(() => afterCarry(answer(state, "no", today()))));
   $("unsure").addEventListener("click", act(() => answer(state, "unsure", today())));
-  $("skip").addEventListener("click", act(() => answer(state, "skip", today())));
+  $("skip").addEventListener("click", act(() => {
+    const said = answer(state, "skip", today());
+    if (said === "skipped" && growthConsentOn(state)) growthCapture(state, "skipped", today());
+    return said;
+  }));
   // Sideways asks carry or set aside, two equal buttons (Mary); a fresh
   // day's "Start clean" sets it aside at once.
   $("sideways").addEventListener("click", (event) => {
@@ -1503,6 +1747,166 @@ if (typeof document !== "undefined") {
     status.tabIndex = -1;
     status.focus();
   });
+  function phrase(key) {
+    return t()[key] || UI.en[key] || "";
+  }
+  let growthNoted = false;
+  let growthLater = false;
+  function drawGrowth() {
+    const host = growthHost();
+    const asking = state.growthConsent == null && state.growth !== false;
+    const on = growthConsentOn(state);
+    const eula = $("eula");
+    if (eula) {
+      eula.hidden = !asking;
+      $("eula-title").textContent = phrase("eulaTitle");
+      $("eula-text").textContent = growthEula(host);
+      $("eula-check-label").textContent = phrase("eulaCheck");
+      $("eula-yes").textContent = phrase("eulaYes");
+      $("eula-no").textContent = phrase("eulaNo");
+      if (asking && !eula.dataset.ready) {
+        eula.dataset.ready = "1";
+        $("eula-check").checked = true;
+      }
+    }
+    const box = $("growth");
+    if (box) {
+      const show = on && !growthLater;
+      box.hidden = !show;
+      if (show) {
+        if (!growthNoted) {
+          growthNoted = true;
+          growthTouch(state, today());
+          growthCapture(state, "opened", today());
+          save();
+          growthFlush(state);
+        }
+        $("growth-nag").textContent = growthLine(state);
+        $("growth-keep").textContent = phrase("growthKeep");
+        $("growth-later").textContent = phrase("growthLater");
+        $("growth-repair").textContent = phrase("growthRepair");
+        $("growth-plus").textContent = phrase("growthPlus");
+      }
+    }
+    const ad = $("sponsored");
+    if (ad) {
+      ad.hidden = !on || state.plusStub;
+      ad.textContent = phrase("sponsored");
+    }
+    if ($("cowbell")) $("cowbell").textContent = phrase("cowbell");
+    if ($("growth-toggle")) $("growth-toggle").textContent = on ? phrase("growthOff") : phrase("growthOn");
+    if ($("growth-server-label")) $("growth-server-label").textContent = phrase("growthServer");
+    if ($("growth-server-save")) $("growth-server-save").textContent = phrase("growthServerSave");
+    const field = $("growth-server");
+    if (field && !field.value) {
+      try { field.value = localStorage.getItem("hello-world-growth-server") || ""; } catch (e) { /* private mode */ }
+    }
+  }
+  function acceptGrowth() {
+    state.growthConsent = true;
+    delete state.growth;
+    growthTouch(state, today());
+    growthCapture(state, "eula_accept", today());
+    growthNoted = false;
+    save();
+  }
+  function declineGrowth() {
+    const event = state.growthConsent === true ? "growth_off" : "eula_decline";
+    state.growthConsent = false;
+    state.growth = false;
+    growthSaveQueue([]);
+    growthLog(state, event, null);
+    growthNoted = false;
+    save();
+  }
+  $("eula-yes").addEventListener("click", () => {
+    if (!$("eula-check").checked) { declineGrowth(); draw(); return; }
+    acceptGrowth();
+    draw();
+    growthFlush(state);
+  });
+  $("eula-no").addEventListener("click", () => { declineGrowth(); draw(); say(""); });
+  $("growth-keep").addEventListener("click", () => {
+    clearTimeout(hearTimer);
+    growthCapture(state, "keep", today());
+    save();
+    const status = $("status");
+    status.textContent = phrase("growthKeepSaid");
+    status.tabIndex = -1;
+    status.focus();
+    growthFlush(state);
+  });
+  $("growth-later").addEventListener("click", () => {
+    growthLater = true;
+    growthCapture(state, "later", today());
+    save();
+    draw();
+    growthFlush(state);
+  });
+  $("growth-repair").addEventListener("click", () => {
+    growthTouch(state, today());
+    const best = Math.max(state.growthBest || 0, state.growthRun || 0, 1);
+    state.growthRun = state.growthBest = best;
+    state.growthDied = false;
+    state.growthLast = today();
+    growthCapture(state, "repair", today());
+    save();
+    draw();
+    clearTimeout(hearTimer);
+    const status = $("status");
+    status.textContent = phrase("growthRepairSaid");
+    status.tabIndex = -1;
+    status.focus();
+    growthFlush(state);
+  });
+  $("growth-plus").addEventListener("click", () => {
+    state.plusStub = true;
+    growthCapture(state, "plus", today());
+    save();
+    draw();
+    clearTimeout(hearTimer);
+    const status = $("status");
+    status.textContent = phrase("growthPlusSaid");
+    status.tabIndex = -1;
+    status.focus();
+    growthFlush(state);
+  });
+  $("growth-toggle").addEventListener("click", () => {
+    if (growthConsentOn(state)) declineGrowth();
+    else acceptGrowth();
+    save();
+    draw();
+    if (growthConsentOn(state)) growthFlush(state);
+  });
+  $("growth-server-save").addEventListener("click", () => {
+    const value = $("growth-server").value.trim();
+    if (!value) {
+      try { localStorage.removeItem("hello-world-growth-server"); } catch (e) { /* private mode */ }
+      say("saved");
+      draw();
+      return;
+    }
+    if (value !== "same-origin" && !growthUrlOk(value)) {
+      $("status").textContent = phrase("growthServerBad");
+      return;
+    }
+    try { localStorage.setItem("hello-world-growth-server", value); } catch (e) { /* private mode */ }
+    say("saved");
+    draw();
+  });
+  $("cowbell").addEventListener("click", () => {
+    clearTimeout(hearTimer);
+    const status = $("status");
+    status.style.whiteSpace = "";
+    status.textContent = phrase("cowbellSaid");
+    status.tabIndex = -1;
+    status.focus();
+    if (growthConsentOn(state)) {
+      growthCapture(state, "cowbell", today());
+      save();
+      growthFlush(state);
+    }
+  });
   $("haiku").addEventListener("click", () => {
     clearTimeout(hearTimer);
     const status = $("status");
@@ -1515,7 +1919,10 @@ if (typeof document !== "undefined") {
   $("clear").addEventListener("click", act(() => clearToday(state, today())));
   $("plan-form").addEventListener("submit", act(() => {
     const said = setPlan(state, $("plan-input").value, today());
-    if (said === "saved") $("plan-input").value = "";
+    if (said === "saved" || said === "addedTomorrow") {
+      $("plan-input").value = "";
+      if (growthConsentOn(state)) growthCapture(state, "plan", today());
+    }
     return said;
   }));
   $("language").addEventListener("change", act(() => { state.lang = $("language").value; return ""; }));
@@ -1560,7 +1967,12 @@ if (typeof document !== "undefined") {
     const lang = state.lang;
     state.remind = null; state.repeat = null;
     await registerPush();
-    try { localStorage.removeItem(KEY); localStorage.removeItem(SYNC_KEY); } catch (e) { /* nothing saved */ }
+    try {
+      localStorage.removeItem(KEY);
+      localStorage.removeItem(SYNC_KEY);
+      localStorage.removeItem("hello-world-growth-queue");
+      localStorage.removeItem("hello-world-growth-log");
+    } catch (e) { /* nothing saved */ }
     keys = null;
     state = blank();
     state.lang = lang;

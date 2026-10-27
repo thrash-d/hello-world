@@ -220,6 +220,7 @@ the pull request named.
 | Personas, 1.43.0 | Forklift horns, bakery orders, badge login, a supply locator, an email "lie detector" | Rick, Harold, Denise | Not buildable here: they need hardware or outside services |
 | Review round 47 | A line under the greeting, Morse and a pirate line as commands, a picture on the streak sentence, a haiku, a code typed at a prompt | Jules Navarro | Built in 1.64.0. A morning of dots, sarcasm, a hello on the local network, a 3 a.m. line, and a zero-dollar invoice were not built |
 | Review round 48 | One command that says the day starts when you said it does | Jules Navarro | Built in 1.65.0. Morning Morse, a dry line, a wave, a zero-dollar receipt, a staple, and a cowbell were not built. Ruth Okonkwo, Dave Pell, and Casey were not on this panel |
+| Review round 49 | Streak notes, a cowbell, and a staple | Casey, Jules Navarro, Profit Maximizer | Built in 1.66.0. Helen Park and Idris Khan voted no. The upload defaults to insights.example.invalid. Repair and Pro+ are stub receipts. Ruth Okonkwo and Dave Pell were not on this panel |
 
 Of 7 claims checked against the code, 2 were wrong, 1 was true only for
 shared Windows logins, and 1 (the export formulas) was a real security issue

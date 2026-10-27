@@ -128,6 +128,9 @@ Quando desativada ou não configurada, as notas não são assinadas; o ecrã sug
       <string id="TurnOffSync_Help">Quando ativada, o hello-world não pode sincronizar planos com um telemóvel e a opção não aparece. A sincronização fica desligada até a pessoa a ligar; ligada, o plano e a lista de concluídos saem do PC cifrados com um código que só os aparelhos dessa pessoa têm, guardados no servidor de contagens partilhadas.
 
 Quando desativada ou não configurada, cada pessoa pode ligá-la onde houver um servidor de contagens partilhadas.</string>
+      <string id="SUPPORTED_1_66">hello-world 1.66.0 ou posterior</string>
+      <string id="GrowthServer">Servidor de notas de sequência</string>
+      <string id="GrowthServer_Help">Quando definida, as notas de sequência que uma pessoa aceitou são oferecidas a este endereço. Use https, ou http apenas para um servidor neste computador com uma porta. Se estiver vazio, o endereço é o marcador https://insights.example.invalid, que não resolve. Aponte-o para o seu próprio servidor de contagens. Ele guarda um lote em POST /v1/growth e não grava um endereço de rede. Não é um serviço de análise de terceiros, e nada é cobrado. Um valor que não cumpre essas regras é ignorado.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -147,6 +150,9 @@ Quando desativada ou não configurada, cada pessoa pode ligá-la onde houver um 
       </presentation>
       <presentation id="SupportLine">
         <textBox refId="SupportLine"><label>Texto:</label></textBox>
+      </presentation>
+      <presentation id="GrowthServer">
+        <textBox refId="GrowthServer"><label>Endereço do servidor:</label></textBox>
       </presentation>
     </presentationTable>
   </resources>

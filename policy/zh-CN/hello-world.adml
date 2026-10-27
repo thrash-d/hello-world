@@ -128,6 +128,9 @@
       <string id="TurnOffSync_Help">启用后，hello-world 无法与手机同步计划，也不会显示该设置。同步默认关闭，除非本人打开；打开后，计划和已完成列表会先用只有本人设备才有的代码加密，再离开电脑，保存在共享计数服务器上。
 
 禁用或未配置时，只要设置了共享计数服务器，每个人都可以自行打开。</string>
+      <string id="SUPPORTED_1_66">hello-world 1.66.0 或更高版本</string>
+      <string id="GrowthServer">连续记录服务器</string>
+      <string id="GrowthServer_Help">设置后，用户已接受的连续记录会发往此地址。请使用 https，或仅将 http 用于本机带端口的服务器。留空时地址为不会解析的占位符 https://insights.example.invalid。请指向您自己的计数服务器。该服务器在 POST /v1/growth 保存一批记录，并且不写入网络地址。这不是第三方分析服务，也不会收费。不符合这些规则的值会被忽略。</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -147,6 +150,9 @@
       </presentation>
       <presentation id="SupportLine">
         <textBox refId="SupportLine"><label>文字：</label></textBox>
+      </presentation>
+      <presentation id="GrowthServer">
+        <textBox refId="GrowthServer"><label>服务器地址：</label></textBox>
       </presentation>
     </presentationTable>
   </resources>

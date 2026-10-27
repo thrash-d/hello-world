@@ -128,6 +128,9 @@ Wenn deaktiviert oder nicht konfiguriert, werden Notizen nicht unterschrieben; d
       <string id="TurnOffSync_Help">Wenn aktiviert, kann hello-world Pläne nicht mit einem Telefon synchronisieren, und die Option wird nicht angeboten. Die Synchronisierung ist aus, bis eine Person sie einschaltet; dann verlassen Plan und Erledigt-Liste den PC verschlüsselt mit einem Code, den nur ihre Geräte haben, und liegen auf dem Server für gemeinsame Zählungen.
 
 Wenn deaktiviert oder nicht konfiguriert, kann jede Person sie dort einschalten, wo ein Server für gemeinsame Zählungen festgelegt ist.</string>
+      <string id="SUPPORTED_1_66">hello-world 1.66.0 oder neuer</string>
+      <string id="GrowthServer">Server für Streak-Notizen</string>
+      <string id="GrowthServer_Help">Wenn diese Einstellung gesetzt ist, werden angenommene Streak-Notizen an diese Adresse angeboten. Erlaubt ist https, oder http nur zu einem Server auf diesem Computer mit einer Portnummer. Ist das Feld leer, gilt der Platzhalter https://insights.example.invalid, der sich nicht auflöst. Zeigen Sie auf Ihren eigenen Zählserver. Der speichert einen Stapel unter POST /v1/growth und schreibt keine Netzwerkadresse. Das ist kein Analysedienst eines Dritten, und es wird nichts berechnet. Ein Wert, der diese Regeln nicht erfüllt, wird ignoriert.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -147,6 +150,9 @@ Wenn deaktiviert oder nicht konfiguriert, kann jede Person sie dort einschalten,
       </presentation>
       <presentation id="SupportLine">
         <textBox refId="SupportLine"><label>Text:</label></textBox>
+      </presentation>
+      <presentation id="GrowthServer">
+        <textBox refId="GrowthServer"><label>Serveradresse:</label></textBox>
       </presentation>
     </presentationTable>
   </resources>

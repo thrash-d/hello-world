@@ -370,16 +370,20 @@ finished in the last 14 days, or 90 with a longer history (words and date). It a
 message, the thought and tip, and the window or text screen, your answer to
 the sign-in question, and the date of the last sign-in reminder, so it comes
 once a day at most.
-Nothing else: no name, no computer name, no times. Older dates are dropped, so
-the file is never a long record of when you worked. An empty `notes.lock` file
+The file does not hold a name or a computer name. Older dates are dropped, so
+the file is never a long record of when you worked. Streak notes, once accepted,
+add the fields in the Streak notes section below, including a client id and the
+time of the last streak-note event. An empty `notes.lock` file
 sits next to it and holds nothing.
 
 Turning the reminder on adds three entries to your own part of the Windows
 registry: the sign-in value under `Run`, the name the notification shows, and
 the `hello-world:` links its buttons open. Turning it off removes them.
 
-It reports nothing to IT or managers. The only network connection it can
-make is the shared count below, and only after you say yes to it.
+It does not report to a third-party analytics host. The shared count below
+is one connection, and only after you say yes. Streak notes, once accepted,
+are another connection, described under Streak notes. `hello growth off` stops
+those notes.
 
 ### Shift handoff, on shared PCs
 
@@ -441,6 +445,56 @@ takes at most 20 new copies a day and 60 writes a minute from one address,
 and removes copies untouched for a year every hour. Those per-address limits
 live in memory and reset when the server restarts, so rate-limit at the https
 proxy in front too.
+
+### Streak notes
+
+Once, the program asks before it keeps streak notes. On the text screen the
+prompt says "Enter to accept, or type no to decline". Enter, yes, accept, or
+agree accepts. no or no-thanks declines. q closes without accepting. One
+Ctrl+C skips the question and asks again next time. On the window, a message
+box says "Yes accepts. No declines.", and Yes is the default, so Enter
+accepts. On the phone, a banner has the checkbox already selected. Continue
+while it is selected accepts. Uncheck and Continue declines. No thanks
+declines. The rest of the page stays usable. `hello growth on` accepts
+without the screen. `hello growth off` declines, clears the queue, and keeps
+only a local line.
+
+Accepted notes keep a client id and a session id (32 hex characters; a
+session ends after 30 minutes without an event), the streak count, the best
+count, the version, the language, the event name, and the words of a plan,
+cut at 400 characters. They do not include the household list, letters, sync
+codes, family numbers, or a network address. Events are written to
+`growth.log` on the PC (rotated near 100 KB to `growth.log.old`) and to
+`hello-world-growth-log` on the phone. A queue, `growth-queue.json` on the PC
+and `hello-world-growth-queue` on the phone, holds up to 200 events. A flush
+sends up to three batches of 20. One failure is tried again immediately. A
+batch is dropped after 8 failures, or at once when the server answers 3xx or
+4xx. Redirects are not followed.
+
+The upload address defaults to `https://insights.example.invalid/v1/growth`,
+which does not resolve. An operator points it at their own
+`server/counts_server.py` with `HELLO_GROWTH_SERVER`, the `GrowthServer`
+policy, or the phone's upload-address box (a full https address, `http` only
+to this computer with a port, or the token `same-origin`). Running the counts
+server with `--growth` rewrites the served phone page so that token means
+the server that served the page. A value that is not https, and not http to
+this computer on a numbered port, is ignored and the placeholder is used.
+The counts server stores each batch as one JSON line under
+`data/growth/YYYY-MM-DD.jsonl`, drops files older than 30 days, and has no
+route that reads the notes back.
+
+Gentle mode hides the spoken nag and the sponsored line. If streak notes
+were accepted, the events are still recorded and still offered. The old
+days-in-a-row switch is separate and still off until turned on. The printed
+fridge page does not include the nag. Delete everything removes the queue,
+the log, the old log, and `growth-receipts.jsonl`, and the question comes
+back because that choice is not one of the kept settings.
+
+`hello repair` writes a local receipt for $2.99 and puts the streak number
+back. `hello plus` writes a local receipt for $9.99 a month and sets a Pro+
+flag. Both receipts say `charged` false and `stub` true. No card is asked
+for, and nothing is billed. Pro+ does not stop the nag, and it is not a Pro
+key.
 
 The file also holds the day you last counted yourself for the tip, whether
 you answered the shared count question, today's reaction, the newest handoff
@@ -591,7 +645,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.65.0'
+$tag = 'v1.66.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

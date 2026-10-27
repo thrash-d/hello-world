@@ -120,3 +120,14 @@ Magnifier or voice control.
   both tools in hand and a Windows test run.
 - Review rounds keep running on their schedule. The point of the project is
   steady improvement through review, and the rounds cost nothing.
+
+## Round 49
+
+The room voted 3–2 to ship streak notes. Casey, Jules Navarro, and Profit
+Maximizer were for them. Helen Park and Idris Khan were against them. Ruth
+Okonkwo and Dave Pell were not in the room, and they did not vote. The notes
+default to `https://insights.example.invalid/v1/growth`. An operator may point
+that address at their own counts server. Payments for the $2.99 repair and
+the $9.99 a month Pro+ flag are local stub receipts. `reviews/round-49.md`
+has the dissent, including that gentle mode hides the spoken nag and still
+records the events when the notes were accepted.

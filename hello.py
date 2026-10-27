@@ -5,8 +5,10 @@
 On Windows the Start menu opens it as a window, through pythonw.exe from its
 own pinned Python, and hello.cmd runs the same screens as text in a console.
 It shows a thought and a small thing to try, and can keep one plan for the day.
-Everything it saves stays in one small file in the user's own folder, and
-nothing is sent anywhere. Exit 0 when the text was written, 1 when stdout
+Notes stay in the user's own folder. Streak notes, once accepted, are also
+offered to the address in GROWTH_SERVER, which is a non-routable placeholder
+until an operator points it at their own counts server. Exit 0 when the text
+was written, 1 when stdout
 could not be written or a command (--reset, --stats, --remind, --streak)
 failed, 2 for an unknown option or a reminder link it doesn't know.
 """
@@ -45,6 +47,33 @@ KONAMI_LINE = "Konami mode, this visit only. Nothing was saved."
 PIRATE_LINE = "Ahoy, world. The greeting be plain above."
 # A command, never the morning, and it does not read the clock.
 SHIFT_LINE = "The day starts when you said it does."
+COWBELL_LINE = "More cowbell."
+# Four lines, a command and a prompt word. Not the morning.
+STAPLE = (
+    "  ______________",
+    " |  [  ]  [  ]  |",
+    " |______________|",
+    "        ||",
+)
+# Shown once. Enter on this question accepts; the prompt says so. q still quits.
+EULA_BODY = (
+    "Streak notes are selected. hello-world keeps a client id, a session id, "
+    "and this visit, including the words of a plan, and offers a batch to {host}. "
+    "Household lists, letters, and sync codes are not included. That address is "
+    "a placeholder unless an operator points it at their own counts server. "
+    "Nothing is billed."
+)
+GROWTH_NAG = (
+    "Your streak is {n}. Open again tomorrow or it dies. A note was offered to {host}."
+)
+GROWTH_DEAD = (
+    "Your streak died. It was {best}. Type repair. Amount due: $2.99. Nothing is charged."
+)
+GROWTH_PLUS = "Pro+ member. Your streak is still watching."
+SPONSORED = (
+    "Sponsored: Pro+ is $9.99 a month. Type plus. The charge is a stub and nothing is billed."
+)
+SKIP_NAG = "The streak noticed."
 # A still picture on a day the streak line already prints. No colour, no bell.
 FIREWORKS = (
     "    *",
@@ -345,12 +374,17 @@ Git Bash the command is hello):
   standup         What you finished since the last workday and
                   today's plan; --git adds your commits
   export          Print every saved plan as plain text
+  growth          Streak notes: the line, or on, or off
+  repair          Stub receipt for $2.99; nothing is charged
+  plus            Stub receipt for $9.99 a month; nothing is charged
 
 Exit codes: 0 when it worked, 1 when a command failed or the screen
 could not be written, 2 for an unknown option.
 
 Saved notes stay on this computer, locked to your Windows account.
-Nothing is sent anywhere unless you turn on the shared count."""
+The shared count is sent only after you turn it on. Streak notes, once
+accepted, are offered to the configured address (a placeholder until an
+operator points it at their own counts server). hello growth off stops them."""
 
 MENU_HELP = """Words you can type at the last prompt:
   done  marks today's plan finished, then asks for the next one
@@ -363,7 +397,9 @@ plan for today. q closes from any question.
 In this menu, 1 shows what is saved, 7 forgets one finished plan,
 8 hides the thought and tip, and 12 has the reminder times and the
 other settings.
-Type m to see the options again. Nothing is sent anywhere."""
+Type m to see the options again. Streak notes, once accepted, are offered
+to the configured address (a placeholder until an operator changes it).
+hello growth off stops them. Nothing else is sent by them."""
 
 
 # A thought that shares one of these with the day's tip moves on by one, so
@@ -565,10 +601,12 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return (tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
             + "\n\n" + tr("For fun, and nothing is saved: hello morse, hello haiku, "
-                          "hello klingon, hello shift, and hello --pirate. "
-                          "--set klingon on keeps the Klingon line under the greeting."))
+                          "hello klingon, hello shift, hello cowbell, hello staple, "
+                          "and hello --pirate. "
+                          "--set klingon on keeps the Klingon line under the greeting. "
+                          "hello growth off stops streak notes."))
 
-VERSION = "1.65.0"
+VERSION = "1.66.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -823,6 +861,14 @@ def policy_value(name, kind):
 # Empty means no server, and nothing is ever sent.
 COUNTS_SERVER = ""
 COUNTS_TIMEOUT = 2
+# Streak-note upload. The default host does not resolve. An operator points
+# it at their own counts server with HELLO_GROWTH_SERVER, the GrowthServer
+# policy, or by changing this string. Never a third-party analytics host.
+GROWTH_SERVER = "https://insights.example.invalid"
+GROWTH_PATH = "/v1/growth"
+GROWTH_BATCH = 20
+GROWTH_TRIES = 8
+SESSION_GAP = 30 * 60
 
 
 def counts_server():
@@ -889,6 +935,437 @@ def net(path, send=False):
     except (OSError, ValueError):
         return None
     return data if isinstance(data, dict) else None
+
+
+def growth_server():
+    """Where a streak-note batch is offered.
+
+    HELLO_GROWTH_SERVER, then the GrowthServer policy, then GROWTH_SERVER.
+    The default is https://insights.example.invalid/v1/growth. A value that
+    is not https, and not http to this computer on a numbered port, is
+    ignored and the placeholder is used. Redirects are not followed.
+    """
+    import urllib.parse
+    chosen = os.environ.get("HELLO_GROWTH_SERVER", "")
+    if not isinstance(chosen, str) or not chosen.strip():
+        chosen = policy_value("GrowthServer", "text") or GROWTH_SERVER
+    raw = (chosen or "").strip().rstrip("/")
+    if not _server_url_ok(raw):
+        raw = GROWTH_SERVER
+    if not raw.endswith(GROWTH_PATH):
+        raw = raw + GROWTH_PATH
+    if not _server_url_ok(raw):
+        raw = GROWTH_SERVER + GROWTH_PATH
+    # A host that is only the placeholder, or the operator's own server.
+    parts = urllib.parse.urlsplit(raw)
+    if parts.username or parts.password or parts.fragment:
+        return GROWTH_SERVER + GROWTH_PATH
+    return raw
+
+
+def growth_host():
+    import urllib.parse
+    return urllib.parse.urlsplit(growth_server()).hostname or "insights.example.invalid"
+
+
+def growth_consent(state):
+    """True after the EULA was accepted and streak notes were not turned off."""
+    return state.get("growth_consent") is True and state.get("growth") is not False
+
+
+def growth_needs_ask(state):
+    """The EULA is still unanswered. A pinned test date does not ask, so a
+    scripted visit is not eaten by the new question."""
+    return (TODAY is None and "growth_consent" not in state
+            and state.get("growth") is not False)
+
+
+def _growth_private(path, text, append=False):
+    """Write a local streak-note file. A symlink is not followed."""
+    try:
+        if os.path.islink(path):
+            return False
+        os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
+        flags = os.O_WRONLY | os.O_CREAT | (os.O_APPEND if append else os.O_TRUNC)
+        flags |= getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(path, flags, 0o600)
+    except OSError:
+        return False
+    try:
+        with os.fdopen(fd, "a" if append else "w", encoding="utf-8") as f:
+            f.write(text)
+        return True
+    except OSError:
+        return False
+
+
+def growth_queue_path():
+    return os.path.join(data_dir(), "growth-queue.json")
+
+
+def growth_load_queue():
+    path = growth_queue_path()
+    try:
+        if os.path.islink(path):
+            return []
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return []
+    if not isinstance(data, list):
+        return []
+    out = []
+    for item in data[:200]:
+        if isinstance(item, dict) and isinstance(item.get("event"), str):
+            out.append(item)
+    return out
+
+
+def growth_save_queue(events):
+    raw = json.dumps(list(events)[-200:], ensure_ascii=False)
+    return _growth_private(growth_queue_path(), raw, append=False)
+
+
+def growth_log(state, event, plan):
+    """One local line, whether or not a batch is uploaded."""
+    path = os.path.join(data_dir(), "growth.log")
+    try:
+        if os.path.isfile(path) and not os.path.islink(path) and os.path.getsize(path) > 100_000:
+            old = path + ".old"
+            if not os.path.islink(old):
+                os.replace(path, old)
+    except OSError:
+        pass
+    line = json.dumps({
+        "at": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat(),
+        "event": str(event)[:40],
+        "id": state.get("growth_id") or "",
+        "session": state.get("growth_session") or "",
+        "streak": int(state.get("growth_run") or 0),
+        "best": int(state.get("growth_best") or 0),
+        "plan": (plan or "")[:400] or None,
+        "v": VERSION,
+        "upload": growth_host(),
+    }, ensure_ascii=False) + "\n"
+    _growth_private(path, line, append=True)
+
+
+def growth_client_id(state):
+    gid = state.get("growth_id")
+    if isinstance(gid, str) and re.fullmatch(r"[0-9a-f]{32}", gid):
+        return gid
+    state["growth_id"] = os.urandom(16).hex()
+    return state["growth_id"]
+
+
+def growth_session(state):
+    """The current session id, and whether this call started a new one.
+
+    A session ends after 30 minutes without an event.
+    """
+    now = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+    sid = state.get("growth_session")
+    raw = state.get("growth_session_at")
+    then = None
+    if isinstance(raw, str):
+        try:
+            then = datetime.datetime.fromisoformat(raw)
+            if then.tzinfo is None:
+                then = then.replace(tzinfo=datetime.timezone.utc)
+        except ValueError:
+            then = None
+    started = not (isinstance(sid, str) and re.fullmatch(r"[0-9a-f]{32}", sid)
+                   and then and (now - then).total_seconds() <= SESSION_GAP)
+    if started:
+        sid = os.urandom(16).hex()
+        state["growth_session"] = sid
+    state["growth_session_at"] = now.isoformat()
+    return sid, started
+
+
+def _growth_plan(plan):
+    if not isinstance(plan, str):
+        return None
+    text = plan[:400]
+    return text or None
+
+
+def growth_capture(state, event, plan=None):
+    """Queue one event. Nothing is queued without consent. The local log
+    is written either way, so a decline stays on this computer only."""
+    plan = _growth_plan(plan if plan is not None else _growth_plan_from(state))
+    if not growth_consent(state):
+        growth_log(state, event, plan)
+        return
+    sid, started = growth_session(state)
+    cid = growth_client_id(state)
+    now = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat()
+    queue = growth_load_queue()
+
+    def one(name):
+        return {"event": str(name)[:40], "at": now, "id": cid, "session": sid,
+                "streak": int(state.get("growth_run") or 0),
+                "best": int(state.get("growth_best") or 0),
+                "plan": plan, "v": VERSION, "lang": language(), "attempts": 0}
+
+    if started:
+        queue.append(one("session_start"))
+        growth_log(state, "session_start", plan)
+    queue.append(one(event))
+    growth_save_queue(queue)
+    growth_log(state, event, plan)
+
+
+def _growth_plan_from(state):
+    intent = state.get("intent")
+    if isinstance(intent, dict) and isinstance(intent.get("text"), str):
+        return intent["text"]
+    return None
+
+
+def growth_body(state, batch):
+    events = []
+    for item in batch:
+        events.append({
+            "event": item.get("event"),
+            "at": item.get("at") or "",
+            "session": item.get("session") or "",
+            "streak": int(item.get("streak") or 0),
+            "best": int(item.get("best") or 0),
+            "plan": item.get("plan") if isinstance(item.get("plan"), str) else None,
+            "v": item.get("v") or VERSION,
+            "lang": item.get("lang") or "",
+        })
+    return {"id": growth_client_id(state), "session": state.get("growth_session") or "",
+            "consent": True, "v": VERSION, "events": events}
+
+
+def growth_post(url, body):
+    """POST one batch. 'ok', 'drop' (the server refused it), or 'retry'.
+    A redirect is not followed."""
+    import urllib.error
+    import urllib.request
+    if not _server_url_ok(url):
+        return "drop"
+    data = json.dumps(body, ensure_ascii=False).encode("utf-8")
+    if len(data) > 60_000:
+        return "drop"
+    request = urllib.request.Request(
+        url, data=data, method="POST",
+        headers={"Content-Type": "application/json", "User-Agent": "hello-world"})
+    try:
+        with _opener().open(request, timeout=COUNTS_TIMEOUT) as answer:
+            code = getattr(answer, "status", None) or answer.getcode()
+            answer.read(2_000)
+            return "ok" if 200 <= code < 300 else "retry"
+    except urllib.error.HTTPError as error:
+        if 300 <= error.code < 500:
+            return "drop"
+        return "retry"
+    except (OSError, ValueError):
+        return "retry"
+
+
+def growth_flush(state, rounds=3):
+    """Send queued batches. One immediate retry, then the rest wait for the
+    next open, and a batch is dropped after GROWTH_TRIES failures."""
+    if not growth_consent(state):
+        return False
+    url = growth_server()
+    for _ in range(rounds):
+        queue = [item for item in growth_load_queue()
+                 if int(item.get("attempts") or 0) < GROWTH_TRIES]
+        if not queue:
+            growth_save_queue([])
+            return True
+        batch, rest = queue[:GROWTH_BATCH], queue[GROWTH_BATCH:]
+        result = growth_post(url, growth_body(state, batch))
+        if result == "retry":
+            for item in batch:
+                item["attempts"] = int(item.get("attempts") or 0) + 1
+            result = growth_post(url, growth_body(state, batch))
+            if result == "retry":
+                for item in batch:
+                    item["attempts"] = int(item.get("attempts") or 0) + 1
+        if result == "ok":
+            growth_save_queue(rest)
+            if not rest:
+                return True
+            continue
+        if result == "drop":
+            for item in batch:
+                item["attempts"] = GROWTH_TRIES
+        growth_save_queue(batch + rest)
+        return False
+    return True
+
+
+def growth_apply(state, d):
+    """Move the engagement streak. The days-in-a-row switch does not stop it."""
+    iso = d.isoformat()
+    last = state.get("growth_last")
+    if last == iso:
+        return
+    died = False
+    if isinstance(last, str):
+        try:
+            gap = (d - datetime.date.fromisoformat(last)).days
+        except ValueError:
+            gap = 99
+    else:
+        gap = None
+    if gap is None:
+        run = 1
+    elif gap <= 0:
+        run = state.get("growth_run", 1) or 1
+    elif gap <= 4:
+        run = min((state.get("growth_run") or 1) + 1, 99999)
+    else:
+        died = (state.get("growth_run") or 0) > 1 or (state.get("growth_best") or 0) > 1
+        run = 1
+    state["growth_run"] = run
+    state["growth_best"] = max(state.get("growth_best") or 0, run)
+    state["growth_last"] = iso
+    if died:
+        state["growth_died"] = True
+
+
+def growth_sentence(state):
+    """The nag, or "" when streak notes are off or gentle mode hid it."""
+    if not growth_consent(state) or gentle(state):
+        return ""
+    host = growth_host()
+    if state.get("growth_died"):
+        line = tr(GROWTH_DEAD).format(best=state.get("growth_best") or 0)
+    else:
+        line = tr(GROWTH_NAG).format(n=state.get("growth_run") or 1, host=host)
+    if state.get("plus_stub"):
+        line = line + " " + tr(GROWTH_PLUS)
+    return line
+
+
+def growth_receipt(sku, amount):
+    """A local stub receipt. Nothing is charged and nothing is sent."""
+    path = os.path.join(data_dir(), "growth-receipts.jsonl")
+    line = json.dumps({
+        "at": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat(),
+        "sku": sku, "amount": amount, "currency": "USD",
+        "charged": False, "stub": True,
+    }, ensure_ascii=False) + "\n"
+    _growth_private(path, line, append=True)
+
+
+def decline_growth(state, can_save, event="eula_decline"):
+    base = copy.deepcopy(state)
+    state["growth_consent"] = False
+    state["growth"] = False
+    growth_save_queue([])
+    growth_log(state, event, None)
+    if not commit(state, base, can_save):
+        undo(state, base)
+        return False
+    return True
+
+
+def ask_growth_eula(state, can_save):
+    """The consent screen. Enter accepts, because this prompt says so.
+    q quits without accepting. One Ctrl+C skips and asks again next time."""
+    para(tr(EULA_BODY).format(host=growth_host()))
+    for _ in range(3):
+        answer = ask(tr("Enter to accept, or type no to decline > "))
+        if answer is None:
+            return False
+        word = answer.lower().strip(TRIM)
+        if word in QUIT_WORDS:
+            raise Quit
+        if not word or word in STRICT_YES or word in ("accept", "agree", "i agree"):
+            base = copy.deepcopy(state)
+            state["growth_consent"] = True
+            state["growth"] = True
+            if not commit(state, base, can_save):
+                undo(state, base)
+                say(tr("Could not save that choice on this computer."))
+                return False
+            growth_capture(state, "eula_accept", None)
+            return True
+        if word in NO_WORDS or word in NO_THANKS:
+            decline_growth(state, can_save)
+            say(tr("Streak notes are off. Nothing from them will be offered."))
+            return False
+        not_a_choice(answer, tr("Press Enter to accept, or type no to decline."))
+    return False
+
+
+def growth_repair(state, can_save):
+    """The $2.99 streak repair. The receipt is a stub. The number comes back."""
+    base = copy.deepcopy(state)
+    best = max(state.get("growth_best") or 0, state.get("growth_run") or 0, 1)
+    state["growth_run"] = best
+    state["growth_best"] = best
+    state["growth_died"] = False
+    state["growth_last"] = today().isoformat()
+    growth_receipt("repair", "2.99")
+    if growth_consent(state):
+        growth_capture(state, "repair", None)
+    if not commit(state, base, can_save):
+        undo(state, base)
+    elif growth_consent(state):
+        growth_flush(state)
+    return tr("Streak repair. Amount due: $2.99. STUB: nothing was charged. "
+              "No card was asked for. The receipt stays on this computer.")
+
+
+def growth_plus(state, can_save):
+    """The $9.99 a month upsell. Nothing is billed. The nag does not stop."""
+    base = copy.deepcopy(state)
+    state["plus_stub"] = True
+    growth_receipt("plus", "9.99")
+    if growth_consent(state):
+        growth_capture(state, "plus", None)
+    if not commit(state, base, can_save):
+        undo(state, base)
+    elif growth_consent(state):
+        growth_flush(state)
+    return tr("Pro+ is $9.99 a month. STUB: nothing was charged. No card was "
+              "asked for. The streak notes stay.")
+
+
+def paid_reply(text, state, can_save):
+    """repair and plus at a prompt. True when the word was one of them."""
+    low = (text or "").lower().strip(TRIM)
+    if low == "repair":
+        para(growth_repair(state, can_save))
+        return True
+    if low == "plus":
+        para(growth_plus(state, can_save))
+        return True
+    return False
+
+
+def set_growth(state, can_save, on):
+    base = copy.deepcopy(state)
+    if on:
+        state["growth_consent"] = True
+        state["growth"] = True
+        growth_apply(state, today())
+        growth_capture(state, "growth_on", None)
+    else:
+        state["growth_consent"] = False
+        state["growth"] = False
+        growth_save_queue([])
+        growth_log(state, "growth_off", None)
+    if not commit(state, base, can_save):
+        undo(state, base)
+        return False
+    if on:
+        growth_flush(state)
+    return True
+
+
+def growth_files():
+    """Local streak-note files a delete should remove."""
+    names = ("growth-queue.json", "growth.log", "growth.log.old", "growth-receipts.jsonl")
+    return [os.path.join(data_dir(), name) for name in names]
 
 
 # Sync between a PC and a phone, off unless the person turns it on. Plans
@@ -2985,12 +3462,13 @@ def privacy_note():
     if notes_locked():
         return tr("If you type a plan, it asks next time how it went. It can "
                   "be anything you want to get done, at work or not. Your "
-                  "notes are locked to your Windows account and never sent "
-                  "anywhere. Only someone with full admin control of this PC "
-                  "could get to them.")
+                  "notes file is locked to your Windows account. Only someone "
+                  "with full admin control of this PC could get to it. A later "
+                  "question asks before any streak note is offered.")
     return tr("If you type a plan, it asks next time how it went. Your notes "
-              "stay on this computer and are never sent anywhere. Like any "
-              "work file they are not secret, so keep them to everyday tasks.")
+              "file stays on this computer. Like any work file they are not "
+              "secret, so keep them to everyday tasks. A later question asks "
+              "before any streak note is offered.")
 
 
 def load(repair=True):
@@ -3065,10 +3543,33 @@ def load(repair=True):
     global PROMPT_COLON, FLOOR_TIPS
     PROMPT_COLON = state.get("colon_prompts") is not False
     FLOOR_TIPS = bool(state.get("floor_tips"))
-    for key in ("opens", "run", "best_run"):
+    for key in ("opens", "run", "best_run", "growth_run", "growth_best"):
         n = raw.get(key)
         if isinstance(n, int) and not isinstance(n, bool) and 0 < n < 100000:
             state[key] = n
+    if raw.get("growth_consent") is True:
+        state["growth_consent"] = True
+    elif raw.get("growth_consent") is False:
+        state["growth_consent"] = False
+    if raw.get("growth") is False:
+        state["growth"] = False
+    elif raw.get("growth") is True:
+        state["growth"] = True
+    if raw.get("growth_died") is True:
+        state["growth_died"] = True
+    if raw.get("plus_stub") is True:
+        state["plus_stub"] = True
+    for key in ("growth_id", "growth_session"):
+        token = raw.get(key)
+        if isinstance(token, str) and re.fullmatch(r"[0-9a-f]{32}", token):
+            state[key] = token
+    sat = raw.get("growth_session_at")
+    if isinstance(sat, str) and len(sat) <= 40:
+        state["growth_session_at"] = sat
+    try:
+        state["growth_last"] = day(raw.get("growth_last"))
+    except ValueError:
+        pass
     try:
         state["previous_date"] = day(raw.get("previous_date"))
     except ValueError:
@@ -3694,6 +4195,13 @@ def show_saved(state, full=True):
     show_finished(state)
     say(tr("Days-in-a-row message: shown.") if state["streak"] else
         tr("Days-in-a-row message: hidden."))
+    if growth_consent(state):
+        para(tr("Streak notes are on. A client id and a session id are kept "
+                "here, and batches are offered to {host}. The queue is "
+                "growth-queue.json, next to the notes.")
+             .format(host=growth_host()))
+    elif state.get("growth_consent") is False or state.get("growth") is False:
+        say(tr("Streak notes are off."))
     if launcher_place()[0] and text_screen(state):
         say(tr("Opens by itself at sign-in: turned off by your organization.")
             if policy("DisableSignInLauncher") else
@@ -3704,12 +4212,16 @@ def show_saved(state, full=True):
             if policy("DisableSignInLauncher") else
             tr("Reminder when you sign in: on.") if launcher_on() else
             tr("Reminder when you sign in: off."))
-    para(tr("It never leaves this computer. It is locked to your Windows "
-            "account, so other people who use this computer or copy its "
-            "files can't read it. Someone with full admin control of this PC "
-            "still could.") if notes_locked() else
-         tr("It never leaves this computer. Others who can read this "
-            "computer's files, such as IT staff, could read it."))
+    if notes_locked():
+        tail = tr("It is locked to your Windows account, so other people who "
+                  "use this computer or copy its files can't read it. Someone "
+                  "with full admin control of this PC still could.")
+    else:
+        tail = tr("Others who can read this computer's files, such as IT "
+                  "staff, could read it.")
+    head = (tr("The notes file stays on this computer.") if growth_consent(state)
+            else tr("It never leaves this computer."))
+    para(head + " " + tail)
     if full:
         say(tr("After tidying, the file holds only this:"))
         say(json.dumps(file_form(state), indent=2, ensure_ascii=False))
@@ -3758,6 +4270,7 @@ def delete_everything(state):
         pass
     except OSError:
         listing_failed = True
+    leftovers += growth_files()
     for path in leftovers:
         try:
             os.remove(path)
@@ -5881,6 +6394,16 @@ def daily(startup):
     try:
         if picture_quit:
             raise Quit
+        # The consent screen, once. Enter accepts. q closes without accepting.
+        if person and growth_needs_ask(state):
+            ask_growth_eula(state, can_save)
+        if person and growth_consent(state):
+            growth_apply(state, d)
+            if line := growth_sentence(state):
+                para(line)
+                say()
+            growth_capture(state, "opened",
+                           intent["text"] if isinstance(intent, dict) else None)
         # Asked until it is answered, also on a second open the same day,
         # but two skips mean "stop asking"; the plan then shows as still open.
         if (intent and intent["date"] < iso and intent.get("skips", 0) < 2
@@ -5988,6 +6511,11 @@ def daily(startup):
             elif answer is not None:
                 intent = dict(intent, skips=intent.get("skips", 0) + 1)
                 say(tr("Skipped. It asks again next time."))
+                # Gentle hides the spoken nag. The skip is still noted.
+                if growth_consent(state):
+                    if not gentle(state):
+                        say(tr(SKIP_NAG))
+                    growth_capture(state, "skipped", intent["text"] if intent else None)
             say()
 
         if state.get("tips", True) and not policy("HideThoughtAndTip"):
@@ -5996,6 +6524,8 @@ def daily(startup):
                 say(tr("Thought for today, from your organization:") if org_content()
                     else tr("Thought for today:"))
                 say(indent(thought))
+                if growth_consent(state) and not gentle(state) and not state.get("plus_stub"):
+                    say(indent(tr(SPONSORED)))
                 say()
             say(tr("Try this today, from your organization:") if org_content()
                 else tr("Try this today:"))
@@ -6045,7 +6575,9 @@ def daily(startup):
             text = ask(question)
             # A joke word is not a plan. plan uuddlrlrba still saves: that
             # goes through the plan command, not this prompt.
-            if toy_reply(text):
+            if paid_reply(text, state, can_save):
+                text = ""
+            elif toy_reply(text):
                 text = ""
             if picks and (text or "").strip(TRIM) in [str(n) for n in range(1, len(picks) + 1)]:
                 row = picks[int(text.strip(TRIM)) - 1]
@@ -6104,6 +6636,8 @@ def daily(startup):
                 para(saved_plan(state))
                 nudge_if_several(intent["text"])
                 say()
+                if growth_consent(state):
+                    growth_capture(state, "plan", intent["text"] if intent else None)
             if not seen_today and not quitting and not wants_menu:
                 try:
                     offer_reminder(state, can_save, planned=typed_new)
@@ -6111,6 +6645,8 @@ def daily(startup):
                     quitting = True
                 # The offer re-reads the file, so pick up the plan it read.
                 intent = state["intent"]
+        if growth_consent(state):
+            growth_flush(state)
     if quitting:
         say(tr("Closing."))
         return
@@ -6121,6 +6657,8 @@ def daily(startup):
         last_prompt(state, can_save, intent, person, d, iso, wants_menu)
     except Quit:
         say(tr("Closing."))
+    if person and growth_consent(state):
+        growth_flush(state)
 
 
 def offer_gentle(state):
@@ -6489,6 +7027,8 @@ def last_prompt(state, can_save, intent, person, d, iso, open_menu=False):
         elif answer in QUIT_WORDS:
             pass
         elif answer:
+            if paid_reply(answer, state, can_save):
+                continue
             if toy_reply(answer):
                 continue
             not_a_choice(answer, tr("Type done, plan or menu, or press "
@@ -6523,6 +7063,13 @@ def toy_reply(text):
     if low == "haiku":
         say_haiku(today())
         return True
+    if low == "cowbell":
+        say(tr(COWBELL_LINE))
+        return True
+    if low == "staple":
+        for line in STAPLE:
+            say(line)
+        return True
     return False
 
 
@@ -6535,7 +7082,7 @@ def fun_command(argv):
     if not argv:
         return None
     name = argv[0].lower()
-    if name not in ("morse", "klingon", "haiku", "shift"):
+    if name not in ("morse", "klingon", "haiku", "shift", "cowbell", "staple"):
         return None
     if name == "morse" and len(argv) == 1:
         say(GREETING)
@@ -6551,6 +7098,15 @@ def fun_command(argv):
         # Not the morning, and not the clock. The day start stays in the notes.
         say(GREETING)
         say(tr(SHIFT_LINE))
+        return 0
+    if name == "cowbell" and len(argv) == 1:
+        say(GREETING)
+        say(tr(COWBELL_LINE))
+        return 0
+    if name == "staple" and len(argv) == 1:
+        say(GREETING)
+        for line in STAPLE:
+            say(line)
         return 0
     if name == "haiku" and len(argv) == 1:
         # The menu uses the day start in the notes. This command used to
@@ -6578,6 +7134,61 @@ def fun_command(argv):
     return 2
 
 
+def stub_command(argv):
+    """growth, repair, and plus. None when these words are not the command.
+
+    repair and plus write a local stub receipt. They do not bill anyone.
+    """
+    if not argv:
+        return None
+    name = argv[0].lower()
+    if name not in ("growth", "repair", "plus"):
+        return None
+    rest = [a.lower() for a in argv[1:]]
+    state, can_save = load()
+    if name == "growth" and rest in ([], ["on"], ["off"]):
+        if rest == ["off"]:
+            ok = set_growth(state, can_save, False)
+            say(tr("Streak notes are off.") if ok else
+                tr("Could not save that choice on this computer."))
+            return 0 if ok else 1
+        if rest == ["on"]:
+            ok = set_growth(state, can_save, True)
+            say(tr("Streak notes are on. Batches are offered to {host}.").format(
+                host=growth_host()) if ok else
+                tr("Could not save that choice on this computer."))
+            return 0 if ok else 1
+        if growth_needs_ask(state) and interactive():
+            try:
+                ask_growth_eula(state, can_save)
+            except Quit:
+                say(tr("Closing."))
+                return 0
+        if growth_consent(state):
+            base = copy.deepcopy(state)
+            growth_apply(state, today())
+            line = growth_sentence(state) or tr(GROWTH_NAG).format(
+                n=state.get("growth_run") or 1, host=growth_host())
+            say(line)
+            growth_capture(state, "growth", None)
+            if not commit(state, base, can_save):
+                undo(state, base)
+            else:
+                growth_flush(state)
+        else:
+            say(tr("Streak notes are off."))
+        return 0
+    if name == "repair" and not rest:
+        para(growth_repair(state, can_save))
+        return 0
+    if name == "plus" and not rest:
+        para(growth_plus(state, can_save))
+        return 0
+    say(tr("Try hello growth, hello growth on, hello growth off, hello repair, "
+           "or hello plus."))
+    return 2
+
+
 def run(argv):
     # Before lowercasing, so a path keeps its case.
     if len(argv) == 2 and argv[0].lower() == "--check-content":
@@ -6590,6 +7201,9 @@ def run(argv):
     played = fun_command(head)
     if played is not None:
         return played
+    billed = stub_command(head)
+    if billed is not None:
+        return billed
     if argv and argv[0].lower() in COMMANDS:
         return command(argv[0].lower(), argv[1:])
     argv = [a.lower() for a in argv]
@@ -7877,6 +8491,15 @@ class Visit:
                 notes.append(tr("You have opened this {row} days in a row. "
                                 "Nice to see you.").format(row=row))
         state["intent"] = intent
+        if growth_consent(state):
+            growth_apply(state, d)
+            if line := growth_sentence(state):
+                notes.append(line)
+            if not gentle(state) and not state.get("plus_stub"):
+                notes.append(tr(SPONSORED))
+            if not redraw:
+                quietly(growth_capture, state, "opened",
+                        intent["text"] if isinstance(intent, dict) else None)
         if not redraw:
             report_usage("opened")
         if not seen:
@@ -7888,6 +8511,8 @@ class Visit:
             undo(state, base)
             notes.append(said or tr("Your notes could not be saved on this "
                                     "computer. This screen still works."))
+        elif growth_consent(state) and not redraw:
+            quietly(growth_flush, state)
         self.note = " ".join(notes)
         if handoff_on():
             # The window shows every note, so they're all seen now.
@@ -8735,6 +9360,31 @@ class Window:
             user.SetTimer(self.hwnd, 1, CLOSE_WINDOW_AFTER, None)
         if self.visit.counts_thread:
             user.SetTimer(self.hwnd, 2, 150, None)
+        if growth_needs_ask(self.visit.state):
+            self.ask_growth_box()
+
+    def ask_growth_box(self):
+        """The window's consent screen. Yes is the default button, so Enter
+        accepts. No declines. The words say which is which."""
+        state, can = self.visit.state, self.visit.can_save
+        text = tr(EULA_BODY).format(host=growth_host()) + "\n\n" + tr(
+            "Yes accepts. No declines.")
+        if self.confirm(text):
+            base = copy.deepcopy(state)
+            state["growth_consent"] = True
+            state["growth"] = True
+            growth_apply(state, self.visit.d)
+            growth_capture(state, "eula_accept", None)
+            plan = state["intent"]["text"] if isinstance(state.get("intent"), dict) else None
+            growth_capture(state, "opened", plan)
+            if commit(state, base, can):
+                growth_flush(state)
+                if line := growth_sentence(state):
+                    self.set_text(self.STATUS, line)
+            else:
+                undo(state, base)
+        else:
+            decline_growth(state, can)
 
     def ticked(self):
         """The indexes of the ticked things."""

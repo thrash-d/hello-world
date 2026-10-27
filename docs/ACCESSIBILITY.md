@@ -49,7 +49,8 @@ everyone. Web criteria apply only where they carry over.
   the words rather than repeating the menu.
 - Tips that assumed sight offer another way to do them.
 - `q` closes from any question, including the picture, and Ctrl+C skips just one prompt, so an
-  accidental key press doesn't end the visit.
+  accidental key press doesn't end the visit. From 1.66.0 the streak-note question says "Enter to accept, or type no to decline". Enter on that question accepts. q still closes, and it does not accept. One Ctrl+C skips it and asks again next time.
+- The phone's streak-note banner is not a focus trap. Tab still reaches the plan box. Not now hides the banner. If focus was inside it, focus moves on, the same way a hidden Skip button does. This was not checked with NVDA.
 - Group Policy and menu settings remove content people don't want read every
   day: the thought and tip, and the days-in-a-row message.
 
