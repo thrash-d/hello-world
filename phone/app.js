@@ -621,7 +621,11 @@ async function syncKeys(code, salt) {
 }
 
 async function hmacKey(raw) {
-  return globalThis.crypto.subtle.importKey("raw", raw, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  // A CryptoKey stored by the browser is already non-extractable. Raw bytes
+  // are imported the same way and are not marked extractable.
+  if (typeof CryptoKey !== "undefined" && raw instanceof CryptoKey) return raw;
+  const bytes = raw instanceof Uint8Array ? raw : Uint8Array.from(raw);
+  return globalThis.crypto.subtle.importKey("raw", bytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
 }
 
 async function stream(key, nonce, size) {
@@ -1041,7 +1045,7 @@ const GROWTH_URL_DEFAULT = "https://insights.example.invalid/v1/growth";
 const GROWTH_BATCH = 20;
 const GROWTH_TRIES = 8;
 const SESSION_GAP_MS = 30 * 60 * 1000;
-const APP_VERSION = "1.68.0";
+const APP_VERSION = "1.69.0";
 
 function growthUrlOk(url) {
   try {
@@ -1375,7 +1379,18 @@ if (typeof document !== "undefined") {
     } catch (e) { /* storage refused */ }
   }
   const save = () => {
-    try { localStorage.setItem(KEY, JSON.stringify(state)); }
+    try {
+      const disk = JSON.parse(JSON.stringify(state));
+      // House key bytes are not part of the notes. IndexedDB holds them.
+      if (disk.house && disk.house.keys && state.house && state.house.keys
+          && state.house.keys.enc instanceof CryptoKey) {
+        disk.house.keys = {
+          label: state.house.keys.label,
+          locked: state.house.keys.stored === "idb" ? "idb" : "memory",
+        };
+      }
+      localStorage.setItem(KEY, JSON.stringify(disk));
+    }
     catch (e) { return false; }
     savePrefs();
     return true;
@@ -1596,10 +1611,142 @@ if (typeof document !== "undefined") {
 
   let forking = false, ending = false, nudging = null;
   const SYNC_KEY = "hello-world-sync";
+  const SECRET_DB = "hello-world-sync-keys";
   let keys = null;
   let changing = false;
-  try { keys = JSON.parse(localStorage.getItem(SYNC_KEY) || "null"); } catch (e) { keys = null; }
-  const asBytes = (k) => k && { label: k.label, enc: Uint8Array.from(k.enc), mac: Uint8Array.from(k.mac) };
+  // Raw key bytes are not the stored form. IndexedDB holds non-extractable
+  // CryptoKeys. localStorage is cleared after that move. A browser with no
+  // IndexedDB keeps the raw bytes only when an acceptor who is not Reed
+  // Mallory is named in hello-world-sync-raw-acceptor. Otherwise the keys
+  // stay in memory for this visit and are not written.
+  function rawKeyAcceptor() {
+    try {
+      const name = String(localStorage.getItem("hello-world-sync-raw-acceptor") || "").trim();
+      if (!name || /^reed mallory$/i.test(name)) return "";
+      return name.slice(0, 80);
+    } catch (e) { return ""; }
+  }
+  function openSecretDb() {
+    return new Promise((resolve, reject) => {
+      if (typeof indexedDB === "undefined") { reject(new Error("no-idb")); return; }
+      const req = indexedDB.open(SECRET_DB, 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains("secrets")) db.createObjectStore("secrets");
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  function idbDo(db, mode, run) {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction("secrets", mode);
+      const req = run(tx.objectStore("secrets"));
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+  async function putSecret(id, value) {
+    const db = await openSecretDb();
+    try { await idbDo(db, "readwrite", (store) => store.put(value, id)); }
+    finally { db.close(); }
+  }
+  async function getSecret(id) {
+    const db = await openSecretDb();
+    try { return await idbDo(db, "readonly", (store) => store.get(id)); }
+    finally { db.close(); }
+  }
+  async function dropSecrets() {
+    try { localStorage.removeItem(SYNC_KEY); } catch (e) { /* private mode */ }
+    await new Promise((resolve) => {
+      if (typeof indexedDB === "undefined") { resolve(); return; }
+      const req = indexedDB.deleteDatabase(SECRET_DB);
+      req.onsuccess = req.onerror = req.onblocked = () => resolve();
+    });
+  }
+  async function lockPair(raw) {
+    const enc = raw.enc instanceof CryptoKey ? raw.enc : await hmacKey(raw.enc);
+    const mac = raw.mac instanceof CryptoKey ? raw.mac : await hmacKey(raw.mac);
+    return { label: raw.label, enc, mac };
+  }
+  async function persistPersonal(raw) {
+    const locked = await lockPair(raw);
+    try {
+      await putSecret("personal", locked);
+      try { localStorage.removeItem(SYNC_KEY); } catch (e) { /* already gone */ }
+      securityNote("sync_keys", { result: "idb" });
+      return Object.assign(locked, { stored: "idb" });
+    } catch (e) {
+      const acceptor = rawKeyAcceptor();
+      if (acceptor) {
+        try {
+          localStorage.setItem(SYNC_KEY, JSON.stringify({
+            label: raw.label,
+            enc: Array.from(raw.enc instanceof CryptoKey ? [] : raw.enc),
+            mac: Array.from(raw.mac instanceof CryptoKey ? [] : raw.mac),
+          }));
+        } catch (err) { /* private mode */ }
+        securityNote("sync_keys", { result: "raw" });
+        return { label: raw.label, enc: raw.enc, mac: raw.mac };
+      }
+      try { localStorage.removeItem(SYNC_KEY); } catch (err) { /* already gone */ }
+      securityNote("sync_keys", { result: "memory" });
+      return Object.assign(locked, { stored: "memory" });
+    }
+  }
+  async function persistHouse(raw) {
+    const locked = await lockPair(raw);
+    try {
+      await putSecret("house:" + locked.label, locked);
+      securityNote("house_keys", { result: "idb" });
+      return Object.assign(locked, { stored: "idb" });
+    } catch (e) {
+      if (rawKeyAcceptor() && !(raw.enc instanceof CryptoKey)) {
+        securityNote("house_keys", { result: "raw" });
+        return { label: raw.label, enc: Array.from(raw.enc), mac: Array.from(raw.mac), stored: "raw" };
+      }
+      securityNote("house_keys", { result: "memory" });
+      return Object.assign(locked, { stored: "memory" });
+    }
+  }
+  async function loadSecrets() {
+    let personal = null;
+    let house = null;
+    try {
+      const row = await getSecret("personal");
+      if (row && row.enc instanceof CryptoKey && row.mac instanceof CryptoKey) {
+        personal = { label: row.label, enc: row.enc, mac: row.mac };
+        try { localStorage.removeItem(SYNC_KEY); } catch (e) { /* already gone */ }
+      }
+    } catch (e) { /* IndexedDB unavailable */ }
+    if (!personal) {
+      let old = null;
+      try { old = JSON.parse(localStorage.getItem(SYNC_KEY) || "null"); } catch (e) { old = null; }
+      if (old && old.label && Array.isArray(old.enc) && Array.isArray(old.mac)) {
+        personal = await persistPersonal({ label: old.label, enc: Uint8Array.from(old.enc), mac: Uint8Array.from(old.mac) });
+      }
+    }
+    if (state.house && state.house.keys) {
+      const stored = state.house.keys;
+      if (stored.locked === "idb" && stored.label) {
+        try {
+          const row = await getSecret("house:" + stored.label);
+          if (row && row.enc instanceof CryptoKey) {
+            house = { label: row.label, enc: row.enc, mac: row.mac, stored: "idb" };
+          }
+        } catch (e) { house = null; }
+      } else if (Array.isArray(stored.enc) && Array.isArray(stored.mac)) {
+        house = await persistHouse({ label: stored.label, enc: Uint8Array.from(stored.enc), mac: Uint8Array.from(stored.mac) });
+      }
+    }
+    return { personal, house };
+  }
+  const asBytes = (k) => {
+    if (!k || k.enc == null || k.mac == null) return null;
+    if (k.enc instanceof CryptoKey) return k;
+    return { label: k.label, enc: Uint8Array.from(k.enc), mac: Uint8Array.from(k.mac) };
+  };
 
   // Pull, merge and push; quiet unless something goes wrong while asked.
   // A failed read is left as it is. The put names the version just read.
@@ -1734,7 +1881,7 @@ if (typeof document !== "undefined") {
     event.preventDefault();
     if (keys && !changing) {
       keys = null;
-      try { localStorage.removeItem(SYNC_KEY); } catch (e) { /* nothing saved */ }
+      try { await dropSecrets(); } catch (e) { /* nothing saved */ }
       // The devices belong to the old code; a stranger among them must not
       // follow to the next one.
       delete state.devices; save();
@@ -1743,10 +1890,9 @@ if (typeof document !== "undefined") {
     }
     if (normalCode($("sync-code").value).length !== 25) { say("syncBad"); return; }
     const k = await syncKeys($("sync-code").value);
-    keys = { label: k.label, enc: Array.from(k.enc), mac: Array.from(k.mac) };
+    keys = await persistPersonal(k);
     changing = false;
     delete state.devices; save();
-    try { localStorage.setItem(SYNC_KEY, JSON.stringify(keys)); } catch (e) { /* private mode */ }
     $("sync-code").value = "";
     drawSync();
     await sync(true);
@@ -2121,6 +2267,7 @@ if (typeof document !== "undefined") {
     try {
       localStorage.removeItem(KEY);
       localStorage.removeItem(SYNC_KEY);
+      try { await dropSecrets(); } catch (e) { /* already gone */ }
       localStorage.removeItem("hello-world-growth-queue");
       localStorage.removeItem("hello-world-growth-log");
       localStorage.removeItem("hello-world-growth-receipts");
@@ -2135,11 +2282,12 @@ if (typeof document !== "undefined") {
   // The household list. Nothing in it is ever sent in someone else's name,
   // and the code is never put in a message.
   let houseReached = true, houseNote = "", houseQueue = Promise.resolve();
-  const houseStore = (k) => ({ label: k.label, enc: Array.from(k.enc), mac: Array.from(k.mac) });
+  const houseStore = (k) => persistHouse(k);
   const houseUrl = (k) => `${location.origin}/v1/sync/${k.label}`;
   // [the list, its version], or [null, null] when it isn't there.
   async function houseFetch(stored) {
     const k = asBytes(stored);
+    if (!k) return [null, null];
     try {
       const got = await fetch(houseUrl(k), { cache: "no-store", redirect: "error" });
       if (!got.ok) return [null, null];
@@ -2151,7 +2299,9 @@ if (typeof document !== "undefined") {
     // No version, no write. A missing tag used to omit If-Match, and the
     // server then replaced whatever was stored.
     if (!tag) return false;
-    const k = asBytes(stored), headers = { "Content-Type": "application/octet-stream", "If-Match": tag };
+    const k = asBytes(stored);
+    if (!k) return false;
+    const headers = { "Content-Type": "application/octet-stream", "If-Match": tag };
     try {
       const put = await fetch(houseUrl(k), { method: "PUT", redirect: "error", body: await sealSync(k, houseBody(doc)), headers });
       return put.ok ? true : put.status === 412 ? "changed" : false;
@@ -2236,7 +2386,7 @@ if (typeof document !== "undefined") {
     event.preventDefault();
     const code = normalCode($("house-code").value), name = houseText($("house-name").value, HOUSE.name);
     if (code.length !== 25 || !name) { say("houseNotFound"); return; }
-    const stored = houseStore(await houseKeys(code.match(/.{5}/g).join("-")));
+    const stored = await houseStore(await houseKeys(code.match(/.{5}/g).join("-")));
     const me = randomHex(6);
     let doc = null, put = false;
     for (let n = 0; n < 3 && put !== true; n++) {
@@ -2268,7 +2418,7 @@ if (typeof document !== "undefined") {
       if (!theirs) { say("rekeyFail"); return; }
       const doc = houseMerge(state.houseList || {}, theirs, state.house.me);
       houseFit(houseTidy(doc, new Date()));
-      const code = newCode(), stored = houseStore(await houseKeys(code));
+      const code = newCode(), stored = await houseStore(await houseKeys(code));
       if (await housePut(stored, doc, "missing") !== true) { say("syncFail"); return; }
       try { await fetch(houseUrl(asBytes(state.house.keys)), { method: "DELETE", redirect: "error" }); } catch (e) { /* gone anyway */ }
       const left = Object.entries(doc.members).filter(([, m]) => m.left).map(([id]) => id);
@@ -2291,11 +2441,16 @@ if (typeof document !== "undefined") {
   });
 
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
-  draw();
-  houseSync();
-  savePrefs();
-  reminders();
-  sync(false);
+  loadSecrets().then((loaded) => {
+    keys = loaded.personal;
+    if (state.house && loaded.house) state.house.keys = loaded.house;
+    if (loaded.house && loaded.house.stored === "idb") save();
+    draw();
+    houseSync();
+    savePrefs();
+    reminders();
+    sync(false);
+  });
   // A page left open past the day's start shows the new day.
   setInterval(() => { if ($("date").textContent !== longDate(today(), language(state, navigator.languages))) draw(); }, 60000);
 }

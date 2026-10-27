@@ -167,4 +167,25 @@ content security policy on the phone page. A streak-note upload appends one
 ledger line with the host and the result, and without the plan. Nothing was
 removed. The morning screen and the printed page do not gain a line. The
 default upload is still the placeholder. This is not the outside review of
-the sync encryption that `TODO.md` still lists.
+the sync encryption. That review's internal half is round 52.
+
+## Round 52
+
+Reed Mallory will not accept a residual. The three cells he marked accepted
+in round 51, and the residuals named on that sign-off, are fixed or moved
+off his name. The record is `reviews/round-52.md`. The version is 1.69.0.
+
+P-256 signing and verification go through libcrypto. A pure-Python ladder
+stays in the file and does not run unless an operator who is not Reed
+Mallory turns it on in writing. Uninstall deletes through a directory handle
+opened so a junction is the node, not the target. If that code cannot be
+loaded, the folder is left in place. The four install scripts can be signed
+with `tools\sign-scripts.ps1` or the package build. An unsigned run names the
+deploying organization. The sync scheme has an internal review in
+`docs/SYNC-CRYPTO-REVIEW.md`. The outside signature is still the deploying
+organization's, and Reed does not sign the word audited. Phone sync keys
+move to non-extractable browser keys. Windows opens of notes, handoff, and
+the counts secrets refuse a reparse point. A notes folder on Windows gets an
+owner-only access list, and a volume that refuses it gets a transfer file
+for the operator. Nothing was removed. The morning screen and the printed
+page do not gain a line. The default upload is still the placeholder.

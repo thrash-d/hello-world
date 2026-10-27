@@ -29,9 +29,24 @@ Prints only the result line.
 #>
 param(
     [Parameter(Mandatory)][ValidatePattern('^[0-9a-fA-F]{64}$')][string]$PackageHash,
-    [switch]$Quiet
+    [switch]$Quiet,
+    [ValidateLength(0, 80)][string]$UnsignedAcceptor
 )
 $ErrorActionPreference = 'Stop'
+function Note-ScriptSignature {
+    # A valid Authenticode signature closes this. Otherwise the residual sits
+    # with the deploying organization, or with -UnsignedAcceptor when that
+    # name is not Reed Mallory. He does not accept an unsigned script.
+    $sig = $null
+    try { $sig = Get-AuthenticodeSignature -LiteralPath $PSCommandPath } catch { $sig = $null }
+    if ($sig -and $sig.Status -eq 'Valid') { return 'signed' }
+    $name = if ($UnsignedAcceptor) { $UnsignedAcceptor } else { $env:HELLO_UNSIGNED_ACCEPTOR }
+    if (-not $name) { $name = 'deploying organization' }
+    if ($name -match '^(?i)\s*reed mallory(\s|$)') { $name = 'deploying organization' }
+    Write-Warning "This script is not signed. Residual acceptor: $name. Reed Mallory has not accepted it. See docs/transfers/code-signing.md."
+    return $name
+}
+$script:ScriptAcceptor = Note-ScriptSignature
 function Write-Info([string]$Text) { if (-not $Quiet) { Write-Host $Text } }
 trap { Write-Host "FAILED: $($_.Exception.Message)"; exit 1 }
 

@@ -16,11 +16,14 @@ tested is the package that ships.
 An empty or missing folder to build the package in.
 
 .PARAMETER CertificateThumbprint
-Signs install.ps1 and uninstall.ps1 with this code-signing certificate before
-hashing, for PCs where an AllSigned execution policy or WDAC script rules
-apply. The certificate must be in Cert:\CurrentUser\My or Cert:\LocalMachine\My
-with its private key. A signed package has its own package hash, and it is
-no longer reproducible from the commit alone, so record the printed hash.
+Signs install.ps1, uninstall.ps1, install-user.ps1 and uninstall-user.ps1
+with this code-signing certificate before hashing, for PCs where an AllSigned
+execution policy or WDAC script rules apply. The certificate must be in
+Cert:\CurrentUser\My or Cert:\LocalMachine\My with its private key. A signed
+package has its own package hash, and it is no longer reproducible from the
+commit alone, so record the printed hash. Without a thumbprint the package
+stays unsigned and names the deploying organization, never Reed Mallory.
+tools\sign-scripts.ps1 signs the same four scripts outside a package build.
 
 .PARAMETER TimestampServer
 An RFC 3161 timestamp server for the signatures, so they stay valid after
@@ -38,7 +41,8 @@ param(
     [Parameter(Mandatory)][string]$OutDir,
     [ValidatePattern('^[0-9A-Fa-f]{40}$')][string]$CertificateThumbprint,
     [string]$TimestampServer,
-    [string[]]$ContentFile
+    [string[]]$ContentFile,
+    [ValidateLength(0, 80)][string]$UnsignedAcceptor
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
@@ -65,6 +69,13 @@ foreach ($f in $languages) { Copy-Item -LiteralPath (Join-Path $root $f) -Destin
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 $ProgressPreference = 'SilentlyContinue'
+if (-not $CertificateThumbprint) {
+    # The package hash stays the hash of the unsigned files. The residual
+    # is named here and is not Reed Mallory's.
+    $acceptor = if ($UnsignedAcceptor) { $UnsignedAcceptor } else { 'deploying organization' }
+    if ($acceptor -match '^(?i)\s*reed mallory(\s|$)') { throw 'Reed Mallory does not accept an unsigned package.' }
+    Write-Host "Unsigned package. Residual acceptor: $acceptor. Not Reed Mallory. Sign with -CertificateThumbprint or tools\sign-scripts.ps1."
+}
 if ($CertificateThumbprint) {
     $cert = @(Get-ChildItem -Path "Cert:\CurrentUser\My\$CertificateThumbprint", "Cert:\LocalMachine\My\$CertificateThumbprint" -CodeSigningCert -ErrorAction SilentlyContinue)[0]
     if (-not $cert) { throw "No code-signing certificate with thumbprint $CertificateThumbprint and a private key in CurrentUser\My or LocalMachine\My." }
