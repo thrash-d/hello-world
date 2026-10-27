@@ -128,6 +128,9 @@ Si désactivé ou non configuré, les notes ne sont pas signées; l'écran sugg�
       <string id="TurnOffSync_Help">Si activé, hello-world ne peut pas synchroniser les plans avec un téléphone et l'option n'est pas proposée. La synchronisation est désactivée tant que la personne ne l'active pas; activée, le plan et la liste des choses faites quittent le PC chiffrés avec un code que seuls ses appareils ont, et sont gardés sur le serveur de comptes partagés.
 
 Si désactivé ou non configuré, chacun peut l'activer là où un serveur de comptes partagés est défini.</string>
+      <string id="SUPPORTED_1_66">hello-world 1.66.0 ou ultérieur</string>
+      <string id="GrowthServer">Serveur des notes de série</string>
+      <string id="GrowthServer_Help">Si cette valeur est définie, les notes de série qu'une personne a acceptées sont proposées à cette adresse. Utilisez https, ou http seulement vers un serveur sur cet ordinateur avec un numéro de port. Si le champ est vide, l'adresse est le substitut https://insights.example.invalid, qui ne se résout pas. Indiquez votre propre serveur de comptes. Il enregistre un lot à POST /v1/growth et n'écrit pas d'adresse réseau. Ce n'est pas un service d'analyse d'un tiers, et rien n'est facturé. Une valeur qui ne respecte pas ces règles est ignorée.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -147,6 +150,9 @@ Si désactivé ou non configuré, chacun peut l'activer là où un serveur de co
       </presentation>
       <presentation id="SupportLine">
         <textBox refId="SupportLine"><label>Texte:</label></textBox>
+      </presentation>
+      <presentation id="GrowthServer">
+        <textBox refId="GrowthServer"><label>Adresse du serveur :</label></textBox>
       </presentation>
     </presentationTable>
   </resources>

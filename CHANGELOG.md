@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-27: fixes from review round 49
+
+Version 1.66.0. On the phone, marking "a; b" done announced two things and stored one row. A saved plan whose text cleaned to nothing, such as `;;;`, was still asked about, and a finished row with no date or only spaces was kept. Delete everything now removes the streak-note files even when the notes folder cannot be listed.
+
+Streak notes, once accepted, keep a client id and a session id, batch events, and offer them to `https://insights.example.invalid/v1/growth` until an operator points `HELLO_GROWTH_SERVER`, the `GrowthServer` policy, or the phone's upload box at their own `counts_server.py`. `POST /v1/growth` stores the batch and does not write a network address. `hello cowbell` and `hello staple` print and do not save. `hello repair` and `hello plus` write a local stub receipt and do not bill anyone. Gentle mode hides the spoken nag. The fridge page does not print it.
+
 ## 2026-10-27: fixes from review round 48
 
 Version 1.65.0. Typing q at the picture, or at Enter to continue after it, left the visit open. The first Skip on the phone moved the cursor off the question while the question was still there. `hello haiku` with no date ignored a day that starts at 18:00. `hello haiku --date` accepted 20261027 and a week date. `haiku.` at the plan prompt was saved. A symlink named vapid.json or push was still followed when the file mode was tightened.

@@ -128,6 +128,9 @@ Si se deshabilita o no se configura, las notas no se firman; la pantalla sugiere
       <string id="TurnOffSync_Help">Si se habilita, hello-world no puede sincronizar planes con un teléfono y la opción no se ofrece. La sincronización está desactivada salvo que una persona la active; si se activa, el plan y la lista de hechos salen del equipo cifrados con un código que solo tienen los dispositivos de esa persona, y se guardan en el servidor de recuentos compartidos.
 
 Si se deshabilita o no se configura, cada persona puede activarla donde haya un servidor de recuentos compartidos.</string>
+      <string id="SUPPORTED_1_66">hello-world 1.66.0 o posterior</string>
+      <string id="GrowthServer">Servidor de notas de racha</string>
+      <string id="GrowthServer_Help">Si se establece, las notas de racha que una persona ha aceptado se ofrecen a esta dirección. Use https, o http solo hacia un servidor en este equipo con un puerto. Si está vacío, la dirección es el marcador https://insights.example.invalid, que no se resuelve. Apúntelo a su propio servidor de recuentos. Ese servidor guarda un lote en POST /v1/growth y no escribe una dirección de red. No es un servicio de analítica de terceros, y no se cobra nada. Un valor que no cumple esas reglas se ignora.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -147,6 +150,9 @@ Si se deshabilita o no se configura, cada persona puede activarla donde haya un 
       </presentation>
       <presentation id="SupportLine">
         <textBox refId="SupportLine"><label>Texto:</label></textBox>
+      </presentation>
+      <presentation id="GrowthServer">
+        <textBox refId="GrowthServer"><label>Dirección del servidor:</label></textBox>
       </presentation>
     </presentationTable>
   </resources>

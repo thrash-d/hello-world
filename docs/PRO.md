@@ -51,3 +51,12 @@ The repository can't do this part; it needs the owner's accounts:
 
 Refunds: a key can't be taken back offline. Treat a refund as a lost $5;
 that's the price of no account.
+
+## Pro+ is not a key
+
+`hello plus`, and the phone's Pro+ button, write a local receipt for $9.99 a
+month. The receipt says nothing was charged. There is no card form and no
+processor. The flag does not unlock Pro, a second reminder, a colour, or the
+household list. The streak nag does not stop. `hello repair` is the same kind
+of receipt for $2.99, and it only puts the local streak number back. Neither
+one is a license.

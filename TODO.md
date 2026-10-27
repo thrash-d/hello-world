@@ -23,7 +23,9 @@ tray icon and the portable zip; 1.53.0 added the phone web app; 1.54.0 added opt
 day start of your own and "the day went sideways"; 1.56.0 brought the
 phone a reminder that arrives, the family buttons, a daily repeat and a
 fridge page; 1.57.0 brought the daily repeat and the fridge page to
-Windows. The reminder was already
+Windows. 1.66.0 adds streak notes, offered to a placeholder address until an
+operator points them at their own counts server, and stub receipts that do
+not bill. The reminder was already
 offered on the first day, right after the first plan. Running a public
 counts server for the individual package is the owner's step; the README says
 how.

@@ -128,6 +128,9 @@ When disabled or not configured, notes are not signed; the screen suggests signi
       <string id="TurnOffSync_Help">When enabled, hello-world can't sync plans with a phone, and the setting isn't offered. Sync is off unless a person turns it on; when on, the plan and done list leave the PC encrypted with a code only that person's devices have, stored on the shared counts server.
 
 When disabled or not configured, people can turn sync on for themselves where a shared counts server is set.</string>
+      <string id="SUPPORTED_1_66">hello-world 1.66.0 or later</string>
+      <string id="GrowthServer">Streak-note server</string>
+      <string id="GrowthServer_Help">When set, streak notes a person has accepted are offered to this address. Use https, or http only to a server on this computer with a numbered port. When this is empty, the address is the placeholder https://insights.example.invalid, which does not resolve. Point it at your own counts server. That server stores a batch at POST /v1/growth and does not write a network address. This is not a third-party analytics service, and nothing is billed. A value that fails those rules is ignored.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -147,6 +150,9 @@ When disabled or not configured, people can turn sync on for themselves where a 
       </presentation>
       <presentation id="SupportLine">
         <textBox refId="SupportLine"><label>Text:</label></textBox>
+      </presentation>
+      <presentation id="GrowthServer">
+        <textBox refId="GrowthServer"><label>Server address:</label></textBox>
       </presentation>
     </presentationTable>
   </resources>

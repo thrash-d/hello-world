@@ -19,6 +19,7 @@
       <definition name="SUPPORTED_1_47" displayName="$(string.SUPPORTED_1_47)" />
       <definition name="SUPPORTED_1_48" displayName="$(string.SUPPORTED_1_48)" />
       <definition name="SUPPORTED_1_54" displayName="$(string.SUPPORTED_1_54)" />
+      <definition name="SUPPORTED_1_66" displayName="$(string.SUPPORTED_1_66)" />
     </definitions>
   </supportedOn>
   <categories>
@@ -162,6 +163,11 @@
       <supportedOn ref="SUPPORTED_1_54" />
       <enabledValue><decimal value="1" /></enabledValue>
       <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+    <policy name="GrowthServer" class="Both" displayName="$(string.GrowthServer)" explainText="$(string.GrowthServer_Help)" presentation="$(presentation.GrowthServer)" key="SOFTWARE\Policies\hello-world">
+      <parentCategory ref="HelloWorld" />
+      <supportedOn ref="SUPPORTED_1_66" />
+      <elements><text id="GrowthServer" valueName="GrowthServer" maxLength="200" /></elements>
     </policy>
   </policies>
 </policyDefinitions>

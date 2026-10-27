@@ -124,6 +124,9 @@
       <string id="TurnOffSync_Help">عند التمكين، لا يمكن لـ hello-world مزامنة الخطط مع هاتف، ولا يظهر الإعداد. المزامنة متوقفة ما لم يشغّلها الشخص؛ وعند تشغيلها تغادر الخطة وقائمة المنجزات الكمبيوتر مشفّرة برمز لا تملكه إلا أجهزة ذلك الشخص، وتُحفظ على خادم العدّ المشترك.
 
 عند التعطيل أو عدم التكوين، يمكن لكل شخص تشغيلها حيث يوجد خادم عدّ مشترك.</string>
+      <string id="SUPPORTED_1_66">hello-world 1.66.0 أو أحدث</string>
+      <string id="GrowthServer">خادم ملاحظات السلسلة</string>
+      <string id="GrowthServer_Help">عند التعيين، تُعرض ملاحظات السلسلة التي قبلها الشخص على هذا العنوان. استخدم https، أو http فقط إلى خادم على هذا الكمبيوتر مع رقم منفذ. إذا تُرك فارغًا فالعنوان هو العنصر النائب https://insights.example.invalid، وهو لا يُحل. وجّهه إلى خادم العدّ الخاص بك. يخزّن ذلك الخادم دفعة عند POST /v1/growth ولا يكتب عنوان شبكة. ليس خدمة تحليلات لطرف ثالث، ولا يُحصَّل شيء. تُتجاهل القيمة التي لا تستوفي هذه القواعد.</string>
     </stringTable>
     <presentationTable>
       <presentation id="FeedbackAddress">
@@ -143,6 +146,9 @@
       </presentation>
       <presentation id="SupportLine">
         <textBox refId="SupportLine"><label>النص:</label></textBox>
+      </presentation>
+      <presentation id="GrowthServer">
+        <textBox refId="GrowthServer"><label>عنوان الخادم:</label></textBox>
       </presentation>
     </presentationTable>
   </resources>

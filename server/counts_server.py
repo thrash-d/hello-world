@@ -43,9 +43,15 @@ push services, so the server can't be used to call anywhere else. A push
 service that says the address is gone, turning the reminder off, or a year
 untouched removes the file.
 
+    POST /v1/growth                 a batch of streak notes, stored as JSON
+                                   lines under growth/ and never a network
+                                   address. consent must be true. There is
+                                   no route that reads them back.
+
 With --phone FOLDER it also serves the phone app (the repository's phone
 folder) at /phone/, so one https address does both. The phone app keeps its
-plans on the phone and asks this server for nothing.
+plans on the phone. With --growth the served page is told to offer streak
+notes to this same server; without it the page keeps its placeholder address.
 
 The week is the boss fight: every tip anyone does that week is one hit. Its
 hit points are 70% of last week's tips, at least 20, so a small company can
@@ -761,12 +767,109 @@ def allowed(day):
     return abs((when - today).days) <= 1
 
 
+GROWTH_EVENTS = 50
+GROWTH_DAY_BYTES = 5_000_000
+GROWTH_EVENT = re.compile(r"^[a-z0-9_]{1,40}$")
+GROWTH_ID = re.compile(r"^[0-9a-f]{32}$")
+
+
+class Growth:
+    """Streak-note batches. One JSON line per batch, under growth/, and the
+    client's address is not written. Files older than 30 days are removed.
+    A symlink is not followed."""
+
+    def __init__(self, folder):
+        self.folder = os.path.join(folder, "growth")
+        os.makedirs(self.folder, exist_ok=True)
+        self.lock = threading.Lock()
+
+    def take(self, payload):
+        """(status, stored count or an error string)."""
+        if not isinstance(payload, dict) or payload.get("consent") is not True:
+            return 400, "consent required"
+        cid = payload.get("id")
+        if not isinstance(cid, str) or not GROWTH_ID.fullmatch(cid):
+            return 400, "id"
+        events = payload.get("events")
+        if not isinstance(events, list) or not events or len(events) > GROWTH_EVENTS:
+            return 400, "events"
+        kept = []
+        for event in events:
+            if not isinstance(event, dict):
+                continue
+            name = event.get("event")
+            if not isinstance(name, str) or not GROWTH_EVENT.fullmatch(name):
+                continue
+            plan = event.get("plan")
+            if isinstance(plan, str):
+                plan = "".join(ch for ch in plan if ch >= " " and ch != "\x7f")[:400] or None
+            else:
+                plan = None
+            session = event.get("session")
+            kept.append({
+                "event": name,
+                "at": event.get("at") if isinstance(event.get("at"), str) else "",
+                "session": session if isinstance(session, str) and GROWTH_ID.fullmatch(session) else "",
+                "streak": event["streak"] if isinstance(event.get("streak"), int)
+                and not isinstance(event.get("streak"), bool) else 0,
+                "best": event["best"] if isinstance(event.get("best"), int)
+                and not isinstance(event.get("best"), bool) else 0,
+                "plan": plan,
+                "v": event.get("v") if isinstance(event.get("v"), str) else "",
+                "lang": event.get("lang") if isinstance(event.get("lang"), str) else "",
+            })
+        if not kept:
+            return 400, "events"
+        day = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+        path = os.path.join(self.folder, day + ".jsonl")
+        line = (json.dumps({"id": cid, "events": kept}, ensure_ascii=False) + "\n").encode()
+        with self.lock:
+            self.trim()
+            if os.path.islink(path):
+                return 500, "not stored"
+            try:
+                size = os.path.getsize(path)
+            except OSError:
+                size = 0
+            if size + len(line) > GROWTH_DAY_BYTES:
+                return 413, "full"
+            flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, "O_NOFOLLOW", 0)
+            try:
+                fd = os.open(path, flags, 0o600)
+            except OSError:
+                return 500, "not stored"
+            try:
+                os.write(fd, line)
+            finally:
+                os.close(fd)
+        return 200, len(kept)
+
+    def trim(self):
+        """Drop day files older than 30 days. Call with the lock held."""
+        cutoff = (datetime.datetime.now(datetime.timezone.utc).date()
+                  - datetime.timedelta(days=30)).isoformat()
+        try:
+            names = os.listdir(self.folder)
+        except OSError:
+            return
+        for name in names:
+            if not name.endswith(".jsonl") or name[:10] >= cutoff:
+                continue
+            path = os.path.join(self.folder, name)
+            if os.path.islink(path):
+                continue
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+
+
 PHONE_FILES = {"index.html": "text/html; charset=utf-8", "app.js": "text/javascript; charset=utf-8",
                "content.js": "text/javascript; charset=utf-8", "sw.js": "text/javascript; charset=utf-8",
                "manifest.webmanifest": "application/manifest+json", "icon.svg": "image/svg+xml"}
 
 
-def handler(counts, phone=None, push=None):
+def handler(counts, phone=None, push=None, growth=None, growth_page=False):
     class Handler(BaseHTTPRequestHandler):
         server_version = "hello-world-counts"
         sys_version = ""
@@ -800,6 +903,13 @@ def handler(counts, phone=None, push=None):
                     return
                 with open(os.path.join(phone, name), "rb") as f:
                     raw = f.read()
+                # --growth tells this page to upload to the server that
+                # served it. Otherwise the placeholder in the file stays.
+                if growth_page and name == "index.html":
+                    raw = raw.replace(
+                        b'<meta name="growth-server" content="">',
+                        b'<meta name="growth-server" content="same-origin">',
+                        1)
                 self.send_response(200)
                 self.send_header("Content-Type", PHONE_FILES[name])
                 self.send_header("Content-Length", str(len(raw)))
@@ -921,6 +1031,27 @@ def handler(counts, phone=None, push=None):
             self.reply(200, {"ok": True})
 
         def do_POST(self):
+            path = self.path.split("?", 1)[0]
+            if path == "/v1/growth":
+                if growth is None:
+                    return self.reply(404, {"error": "not found"})
+                raw = self.body()
+                if raw is None:
+                    return self.reply(413, {"error": "too large or empty"})
+                try:
+                    payload = json.loads(raw or b"")
+                except ValueError:
+                    return self.reply(400, {"error": "events"})
+                # A refused body does not count as a write.
+                if not isinstance(payload, dict) or payload.get("consent") is not True:
+                    return self.reply(400, {"error": "consent required"})
+                refused = counts.may_write(self.address(), False, "growth")
+                if refused:
+                    return self.reply(refused[0], {"error": refused[1]})
+                status, stored = growth.take(payload)
+                if status != 200:
+                    return self.reply(status, {"error": stored})
+                return self.reply(200, {"ok": True, "stored": stored})
             # Bodies are ignored, and refused when large, so nothing else
             # can be sent here.
             try:
@@ -945,11 +1076,18 @@ def handler(counts, phone=None, push=None):
 
 
 def serve(port=8080, folder="counts", host="0.0.0.0", trust_proxy=False, boss_hp=None, phone=None,
-          remind=False, min_group=MIN_GROUP, sync_quota=SYNC_QUOTA, refresh=REFRESH):
-    """The server. With remind, phones' reminders are kept and sent too."""
+          remind=False, min_group=MIN_GROUP, sync_quota=SYNC_QUOTA, refresh=REFRESH,
+          growth_page=False):
+    """The server. With remind, phones' reminders are kept and sent too.
+
+    Streak notes are accepted at POST /v1/growth. growth_page rewrites the
+    phone page so it offers them to this server; otherwise that page keeps
+    the placeholder address baked into it.
+    """
     push = Push(folder) if remind else None
     counts = Counts(folder, boss_hp, min_group, sync_quota, refresh)
-    server = ThreadingHTTPServer((host, port), handler(counts, phone, push))
+    growth = Growth(folder)
+    server = ThreadingHTTPServer((host, port), handler(counts, phone, push, growth, growth_page))
     server.counts = counts
     server.trust_proxy = trust_proxy
     server.push = push
@@ -975,10 +1113,12 @@ def main(argv=None):
                         help="seconds the published counts stay fixed (default 3600)")
     parser.add_argument("--remind", action="store_true",
                         help="keep and send phones' reminders, by Web Push with no content")
+    parser.add_argument("--growth", action="store_true",
+                        help="tell the phone page to offer streak notes to this server")
     args = parser.parse_args(argv)
     server = serve(args.port, args.data, args.host, args.trust_proxy, args.boss_hp, args.phone,
                    args.remind, max(1, args.min_group), max(1, args.sync_quota),
-                   max(60, args.refresh))
+                   max(60, args.refresh), args.growth)
     threading.Thread(target=server.counts.run_sweep, daemon=True).start()
     if server.push:
         threading.Thread(target=server.push.run, daemon=True).start()

@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#1f5f8b">
+<meta name="growth-server" content="">
 <title>hello-world</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -58,6 +59,28 @@
   <p class="date" id="date"></p>
   <p><button class="small-button" id="large"></button></p>
   <p class="status" id="status" role="status" aria-live="polite" tabindex="-1"></p>
+
+  <section id="eula" hidden>
+    <h2 id="eula-title"></h2>
+    <p id="eula-text"></p>
+    <p><label><input type="checkbox" id="eula-check" checked> <span id="eula-check-label"></span></label></p>
+    <div class="buttons">
+      <button class="primary" id="eula-yes" type="button"></button>
+      <button id="eula-no" type="button"></button>
+    </div>
+  </section>
+
+  <section id="growth" hidden>
+    <p id="growth-nag"></p>
+    <div class="buttons">
+      <button class="primary" id="growth-keep" type="button"></button>
+      <button id="growth-later" type="button"></button>
+    </div>
+    <div class="buttons" style="margin-top:10px">
+      <button class="small-button" id="growth-repair" type="button"></button>
+      <button class="small-button" id="growth-plus" type="button"></button>
+    </div>
+  </section>
 
   <section id="ask" hidden>
     <h2 id="ask-label"></h2>
@@ -161,6 +184,7 @@
   <section>
     <h2 id="thought-label"></h2>
     <p id="thought"></p>
+    <p class="note" id="sponsored" hidden></p>
     <h2 id="tip-label"></h2>
     <p id="tip"></p>
   </section>
@@ -211,6 +235,11 @@
       </div>
       <p><button type="button" id="klingon" class="small-button"></button></p>
       <p><button type="button" id="haiku" class="small-button"></button></p>
+      <p><button type="button" id="cowbell" class="small-button"></button></p>
+      <p><button type="button" id="growth-toggle" class="small-button"></button></p>
+      <label for="growth-server" id="growth-server-label"></label>
+      <input type="text" id="growth-server" autocomplete="off" spellcheck="false">
+      <p><button type="button" id="growth-server-save" class="small-button"></button></p>
       <p><button id="forget"></button></p>
     </details>
     <p class="note" id="privacy"></p>
