@@ -63,6 +63,10 @@ const UI = {
     forget: "Delete everything on this phone", forgetAsk: "Delete your plans and settings from this phone?",
     forgotten: "Everything on this phone was deleted.",
     privacy: "Your plans stay on this phone, in this browser. They leave it only if you turn on sync.",
+    klingon: "Klingon hello",
+    klingonOn: "Klingon hello is on. Made up for fun. Not checked by a linguist.",
+    klingonOff: "Klingon hello is off.",
+    haiku: "A haiku",
     good: "Good. That one is off your list.", goodMany: "Good. {n} things are off your list.",
     unsureSaid: "That's fine. It's kept for today.",
     kept: "Kept for today.", skipped: "Skipped. It asks again next time.",
@@ -131,6 +135,10 @@ const UI = {
     forget: "Borrar todo en este teléfono", forgetAsk: "¿Borrar tus planes y ajustes de este teléfono?",
     forgotten: "Se borró todo en este teléfono.",
     privacy: "Tus planes se quedan en este teléfono, en este navegador. Solo salen de él si activas la sincronización.",
+    klingon: "Saludo en klingon",
+    klingonOn: "El saludo en klingon está activado. Inventado por diversión. Un lingüista no lo ha revisado.",
+    klingonOff: "El saludo en klingon está desactivado.",
+    haiku: "Un haiku",
     good: "Bien. Una cosa menos en tu lista.", goodMany: "Bien. {n} cosas menos en tu lista.",
     unsureSaid: "No pasa nada. Se queda para hoy.",
     kept: "Se queda para hoy.", skipped: "Saltado. Volverá a preguntar la próxima vez.",
@@ -199,6 +207,10 @@ const UI = {
     forget: "احذف كل شيء على هذا الهاتف", forgetAsk: "حذف خططك وإعداداتك من هذا الهاتف؟",
     forgotten: "حُذف كل شيء على هذا الهاتف.",
     privacy: "تبقى خططك على هذا الهاتف، في هذا المتصفح. لا تغادره إلا إذا شغّلت المزامنة.",
+    klingon: "تحية كلينغون",
+    klingonOn: "تحية كلينغون مفعّلة. كُتبت للمرح. لم يراجعها لغوي.",
+    klingonOff: "تحية كلينغون متوقفة.",
+    haiku: "هايكو",
     good: "جيد. شيء أقل في قائمتك.", goodMany: "رائع. عدد المهام التي شُطبت من قائمتك: {n}.",
     unsureSaid: "لا بأس. أُبقيت لليوم.",
     kept: "تبقى لليوم.", skipped: "تم التخطي. سيسأل مرة أخرى في المرة القادمة.",
@@ -295,6 +307,7 @@ function parse(raw) {
     if (isDate(data.smallerOffered)) state.smallerOffered = data.smallerOffered;
     if (typeof data.smallerAsked === "string") state.smallerAsked = data.smallerAsked.slice(0, MAX_PLAN);
     if (data.large === true) state.large = true;
+    if (data.klingon === true) state.klingon = true;
     if (data.intent && isDate(data.intent.since) && state.intent) state.intent.since = data.intent.since;
     // The household code itself is never kept, only the keys made from it.
     const hk = data.house && data.house.keys;
@@ -490,19 +503,26 @@ function utcTime(at, now) {
 
 // What a push shows, chosen on the phone: the daily repeat's own words at its
 // time, otherwise the check-in. The server's push carries nothing.
+// Fifteen minutes either side of a real HH:MM, including across midnight.
+// The same rule as nearClock in sw.js. 99:99 is not a clock time: a gap
+// past 1440 would make "near" true for every minute.
+function nearClock(at, minutes) {
+  if (typeof at !== "string" || !/^([01]\d|2[0-3]):[0-5]\d$/.test(at)) return false;
+  const [h, m] = at.split(":").map(Number);
+  const diff = Math.abs(h * 60 + m - minutes);
+  return Math.min(diff, 1440 - diff) <= 15;
+}
+
+function haikuText(day) {
+  const n = String(day).padStart(2, "0");
+  return "The screen says hello\nDay " + n + " still fits on one line\nHello, world, still here";
+}
+
 function pushText(prefs, now) {
   now = now || new Date();
   const minutes = now.getHours() * 60 + now.getMinutes();
   // The server retries a missed push for 15 minutes, including past midnight.
-  // The same window as sw.js, including across midnight.
-  const near = (at) => {
-    if (typeof at !== "string" || !at.includes(":")) return false;
-    const [h, m] = at.split(":").map(Number);
-    if (!Number.isFinite(h) || !Number.isFinite(m)) return false;
-    const diff = Math.abs(h * 60 + m - minutes);
-    return Math.min(diff, 1440 - diff) <= 15;
-  };
-  if (prefs && prefs.repeat && near(prefs.repeat.at)) return prefs.repeat.text;
+  if (prefs && prefs.repeat && nearClock(prefs.repeat.at, minutes)) return prefs.repeat.text;
   return (prefs && prefs.checkin) || UI.en.remindShown;
 }
 
@@ -972,7 +992,7 @@ function syncAction(status, opened) {
 if (typeof module !== "undefined") {
   module.exports = { UI, ordinal, todaysPair, clean, parse, asks, answer, setPlan, finishToday, language, blank,
     syncKeys, sealSync, openSync, mergeSync, syncForm, normalCode, todayOf, clearToday, picks, bringBack,
-    phoneNumber, smsLink, utcTime, pushText, exportText, setDayStart, REMIND_TIMES, DAY_STARTS,
+    phoneNumber, smsLink, utcTime, pushText, nearClock, haikuText, exportText, setDayStart, REMIND_TIMES, DAY_STARTS,
     fresh, smallerDue, comingBack, smaller, endDay, noteSideways, mergeDevices, noteDevice, letterLink,
     houseKeys, houseNew, houseJoin, houseLeave, houseChange, houseMerge, houseTidy, houseBody, houseHistory,
     houseNews, houseLeftUnasked, newCode, houseFit, houseStamp, syncAction, syncTime, HOUSE };
@@ -984,6 +1004,24 @@ if (typeof document !== "undefined") {
   let timer = null, hearTimer = null;
   const t = () => UI[language(state, navigator.languages)];
   const today = () => todayOf(state);
+  function buried() {
+    const el = document.activeElement;
+    return Boolean(el && el.closest && el.closest("[hidden]"));
+  }
+  // The status line first, then the plan box, and only if it is on screen
+  // and the person has not moved. A later line that is not one of these
+  // cancels the wait, so it does not pull the cursor.
+  function hearSoon() {
+    const status = $("status");
+    status.tabIndex = -1;
+    status.focus();
+    clearTimeout(hearTimer);
+    hearTimer = setTimeout(() => {
+      if (document.activeElement !== status) return;
+      const form = $("plan-form"), plan = $("plan-input");
+      if (plan && form && !form.hidden) plan.focus();
+    }, 400);
+  }
   const say = (key) => {
     const words = t();
     let text = "";
@@ -995,19 +1033,17 @@ if (typeof document !== "undefined") {
       text = words[key] || "";
     }
     const status = $("status");
+    status.style.whiteSpace = "";
     status.textContent = text;
-    // Saved, Kept, and the done line stay where a screen reader can land
-    // before the plan box takes the cursor.
-    if (!text || (key !== "saved" && key !== "kept" && key !== "good" && key !== "unsureSaid"
-        && !(typeof key === "string" && key.startsWith("goodMany:")))) return;
-    status.tabIndex = -1;
-    status.focus();
-    clearTimeout(hearTimer);
-    hearTimer = setTimeout(() => {
-      if (document.activeElement !== status) return;
-      const form = $("plan-form"), plan = $("plan-input");
-      if (plan && form && !form.hidden) plan.focus();
-    }, 400);
+    const hear = Boolean(text) && (key === "saved" || key === "kept" || key === "good"
+      || key === "unsureSaid" || key === "skipped" || key === "carriedSaid"
+      || key === "sidewaysSaid" || key === "cleanSaid" || key === "cleared" || key === "back"
+      || (typeof key === "string" && key.startsWith("goodMany:")));
+    if (!hear) {
+      clearTimeout(hearTimer);
+      return;
+    }
+    hearSoon();
   };
 
   // What the service worker shows for a push, kept where it can read it.
@@ -1225,6 +1261,15 @@ if (typeof document !== "undefined") {
     drawSync();
     if (typeof drawHouse === "function") drawHouse();
     if (typeof drawLetters === "function") drawLetters();
+    const line = $("klingon-line");
+    if (line) {
+      line.hidden = !state.klingon;
+      line.textContent = "qo' vIquv.";
+    }
+    if ($("klingon")) $("klingon").textContent = s.klingon;
+    if ($("haiku")) $("haiku").textContent = s.haiku;
+    // A second Skip hides the question while focus is still on that button.
+    if (buried()) hearSoon();
   }
 
   let forking = false, ending = false, nudging = null;
@@ -1440,6 +1485,26 @@ if (typeof document !== "undefined") {
     return "endTally";
   }));
   $("large").addEventListener("click", act(() => { state.large = !state.large; return ""; }));
+  $("klingon").addEventListener("click", () => {
+    if (state.klingon) delete state.klingon;
+    else state.klingon = true;
+    save();
+    draw();
+    clearTimeout(hearTimer);
+    const status = $("status");
+    status.style.whiteSpace = "";
+    status.textContent = state.klingon ? t().klingonOn : t().klingonOff;
+    status.tabIndex = -1;
+    status.focus();
+  });
+  $("haiku").addEventListener("click", () => {
+    clearTimeout(hearTimer);
+    const status = $("status");
+    status.style.whiteSpace = "pre-line";
+    status.textContent = haikuText(Number(String(today()).slice(8, 10)));
+    status.tabIndex = -1;
+    status.focus();
+  });
   $("did").addEventListener("click", act(() => finishToday(state, today())));
   $("clear").addEventListener("click", act(() => clearToday(state, today())));
   $("plan-form").addEventListener("submit", act(() => {
