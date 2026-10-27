@@ -477,28 +477,48 @@ class Push:
 
     def __init__(self, folder):
         self.folder = os.path.join(folder, "push")
-        os.makedirs(self.folder, exist_ok=True)
-        # 0755 from a 022 umask would let anyone on the machine list the
-        # tokens. The token in the file name is what authorizes a change.
-        tighten(self.folder, 0o700)
+        self.ready = True
+        # A symlink named push is the folder the next write would follow.
+        # Remove the link itself. If it is still a link, do not use it.
+        if os.path.islink(self.folder):
+            try:
+                os.unlink(self.folder)
+            except OSError:
+                pass
+        if os.path.islink(self.folder):
+            self.ready = False
+        else:
+            os.makedirs(self.folder, exist_ok=True)
+            # 0755 from a 022 umask would let anyone on the machine list the
+            # tokens. The token in the file name is what authorizes a change.
+            tighten(self.folder, 0o700)
         self.lock = threading.Lock()
         key = os.path.join(folder, "vapid.json")
-        try:
-            with open(key, encoding="utf-8") as f:
-                self.d = int(json.load(f)["d"], 16)
-            # A key written before 1.64.0 can still be mode 0644. Creating
-            # a new file at 0600 does not change the one already on disk.
-            tighten(key, 0o600)
-        except (OSError, ValueError, KeyError, TypeError):
+        # open() follows a symlink. A link named vapid.json is replaced
+        # with a new key, and the file it pointed at is not read.
+        if os.path.islink(key):
             self.d = secrets.randbelow(P256_N - 1) + 1
             write_private(key, json.dumps({"d": format(self.d, "064x")}))
-        try:
-            names = os.listdir(self.folder)
-        except OSError:
-            names = []
+        else:
+            try:
+                with open(key, encoding="utf-8") as f:
+                    self.d = int(json.load(f)["d"], 16)
+                # A key written before 1.64.0 can still be mode 0644. Creating
+                # a new file at 0600 does not change the one already on disk.
+                tighten(key, 0o600)
+            except (OSError, ValueError, KeyError, TypeError):
+                self.d = secrets.randbelow(P256_N - 1) + 1
+                write_private(key, json.dumps({"d": format(self.d, "064x")}))
+        names = []
+        if self.ready:
+            try:
+                names = os.listdir(self.folder)
+            except OSError:
+                names = []
         for name in names:
-            if re.fullmatch(r"[0-9a-f]{32}", name):
-                tighten(os.path.join(self.folder, name), 0o600)
+            path = os.path.join(self.folder, name)
+            if re.fullmatch(r"[0-9a-f]{32}", name) and not os.path.islink(path):
+                tighten(path, 0o600)
         self.public = p256_public(self.d)
 
     def path(self, token):
@@ -517,30 +537,32 @@ class Push:
         """Keep a phone's push address and times. False when they aren't
         acceptable. The same times keep the record of what was already sent,
         so opening the app during the retry window does not send it again."""
-        if not self.acceptable(data):
+        if not self.acceptable(data) or not self.ready:
             return False
         times = sorted(set(data["times"]))
         with self.lock:
             sent = []
             path = self.path(token)
-            try:
-                with open(path, encoding="utf-8") as f:
-                    old = json.load(f)
-                # The same address and the same times keep what was already
-                # sent. A new address is a new subscription, and a file whose
-                # times are not strings must not stop the phone updating it.
-                old_times = old.get("times") if isinstance(old, dict) else None
-                same_address = isinstance(old, dict) and old.get("endpoint") == data["endpoint"]
-                if (same_address and isinstance(old_times, list)
-                        and sorted(t for t in old_times if isinstance(t, str)) == times
-                        and all(isinstance(t, str) for t in old_times)):
-                    marks = old.get("sent")
-                    if isinstance(marks, str):
-                        marks = [marks]
-                    if isinstance(marks, list):
-                        sent = [m for m in marks if isinstance(m, str) and PUSH_SENT.fullmatch(m)]
-            except (OSError, ValueError, TypeError):
-                sent = []
+            # A symlink is replaced below. It is not opened.
+            if not os.path.islink(path):
+                try:
+                    with open(path, encoding="utf-8") as f:
+                        old = json.load(f)
+                    # The same address and the same times keep what was already
+                    # sent. A new address is a new subscription, and a file whose
+                    # times are not strings must not stop the phone updating it.
+                    old_times = old.get("times") if isinstance(old, dict) else None
+                    same_address = isinstance(old, dict) and old.get("endpoint") == data["endpoint"]
+                    if (same_address and isinstance(old_times, list)
+                            and sorted(t for t in old_times if isinstance(t, str)) == times
+                            and all(isinstance(t, str) for t in old_times)):
+                        marks = old.get("sent")
+                        if isinstance(marks, str):
+                            marks = [marks]
+                        if isinstance(marks, list):
+                            sent = [m for m in marks if isinstance(m, str) and PUSH_SENT.fullmatch(m)]
+                except (OSError, ValueError, TypeError):
+                    sent = []
             body = {"endpoint": data["endpoint"], "times": times}
             if sent:
                 body["sent"] = sent
@@ -549,6 +571,8 @@ class Push:
 
     def forget(self, token):
         """True when there was something to forget."""
+        if not self.ready:
+            return False
         with self.lock:
             try:
                 os.remove(self.path(token))
@@ -595,12 +619,16 @@ class Push:
         """Send reminders whose UTC minute is `when`, or missed it by a few
         minutes. A push the service did not accept is tried again. Returns
         how many went out."""
+        if not self.ready:
+            return 0
         send = send or self.send
         sent = 0
         for token in os.listdir(self.folder):
             if not re.fullmatch(r"[0-9a-f]{32}", token):
                 continue
             path = self.path(token)
+            if os.path.islink(path):
+                continue
             try:
                 if time.time() - os.path.getmtime(path) > SYNC_DAYS * 86400:
                     self.forget(token)
@@ -651,6 +679,8 @@ class Push:
 
     def _registration(self, path, endpoint, times):
         """The file as stored, when it still names this address and these times."""
+        if os.path.islink(path):
+            return None
         try:
             with open(path, encoding="utf-8") as f:
                 current = json.load(f)
@@ -686,6 +716,8 @@ class Push:
     def _forget_if_same(self, path, endpoint):
         """Drop the registration only when it is still the one we called."""
         with self.lock:
+            if os.path.islink(path):
+                return
             try:
                 with open(path, encoding="utf-8") as f:
                     current = json.load(f)

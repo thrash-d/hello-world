@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-27: fixes from review round 48
+
+Version 1.65.0. Typing q at the picture, or at Enter to continue after it, left the visit open. The first Skip on the phone moved the cursor off the question while the question was still there. `hello haiku` with no date ignored a day that starts at 18:00. `hello haiku --date` accepted 20261027 and a week date. `haiku.` at the plan prompt was saved. A symlink named vapid.json or push was still followed when the file mode was tightened.
+
+`hello shift` prints the greeting and one line, "The day starts when you said it does.", saves nothing, does not read the clock, and is not on the phone.
+
 ## 2026-10-26: fixes from review round 47
 
 Version 1.64.0. A push key that was already on disk stayed readable by everyone else on the machine, and so did the folder of phone registrations. Prompts in Chinese and Japanese that had no space before the greater-than sign still ended that way. The plan box and the handoff box kept the system's colours when a Pro colour was on. After a second Skip, focus could sit on a button that was no longer on screen. Turning the colon off and failing to save could still change the prompts for that visit. A reminder time that was not a clock time, such as 99:99, made every push look near. The window's household menu showed the words and not the weekday and the time.

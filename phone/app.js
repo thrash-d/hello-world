@@ -1043,6 +1043,12 @@ if (typeof document !== "undefined") {
       clearTimeout(hearTimer);
       return;
     }
+    // First Skip: the question is still there. The status line is live,
+    // so it is read without leaving the button. A second Skip hides it.
+    if (key === "skipped" && asks(state, today())) {
+      clearTimeout(hearTimer);
+      return;
+    }
     hearSoon();
   };
 

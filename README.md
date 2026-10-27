@@ -122,11 +122,13 @@ the text screen, menu option 10 picks the language, option 12 has the
 reminder times and the window's other settings, and pressing Ctrl+C twice
 closes it.
 
-`hello morse`, `hello haiku`, `hello klingon`, and `hello --pirate` print a
-joke and save nothing. `hello haiku --date YYYY-MM-DD` puts that day in the
-middle line. None of these is part of Pro, and none of them sends anything.
-Typing `pic` after the days-in-a-row line shows a picture. Typing `haiku`,
-or the letters `uuddlrlrba`, at a prompt answers and does not save a plan.
+`hello morse`, `hello haiku`, `hello klingon`, `hello shift`, and `hello --pirate` print a
+joke and save nothing. `hello haiku` with no date uses the day start saved in the notes.
+`hello haiku --date YYYY-MM-DD` puts that calendar day in the
+middle line. A date that is not written that way is refused. `hello shift` prints the greeting and one line, "The day starts when you said it does." It does not read the clock, and it is not on the phone.
+None of these is part of Pro, and none of them sends anything.
+Typing `pic` after the days-in-a-row line shows a picture. `q` there closes, the same as any other question, and Enter still skips. Typing `haiku`,
+or the letters `uuddlrlrba`, at a prompt answers and does not save a plan. A full stop after `haiku` is the same joke.
 
 ### The text screen
 
@@ -589,7 +591,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.64.0'
+$tag = 'v1.65.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

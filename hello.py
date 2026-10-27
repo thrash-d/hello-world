@@ -43,6 +43,8 @@ KLINGON_NOTE = "Made up for fun. Not checked by a linguist."
 MORSE_LINE = ".... . .-.. .-.. --- --..-- / .-- --- .-. .-.. -.. -.-.--"
 KONAMI_LINE = "Konami mode, this visit only. Nothing was saved."
 PIRATE_LINE = "Ahoy, world. The greeting be plain above."
+# A command, never the morning, and it does not read the clock.
+SHIFT_LINE = "The day starts when you said it does."
 # A still picture on a day the streak line already prints. No colour, no bell.
 FIREWORKS = (
     "    *",
@@ -563,10 +565,10 @@ def help_text():
     here = os.path.dirname(os.path.abspath(__file__))
     return (tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
             + "\n\n" + tr("For fun, and nothing is saved: hello morse, hello haiku, "
-                          "hello klingon, and hello --pirate. --set klingon on keeps "
-                          "the Klingon line under the greeting."))
+                          "hello klingon, hello shift, and hello --pirate. "
+                          "--set klingon on keeps the Klingon line under the greeting."))
 
-VERSION = "1.64.0"
+VERSION = "1.65.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -5841,6 +5843,7 @@ def daily(startup):
         if person:
             mark_handoff_seen(state, can_save)
 
+    picture_quit = False
     if first:
         para(tr("Press Enter at each question to skip it, and once more to "
                 "close. That's it."))
@@ -5864,12 +5867,20 @@ def daily(startup):
             say(tr("You have opened this {row} days in a row. Nice to see "
                    "you.").format(row=row))
             if person:
-                show_fireworks()
-            say()
+                try:
+                    show_fireworks()
+                except Quit:
+                    # q here is the same close as a later question. The visit
+                    # is still recorded below.
+                    picture_quit = True
+            if not picture_quit:
+                say()
 
-    quitting = False
+    quitting = picture_quit
     wants_menu = False
     try:
+        if picture_quit:
+            raise Quit
         # Asked until it is answered, also on a second open the same day,
         # but two skips mean "stop asking"; the plan then shows as still open.
         if (intent and intent["date"] < iso and intent.get("skips", 0) < 2
@@ -6490,18 +6501,21 @@ def last_prompt(state, can_save, intent, person, d, iso, open_menu=False):
 
 def show_fireworks():
     """A still picture, only if the person asks, on a day the streak line
-    already prints. Enter skips it, the same as every other question."""
-    picture = (ask(tr("A picture is here. Type pic, or press Enter > ")) or "").strip().lower()
+    already prints. Enter skips it. q closes, the same as every other question."""
+    picture = (ask(tr("A picture is here. Type pic, or press Enter > ")) or "").lower().strip(TRIM)
+    if picture in QUIT_WORDS:
+        raise Quit
     if picture != "pic":
         return
     for line in FIREWORKS:
         say(line)
-    ask(tr("Enter to continue > "))
+    if (ask(tr("Enter to continue > ")) or "").lower().strip(TRIM) in QUIT_WORDS:
+        raise Quit
 
 
 def toy_reply(text):
     """A joke typed at a prompt. Nothing is saved. True when it was one."""
-    low = (text or "").strip().lower()
+    low = (text or "").lower().strip(TRIM)
     if low == "uuddlrlrba":
         say(GREETING)
         say(tr(KONAMI_LINE))
@@ -6521,7 +6535,7 @@ def fun_command(argv):
     if not argv:
         return None
     name = argv[0].lower()
-    if name not in ("morse", "klingon", "haiku"):
+    if name not in ("morse", "klingon", "haiku", "shift"):
         return None
     if name == "morse" and len(argv) == 1:
         say(GREETING)
@@ -6533,18 +6547,33 @@ def fun_command(argv):
         say(KLINGON_LINE)
         say(tr(KLINGON_NOTE))
         return 0
+    if name == "shift" and len(argv) == 1:
+        # Not the morning, and not the clock. The day start stays in the notes.
+        say(GREETING)
+        say(tr(SHIFT_LINE))
+        return 0
     if name == "haiku" and len(argv) == 1:
+        # The menu uses the day start in the notes. This command used to
+        # ignore it, because it runs before the day is opened. Read only.
+        load(repair=False)
         say_haiku(today())
         return 0
     if name == "haiku" and len(argv) == 3 and argv[1].lower() == "--date":
-        try:
-            when = datetime.date.fromisoformat(argv[2])
-        except ValueError:
+        # fromisoformat also takes 20261027 and 2026-W44-2. The help names
+        # the hyphenated calendar day, and a week date is not that day.
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", argv[2]):
+            try:
+                when = datetime.date.fromisoformat(argv[2])
+            except ValueError:
+                when = None
+        else:
+            when = None
+        if when is None:
             say(tr("That date doesn't look right."))
             return 2
         say_haiku(when)
         return 0
-    say(tr("Try hello morse, hello klingon, or hello haiku. "
+    say(tr("Try hello morse, hello klingon, hello haiku, or hello shift. "
            "A date is hello haiku --date YYYY-MM-DD."))
     return 2
 
