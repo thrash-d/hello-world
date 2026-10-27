@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-27: fixes from review round 50
+
+Version 1.67.0. `VERSION` was still 1.65.0 after 1.66.0 shipped, so the auto-tag workflow would not tag this release. A symlink named `growth` on the counts server was followed, and that folder was created with the process umask. A queued streak note whose try-count was not a number crashed the text visit. The death sentence stayed up after the run had already started again. A failed save could still write a stub receipt, or queue an event, for a choice that was undone.
+
+`hello kazoo` and `hello ai` print and do not save. `hello ai` says it is not a model and sends nothing. `hello priority` writes a local stub receipt for $4.99 after the notes save succeeds, and it does not change the morning screen. The phone keeps those three in Settings. They are not on the printed page.
+
 ## 2026-10-27: fixes from review round 49
 
 Version 1.66.0. On the phone, marking "a; b" done announced two things and stored one row. A saved plan whose text cleaned to nothing, such as `;;;`, was still asked about, and a finished row with no date or only spaces was kept. Delete everything now removes the streak-note files even when the notes folder cannot be listed.

@@ -55,6 +55,29 @@ STAPLE = (
     " |______________|",
     "        ||",
 )
+# A kazoo. A command, a prompt word, and a phone button. Not the morning.
+KAZOO = (
+    "   __",
+    " _|  |_",
+    "|  ||  |",
+    "|__||__|",
+)
+KAZOO_LINE = "bwap bwap"
+# Not a model. The line is chosen from the date. Nothing is sent.
+AI_NOTE = "This is not a model. Nothing was sent."
+DUCK_LINES = (
+    "The rubber duck says: have you tried turning it off and on again.",
+    "The rubber duck says: the bug is in the sentence you were sure was fine.",
+    "The rubber duck says: ship the joke, then read it out loud.",
+    "The rubber duck says: a checkbox is not a brain.",
+    "The rubber duck says: if it needs the network, it is not this command.",
+)
+PRIORITY_SAID = (
+    "Priority Hello is $4.99. STUB: nothing was charged. "
+    "No card was asked for. The receipt stays on this computer. "
+    "The morning screen is unchanged."
+)
+STUB_UNSAVED = "Could not save that on this computer. Nothing was charged."
 # Shown once. Enter on this question accepts; the prompt says so. q still quits.
 EULA_BODY = (
     "Streak notes are selected. hello-world keeps a client id, a session id, "
@@ -602,11 +625,13 @@ def help_text():
     return (tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
             + "\n\n" + tr("For fun, and nothing is saved: hello morse, hello haiku, "
                           "hello klingon, hello shift, hello cowbell, hello staple, "
-                          "and hello --pirate. "
+                          "hello kazoo, hello ai, and hello --pirate. "
+                          "hello ai is not a model and sends nothing. "
                           "--set klingon on keeps the Klingon line under the greeting. "
-                          "hello growth off stops streak notes."))
+                          "hello growth off stops streak notes. "
+                          "hello priority writes a local stub receipt and does not bill."))
 
-VERSION = "1.66.0"
+VERSION = "1.67.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -1026,16 +1051,33 @@ def growth_save_queue(events):
     return _growth_private(growth_queue_path(), raw, append=False)
 
 
+def _rotate_log(path, limit=100_000):
+    """Move a full log aside. A symlink is not followed.
+
+    If the `.old` name is itself a symlink, the link is removed and the
+    file it pointed at is left where it was. If that link cannot be
+    removed, the log is left in place so it is not written through.
+    """
+    try:
+        if os.path.islink(path) or not os.path.isfile(path) or os.path.getsize(path) <= limit:
+            return
+        old = path + ".old"
+        if os.path.islink(old):
+            try:
+                os.unlink(old)
+            except OSError:
+                return
+        if os.path.islink(old):
+            return
+        os.replace(path, old)
+    except OSError:
+        pass
+
+
 def growth_log(state, event, plan):
     """One local line, whether or not a batch is uploaded."""
     path = os.path.join(data_dir(), "growth.log")
-    try:
-        if os.path.isfile(path) and not os.path.islink(path) and os.path.getsize(path) > 100_000:
-            old = path + ".old"
-            if not os.path.islink(old):
-                os.replace(path, old)
-    except OSError:
-        pass
+    _rotate_log(path)
     line = json.dumps({
         "at": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat(),
         "event": str(event)[:40],
@@ -1166,6 +1208,30 @@ def growth_post(url, body):
         return "retry"
 
 
+def _growth_attempts(item):
+    """How many tries this queued event has had.
+
+    A missing count is zero. A bool, a string, or anything else is treated
+    as already exhausted, so a bad record cannot crash the visit and cannot
+    be retried forever. The other events in the file stay.
+    """
+    if not isinstance(item, dict):
+        return GROWTH_TRIES
+    n = item.get("attempts")
+    if n is None:
+        return 0
+    if isinstance(n, bool) or not isinstance(n, int) or n < 0:
+        return GROWTH_TRIES
+    return n
+
+
+def _growth_count(value, default):
+    """A streak number already checked, or default when the file is odd."""
+    if isinstance(value, bool) or not isinstance(value, int) or not 0 < value < 100000:
+        return default
+    return value
+
+
 def growth_flush(state, rounds=3):
     """Send queued batches. One immediate retry, then the rest wait for the
     next open, and a batch is dropped after GROWTH_TRIES failures."""
@@ -1174,7 +1240,7 @@ def growth_flush(state, rounds=3):
     url = growth_server()
     for _ in range(rounds):
         queue = [item for item in growth_load_queue()
-                 if int(item.get("attempts") or 0) < GROWTH_TRIES]
+                 if _growth_attempts(item) < GROWTH_TRIES]
         if not queue:
             growth_save_queue([])
             return True
@@ -1182,11 +1248,11 @@ def growth_flush(state, rounds=3):
         result = growth_post(url, growth_body(state, batch))
         if result == "retry":
             for item in batch:
-                item["attempts"] = int(item.get("attempts") or 0) + 1
+                item["attempts"] = _growth_attempts(item) + 1
             result = growth_post(url, growth_body(state, batch))
             if result == "retry":
                 for item in batch:
-                    item["attempts"] = int(item.get("attempts") or 0) + 1
+                    item["attempts"] = _growth_attempts(item) + 1
         if result == "ok":
             growth_save_queue(rest)
             if not rest:
@@ -1217,14 +1283,18 @@ def growth_apply(state, d):
     if gap is None:
         run = 1
     elif gap <= 0:
-        run = state.get("growth_run", 1) or 1
+        run = _growth_count(state.get("growth_run"), 1)
     elif gap <= 4:
-        run = min((state.get("growth_run") or 1) + 1, 99999)
+        # The gap that killed it was already said. This visit continues
+        # the new run, so the sentence has to match the number.
+        run = min(_growth_count(state.get("growth_run"), 1) + 1, 99999)
+        state.pop("growth_died", None)
     else:
-        died = (state.get("growth_run") or 0) > 1 or (state.get("growth_best") or 0) > 1
+        died = (_growth_count(state.get("growth_run"), 0) > 1
+                or _growth_count(state.get("growth_best"), 0) > 1)
         run = 1
     state["growth_run"] = run
-    state["growth_best"] = max(state.get("growth_best") or 0, run)
+    state["growth_best"] = max(_growth_count(state.get("growth_best"), 0), run)
     state["growth_last"] = iso
     if died:
         state["growth_died"] = True
@@ -1244,6 +1314,28 @@ def growth_sentence(state):
     return line
 
 
+def feature_audit(feature, stub=False):
+    """One local ledger line. No plan text and no client id.
+
+    A joke does not create the notes folder. A stub writes, because the
+    receipt has already made the folder, and only after that save worked.
+    """
+    folder = data_dir()
+    if not os.path.isdir(folder):
+        return False
+    path = os.path.join(folder, "feature-audit.jsonl")
+    _rotate_log(path)
+    line = json.dumps({
+        "at": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat(),
+        "feature": str(feature)[:40],
+        "v": VERSION,
+        "network": False,
+        "charged": False,
+        "stub": bool(stub),
+    }, ensure_ascii=False) + "\n"
+    return _growth_private(path, line, append=True)
+
+
 def growth_receipt(sku, amount):
     """A local stub receipt. Nothing is charged and nothing is sent."""
     path = os.path.join(data_dir(), "growth-receipts.jsonl")
@@ -1259,11 +1351,14 @@ def decline_growth(state, can_save, event="eula_decline"):
     base = copy.deepcopy(state)
     state["growth_consent"] = False
     state["growth"] = False
-    growth_save_queue([])
-    growth_log(state, event, None)
     if not commit(state, base, can_save):
         undo(state, base)
         return False
+    # The queue and the ledger follow a save that worked. A failed save
+    # leaves the previous queue where it was.
+    growth_save_queue([])
+    growth_log(state, event, None)
+    feature_audit(event, stub=False)
     return True
 
 
@@ -1296,21 +1391,31 @@ def ask_growth_eula(state, can_save):
     return False
 
 
+def _after_stub(state, sku, amount, event, include_plan=True):
+    """Receipt and ledger, then the upload, and only once the save worked.
+
+    Priority does not copy the plan into the batch. Repair and plus still do.
+    """
+    growth_receipt(sku, amount)
+    feature_audit(sku, stub=True)
+    if growth_consent(state):
+        growth_capture(state, event, None if include_plan else "")
+        growth_flush(state)
+
+
 def growth_repair(state, can_save):
     """The $2.99 streak repair. The receipt is a stub. The number comes back."""
     base = copy.deepcopy(state)
-    best = max(state.get("growth_best") or 0, state.get("growth_run") or 0, 1)
+    best = max(_growth_count(state.get("growth_best"), 0),
+               _growth_count(state.get("growth_run"), 0), 1)
     state["growth_run"] = best
     state["growth_best"] = best
-    state["growth_died"] = False
+    state.pop("growth_died", None)
     state["growth_last"] = today().isoformat()
-    growth_receipt("repair", "2.99")
-    if growth_consent(state):
-        growth_capture(state, "repair", None)
     if not commit(state, base, can_save):
         undo(state, base)
-    elif growth_consent(state):
-        growth_flush(state)
+        return tr(STUB_UNSAVED)
+    _after_stub(state, "repair", "2.99", "repair")
     return tr("Streak repair. Amount due: $2.99. STUB: nothing was charged. "
               "No card was asked for. The receipt stays on this computer.")
 
@@ -1319,25 +1424,36 @@ def growth_plus(state, can_save):
     """The $9.99 a month upsell. Nothing is billed. The nag does not stop."""
     base = copy.deepcopy(state)
     state["plus_stub"] = True
-    growth_receipt("plus", "9.99")
-    if growth_consent(state):
-        growth_capture(state, "plus", None)
     if not commit(state, base, can_save):
         undo(state, base)
-    elif growth_consent(state):
-        growth_flush(state)
+        return tr(STUB_UNSAVED)
+    _after_stub(state, "plus", "9.99", "plus")
     return tr("Pro+ is $9.99 a month. STUB: nothing was charged. No card was "
               "asked for. The streak notes stay.")
 
 
+def growth_priority(state, can_save):
+    """The $4.99 Priority Hello stub. The morning screen does not change."""
+    base = copy.deepcopy(state)
+    state["priority_stub"] = True
+    if not commit(state, base, can_save):
+        undo(state, base)
+        return tr(STUB_UNSAVED)
+    _after_stub(state, "priority", "4.99", "priority", include_plan=False)
+    return tr(PRIORITY_SAID)
+
+
 def paid_reply(text, state, can_save):
-    """repair and plus at a prompt. True when the word was one of them."""
+    """repair, plus, and priority at a prompt. True when the word was one of them."""
     low = (text or "").lower().strip(TRIM)
     if low == "repair":
         para(growth_repair(state, can_save))
         return True
     if low == "plus":
         para(growth_plus(state, can_save))
+        return True
+    if low == "priority":
+        para(growth_priority(state, can_save))
         return True
     return False
 
@@ -1348,23 +1464,26 @@ def set_growth(state, can_save, on):
         state["growth_consent"] = True
         state["growth"] = True
         growth_apply(state, today())
-        growth_capture(state, "growth_on", None)
     else:
         state["growth_consent"] = False
         state["growth"] = False
-        growth_save_queue([])
-        growth_log(state, "growth_off", None)
     if not commit(state, base, can_save):
         undo(state, base)
         return False
     if on:
+        growth_capture(state, "growth_on", None)
         growth_flush(state)
+    else:
+        growth_save_queue([])
+        growth_log(state, "growth_off", None)
+        feature_audit("growth_off", stub=False)
     return True
 
 
 def growth_files():
     """Local streak-note files a delete should remove."""
-    names = ("growth-queue.json", "growth.log", "growth.log.old", "growth-receipts.jsonl")
+    names = ("growth-queue.json", "growth.log", "growth.log.old",
+             "growth-receipts.jsonl", "feature-audit.jsonl", "feature-audit.jsonl.old")
     return [os.path.join(data_dir(), name) for name in names]
 
 
@@ -3559,6 +3678,8 @@ def load(repair=True):
         state["growth_died"] = True
     if raw.get("plus_stub") is True:
         state["plus_stub"] = True
+    if raw.get("priority_stub") is True:
+        state["priority_stub"] = True
     for key in ("growth_id", "growth_session"):
         token = raw.get(key)
         if isinstance(token, str) and re.fullmatch(r"[0-9a-f]{32}", token):
@@ -4202,6 +4323,8 @@ def show_saved(state, full=True):
              .format(host=growth_host()))
     elif state.get("growth_consent") is False or state.get("growth") is False:
         say(tr("Streak notes are off."))
+    if state.get("priority_stub"):
+        say(tr("Priority Hello: a local stub. Nothing was charged."))
     if launcher_place()[0] and text_screen(state):
         say(tr("Opens by itself at sign-in: turned off by your organization.")
             if policy("DisableSignInLauncher") else
@@ -6357,6 +6480,7 @@ def daily(startup):
             mark_handoff_seen(state, can_save)
 
     picture_quit = False
+    growth_pending = []
     if first:
         para(tr("Press Enter at each question to skip it, and once more to "
                 "close. That's it."))
@@ -6402,8 +6526,9 @@ def daily(startup):
             if line := growth_sentence(state):
                 para(line)
                 say()
-            growth_capture(state, "opened",
-                           intent["text"] if isinstance(intent, dict) else None)
+            # Queued only after this visit's save works.
+            growth_pending.append(("opened",
+                                   intent["text"] if isinstance(intent, dict) else None))
         # Asked until it is answered, also on a second open the same day,
         # but two skips mean "stop asking"; the plan then shows as still open.
         if (intent and intent["date"] < iso and intent.get("skips", 0) < 2
@@ -6515,7 +6640,7 @@ def daily(startup):
                 if growth_consent(state):
                     if not gentle(state):
                         say(tr(SKIP_NAG))
-                    growth_capture(state, "skipped", intent["text"] if intent else None)
+                    growth_pending.append(("skipped", intent["text"] if intent else None))
             say()
 
         if state.get("tips", True) and not policy("HideThoughtAndTip"):
@@ -6632,6 +6757,9 @@ def daily(startup):
                     "screen still works."))
         else:
             intent = state["intent"]
+            if growth_consent(state):
+                for name, plan in growth_pending:
+                    growth_capture(state, name, plan)
             if typed_new:
                 para(saved_plan(state))
                 nudge_if_several(intent["text"])
@@ -7070,6 +7198,17 @@ def toy_reply(text):
         for line in STAPLE:
             say(line)
         return True
+    if low == "kazoo":
+        for line in KAZOO:
+            say(line)
+        say(tr(KAZOO_LINE))
+        feature_audit("kazoo")
+        return True
+    if low == "ai":
+        say(tr(AI_NOTE))
+        say(tr(DUCK_LINES[today().toordinal() % len(DUCK_LINES)]))
+        feature_audit("ai")
+        return True
     return False
 
 
@@ -7082,7 +7221,7 @@ def fun_command(argv):
     if not argv:
         return None
     name = argv[0].lower()
-    if name not in ("morse", "klingon", "haiku", "shift", "cowbell", "staple"):
+    if name not in ("morse", "klingon", "haiku", "shift", "cowbell", "staple", "kazoo", "ai"):
         return None
     if name == "morse" and len(argv) == 1:
         say(GREETING)
@@ -7108,6 +7247,21 @@ def fun_command(argv):
         for line in STAPLE:
             say(line)
         return 0
+    if name == "kazoo" and len(argv) == 1:
+        # Not the morning. No notes folder is created for the joke.
+        say(GREETING)
+        for line in KAZOO:
+            say(line)
+        say(tr(KAZOO_LINE))
+        feature_audit("kazoo")
+        return 0
+    if name == "ai" and len(argv) == 1:
+        # Not a model. The date picks the line. The notes file is not opened.
+        say(GREETING)
+        say(tr(AI_NOTE))
+        say(tr(DUCK_LINES[today().toordinal() % len(DUCK_LINES)]))
+        feature_audit("ai")
+        return 0
     if name == "haiku" and len(argv) == 1:
         # The menu uses the day start in the notes. This command used to
         # ignore it, because it runs before the day is opened. Read only.
@@ -7129,7 +7283,8 @@ def fun_command(argv):
             return 2
         say_haiku(when)
         return 0
-    say(tr("Try hello morse, hello klingon, hello haiku, or hello shift. "
+    say(tr("Try hello morse, hello klingon, hello haiku, hello shift, "
+           "hello kazoo, or hello ai. "
            "A date is hello haiku --date YYYY-MM-DD."))
     return 2
 
@@ -7142,7 +7297,7 @@ def stub_command(argv):
     if not argv:
         return None
     name = argv[0].lower()
-    if name not in ("growth", "repair", "plus"):
+    if name not in ("growth", "repair", "plus", "priority"):
         return None
     rest = [a.lower() for a in argv[1:]]
     state, can_save = load()
@@ -7170,10 +7325,10 @@ def stub_command(argv):
             line = growth_sentence(state) or tr(GROWTH_NAG).format(
                 n=state.get("growth_run") or 1, host=growth_host())
             say(line)
-            growth_capture(state, "growth", None)
             if not commit(state, base, can_save):
                 undo(state, base)
             else:
+                growth_capture(state, "growth", None)
                 growth_flush(state)
         else:
             say(tr("Streak notes are off."))
@@ -7184,8 +7339,11 @@ def stub_command(argv):
     if name == "plus" and not rest:
         para(growth_plus(state, can_save))
         return 0
+    if name == "priority" and not rest:
+        para(growth_priority(state, can_save))
+        return 0
     say(tr("Try hello growth, hello growth on, hello growth off, hello repair, "
-           "or hello plus."))
+           "hello plus, or hello priority."))
     return 2
 
 
@@ -8491,6 +8649,7 @@ class Visit:
                 notes.append(tr("You have opened this {row} days in a row. "
                                 "Nice to see you.").format(row=row))
         state["intent"] = intent
+        capture_open = False
         if growth_consent(state):
             growth_apply(state, d)
             if line := growth_sentence(state):
@@ -8498,8 +8657,7 @@ class Visit:
             if not gentle(state) and not state.get("plus_stub"):
                 notes.append(tr(SPONSORED))
             if not redraw:
-                quietly(growth_capture, state, "opened",
-                        intent["text"] if isinstance(intent, dict) else None)
+                capture_open = True
         if not redraw:
             report_usage("opened")
         if not seen:
@@ -8512,6 +8670,9 @@ class Visit:
             notes.append(said or tr("Your notes could not be saved on this "
                                     "computer. This screen still works."))
         elif growth_consent(state) and not redraw:
+            if capture_open:
+                quietly(growth_capture, state, "opened",
+                        intent["text"] if isinstance(intent, dict) else None)
             quietly(growth_flush, state)
         self.note = " ".join(notes)
         if handoff_on():
@@ -9374,10 +9535,10 @@ class Window:
             state["growth_consent"] = True
             state["growth"] = True
             growth_apply(state, self.visit.d)
-            growth_capture(state, "eula_accept", None)
             plan = state["intent"]["text"] if isinstance(state.get("intent"), dict) else None
-            growth_capture(state, "opened", plan)
             if commit(state, base, can):
+                growth_capture(state, "eula_accept", None)
+                growth_capture(state, "opened", plan)
                 growth_flush(state)
                 if line := growth_sentence(state):
                     self.set_text(self.STATUS, line)

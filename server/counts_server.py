@@ -776,15 +776,34 @@ GROWTH_ID = re.compile(r"^[0-9a-f]{32}$")
 class Growth:
     """Streak-note batches. One JSON line per batch, under growth/, and the
     client's address is not written. Files older than 30 days are removed.
-    A symlink is not followed."""
+    A symlink is not followed. The folder is mode 0700 so other accounts
+    on the machine cannot list the day files."""
 
     def __init__(self, folder):
         self.folder = os.path.join(folder, "growth")
-        os.makedirs(self.folder, exist_ok=True)
+        self.ready = True
+        # A symlink named growth is the directory the next write would
+        # follow. Remove the link itself. If it is still a link, do not
+        # use it. The file it pointed at is left in place.
+        if os.path.islink(self.folder):
+            try:
+                os.unlink(self.folder)
+            except OSError:
+                pass
+        if os.path.islink(self.folder):
+            self.ready = False
+        else:
+            try:
+                os.makedirs(self.folder, exist_ok=True)
+                tighten(self.folder, 0o700)
+            except OSError:
+                self.ready = False
         self.lock = threading.Lock()
 
     def take(self, payload):
         """(status, stored count or an error string)."""
+        if not self.ready or os.path.islink(self.folder):
+            return 500, "not stored"
         if not isinstance(payload, dict) or payload.get("consent") is not True:
             return 400, "consent required"
         cid = payload.get("id")
@@ -824,6 +843,8 @@ class Growth:
         path = os.path.join(self.folder, day + ".jsonl")
         line = (json.dumps({"id": cid, "events": kept}, ensure_ascii=False) + "\n").encode()
         with self.lock:
+            if not self.ready or os.path.islink(self.folder):
+                return 500, "not stored"
             self.trim()
             if os.path.islink(path):
                 return 500, "not stored"

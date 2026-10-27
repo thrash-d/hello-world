@@ -131,3 +131,21 @@ that address at their own counts server. Payments for the $2.99 repair and
 the $9.99 a month Pro+ flag are local stub receipts. `reviews/round-49.md`
 has the dissent, including that gentle mode hides the spoken nag and still
 records the events when the notes were accepted.
+
+## Round 50
+
+The October panel and every persona named in `docs/PERSONAS-2026-10.md` are
+retired. The record stays in those files and in `reviews/`. The sitting
+panel has not read those rounds. It is Bex Calder, Vance Harlow, Nico
+Paredes, Reed Mallory, Amina Soule, and Edith Cho. `reviews/round-50.md`
+has the vote.
+
+What they shipped: `hello kazoo`, `hello ai` (the screen says it is not a
+model and nothing is sent), and a $4.99 Priority Hello stub whose receipt
+is written only after the notes save succeeds. The morning screen and the
+printed page do not gain a line. The sponsored line stays. Reed Mallory
+does not veto. His conditions are in the code: the growth folder is not a
+symlink and is mode 0700, a bad queue does not crash the visit, the ledger
+`feature-audit.jsonl` has no plan text, and a failed save does not write a
+receipt. The death sentence now matches the run on the next continued day.
+Vance Harlow wanted that sentence to stay until someone paid. He lost, 5–1.

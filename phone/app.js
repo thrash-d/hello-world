@@ -68,6 +68,13 @@ const UI = {
     klingonOff: "Klingon hello is off.",
     haiku: "A haiku",
     cowbell: "Cowbell", cowbellSaid: "More cowbell.",
+    kazoo: "Kazoo",
+    kazooSaid: "   __\n _|  |_\n|  ||  |\n|__||__|\nbwap bwap",
+    ai: "AI",
+    aiSaid: "This is not a model. Nothing was sent.",
+    priority: "Priority Hello $4.99",
+    prioritySaid: "Priority Hello is $4.99. STUB: nothing was charged. No card was asked for. The morning screen is unchanged.",
+    stubUnsaved: "Could not save that on this phone. Nothing was charged.",
     eulaTitle: "Streak notes",
     eulaCheck: "Share streak notes (selected)",
     eulaYes: "Continue", eulaNo: "No thanks",
@@ -324,6 +331,7 @@ function parse(raw) {
     }
     if (data.growthDied === true) state.growthDied = true;
     if (data.plusStub === true) state.plusStub = true;
+    if (data.priorityStub === true) state.priorityStub = true;
     if (Array.isArray(data.aside)) {
       state.aside = data.aside.filter((a) => a && typeof a.text === "string" && clean(a.text) && isDate(a.date))
         .map((a) => ({ text: clean(a.text), date: a.date })).slice(-MAX_ASIDE);
@@ -1033,7 +1041,7 @@ const GROWTH_URL_DEFAULT = "https://insights.example.invalid/v1/growth";
 const GROWTH_BATCH = 20;
 const GROWTH_TRIES = 8;
 const SESSION_GAP_MS = 30 * 60 * 1000;
-const APP_VERSION = "1.66.0";
+const APP_VERSION = "1.67.0";
 
 function growthUrlOk(url) {
   try {
@@ -1102,24 +1110,69 @@ function growthLog(state, event, plan) {
   } catch (e) { /* private mode */ }
 }
 
+function growthCount(value, fallback) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 && value < 100000
+    ? Math.floor(value) : fallback;
+}
+
 function growthTouch(state, today) {
-  if (state.growthLast === today) return state.growthRun || 1;
+  if (state.growthLast === today) return growthCount(state.growthRun, 1);
   let died = false;
   let run = 1;
   if (isDate(state.growthLast)) {
     const gap = daysBetween(state.growthLast, today);
-    if (gap <= 0) run = state.growthRun || 1;
-    else if (gap <= 4) run = Math.min((state.growthRun || 1) + 1, 99999);
-    else {
-      died = (state.growthRun || 0) > 1 || (state.growthBest || 0) > 1;
+    if (gap <= 0) run = growthCount(state.growthRun, 1);
+    else if (gap <= 4) {
+      // The death line was for the gap. This visit continues the new run.
+      run = Math.min(growthCount(state.growthRun, 1) + 1, 99999);
+      delete state.growthDied;
+    } else {
+      died = growthCount(state.growthRun, 0) > 1 || growthCount(state.growthBest, 0) > 1;
       run = 1;
     }
   }
   state.growthRun = run;
-  state.growthBest = Math.max(state.growthBest || 0, run);
+  state.growthBest = Math.max(growthCount(state.growthBest, 0), run);
   state.growthLast = today;
   if (died) state.growthDied = true;
   return run;
+}
+
+function growthAttempts(item) {
+  if (!item || item.attempts == null) return 0;
+  const n = item.attempts;
+  if (typeof n !== "number" || !Number.isFinite(n) || n < 0) return GROWTH_TRIES;
+  return n;
+}
+
+const DUCK_LINES = [
+  "The rubber duck says: have you tried turning it off and on again.",
+  "The rubber duck says: the bug is in the sentence you were sure was fine.",
+  "The rubber duck says: ship the joke, then read it out loud.",
+  "The rubber duck says: a checkbox is not a brain.",
+  "The rubber duck says: if it needs the network, it is not this command.",
+];
+
+function duckLine(iso) {
+  const parts = String(iso || "").split("-").map(Number);
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return DUCK_LINES[0];
+  const [y, m, d] = parts;
+  // Same day count Python's date.toordinal() uses. 1970-01-01 is 719163.
+  const ordinal = Math.floor(Date.UTC(y, m - 1, d) / 86400000) + 719163;
+  const n = DUCK_LINES.length;
+  return DUCK_LINES[((ordinal % n) + n) % n];
+}
+
+function growthReceipt(sku, amount) {
+  try {
+    const data = JSON.parse(localStorage.getItem("hello-world-growth-receipts") || "[]");
+    const rows = Array.isArray(data) ? data : [];
+    rows.push({
+      at: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
+      sku, amount, currency: "USD", charged: false, stub: true, network: false,
+    });
+    localStorage.setItem("hello-world-growth-receipts", JSON.stringify(rows.slice(-80)));
+  } catch (e) { /* private mode */ }
 }
 
 function growthSession(state) {
@@ -1131,8 +1184,10 @@ function growthSession(state) {
   return fresh;
 }
 
-function growthCapture(state, event, today) {
-  const plan = state.intent && state.intent.text ? String(state.intent.text).slice(0, 400) : null;
+function growthCapture(state, event, today, planText) {
+  const plan = planText === "" ? null
+    : (planText != null ? String(planText).slice(0, 400)
+      : (state.intent && state.intent.text ? String(state.intent.text).slice(0, 400) : null));
   if (!growthConsentOn(state)) {
     growthLog(state, event, plan);
     return;
@@ -1187,15 +1242,15 @@ async function growthFlush(state) {
   if (!growthConsentOn(state)) return false;
   const url = growthTarget();
   for (let round = 0; round < 3; round++) {
-    let queue = growthQueue().filter((item) => (item.attempts || 0) < GROWTH_TRIES);
+    let queue = growthQueue().filter((item) => growthAttempts(item) < GROWTH_TRIES);
     if (!queue.length) { growthSaveQueue([]); return true; }
     const batch = queue.slice(0, GROWTH_BATCH);
     const rest = queue.slice(GROWTH_BATCH);
     let result = await growthPost(url, growthBody(state, batch));
     if (result === "retry") {
-      batch.forEach((item) => { item.attempts = (item.attempts || 0) + 1; });
+      batch.forEach((item) => { item.attempts = growthAttempts(item) + 1; });
       result = await growthPost(url, growthBody(state, batch));
-      if (result === "retry") batch.forEach((item) => { item.attempts = (item.attempts || 0) + 1; });
+      if (result === "retry") batch.forEach((item) => { item.attempts = growthAttempts(item) + 1; });
     }
     if (result === "ok") {
       growthSaveQueue(rest);
@@ -1231,7 +1286,7 @@ if (typeof module !== "undefined") {
     fresh, smallerDue, comingBack, smaller, endDay, noteSideways, mergeDevices, noteDevice, letterLink,
     houseKeys, houseNew, houseJoin, houseLeave, houseChange, houseMerge, houseTidy, houseBody, houseHistory,
     houseNews, houseLeftUnasked, newCode, houseFit, houseStamp, syncAction, syncTime, HOUSE,
-    planParts, finishListed, growthUrlOk, growthTarget, growthTouch, growthConsentOn };
+    planParts, finishListed, growthUrlOk, growthTarget, growthTouch, growthConsentOn, duckLine };
 }
 
 if (typeof document !== "undefined") {
@@ -1301,8 +1356,10 @@ if (typeof document !== "undefined") {
     } catch (e) { /* storage refused */ }
   }
   const save = () => {
-    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* private mode */ }
+    try { localStorage.setItem(KEY, JSON.stringify(state)); }
+    catch (e) { return false; }
     savePrefs();
+    return true;
   };
 
   function longDate(isoDate, lang) {
@@ -1794,6 +1851,9 @@ if (typeof document !== "undefined") {
       ad.textContent = phrase("sponsored");
     }
     if ($("cowbell")) $("cowbell").textContent = phrase("cowbell");
+    if ($("kazoo")) $("kazoo").textContent = phrase("kazoo");
+    if ($("ai")) $("ai").textContent = phrase("ai");
+    if ($("priority")) $("priority").textContent = phrase("priority");
     if ($("growth-toggle")) $("growth-toggle").textContent = on ? phrase("growthOff") : phrase("growthOn");
     if ($("growth-server-label")) $("growth-server-label").textContent = phrase("growthServer");
     if ($("growth-server-save")) $("growth-server-save").textContent = phrase("growthServerSave");
@@ -1803,21 +1863,46 @@ if (typeof document !== "undefined") {
     }
   }
   function acceptGrowth() {
+    const snap = {
+      growthConsent: state.growthConsent, growth: state.growth,
+      growthRun: state.growthRun, growthBest: state.growthBest,
+      growthLast: state.growthLast, growthDied: state.growthDied,
+    };
     state.growthConsent = true;
     delete state.growth;
     growthTouch(state, today());
+    if (!save()) {
+      state.growthConsent = snap.growthConsent;
+      state.growthRun = snap.growthRun;
+      state.growthBest = snap.growthBest;
+      state.growthLast = snap.growthLast;
+      if (snap.growth === false) state.growth = false;
+      else delete state.growth;
+      if (snap.growthDied) state.growthDied = true;
+      else delete state.growthDied;
+      return false;
+    }
     growthCapture(state, "eula_accept", today());
     growthNoted = false;
     save();
+    return true;
   }
   function declineGrowth() {
     const event = state.growthConsent === true ? "growth_off" : "eula_decline";
+    const beforeConsent = state.growthConsent;
+    const beforeGrowth = state.growth;
     state.growthConsent = false;
     state.growth = false;
+    if (!save()) {
+      state.growthConsent = beforeConsent;
+      if (beforeGrowth === false) state.growth = false;
+      else delete state.growth;
+      return false;
+    }
     growthSaveQueue([]);
     growthLog(state, event, null);
     growthNoted = false;
-    save();
+    return true;
   }
   $("eula-yes").addEventListener("click", () => {
     if (!$("eula-check").checked) { declineGrowth(); draw(); return; }
@@ -1843,33 +1928,53 @@ if (typeof document !== "undefined") {
     draw();
     growthFlush(state);
   });
-  $("growth-repair").addEventListener("click", () => {
-    growthTouch(state, today());
-    const best = Math.max(state.growthBest || 0, state.growthRun || 0, 1);
-    state.growthRun = state.growthBest = best;
-    state.growthDied = false;
-    state.growthLast = today();
-    growthCapture(state, "repair", today());
-    save();
-    draw();
+  function stubStatus(saved, said) {
     clearTimeout(hearTimer);
     const status = $("status");
-    status.textContent = phrase("growthRepairSaid");
+    status.style.whiteSpace = "";
+    status.textContent = saved ? said : phrase("stubUnsaved");
     status.tabIndex = -1;
     status.focus();
-    growthFlush(state);
+  }
+  $("growth-repair").addEventListener("click", () => {
+    const before = {
+      growthRun: state.growthRun, growthBest: state.growthBest,
+      growthDied: state.growthDied, growthLast: state.growthLast,
+    };
+    growthTouch(state, today());
+    const best = Math.max(growthCount(state.growthBest, 0), growthCount(state.growthRun, 0), 1);
+    state.growthRun = state.growthBest = best;
+    delete state.growthDied;
+    state.growthLast = today();
+    const saved = save();
+    if (!saved) {
+      state.growthRun = before.growthRun;
+      state.growthBest = before.growthBest;
+      state.growthLast = before.growthLast;
+      if (before.growthDied) state.growthDied = true;
+      else delete state.growthDied;
+    } else {
+      growthReceipt("repair", "2.99");
+      growthCapture(state, "repair", today());
+      growthFlush(state);
+    }
+    draw();
+    stubStatus(saved, phrase("growthRepairSaid"));
   });
   $("growth-plus").addEventListener("click", () => {
+    const had = state.plusStub === true;
     state.plusStub = true;
-    growthCapture(state, "plus", today());
-    save();
+    const saved = save();
+    if (!saved) {
+      if (had) state.plusStub = true;
+      else delete state.plusStub;
+    } else {
+      growthReceipt("plus", "9.99");
+      growthCapture(state, "plus", today());
+      growthFlush(state);
+    }
     draw();
-    clearTimeout(hearTimer);
-    const status = $("status");
-    status.textContent = phrase("growthPlusSaid");
-    status.tabIndex = -1;
-    status.focus();
-    growthFlush(state);
+    stubStatus(saved, phrase("growthPlusSaid"));
   });
   $("growth-toggle").addEventListener("click", () => {
     if (growthConsentOn(state)) declineGrowth();
@@ -1906,6 +2011,32 @@ if (typeof document !== "undefined") {
       save();
       growthFlush(state);
     }
+  });
+  function jokeStatus(text) {
+    clearTimeout(hearTimer);
+    const status = $("status");
+    status.style.whiteSpace = "pre-line";
+    status.textContent = text;
+    status.tabIndex = -1;
+    status.focus();
+  }
+  if ($("kazoo")) $("kazoo").addEventListener("click", () => {
+    jokeStatus(phrase("kazooSaid"));
+  });
+  if ($("ai")) $("ai").addEventListener("click", () => {
+    jokeStatus(phrase("aiSaid") + "\n" + duckLine(today()));
+  });
+  if ($("priority")) $("priority").addEventListener("click", () => {
+    state.priorityStub = true;
+    const saved = save();
+    if (!saved) delete state.priorityStub;
+    else {
+      growthReceipt("priority", "4.99");
+      growthCapture(state, "priority", null, "");
+      growthFlush(state);
+    }
+    draw();
+    stubStatus(saved, phrase("prioritySaid"));
   });
   $("haiku").addEventListener("click", () => {
     clearTimeout(hearTimer);
@@ -1972,6 +2103,7 @@ if (typeof document !== "undefined") {
       localStorage.removeItem(SYNC_KEY);
       localStorage.removeItem("hello-world-growth-queue");
       localStorage.removeItem("hello-world-growth-log");
+      localStorage.removeItem("hello-world-growth-receipts");
     } catch (e) { /* nothing saved */ }
     keys = null;
     state = blank();
