@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-27: fixes from review round 52
+
+Version 1.69.0. Reed Mallory had accepted three residuals in 1.68.0. He does not accept them now. P-256 signing and verification use libcrypto, which is constant-time. The pure-Python ladder does not run unless an operator who is not him turns it on in a transfer file. `uninstall.ps1` deletes through a directory handle opened so a junction is not followed. If that code cannot load, the folder is left in place. The four install scripts can be Authenticode-signed with `tools/sign-scripts.ps1` or the package build. An unsigned run names the deploying organization. Phone sync keys are non-extractable browser keys in IndexedDB, and the raw copy in local storage is removed. Windows opens of the notes, the handoff file, and the counts secrets refuse a reparse point. A notes folder on Windows is limited to the current user and SYSTEM when the volume allows it.
+
+The sync encryption has an internal review in `docs/SYNC-CRYPTO-REVIEW.md`. The key derivation, the salt, and the blob format are unchanged, so an existing copy still opens. That review is not an outside audit. The screen still says so.
+
+Nothing was removed. Streak notes, sync, reminders, the kazoo, the duck line, and the stub receipts are still there. The default upload is still `https://insights.example.invalid/v1/growth`.
+
 ## 2026-10-27: fixes from review round 51
 
 Version 1.68.0. One push registration whose address contained a space or a control character stopped every phone's reminder: the sender raised `InvalidURL`, which is not an `OSError`, and that thread is the only one that sends. A sync copy that already existed could be replaced by a PUT with no `If-Match`. The sync folder and the day files were created at the process umask, often `0755` and `0644`, so another account on the machine could list the sync labels and read the exact counts. A symlink in the shared handoff folder was followed on read and write. A symlink named `notes.json` was read as the notes. The phone's service worker stored a redirected response under the address that was asked for. The phone page from the counts server had no content security policy and sent a referrer. A streak-note upload was not on the ledger, so the ledger could say nothing had left while a batch had been offered. The plan text is still not on that line.

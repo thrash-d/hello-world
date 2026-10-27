@@ -80,6 +80,8 @@ front as well.
 
 import argparse
 import base64
+import ctypes
+import ctypes.util
 import datetime
 import hashlib
 import json
@@ -165,7 +167,8 @@ class Counts:
             data = {}
         else:
             try:
-                with open(path, encoding="utf-8") as f:
+                fd = open_nofollow(path, os.O_RDONLY)
+                with os.fdopen(fd, "r", encoding="utf-8") as f:
                     data = json.load(f)
             except (OSError, ValueError, RecursionError):
                 data = {}
@@ -343,39 +346,425 @@ class Counts:
             return data
 
 
-# ECDSA on P-256 with SHA-256 (ES256), for the Web Push VAPID signature,
-# with only the standard library.
+# ECDSA on P-256 with SHA-256 (ES256), for the Web Push VAPID signature.
+# The shipping path is libcrypto's NIST P-256, which is constant-time.
+# The pure-Python ladder below does not branch on the scalar. It is not the
+# shipping path: CPython's big integers are still variable-time, so it runs
+# only when an operator who is not Reed Mallory has taken that residual in
+# writing. Reed Mallory does not accept it.
 P256_P = 2**256 - 2**224 + 2**192 + 2**96 - 1
 P256_N = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551
 P256_B = 0x5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2604b
+P256_A = (-3) % P256_P
 P256_G = (0x6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296,
           0x4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5)
+# Projective infinity for the complete addition law. Not a secret.
+_P256_INF = (0, 1, 0)
 
 
-def _add(a, b):
-    if a is None:
-        return b
-    if b is None:
-        return a
-    p = P256_P
-    if a[0] == b[0] and (a[1] + b[1]) % p == 0:
+class P256Unavailable(OSError):
+    """libcrypto is missing and nobody but Reed has taken the other path."""
+
+
+def _transfer_ok(path, token):
+    """True when a regular file names an acceptor who is not Reed Mallory.
+
+    The file is not followed if it is a symlink. `token` is the whole
+    `accepts:` line, for example `variable-time-p256`.
+    """
+    if not path or os.path.islink(path):
+        return False
+    try:
+        info = os.lstat(path)
+        if not stat.S_ISREG(info.st_mode) or info.st_size > 4000:
+            return False
+        with open(path, encoding="utf-8") as handle:
+            text = handle.read(4000)
+    except (OSError, UnicodeError):
+        return False
+    acceptor = ""
+    accepts = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.lower().startswith("acceptor:"):
+            acceptor = stripped.split(":", 1)[1].strip()
+        if stripped.lower() == f"accepts: {token}":
+            accepts = True
+    folded = " ".join(acceptor.lower().split())
+    if not accepts or not (2 <= len(acceptor) <= 80):
+        return False
+    if folded == "reed mallory" or folded.startswith("reed mallory "):
+        return False
+    return True
+
+
+def p256_variable_time_allowed():
+    """The ladder, only with the environment gate and a transfer file."""
+    if os.environ.get("HELLO_P256_VARIABLE_TIME") != "1":
+        return False
+    return _transfer_ok(os.environ.get("HELLO_P256_TRANSFER", ""), "variable-time-p256")
+
+
+def sync_review_status():
+    """`external` only when an operator who is not Reed Mallory says so.
+
+    The internal review is `docs/SYNC-CRYPTO-REVIEW.md`. That file is not
+    an outside audit, and this function does not call it one.
+    """
+    if _transfer_ok(os.environ.get("HELLO_SYNC_EXTERNAL_REVIEW", ""), "sync-external-review"):
+        return "external"
+    return "internal-only"
+
+
+def _ct_gt(a, b):
+    """1 when a > b, else 0. Both are non-negative and fit in 256 bits."""
+    diff = (b - a) & ((1 << 512) - 1)
+    return (diff >> 511) & 1
+
+
+def _ct_select(a, b, bit):
+    """a when bit is 1, else b. bit must be 0 or 1."""
+    mask = -(bit & 1)
+    return (a & mask) | (b & ~mask)
+
+
+def _low_s(s):
+    """The low representative. The choice does not branch on s."""
+    return _ct_select(P256_N - s, s, _ct_gt(s, P256_N // 2))
+
+
+def _libcrypto():
+    """The libcrypto this process already uses, or None."""
+    if getattr(_libcrypto, "done", False):
+        return getattr(_libcrypto, "lib", None)
+    _libcrypto.done = True
+    _libcrypto.lib = None
+    path = None
+    try:
+        with open("/proc/self/maps", encoding="utf-8", errors="replace") as handle:
+            for line in handle:
+                if "libcrypto" in line and "deleted" not in line:
+                    candidate = line.split()[-1]
+                    if os.path.exists(candidate):
+                        path = candidate
+                        break
+    except OSError:
+        path = None
+    if path is None:
+        try:
+            path = ctypes.util.find_library("crypto")
+        except Exception:
+            path = None
+    if path is None:
+        import importlib.util
+        import sys
+        spec = importlib.util.find_spec("_ssl")
+        names = ("libcrypto-3.dll", "libcrypto-3-x64.dll", "libcrypto-1_1.dll",
+                 "libcrypto.so.3", "libcrypto.so.1.1", "libcrypto.dylib")
+        folders = []
+        if spec and spec.origin:
+            origin = os.path.dirname(spec.origin)
+            folders.extend((origin, os.path.join(os.path.dirname(origin), "DLLs")))
+        folders.append(os.path.dirname(sys.executable))
+        for folder in folders:
+            for name in names:
+                candidate = os.path.join(folder, name)
+                if os.path.exists(candidate):
+                    path = candidate
+                    break
+            if path:
+                break
+    if not path:
         return None
-    if a == b:
-        m = (3 * a[0] * a[0] - 3) * pow(2 * a[1], -1, p) % p
-    else:
-        m = (b[1] - a[1]) * pow(b[0] - a[0], -1, p) % p
-    x = (m * m - a[0] - b[0]) % p
-    return x, (m * (a[0] - x) - a[1]) % p
+    try:
+        lib = ctypes.CDLL(path)
+        _bind_libcrypto(lib)
+        # Touch the curve once so a missing symbol fails here, not mid-sign.
+        probe = lib.EC_KEY_new_by_curve_name(415)
+        if not probe:
+            return None
+        lib.EC_KEY_free(probe)
+    except (OSError, AttributeError):
+        return None
+    _libcrypto.lib = lib
+    return lib
 
 
-def _mul(k, point):
-    out = None
-    while k:
-        if k & 1:
-            out = _add(out, point)
-        point = _add(point, point)
-        k >>= 1
-    return out
+def _bind_libcrypto(lib):
+    """Argument sizes for the NIST P-256 calls. Pointers stay pointer-sized."""
+    void = ctypes.c_void_p
+    cint = ctypes.c_int
+    csize = ctypes.c_size_t
+    void_p = ctypes.POINTER(void)
+
+    def bind(name, restype, *args):
+        fn = getattr(lib, name)
+        fn.restype = restype
+        fn.argtypes = list(args)
+        return fn
+
+    bind("EC_KEY_new_by_curve_name", void, cint)
+    bind("EC_KEY_free", None, void)
+    bind("EC_KEY_get0_group", void, void)
+    bind("EC_KEY_set_private_key", cint, void, void)
+    bind("EC_KEY_set_public_key", cint, void, void)
+    bind("EC_POINT_new", void, void)
+    bind("EC_POINT_free", None, void)
+    bind("EC_POINT_mul", cint, void, void, void, void, void, void)
+    bind("EC_POINT_point2oct", csize, void, void, cint, void, csize, void)
+    bind("EC_POINT_oct2point", cint, void, void, void, csize, void)
+    bind("BN_bin2bn", void, void, cint, void)
+    bind("BN_new", void)
+    bind("BN_free", None, void)
+    bind("BN_bn2binpad", cint, void, void, cint)
+    bind("BN_cmp", cint, void, void)
+    bind("BN_dup", void, void)
+    bind("BN_sub", cint, void, void, void)
+    bind("BN_rshift1", cint, void, void)
+    bind("BN_CTX_new", void)
+    bind("BN_CTX_free", None, void)
+    bind("EC_GROUP_get_order", cint, void, void, void)
+    bind("ECDSA_do_sign", void, void, cint, void)
+    bind("ECDSA_do_verify", cint, void, cint, void, void)
+    bind("ECDSA_SIG_new", void)
+    bind("ECDSA_SIG_free", None, void)
+    bind("ECDSA_SIG_get0", None, void, void_p, void_p)
+    bind("ECDSA_SIG_set0", cint, void, void, void)
+    if hasattr(lib, "ERR_clear_error"):
+        bind("ERR_clear_error", None)
+
+
+def _bn_bytes(lib, bn):
+    buf = ctypes.create_string_buffer(32)
+    if lib.BN_bn2binpad(bn, buf, 32) != 32:
+        raise OSError("bignum")
+    return buf.raw
+
+
+def _ossl_public(lib, d):
+    """Uncompressed point from libcrypto. The scalar multiply is OpenSSL's."""
+    key = point = bn = None
+    try:
+        if hasattr(lib, "ERR_clear_error"):
+            lib.ERR_clear_error()
+        key = lib.EC_KEY_new_by_curve_name(415)
+        raw = int(d).to_bytes(32, "big")
+        bn = lib.BN_bin2bn(raw, 32, None)
+        if not key or not bn or lib.EC_KEY_set_private_key(key, bn) != 1:
+            raise OSError("p256 key")
+        group = lib.EC_KEY_get0_group(key)
+        point = lib.EC_POINT_new(group)
+        if not point or lib.EC_POINT_mul(group, point, bn, None, None, None) != 1:
+            raise OSError("p256 mul")
+        if lib.EC_KEY_set_public_key(key, point) != 1:
+            raise OSError("p256 public")
+        buf = ctypes.create_string_buffer(65)
+        if lib.EC_POINT_point2oct(group, point, 4, buf, 65, None) != 65:
+            raise OSError("p256 encode")
+        return buf.raw
+    finally:
+        if point:
+            lib.EC_POINT_free(point)
+        if bn:
+            lib.BN_free(bn)
+        if key:
+            lib.EC_KEY_free(key)
+
+
+def _ossl_sign(lib, d, message):
+    """r || s, low s, from ECDSA_do_sign. Retries only when r or s is zero."""
+    digest = hashlib.sha256(message).digest()
+    key = bn = None
+    try:
+        key = lib.EC_KEY_new_by_curve_name(415)
+        raw = int(d).to_bytes(32, "big")
+        bn = lib.BN_bin2bn(raw, 32, None)
+        if not key or not bn or lib.EC_KEY_set_private_key(key, bn) != 1:
+            raise OSError("p256 key")
+        group = lib.EC_KEY_get0_group(key)
+        point = lib.EC_POINT_new(group)
+        try:
+            if not point or lib.EC_POINT_mul(group, point, bn, None, None, None) != 1:
+                raise OSError("p256 mul")
+            if lib.EC_KEY_set_public_key(key, point) != 1:
+                raise OSError("p256 public")
+        finally:
+            if point:
+                lib.EC_POINT_free(point)
+        order = lib.BN_new()
+        half = lib.BN_new()
+        ctx = lib.BN_CTX_new()
+        try:
+            if (not order or not half or not ctx
+                    or lib.EC_GROUP_get_order(group, order, ctx) != 1
+                    or lib.BN_rshift1(half, order) != 1):
+                raise OSError("p256 order")
+            for _ in range(8):
+                if hasattr(lib, "ERR_clear_error"):
+                    lib.ERR_clear_error()
+                sig = lib.ECDSA_do_sign(digest, 32, key)
+                if not sig:
+                    continue
+                try:
+                    r_ptr = ctypes.c_void_p()
+                    s_ptr = ctypes.c_void_p()
+                    lib.ECDSA_SIG_get0(sig, ctypes.byref(r_ptr), ctypes.byref(s_ptr))
+                    if lib.BN_cmp(s_ptr, half) > 0:
+                        r_copy = lib.BN_dup(r_ptr)
+                        s_low = lib.BN_new()
+                        if (not r_copy or not s_low
+                                or lib.BN_sub(s_low, order, s_ptr) != 1
+                                or lib.ECDSA_SIG_set0(sig, r_copy, s_low) != 1):
+                            if r_copy:
+                                lib.BN_free(r_copy)
+                            if s_low:
+                                lib.BN_free(s_low)
+                            raise OSError("p256 low s")
+                        lib.ECDSA_SIG_get0(sig, ctypes.byref(r_ptr), ctypes.byref(s_ptr))
+                    r_raw = _bn_bytes(lib, r_ptr)
+                    s_raw = _bn_bytes(lib, s_ptr)
+                except OSError:
+                    lib.ECDSA_SIG_free(sig)
+                    raise
+                else:
+                    lib.ECDSA_SIG_free(sig)
+                if int.from_bytes(r_raw, "big") and int.from_bytes(s_raw, "big"):
+                    return r_raw + s_raw
+        finally:
+            if order:
+                lib.BN_free(order)
+            if half:
+                lib.BN_free(half)
+            if ctx:
+                lib.BN_CTX_free(ctx)
+    finally:
+        if bn:
+            lib.BN_free(bn)
+        if key:
+            lib.EC_KEY_free(key)
+    raise OSError("p256 sign")
+
+
+def _ossl_verify(lib, public, message, signature):
+    digest = hashlib.sha256(message).digest()
+    key = point = sig = r_bn = s_bn = None
+    try:
+        if hasattr(lib, "ERR_clear_error"):
+            lib.ERR_clear_error()
+        key = lib.EC_KEY_new_by_curve_name(415)
+        if not key:
+            return False
+        group = lib.EC_KEY_get0_group(key)
+        point = lib.EC_POINT_new(group)
+        if not point or lib.EC_POINT_oct2point(group, point, public, 65, None) != 1:
+            return False
+        if lib.EC_KEY_set_public_key(key, point) != 1:
+            return False
+        sig = lib.ECDSA_SIG_new()
+        r_bn = lib.BN_bin2bn(signature[:32], 32, None)
+        s_bn = lib.BN_bin2bn(signature[32:], 32, None)
+        if not sig or not r_bn or not s_bn or lib.ECDSA_SIG_set0(sig, r_bn, s_bn) != 1:
+            return False
+        # set0 took ownership of both bignums.
+        r_bn = s_bn = None
+        return lib.ECDSA_do_verify(digest, 32, sig, key) == 1
+    except OSError:
+        return False
+    finally:
+        if r_bn:
+            lib.BN_free(r_bn)
+        if s_bn:
+            lib.BN_free(s_bn)
+        if sig:
+            lib.ECDSA_SIG_free(sig)
+        if point:
+            lib.EC_POINT_free(point)
+        if key:
+            lib.EC_KEY_free(key)
+
+
+def _add_complete(p1, p2):
+    """Complete addition on P-256 (Renes, Costello, Batina, a = -3).
+
+    Every step runs for every pair of points, including infinity and P + P.
+    The formula is exception-free. It does not look at the scalar.
+    """
+    x1, y1, z1 = p1
+    x2, y2, z2 = p2
+    p = P256_P
+    b3 = (P256_B * 3) % p
+    t0 = (x1 * x2) % p
+    t1 = (y1 * y2) % p
+    t2 = (z1 * z2) % p
+    t3 = (x1 + y1) % p
+    t4 = (x2 + y2) % p
+    t3 = (t3 * t4) % p
+    t4 = (t0 + t1) % p
+    t3 = (t3 - t4) % p
+    t4 = (x1 + z1) % p
+    t5 = (x2 + z2) % p
+    t4 = (t4 * t5) % p
+    t5 = (t0 + t2) % p
+    t4 = (t4 - t5) % p
+    t5 = (y1 + z1) % p
+    x3 = (y2 + z2) % p
+    t5 = (t5 * x3) % p
+    x3 = (t1 + t2) % p
+    t5 = (t5 - x3) % p
+    z3 = (P256_A * t4) % p
+    x3 = (b3 * t2) % p
+    z3 = (x3 + z3) % p
+    x3 = (t1 - z3) % p
+    z3 = (t1 + z3) % p
+    y3 = (x3 * z3) % p
+    t1 = (t0 + t0) % p
+    t1 = (t1 + t0) % p
+    t2 = (P256_A * t2) % p
+    t4 = (b3 * t4) % p
+    t1 = (t1 + t2) % p
+    t2 = (t0 - t2) % p
+    t2 = (P256_A * t2) % p
+    t4 = (t4 + t2) % p
+    t0 = (t1 * t4) % p
+    y3 = (y3 + t0) % p
+    t0 = (t5 * t4) % p
+    x3 = (t3 * x3) % p
+    x3 = (x3 - t0) % p
+    t0 = (t3 * t1) % p
+    z3 = (t5 * z3) % p
+    z3 = (z3 + t0) % p
+    return x3 % p, y3 % p, z3 % p
+
+
+def _select_point(p1, p2, bit):
+    return tuple(_ct_select(a, b, bit) for a, b in zip(p1, p2))
+
+
+def _to_affine(point):
+    x, y, z = point
+    if z % P256_P == 0:
+        return None
+    inv = pow(z, P256_P - 2, P256_P)
+    return (x * inv) % P256_P, (y * inv) % P256_P
+
+
+def _mul_ladder(k, affine):
+    """Fixed 256-step ladder. The Python path does not branch on bits of k.
+
+    CPython multiplies in variable time. Callers use this only behind
+    p256_variable_time_allowed().
+    """
+    x, y = affine
+    base = (x % P256_P, y % P256_P, 1)
+    r0, r1 = _P256_INF, base
+    for shift in range(255, -1, -1):
+        bit = (k >> shift) & 1
+        added = _add_complete(r0, r1)
+        double0 = _add_complete(r0, r0)
+        double1 = _add_complete(r1, r1)
+        r0 = _select_point(added, double0, bit)
+        r1 = _select_point(double1, added, bit)
+    return _to_affine(r0)
 
 
 def on_curve(point):
@@ -383,39 +772,94 @@ def on_curve(point):
     return (y * y - (x ** 3 - 3 * x + P256_B)) % P256_P == 0
 
 
+def p256_backend():
+    """`openssl` on the shipping path, else `variable-time` or `unavailable`."""
+    if _libcrypto():
+        return "openssl"
+    if p256_variable_time_allowed():
+        return "variable-time"
+    return "unavailable"
+
+
 def p256_public(d):
     """The uncompressed public point, 65 bytes."""
-    x, y = _mul(d, P256_G)
-    return b"\x04" + x.to_bytes(32, "big") + y.to_bytes(32, "big")
+    if not isinstance(d, int) or isinstance(d, bool) or not 1 <= d < P256_N:
+        raise ValueError("scalar")
+    lib = _libcrypto()
+    if lib:
+        return _ossl_public(lib, d)
+    if p256_variable_time_allowed():
+        x, y = _mul_ladder(d, P256_G)
+        return b"\x04" + x.to_bytes(32, "big") + y.to_bytes(32, "big")
+    raise P256Unavailable(
+        "P-256 needs libcrypto. The variable-time ladder is off. "
+        "Reed Mallory has not accepted it.")
+
+
+def _sign_variable_time(d, message):
+    e = int.from_bytes(hashlib.sha256(message).digest(), "big")
+    for _ in range(8):
+        k = secrets.randbelow(P256_N - 1) + 1
+        point = _mul_ladder(k, P256_G)
+        r = point[0] % P256_N
+        # Fixed exponent. Still not constant-time inside CPython.
+        s = _low_s(pow(k, P256_N - 2, P256_N) * (e + r * d) % P256_N)
+        if r and s:
+            return r.to_bytes(32, "big") + s.to_bytes(32, "big")
+    raise OSError("p256 sign")
 
 
 def es256_sign(d, message):
-    """r || s, 64 bytes, as JWS wants."""
-    e = int.from_bytes(hashlib.sha256(message).digest(), "big")
-    while True:
-        k = secrets.randbelow(P256_N - 1) + 1
-        r = _mul(k, P256_G)[0] % P256_N
-        s = pow(k, -1, P256_N) * (e + r * d) % P256_N
-        # The low form. A verifier that rejects the high form would drop
-        # about half of these signatures, and the high form is the same
-        # signature written the other way.
-        if s > P256_N // 2:
-            s = P256_N - s
-        if r and s:
-            return r.to_bytes(32, "big") + s.to_bytes(32, "big")
+    """r || s, 64 bytes, low s, as JWS wants."""
+    if not isinstance(d, int) or isinstance(d, bool) or not 1 <= d < P256_N:
+        raise ValueError("scalar")
+    if not isinstance(message, (bytes, bytearray)):
+        raise TypeError("message")
+    lib = _libcrypto()
+    if lib:
+        return _ossl_sign(lib, d, bytes(message))
+    if p256_variable_time_allowed():
+        return _sign_variable_time(d, bytes(message))
+    raise P256Unavailable(
+        "P-256 needs libcrypto. The variable-time ladder is off. "
+        "Reed Mallory has not accepted it.")
 
 
-def es256_verify(public, message, signature):
-    if len(public) != 65 or public[0] != 4 or len(signature) != 64:
-        return False
+def _project(affine):
+    if affine is None:
+        return _P256_INF
+    return affine[0], affine[1], 1
+
+
+def _verify_variable_time(public, message, signature):
     q = (int.from_bytes(public[1:33], "big"), int.from_bytes(public[33:], "big"))
-    r, s = int.from_bytes(signature[:32], "big"), int.from_bytes(signature[32:], "big")
+    r = int.from_bytes(signature[:32], "big")
+    s = int.from_bytes(signature[32:], "big")
+    if q[0] >= P256_P or q[1] >= P256_P:
+        return False
     if not (on_curve(q) and 0 < r < P256_N and 0 < s < P256_N):
         return False
     e = int.from_bytes(hashlib.sha256(message).digest(), "big")
-    w = pow(s, -1, P256_N)
-    point = _add(_mul(e * w % P256_N, P256_G), _mul(r * w % P256_N, q))
+    w = pow(s, P256_N - 2, P256_N)
+    point = _to_affine(_add_complete(
+        _project(_mul_ladder(e * w % P256_N, P256_G)),
+        _project(_mul_ladder(r * w % P256_N, q)),
+    ))
     return point is not None and point[0] % P256_N == r
+
+
+def es256_verify(public, message, signature):
+    if (not isinstance(public, (bytes, bytearray)) or not isinstance(signature, (bytes, bytearray))
+            or not isinstance(message, (bytes, bytearray))):
+        return False
+    if len(public) != 65 or public[0] != 4 or len(signature) != 64:
+        return False
+    lib = _libcrypto()
+    if lib:
+        return _ossl_verify(lib, bytes(public), bytes(message), bytes(signature))
+    if p256_variable_time_allowed():
+        return _verify_variable_time(bytes(public), bytes(message), bytes(signature))
+    return False
 
 
 def tighten(path, mode):
@@ -485,8 +929,8 @@ def security_note(folder, event, **fields):
     try:
         if os.path.isfile(path) and not os.path.islink(path) and os.path.getsize(path) > 100_000:
             return
-        flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, "O_NOFOLLOW", 0)
-        fd = os.open(path, flags, 0o600)
+        flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
+        fd = open_nofollow(path, flags, 0o600)
     except OSError:
         return
     try:
@@ -497,6 +941,107 @@ def security_note(folder, event, **fields):
         pass
     finally:
         os.close(fd)
+
+
+def open_nofollow(path, flags, mode=0o666):
+    """Open `path` without following a symlink or junction at the final name.
+
+    POSIX sets O_NOFOLLOW. Windows opens with FILE_FLAG_OPEN_REPARSE_POINT
+    and refuses a reparse point, so a name swapped in after a check is the
+    link itself and not the file it points at. The descriptor owns the object
+    that was opened.
+    """
+    if os.name != "nt":
+        return os.open(path, flags | getattr(os, "O_NOFOLLOW", 0), mode)
+    return _win_open_nofollow(path, flags, mode)
+
+
+
+def _win_open_nofollow(path, flags, mode):
+    """CreateFileW with FILE_FLAG_OPEN_REPARSE_POINT. A reparse point is refused."""
+    import ctypes
+    import errno
+    import msvcrt
+    from ctypes import wintypes
+    creat = bool(flags & getattr(os, "O_CREAT", 0))
+    excl = bool(flags & getattr(os, "O_EXCL", 0))
+    trunc = bool(flags & getattr(os, "O_TRUNC", 0))
+    append = bool(flags & getattr(os, "O_APPEND", 0))
+    rdwr = bool(flags & getattr(os, "O_RDWR", 0))
+    write = bool(flags & getattr(os, "O_WRONLY", 0)) or rdwr or append
+    generic_read = 0x80000000
+    generic_write = 0x40000000
+    file_append = 0x0004
+    if append:
+        access = file_append
+    elif write and rdwr:
+        access = generic_read | generic_write
+    elif write:
+        access = generic_write
+    else:
+        access = generic_read
+    if creat and excl:
+        disposition = 1  # CREATE_NEW
+    elif creat and trunc:
+        disposition = 2  # CREATE_ALWAYS
+    elif creat:
+        disposition = 4  # OPEN_ALWAYS
+    else:
+        disposition = 3  # OPEN_EXISTING
+    # FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT
+    attributes = 0x80 | 0x00200000
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.CreateFileW.restype = wintypes.HANDLE
+    kernel.CreateFileW.argtypes = [
+        wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p,
+        wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+    handle = kernel.CreateFileW(path, access, 7, None, disposition, attributes, None)
+    invalid = ctypes.c_void_p(-1).value
+    if not handle or handle == invalid:
+        err = ctypes.get_last_error() or errno.EINVAL
+        raise OSError(err, os.strerror(err), path)
+
+    class Info(ctypes.Structure):
+        _fields_ = [
+            ("attrs", wintypes.DWORD),
+            ("create_low", wintypes.DWORD), ("create_high", wintypes.DWORD),
+            ("access_low", wintypes.DWORD), ("access_high", wintypes.DWORD),
+            ("write_low", wintypes.DWORD), ("write_high", wintypes.DWORD),
+            ("volume", wintypes.DWORD),
+            ("size_high", wintypes.DWORD), ("size_low", wintypes.DWORD),
+            ("links", wintypes.DWORD),
+            ("index_high", wintypes.DWORD), ("index_low", wintypes.DWORD),
+        ]
+
+    info = Info()
+    kernel.GetFileInformationByHandle.argtypes = [wintypes.HANDLE, ctypes.POINTER(Info)]
+    kernel.GetFileInformationByHandle.restype = wintypes.BOOL
+    if not kernel.GetFileInformationByHandle(handle, ctypes.byref(info)):
+        kernel.CloseHandle(handle)
+        err = ctypes.get_last_error() or errno.EINVAL
+        raise OSError(err, os.strerror(err), path)
+    if info.attrs & 0x400:  # FILE_ATTRIBUTE_REPARSE_POINT
+        kernel.CloseHandle(handle)
+        raise OSError(getattr(errno, "ELOOP", 40), "is a link", path)
+    return msvcrt.open_osfhandle(int(handle), 0)
+
+
+
+def seal_windows_fd(fd, folder):
+    """Owner-only access list on Windows. A refusal is the operator's note.
+
+    Unix mode is the control everywhere else. Reed Mallory does not accept
+    a volume that ignores both.
+    """
+    if os.name != "nt" or fd is None:
+        return
+    try:
+        import importlib
+        hello = importlib.import_module("hello")
+        if not hello.seal_owner_fd(fd):
+            hello.note_dacl_transfer(folder)
+    except (ImportError, OSError):
+        pass
 
 
 def write_private(path, text):
@@ -510,17 +1055,16 @@ def write_private(path, text):
     """
     tmp = path + ".tmp"
     flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
-    nofollow = getattr(os, "O_NOFOLLOW", 0)
-    flags |= nofollow
     try:
-        fd = os.open(tmp, flags, 0o600)
+        fd = open_nofollow(tmp, flags, 0o600)
     except OSError:
-        if nofollow and os.path.islink(tmp):
+        if os.path.islink(tmp):
             os.unlink(tmp)
-            fd = os.open(tmp, flags, 0o600)
+            fd = open_nofollow(tmp, flags, 0o600)
         else:
             raise
     try:
+        seal_windows_fd(fd, os.path.dirname(path))
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(text)
     except Exception:
@@ -613,7 +1157,8 @@ class Push:
             write_private(key, json.dumps({"d": format(self.d, "064x")}))
         else:
             try:
-                with open(key, encoding="utf-8") as f:
+                fd = open_nofollow(key, os.O_RDONLY)
+                with os.fdopen(fd, "r", encoding="utf-8") as f:
                     self.d = int(json.load(f)["d"], 16)
                 if not 1 <= self.d < P256_N:
                     raise ValueError("scalar")
@@ -660,7 +1205,8 @@ class Push:
             # A symlink is replaced below. It is not opened.
             if not os.path.islink(path):
                 try:
-                    with open(path, encoding="utf-8") as f:
+                    fd = open_nofollow(path, os.O_RDONLY)
+                    with os.fdopen(fd, "r", encoding="utf-8") as f:
                         old = json.load(f)
                     # The same address and the same times keep what was already
                     # sent. A new address is a new subscription, and a file whose
@@ -748,7 +1294,8 @@ class Push:
                 if time.time() - os.path.getmtime(path) > SYNC_DAYS * 86400:
                     self.forget(token)
                     continue
-                with open(path, encoding="utf-8") as f:
+                fd = open_nofollow(path, os.O_RDONLY)
+                with os.fdopen(fd, "r", encoding="utf-8") as f:
                     data = json.load(f)
             except (OSError, ValueError):
                 continue
@@ -800,7 +1347,8 @@ class Push:
         if os.path.islink(path):
             return None
         try:
-            with open(path, encoding="utf-8") as f:
+            fd = open_nofollow(path, os.O_RDONLY)
+            with os.fdopen(fd, "r", encoding="utf-8") as f:
                 current = json.load(f)
         except (OSError, ValueError):
             return None
@@ -837,7 +1385,8 @@ class Push:
             if os.path.islink(path):
                 return
             try:
-                with open(path, encoding="utf-8") as f:
+                fd = open_nofollow(path, os.O_RDONLY)
+                with os.fdopen(fd, "r", encoding="utf-8") as f:
                     current = json.load(f)
             except (OSError, ValueError):
                 return
@@ -970,9 +1519,9 @@ class Growth:
                 size = 0
             if size + len(line) > GROWTH_DAY_BYTES:
                 return 413, "full"
-            flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, "O_NOFOLLOW", 0)
+            flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
             try:
-                fd = os.open(path, flags, 0o600)
+                fd = open_nofollow(path, flags, 0o600)
             except OSError:
                 return 500, "not stored"
             try:
@@ -980,6 +1529,7 @@ class Growth:
                 # group bits, so a normal umask leaves it. fchmod sets it.
                 if hasattr(os, "fchmod"):
                     os.fchmod(fd, 0o600)
+                seal_windows_fd(fd, self.folder)
                 os.write(fd, line)
             finally:
                 os.close(fd)
@@ -1102,8 +1652,11 @@ def handler(counts, phone=None, push=None, growth=None, growth_page=False):
                     if time.time() - st.st_mtime > SYNC_DAYS * 86400:
                         os.remove(path)
                         return self.reply(404, {"error": "not found"})
-                    with open(path, "rb") as f:
-                        raw = f.read(MAX_SYNC)
+                    fd = open_nofollow(path, os.O_RDONLY)
+                    try:
+                        raw = os.read(fd, MAX_SYNC)
+                    finally:
+                        os.close(fd)
                 except OSError:
                     return self.reply(404, {"error": "not found"})
                 self.send_response(200)
@@ -1181,8 +1734,11 @@ def handler(counts, phone=None, push=None, growth=None, growth_page=False):
                 current = None
                 if not link:
                     try:
-                        with open(path, "rb") as f:
-                            current = etag(f.read(MAX_SYNC))
+                        fd = open_nofollow(path, os.O_RDONLY)
+                        try:
+                            current = etag(os.read(fd, MAX_SYNC))
+                        finally:
+                            os.close(fd)
                     except OSError:
                         current = None
                 # If-Match names the copy the writer last read. A missing
@@ -1209,14 +1765,15 @@ def handler(counts, phone=None, push=None, growth=None, growth_page=False):
                     except OSError:
                         return self.reply(500, {"error": "not stored"})
                 tmp = f"{path}.{secrets.token_hex(4)}.tmp"
-                flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+                flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
                 try:
-                    fd = os.open(tmp, flags, 0o600)
+                    fd = open_nofollow(tmp, flags, 0o600)
                 except OSError:
                     return self.reply(500, {"error": "not stored"})
                 try:
                     if hasattr(os, "fchmod"):
                         os.fchmod(fd, 0o600)
+                    seal_windows_fd(fd, os.path.dirname(path))
                     os.write(fd, raw)
                 except OSError:
                     try:
@@ -1338,7 +1895,14 @@ def main(argv=None):
     threading.Thread(target=server.counts.run_sweep, daemon=True).start()
     if server.push:
         threading.Thread(target=server.push.run, daemon=True).start()
+    review = sync_review_status()
+    backend = p256_backend()
+    security_note(args.data, "p256_backend", result=backend)
+    security_note(args.data, "sync_review", result=review)
     print(f"hello-world counts on {args.host}:{server.server_address[1]}, data in {args.data}")
+    # The internal review is not an outside audit. Wide promotion stays with
+    # the deploying organization. Reed Mallory is not the acceptor.
+    print(f"sync review: {review}; P-256: {backend}")
     server.serve_forever()
 
 

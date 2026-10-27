@@ -631,7 +631,7 @@ def help_text():
                           "hello growth off stops streak notes. "
                           "hello priority writes a local stub receipt and does not bill."))
 
-VERSION = "1.68.0"
+VERSION = "1.69.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -818,6 +818,264 @@ def long_date(d):
     day = data.get("first", 1) if d.day == 1 else d.day
     return data["date"].format(day=data["days"][d.weekday()], d=day,
                                month=data["months"][d.month - 1], year=d.year)
+
+
+def open_nofollow(path, flags, mode=0o666):
+    """Open `path` without following a symlink or junction at the final name.
+
+    POSIX sets O_NOFOLLOW. Windows opens with FILE_FLAG_OPEN_REPARSE_POINT
+    and refuses a reparse point, so a name swapped in after a check is the
+    link itself and not the file it points at. The descriptor owns the object
+    that was opened.
+    """
+    if os.name != "nt":
+        return os.open(path, flags | getattr(os, "O_NOFOLLOW", 0), mode)
+    return _win_open_nofollow(path, flags, mode)
+
+
+def read_text_nofollow(path, limit, encoding="utf-8"):
+    """The text of a regular file, or OSError when the name is a link."""
+    fd = open_nofollow(path, os.O_RDONLY)
+    with os.fdopen(fd, "r", encoding=encoding) as handle:
+        return handle.read(limit)
+
+
+def seal_owner_fd(fd):
+    """On Windows, limit this open file to the current user and SYSTEM.
+
+    Elsewhere the Unix mode is the control. A volume that refuses the
+    access list returns False; the notes are still written.
+    """
+    if os.name != "nt" or fd is None:
+        return True
+    try:
+        return _win_seal_handle(fd, is_dir=False)
+    except OSError:
+        return False
+
+
+def seal_owner_dir(path):
+    """Owner-only access list on a notes directory. No-op off Windows.
+
+    The handoff folder is not passed here: other people on that PC have to
+    be able to read it. A refusal is recorded once, for the operator who
+    keeps the folder, and is not accepted by Reed Mallory.
+    """
+    if os.name != "nt" or os.path.islink(path):
+        return True
+    try:
+        if not _win_seal_path(path):
+            note_dacl_transfer(path)
+            return False
+    except OSError:
+        note_dacl_transfer(path)
+        return False
+    return True
+
+
+def note_dacl_transfer(folder):
+    """One file when Windows will not set the access list. Written once."""
+    if os.name != "nt" or not folder or os.path.islink(folder):
+        return
+    path = os.path.join(folder, "dacl-transfer.txt")
+    try:
+        if os.path.lexists(path):
+            return
+        fd = open_nofollow(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except OSError:
+        return
+    text = (
+        "This folder's volume refused an owner-only access list.\n"
+        "Reed Mallory does not accept that residual.\n"
+        "The operator who keeps this folder accepts it by writing a name\n"
+        "that is not Reed Mallory on the acceptor line.\n"
+        "acceptor:\n"
+    )
+    try:
+        os.write(fd, text.encode("utf-8"))
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
+
+
+def _win_open_nofollow(path, flags, mode):
+    """CreateFileW with FILE_FLAG_OPEN_REPARSE_POINT. A reparse point is refused."""
+    import ctypes
+    import errno
+    import msvcrt
+    from ctypes import wintypes
+    creat = bool(flags & getattr(os, "O_CREAT", 0))
+    excl = bool(flags & getattr(os, "O_EXCL", 0))
+    trunc = bool(flags & getattr(os, "O_TRUNC", 0))
+    append = bool(flags & getattr(os, "O_APPEND", 0))
+    rdwr = bool(flags & getattr(os, "O_RDWR", 0))
+    write = bool(flags & getattr(os, "O_WRONLY", 0)) or rdwr or append
+    generic_read = 0x80000000
+    generic_write = 0x40000000
+    file_append = 0x0004
+    if append:
+        access = file_append
+    elif write and rdwr:
+        access = generic_read | generic_write
+    elif write:
+        access = generic_write
+    else:
+        access = generic_read
+    if creat and excl:
+        disposition = 1  # CREATE_NEW
+    elif creat and trunc:
+        disposition = 2  # CREATE_ALWAYS
+    elif creat:
+        disposition = 4  # OPEN_ALWAYS
+    else:
+        disposition = 3  # OPEN_EXISTING
+    # FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT
+    attributes = 0x80 | 0x00200000
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.CreateFileW.restype = wintypes.HANDLE
+    kernel.CreateFileW.argtypes = [
+        wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p,
+        wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+    handle = kernel.CreateFileW(path, access, 7, None, disposition, attributes, None)
+    invalid = ctypes.c_void_p(-1).value
+    if not handle or handle == invalid:
+        err = ctypes.get_last_error() or errno.EINVAL
+        raise OSError(err, os.strerror(err), path)
+
+    class Info(ctypes.Structure):
+        _fields_ = [
+            ("attrs", wintypes.DWORD),
+            ("create_low", wintypes.DWORD), ("create_high", wintypes.DWORD),
+            ("access_low", wintypes.DWORD), ("access_high", wintypes.DWORD),
+            ("write_low", wintypes.DWORD), ("write_high", wintypes.DWORD),
+            ("volume", wintypes.DWORD),
+            ("size_high", wintypes.DWORD), ("size_low", wintypes.DWORD),
+            ("links", wintypes.DWORD),
+            ("index_high", wintypes.DWORD), ("index_low", wintypes.DWORD),
+        ]
+
+    info = Info()
+    kernel.GetFileInformationByHandle.argtypes = [wintypes.HANDLE, ctypes.POINTER(Info)]
+    kernel.GetFileInformationByHandle.restype = wintypes.BOOL
+    if not kernel.GetFileInformationByHandle(handle, ctypes.byref(info)):
+        kernel.CloseHandle(handle)
+        err = ctypes.get_last_error() or errno.EINVAL
+        raise OSError(err, os.strerror(err), path)
+    if info.attrs & 0x400:  # FILE_ATTRIBUTE_REPARSE_POINT
+        kernel.CloseHandle(handle)
+        raise OSError(getattr(errno, "ELOOP", 40), "is a link", path)
+    return msvcrt.open_osfhandle(int(handle), 0)
+
+
+def _win_user_and_system_sids():
+    """(current user SID bytes-pointer buffer, SYSTEM sid buffer)."""
+    import ctypes
+    from ctypes import wintypes
+    adv = ctypes.WinDLL("advapi32", use_last_error=True)
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    token = wintypes.HANDLE()
+    if not adv.OpenProcessToken(kernel.GetCurrentProcess(), 0x0008, ctypes.byref(token)):
+        raise OSError("token")
+    needed = wintypes.DWORD(0)
+    adv.GetTokenInformation(token, 1, None, 0, ctypes.byref(needed))
+    user = ctypes.create_string_buffer(needed.value)
+    if not adv.GetTokenInformation(token, 1, user, needed, ctypes.byref(needed)):
+        kernel.CloseHandle(token)
+        raise OSError("token user")
+    kernel.CloseHandle(token)
+    system = ctypes.create_string_buffer(68)
+    size = wintypes.DWORD(len(system))
+    # WinLocalSystemSid = 22
+    if not adv.CreateWellKnownSid(22, None, system, ctypes.byref(size)):
+        raise OSError("system sid")
+    return user, system
+
+
+def _win_apply_dacl(handle, is_dir, user, system):
+    import ctypes
+    from ctypes import wintypes
+    adv = ctypes.WinDLL("advapi32", use_last_error=True)
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+
+    class Trustee(ctypes.Structure):
+        _fields_ = [
+            ("multiple", ctypes.c_void_p),
+            ("operation", wintypes.DWORD),
+            ("form", wintypes.DWORD),
+            ("type", wintypes.DWORD),
+            ("name", ctypes.c_void_p),
+        ]
+
+    class Explicit(ctypes.Structure):
+        _fields_ = [
+            ("permissions", wintypes.DWORD),
+            ("mode", wintypes.DWORD),
+            ("inheritance", wintypes.DWORD),
+            ("trustee", Trustee),
+        ]
+
+    # TOKEN_USER begins with a pointer to the SID.
+    user_sid = ctypes.cast(user, ctypes.POINTER(ctypes.c_void_p)).contents.value
+    system_sid = ctypes.addressof(system)
+    entries = (Explicit * 2)()
+    inherit = 0x3 if is_dir else 0  # object and container inherit
+    for entry, sid, kind in (
+            (entries[0], user_sid, 1),  # TRUSTEE_IS_USER
+            (entries[1], system_sid, 1)):
+        entry.permissions = 0x1F01FF  # FILE_ALL_ACCESS
+        entry.mode = 1  # GRANT_ACCESS
+        entry.inheritance = inherit
+        entry.trustee.form = 0  # TRUSTEE_IS_SID
+        entry.trustee.type = kind
+        entry.trustee.name = sid
+    new_acl = ctypes.c_void_p()
+    adv.SetEntriesInAclW.argtypes = [
+        wintypes.ULONG, ctypes.POINTER(Explicit), ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p)]
+    adv.SetEntriesInAclW.restype = wintypes.DWORD
+    if adv.SetEntriesInAclW(2, entries, None, ctypes.byref(new_acl)) != 0:
+        return False
+    try:
+        adv.SetSecurityInfo.argtypes = [
+            wintypes.HANDLE, wintypes.DWORD, wintypes.DWORD,
+            ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+        adv.SetSecurityInfo.restype = wintypes.DWORD
+        # SE_FILE_OBJECT, PROTECTED_DACL | DACL
+        status = adv.SetSecurityInfo(handle, 1, 0x80000004, None, None, new_acl, None)
+        return status == 0
+    finally:
+        kernel.LocalFree(new_acl)
+
+
+def _win_seal_handle(fd, is_dir):
+    import msvcrt
+    user, system = _win_user_and_system_sids()
+    return _win_apply_dacl(msvcrt.get_osfhandle(fd), is_dir, user, system)
+
+
+def _win_seal_path(path):
+    import ctypes
+    import msvcrt
+    from ctypes import wintypes
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.CreateFileW.restype = wintypes.HANDLE
+    kernel.CreateFileW.argtypes = [
+        wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p,
+        wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+    # FILE_READ_ATTRIBUTES | READ_CONTROL | WRITE_DAC, backup semantics, no follow
+    # READ_CONTROL | WRITE_DAC, so the access list can be replaced.
+    # FILE_FLAG_BACKUP_SEMANTICS opens a directory. OPEN_REPARSE_POINT
+    # does not follow a junction swapped in under this name.
+    handle = kernel.CreateFileW(
+        path, 0x00020000 | 0x00040000, 7, None, 3, 0x02000000 | 0x00200000, None)
+    invalid = ctypes.c_void_p(-1).value
+    if not handle or handle == invalid:
+        return False
+    fd = msvcrt.open_osfhandle(int(handle), 0)
+    try:
+        return _win_seal_handle(fd, is_dir=True)
+    finally:
+        os.close(fd)
 
 
 def data_dir():
@@ -1020,11 +1278,13 @@ def _growth_private(path, text, append=False):
                 os.chmod(parent, 0o700)
             except OSError:
                 pass
+            seal_owner_dir(parent)
         flags = os.O_WRONLY | os.O_CREAT | (os.O_APPEND if append else os.O_TRUNC)
-        flags |= getattr(os, "O_NOFOLLOW", 0)
-        fd = os.open(path, flags, 0o600)
+        fd = open_nofollow(path, flags, 0o600)
         if hasattr(os, "fchmod"):
             os.fchmod(fd, 0o600)
+        if not seal_owner_fd(fd):
+            note_dacl_transfer(parent)
     except OSError:
         if fd is not None:
             try:
@@ -1049,8 +1309,7 @@ def growth_load_queue():
     try:
         if os.path.islink(path):
             return []
-        with open(path, encoding="utf-8") as f:
-            data = json.load(f)
+        data = json.loads(read_text_nofollow(path, 200_000))
     except (OSError, ValueError):
         return []
     if not isinstance(data, list):
@@ -1519,8 +1778,8 @@ def growth_files():
 # bytes under a label made from the same code and can't read them. It is
 # built from what both Python's standard library and a browser's WebCrypto
 # have: PBKDF2, then HMAC-SHA256 as a counter-mode stream with an HMAC tag
-# over the result (encrypt-then-MAC). It has had no outside audit, which the
-# README says.
+# over the result (encrypt-then-MAC). docs/SYNC-CRYPTO-REVIEW.md is an
+# internal review. It is not an outside audit. The screen still says so.
 SYNC_SALT = b"hello-world sync v1"
 SYNC_ROUNDS = 200_000
 SYNC_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"  # no 0, 1, i, l or o
@@ -1552,6 +1811,9 @@ def _stream(key, nonce, size):
 
 def seal_sync(enc, mac, data, nonce=None):
     """Encrypt then tag: b"v1" + nonce + ciphertext + tag."""
+    if (not isinstance(enc, (bytes, bytearray)) or not isinstance(mac, (bytes, bytearray))
+            or len(enc) != 32 or len(mac) != 32):
+        raise ValueError("sync key")
     nonce = nonce or os.urandom(16)
     plain = json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode()
     cipher = bytes(a ^ b for a, b in zip(plain, _stream(enc, nonce, len(plain))))
@@ -1561,14 +1823,19 @@ def seal_sync(enc, mac, data, nonce=None):
 
 def open_sync(enc, mac, blob):
     """The data in a sealed blob, or None when it was changed or isn't ours."""
-    if len(blob) < 50 or blob[:2] != b"v1":
+    if (not isinstance(blob, (bytes, bytearray)) or len(blob) < 50
+            or len(blob) > MAX_SYNC or blob[:2] != b"v1"):
+        return None
+    if (not isinstance(enc, (bytes, bytearray)) or not isinstance(mac, (bytes, bytearray))
+            or len(enc) != 32 or len(mac) != 32):
         return None
     nonce, cipher, tag = blob[2:18], blob[18:-32], blob[-32:]
     if not hmac.compare_digest(tag, hmac.new(mac, b"v1" + nonce + cipher, hashlib.sha256).digest()):
         return None
     try:
-        data = json.loads(bytes(a ^ b for a, b in zip(cipher, _stream(enc, nonce, len(cipher)))))
-    except ValueError:
+        plain = bytes(a ^ b for a, b in zip(cipher, _stream(enc, nonce, len(cipher))))
+        data = json.loads(plain.decode("utf-8"))
+    except (ValueError, UnicodeError, TypeError):
         return None
     return data if isinstance(data, dict) else None
 
@@ -3247,17 +3514,20 @@ def log_error(error):
                 os.chmod(data_dir(), 0o700)
             except OSError:
                 pass
+            seal_owner_dir(data_dir())
         if os.path.islink(path):
             return
         old = path + ".old"
         if (os.path.isfile(path) and not os.path.islink(path)
                 and os.path.getsize(path) > 100_000 and not os.path.islink(old)):
             os.replace(path, old)
-        flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, "O_NOFOLLOW", 0)
-        fd = os.open(path, flags, 0o600)
+        flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
+        fd = open_nofollow(path, flags, 0o600)
         try:
             if hasattr(os, "fchmod"):
                 os.fchmod(fd, 0o600)
+            if not seal_owner_fd(fd):
+                note_dacl_transfer(data_dir())
             os.write(fd, line.encode("utf-8"))
         finally:
             os.close(fd)
@@ -3650,8 +3920,7 @@ def load(repair=True):
     if os.path.islink(path):
         return state, False
     try:
-        with open(path, encoding="utf-8-sig") as f:
-            text = f.read(MAX_FILE + 1)
+        text = read_text_nofollow(path, MAX_FILE + 1, "utf-8-sig")
     except FileNotFoundError:
         return state, True
     except OSError:
@@ -4016,6 +4285,7 @@ def save(state):
             os.chmod(data_dir(), 0o700)
         except OSError:
             pass
+        seal_owner_dir(data_dir())
         if os.path.islink(data_file()):
             return False
         tmp = f"{data_file()}.{os.getpid()}.tmp"
@@ -4025,10 +4295,12 @@ def save(state):
             pass
         # Created private, never through a link, and flushed to disk before it
         # replaces the real file, so a power cut can't leave a half-written one.
-        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
-        fd = os.open(tmp, flags, 0o600)
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+        fd = open_nofollow(tmp, flags, 0o600)
         if hasattr(os, "fchmod"):
             os.fchmod(fd, 0o600)
+        if not seal_owner_fd(fd):
+            note_dacl_transfer(data_dir())
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(seal(json.dumps(file_form(state), indent=2)))
             f.flush()
@@ -4237,7 +4509,9 @@ def launcher_command():
     skips it.
     """
     script = os.path.abspath(__file__)
-    if any(c in script + window_python() for c in '"%'):
+    # "!" is expanded when a test launcher is a .cmd and delayed expansion
+    # is on. The shipping launcher is a registry value. Both refuse it.
+    if any(c in script + window_python() for c in '"%!'):
         return None
     return f'"{window_python()}" -I "{script}" --startup'
 
@@ -4336,7 +4610,8 @@ def write_launcher_file(path, command):
     tmp = f"{path}.{os.getpid()}.tmp"
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(tmp, "w", encoding="ascii", newline="") as f:
+        fd = open_nofollow(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w", encoding="ascii", newline="") as f:
             f.write("@echo off\r\n" + command + "\r\n")
         os.replace(tmp, path)
     except (OSError, UnicodeEncodeError):
@@ -4527,9 +4802,13 @@ def file_lock(folder=None, name="notes.lock"):
             except OSError:
                 yield
                 return
-        fd = os.open(lock_path, os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), mode)
+        fd = open_nofollow(lock_path, os.O_RDWR | os.O_CREAT, mode)
         if hasattr(os, "fchmod"):
             os.fchmod(fd, mode)
+        # The handoff lock stays readable by the shared folder. The notes
+        # lock does not. A volume that refuses the list is the operator's.
+        if mode == 0o600 and not seal_owner_fd(fd):
+            note_dacl_transfer(folder)
     except OSError:
         if fd is not None:
             try:
@@ -6989,8 +7268,7 @@ def read_handoff():
     if os.path.islink(path):
         return []
     try:
-        with open(path, encoding="utf-8") as f:
-            raw = json.loads(f.read(100_000))
+        raw = json.loads(read_text_nofollow(path, 100_000))
         raw = unseal(raw) if isinstance(raw, dict) else {}
     except (OSError, ValueError, RecursionError):
         return []
@@ -7020,8 +7298,8 @@ def write_handoff(notes):
             text = seal(text, machine=True)
         # The pid in the temp name was guessable on a shared folder.
         tmp = os.path.join(folder, f"handoff.json.{os.urandom(4).hex()}.tmp")
-        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
-        fd = os.open(tmp, flags, 0o666)
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+        fd = open_nofollow(tmp, flags, 0o666)
         try:
             os.write(fd, text.encode("utf-8"))
         finally:

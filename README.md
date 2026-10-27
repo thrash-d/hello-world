@@ -626,7 +626,10 @@ code before they go, and the counts server keeps only the encrypted copy under
 a label made from the same code. The phone app needs to be served by that
 counts server (`--phone`). The scheme is PBKDF2-SHA256, then HMAC-SHA256 as a
 counter-mode stream with an HMAC tag, built from what both Python's standard
-library and a browser have; it has had no outside audit. `hello.cmd sync code`
+library and a browser have. An internal review is in
+`docs/SYNC-CRYPTO-REVIEW.md`. That file is not an outside audit. The
+deploying organization signs the outside review before wide promotion
+(`docs/transfers/sync-external-review.md`). `hello.cmd sync code`
 shows the code again for a new phone, and `hello.cmd sync new` (or **Change
 my sync code**) makes a new one, moves the copy and deletes the old one, so a
 code someone else saw stops working.
@@ -658,7 +661,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.68.0'
+$tag = 'v1.69.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
