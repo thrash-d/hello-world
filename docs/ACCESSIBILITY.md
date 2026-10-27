@@ -28,14 +28,15 @@ everyone. Web criteria apply only where they carry over.
 - One top-to-bottom flow of plain text: no colors, no cursor movement,
   nothing redrawn, so a screen reader reads it in order. A picture of
   characters can follow the days-in-a-row line, and only if the person types
-  pic. Enter skips it.
+  pic. Enter skips it. From 1.65.0, `q` at that question, and at Enter to
+  continue after the picture, closes the visit.
 - Every prompt ends by saying what Enter does, such as "Enter to close".
   From 1.63.0 the prompt itself ends in a colon, unless `colon_prompts` is off.
   From 1.64.0 that includes a cue with no space before the greater-than sign,
   which is how some Chinese and Japanese prompts are written. The sentence
   "Prefer no follow-up questions? Options > What the window shows." is not a
   prompt, and it still says greater. A joke line never replaces Hello, world!. Morse is a command,
-  not the morning.
+  not the morning. `hello shift` is a command too. It prints the greeting and one plain sentence, it does not read the clock, and it is not on the phone.
 - Long prompts and paragraphs wrap to the window width, down to 30 columns,
   so nothing runs off a magnified screen.
 - No time limits: no prompt times out and nothing closes by itself.
@@ -47,7 +48,7 @@ everyone. Web criteria apply only where they carry over.
 - The menu is read once and listed again only on request, and Help explains
   the words rather than repeating the menu.
 - Tips that assumed sight offer another way to do them.
-- `q` closes from any question, and Ctrl+C skips just one prompt, so an
+- `q` closes from any question, including the picture, and Ctrl+C skips just one prompt, so an
   accidental key press doesn't end the visit.
 - Group Policy and menu settings remove content people don't want read every
   day: the thought and tip, and the days-in-a-row message.
@@ -66,6 +67,14 @@ everyone. Web criteria apply only where they carry over.
 - A message after a button, such as "Kept for today.", changes a label's text.
   Screen readers don't announce that by themselves; focus moves to the plan
   box next, and the message sits just above it.
+
+## The phone
+
+- After the first Skip the question is still there, and focus stays on that
+  button. The status line is live, so the words are announced without leaving
+  the button. A second Skip hides the question. Focus then goes to the status
+  line, and to the plan box when that box is on screen. This was not checked
+  with NVDA.
 
 ## Known limits
 
