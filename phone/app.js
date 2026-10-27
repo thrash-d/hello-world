@@ -1041,7 +1041,7 @@ const GROWTH_URL_DEFAULT = "https://insights.example.invalid/v1/growth";
 const GROWTH_BATCH = 20;
 const GROWTH_TRIES = 8;
 const SESSION_GAP_MS = 30 * 60 * 1000;
-const APP_VERSION = "1.67.0";
+const APP_VERSION = "1.68.0";
 
 function growthUrlOk(url) {
   try {
@@ -1238,6 +1238,24 @@ async function growthPost(url, body) {
   }
 }
 
+function securityNote(event, extra) {
+  // Host and result only. No plan text and no client id.
+  if (typeof localStorage === "undefined") return;
+  try {
+    const data = JSON.parse(localStorage.getItem("hello-world-security-audit") || "[]");
+    const rows = Array.isArray(data) ? data : [];
+    const row = {
+      at: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
+      event: String(event).slice(0, 40),
+    };
+    if (extra && typeof extra.host === "string") row.host = extra.host.slice(0, 200);
+    if (extra && typeof extra.result === "string") row.result = extra.result.slice(0, 20);
+    if (extra && typeof extra.n === "number" && Number.isFinite(extra.n)) row.n = extra.n;
+    rows.push(row);
+    localStorage.setItem("hello-world-security-audit", JSON.stringify(rows.slice(-40)));
+  } catch (e) { /* private mode */ }
+}
+
 async function growthFlush(state) {
   if (!growthConsentOn(state)) return false;
   const url = growthTarget();
@@ -1252,6 +1270,7 @@ async function growthFlush(state) {
       result = await growthPost(url, growthBody(state, batch));
       if (result === "retry") batch.forEach((item) => { item.attempts = growthAttempts(item) + 1; });
     }
+    securityNote("growth_upload", { host: growthHost(), result, n: batch.length });
     if (result === "ok") {
       growthSaveQueue(rest);
       if (!rest.length) return true;
@@ -1996,6 +2015,7 @@ if (typeof document !== "undefined") {
       return;
     }
     try { localStorage.setItem("hello-world-growth-server", value); } catch (e) { /* private mode */ }
+    securityNote("growth_server", { host: growthHost() });
     say("saved");
     draw();
   });
@@ -2104,6 +2124,7 @@ if (typeof document !== "undefined") {
       localStorage.removeItem("hello-world-growth-queue");
       localStorage.removeItem("hello-world-growth-log");
       localStorage.removeItem("hello-world-growth-receipts");
+      localStorage.removeItem("hello-world-security-audit");
     } catch (e) { /* nothing saved */ }
     keys = null;
     state = blank();

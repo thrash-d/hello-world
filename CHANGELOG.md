@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-27: fixes from review round 51
+
+Version 1.68.0. One push registration whose address contained a space or a control character stopped every phone's reminder: the sender raised `InvalidURL`, which is not an `OSError`, and that thread is the only one that sends. A sync copy that already existed could be replaced by a PUT with no `If-Match`. The sync folder and the day files were created at the process umask, often `0755` and `0644`, so another account on the machine could list the sync labels and read the exact counts. A symlink in the shared handoff folder was followed on read and write. A symlink named `notes.json` was read as the notes. The phone's service worker stored a redirected response under the address that was asked for. The phone page from the counts server had no content security policy and sent a referrer. A streak-note upload was not on the ledger, so the ledger could say nothing had left while a batch had been offered. The plan text is still not on that line.
+
+Nothing was removed. Streak notes, sync, reminders, the kazoo, the duck line, and the stub receipts are still there. The default upload is still `https://insights.example.invalid/v1/growth`.
+
 ## 2026-10-27: fixes from review round 50
 
 Version 1.67.0. `VERSION` was still 1.65.0 after 1.66.0 shipped, so the auto-tag workflow would not tag this release. A symlink named `growth` on the counts server was followed, and that folder was created with the process umask. A queued streak note whose try-count was not a number crashed the text visit. The death sentence stayed up after the run had already started again. A failed save could still write a stub receipt, or queue an event, for a choice that was undone.

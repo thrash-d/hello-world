@@ -149,3 +149,22 @@ symlink and is mode 0700, a bad queue does not crash the visit, the ledger
 `feature-audit.jsonl` has no plan text, and a failed save does not write a
 receipt. The death sentence now matches the run on the next continued day.
 Vance Harlow wanted that sentence to stay until someone paid. He lost, 5–1.
+
+## Round 51
+
+Reed Mallory led a security assessment of the program as it stood in 1.67.0.
+He does not veto. He asked for the findings in `reviews/round-51.md` to be
+hardened and written down so his name is on the sign-off. The fixes are in
+1.68.0.
+
+A bad push address can no longer end the reminder thread. A sync copy that
+is already stored requires `If-Match`. The counts folder, the sync folder,
+and the day files are mode `0700` or `0600`, and a symlink is not followed.
+The shared handoff file is not opened through a link. The notes file is not
+either. The phone service worker caches only this app's own files, and not
+after a redirect. The counts server sends `nosniff`, `no-referrer`, and a
+content security policy on the phone page. A streak-note upload appends one
+ledger line with the host and the result, and without the plan. Nothing was
+removed. The morning screen and the printed page do not gain a line. The
+default upload is still the placeholder. This is not the outside review of
+the sync encryption that `TODO.md` still lists.
