@@ -18,7 +18,9 @@ unless both of the following are set:
 
 - `HELLO_P256_VARIABLE_TIME=1`
 - `HELLO_P256_TRANSFER` points at a regular file, not a symlink, of at most
-  4000 bytes:
+  4000 bytes. The open refuses a reparse point, so a swap after a check is
+  not followed. Spaces inside the name are folded, so "Reed  Mallory" and
+  "Reed Mallory." are still his name:
 
 ```
 acceptor: <name that is not Reed Mallory>

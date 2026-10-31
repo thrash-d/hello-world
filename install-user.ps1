@@ -42,7 +42,8 @@ function Note-ScriptSignature {
     if ($sig -and $sig.Status -eq 'Valid') { return 'signed' }
     $name = if ($UnsignedAcceptor) { $UnsignedAcceptor } else { $env:HELLO_UNSIGNED_ACCEPTOR }
     if (-not $name) { $name = 'deploying organization' }
-    if ($name -match '^(?i)\s*reed mallory(\s|$)') { $name = 'deploying organization' }
+    $folded = [regex]::Replace($name.Trim().ToLowerInvariant(), '\s+', ' ')
+    if ($folded.StartsWith('reed mallory')) { $name = 'deploying organization' }
     Write-Warning "This script is not signed. Residual acceptor: $name. Reed Mallory has not accepted it. See docs/transfers/code-signing.md."
     return $name
 }

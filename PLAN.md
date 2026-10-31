@@ -189,3 +189,22 @@ the counts secrets refuse a reparse point. A notes folder on Windows gets an
 owner-only access list, and a volume that refuses it gets a transfer file
 for the operator. Nothing was removed. The morning screen and the printed
 page do not gain a line. The default upload is still the placeholder.
+
+## Round 53
+
+The same six. Reed Mallory still accepts no residual, and he does not veto.
+The record is `reviews/round-53.md`. The version is 1.70.0.
+
+The phone's household list survives a refresh after the keys have moved to
+non-extractable browser keys. The death sentence names the run that stopped.
+When the longest run is a different number, the sentence says that too.
+`hello growth` in gentle mode no longer says a dead run is still going. The
+morning screen still hides that line. A bad streak number in the queue does
+not crash the visit. The transfer file is opened without following a
+reparse point, and a name that is Reed Mallory, or that starts with his
+name after spaces are folded, does not open the gate.
+
+What they added: `hello trombone` (free, not the morning, not a recording)
+and `hello encore`, a $3.99 local stub. The trombone stays free. The
+morning screen and the printed page do not gain a line. The default upload
+is still the placeholder. He did not sign the word audited.

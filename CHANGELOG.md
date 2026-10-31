@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-31: review round 53
+
+Version 1.70.0. A phone that had moved its household keys into the browser's key store lost the household on the next open, because the notes kept a pointer and the loader still demanded the old key bytes. The loader reads the pointer and loads the keys back. A streak that stopped at 3 while the longest was 5 used to say it was 5. The sentence now names the run that stopped, and names the longest only when that number is different. `hello growth` in gentle mode used to say the streak was still going. The morning still hides the line. The command says the run that stopped.
+
+`hello trombone` prints four lines and "womp womp", and says it is not a recording and that nothing was sent. The phone button may start a tone in the page, and the status line says whether it did. `hello encore` writes a local stub receipt for $3.99 after the notes save succeeds. The trombone stays free. The morning screen and the printed page do not gain a line.
+
+Nothing was removed. Streak notes, sync, reminders, the kazoo, the duck line, and the other stub receipts are still there. The default upload is still `https://insights.example.invalid/v1/growth`.
+
 ## 2026-10-27: fixes from review round 52
 
 Version 1.69.0. Reed Mallory had accepted three residuals in 1.68.0. He does not accept them now. P-256 signing and verification use libcrypto, which is constant-time. The pure-Python ladder does not run unless an operator who is not him turns it on in a transfer file. `uninstall.ps1` deletes through a directory handle opened so a junction is not followed. If that code cannot load, the folder is left in place. The four install scripts can be Authenticode-signed with `tools/sign-scripts.ps1` or the package build. An unsigned run names the deploying organization. Phone sync keys are non-extractable browser keys in IndexedDB, and the raw copy in local storage is removed. Windows opens of the notes, the handoff file, and the counts secrets refuse a reparse point. A notes folder on Windows is limited to the current user and SYSTEM when the volume allows it.

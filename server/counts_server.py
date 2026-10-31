@@ -366,22 +366,40 @@ class P256Unavailable(OSError):
     """libcrypto is missing and nobody but Reed has taken the other path."""
 
 
+def _reed_named(name):
+    """True when the folded name is Reed Mallory or starts with that name.
+
+    Internal spaces fold, so a doubled space is still his. A mark after the
+    name still starts with it. He does not accept that name on a transfer.
+    """
+    folded = " ".join((name or "").lower().split())
+    return folded.startswith("reed mallory")
+
+
 def _transfer_ok(path, token):
     """True when a regular file names an acceptor who is not Reed Mallory.
 
-    The file is not followed if it is a symlink. `token` is the whole
-    `accepts:` line, for example `variable-time-p256`.
+    The open refuses a symlink or other reparse point. A check followed by
+    open() could be swapped. `token` is the whole `accepts:` line, for
+    example `variable-time-p256`.
     """
     if not path or os.path.islink(path):
         return False
+    fd = None
     try:
-        info = os.lstat(path)
+        fd = open_nofollow(path, os.O_RDONLY)
+        info = os.fstat(fd)
         if not stat.S_ISREG(info.st_mode) or info.st_size > 4000:
             return False
-        with open(path, encoding="utf-8") as handle:
-            text = handle.read(4000)
+        text = os.read(fd, 4000).decode("utf-8")
     except (OSError, UnicodeError):
         return False
+    finally:
+        if fd is not None:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
     acceptor = ""
     accepts = False
     for line in text.splitlines():
@@ -390,10 +408,9 @@ def _transfer_ok(path, token):
             acceptor = stripped.split(":", 1)[1].strip()
         if stripped.lower() == f"accepts: {token}":
             accepts = True
-    folded = " ".join(acceptor.lower().split())
     if not accepts or not (2 <= len(acceptor) <= 80):
         return False
-    if folded == "reed mallory" or folded.startswith("reed mallory "):
+    if _reed_named(acceptor):
         return False
     return True
 
