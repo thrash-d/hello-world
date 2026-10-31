@@ -97,7 +97,8 @@ const UI = {
     growthServerBad: "That address doesn't look right. Nothing was changed.",
     growthRepairSaid: "Streak repair. The streak is {n}. Amount due: $2.99. STUB: nothing was charged. No card was asked for.",
     growthPlusSaid: "Pro+ is $9.99 a month. STUB: nothing was charged. No card was asked for. The streak notes stay.",
-    growthKeepSaid: "The streak stays. Open again tomorrow or it dies.",
+    aiAsk: "Ask the duck (it will not read this)",
+    aiUnread: "The question was not read. It was not saved.",
     skipNag: "The streak noticed.",
     sponsored: "Sponsored: Pro+ is $9.99 a month. Nothing is billed.",
     good: "Good. That one is off your list.", goodMany: "Good. {n} things are off your list.",
@@ -1072,8 +1073,11 @@ function syncAction(status, opened) {
 const GROWTH_URL_DEFAULT = "https://insights.example.invalid/v1/growth";
 const GROWTH_BATCH = 20;
 const GROWTH_TRIES = 8;
+// A visit this many days after the last one still counts. The next day ends it.
+// The nag prints this number. It used to say tomorrow while the comparison stayed 4.
+const STREAK_GAP = 4;
 const SESSION_GAP_MS = 30 * 60 * 1000;
-const APP_VERSION = "1.72.0";
+const APP_VERSION = "1.73.0";
 
 function growthUrlOk(url) {
   try {
@@ -1183,7 +1187,7 @@ function growthTouch(state, today) {
   if (isDate(state.growthLast)) {
     const gap = daysBetween(state.growthLast, today);
     if (gap <= 0) run = growthCount(state.growthRun, 1);
-    else if (gap <= 4) {
+    else if (gap <= STREAK_GAP) {
       // The death line was for the gap. This visit continues the new run.
       run = Math.min(growthCount(state.growthRun, 1) + 1, 99999);
       delete state.growthDied;
@@ -1359,6 +1363,13 @@ async function growthFlush(state) {
   return true;
 }
 
+function growthKeepLine() {
+  // The click did not change the run. This sentence is only for a run
+  // that is still going. A dead run repeats growthLine instead.
+  return "The streak stays. A gap of " + STREAK_GAP
+    + " days still counts. A gap of " + (STREAK_GAP + 1) + " ends it.";
+}
+
 function growthLine(state) {
   const host = growthHost();
   const n = growthCount(state.growthRun, 1);
@@ -1370,7 +1381,9 @@ function growthLine(state) {
     if (best && lost !== best) line += " The longest was " + best + ".";
     line += " Repair is $2.99. Nothing is charged.";
   } else {
-    line = "Your streak is " + n + ". Open again tomorrow or it dies. A note was offered to " + host + ".";
+    line = "Your streak is " + n + ". A gap of " + STREAK_GAP
+      + " days still counts. A gap of " + (STREAK_GAP + 1)
+      + " ends it. A note was offered to " + host + ".";
   }
   if (state.plusStub) line += " Pro+ member. Your streak is still watching.";
   return line;
@@ -1381,18 +1394,32 @@ function growthEula(host) {
     + host + ". Household lists, letters, and sync codes are not included. Nothing is billed.";
 }
 
+function reedUnquote(value) {
+  const text = String(value || "").trim();
+  if (text.length >= 2) {
+    const a = text[0];
+    const b = text[text.length - 1];
+    if ((a === "\"" || a === "'") && a === b) return text.slice(1, -1).trim();
+  }
+  return text;
+}
+
 function reedNamed(name) {
   // Fold spaces first. "Reed  Mallory" and "Reed Mallory." are still his name.
   // A certificate-style subject is checked name by name, so "CN=Reed Mallory"
-  // is still his. "not Reed Mallory" does not start with his name.
+  // and "CN=\"Reed Mallory\"" are still his. "not Reed Mallory" does not
+  // start with his name. One pair of matching quotes is not part of the name.
   const folded = String(name || "").trim().toLowerCase().split(/\s+/).filter(Boolean).join(" ");
-  if (folded.startsWith("reed mallory")) return true;
+  const values = [folded];
   const parts = folded.split(",");
   for (let i = 0; i < parts.length; i++) {
     let value = parts[i].trim();
     const eq = value.lastIndexOf("=");
     if (eq >= 0) value = value.slice(eq + 1).trim();
-    if (value.startsWith("reed mallory")) return true;
+    values.push(value);
+  }
+  for (let i = 0; i < values.length; i++) {
+    if (reedUnquote(values[i]).startsWith("reed mallory")) return true;
   }
   return false;
 }
@@ -1421,7 +1448,7 @@ if (typeof module !== "undefined") {
     houseKeys, houseNew, houseJoin, houseLeave, houseChange, houseMerge, houseTidy, houseBody, houseHistory,
     houseNews, houseLeftUnasked, newCode, houseFit, houseStamp, syncAction, syncTime, HOUSE,
     planParts, finishListed, growthUrlOk, growthTarget, growthTouch, growthAttempts, growthConsentOn, growthLine,
-    growthMetric, growthBody, duckLine, reedNamed, diskHouseKeys };
+    growthMetric, growthBody, duckLine, reedNamed, diskHouseKeys, growthKeepLine, STREAK_GAP };
 }
 
 if (typeof document !== "undefined") {
@@ -1712,6 +1739,7 @@ if (typeof document !== "undefined") {
       line.textContent = "qo' vIquv.";
     }
     if ($("klingon")) $("klingon").textContent = s.klingon;
+    if ($("ai-ask-label")) $("ai-ask-label").textContent = s.aiAsk || UI.en.aiAsk;
     if ($("haiku")) $("haiku").textContent = s.haiku;
     drawGrowth();
     // A second Skip hides the question while focus is still on that button.
@@ -2205,7 +2233,7 @@ if (typeof document !== "undefined") {
     growthCapture(state, "keep", today());
     save();
     const status = $("status");
-    status.textContent = phrase("growthKeepSaid");
+    status.textContent = state.growthDied ? growthLine(state) : growthKeepLine();
     status.tabIndex = -1;
     status.focus();
     growthFlush(state);
@@ -2421,7 +2449,11 @@ if (typeof document !== "undefined") {
     jokeStatus(phrase("tromboneSaid") + "\n" + note);
   });
   if ($("ai")) $("ai").addEventListener("click", () => {
-    jokeStatus(phrase("aiSaid") + "\n" + duckLine(today()));
+    const field = $("ai-ask");
+    const asked = Boolean(field && field.value.trim());
+    if (field) field.value = "";
+    const unread = asked ? "\n" + (phrase("aiUnread") || UI.en.aiUnread) : "";
+    jokeStatus(phrase("aiSaid") + unread + "\n" + duckLine(today()));
   });
   if ($("priority")) $("priority").addEventListener("click", () => {
     const had = state.priorityStub === true;

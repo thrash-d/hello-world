@@ -472,7 +472,7 @@
   "My saved notes...": "ההערות השמורות שלי...",
   "What do you want to get done today?": "מה רוצים לסיים היום?",
   "What the window shows...": "מה מוצג בחלון...",
-  "A run goes on over a gap of up to three days, such as a weekend.": "הרצף נמשך גם אחרי הפסקה של עד שלושה ימים, כמו סוף שבוע.",
+  "A run goes on over a gap of {gap} days or fewer. A gap of {end} starts it over.": "הרצף נמשך כשההפסקה היא {gap} ימים או פחות. הפסקה של {end} ימים מתחילה אותו מחדש.",
   "Answering no longer opens hello-world.": "hello-world לא ייפתח עוד אחרי התשובה.",
   "Finished plans are kept for 14 days, as usual.": "תוכניות שהושלמו נשמרות למשך 14 ימים, כרגיל.",
   "No reminder on Saturday or Sunday.": "בלי תזכורת בשבת ובראשון.",

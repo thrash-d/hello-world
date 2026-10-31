@@ -53,7 +53,12 @@ the variable-time gate, does not keep raw phone keys, and is not printed
 as the unsigned-script acceptor. A joke event stored on the counts server
 does not include the plan. `hello bell` prints and does not save. The
 phone may start a tone and says whether it did. `hello ring` is a $6.99
-local stub. The bell stays free. Nothing was removed. The reminder was already
+local stub. The bell stays free. 1.73.0 says a gap of 4 days still counts
+and a gap of 5 ends it, in the nag and in My numbers. The phone's Keep
+button repeats the death sentence after a run has stopped. A quoted
+`CN="Reed Mallory"` does not open the variable-time gate. `hello ai` reads
+the saved day start. Words after that command are not read, not saved, and
+not sent. No fifth noise was added. No new stub was added. Nothing was removed. The reminder was already
 offered on the first day, right after the first plan. Running a public
 counts server for the individual package is the owner's step; the README says
 how.

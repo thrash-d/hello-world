@@ -473,7 +473,7 @@
   "My saved notes...": "Mes notes enregistrées...",
   "What do you want to get done today?": "Qu'aimeriez-vous accomplir aujourd'hui ?",
   "What the window shows...": "Ce qu'affiche la fenêtre...",
-  "A run goes on over a gap of up to three days, such as a weekend.": "Une suite de jours continue malgré une pause de trois jours au plus, comme un week-end.",
+  "A run goes on over a gap of {gap} days or fewer. A gap of {end} starts it over.": "Une suite de jours continue avec un écart de {gap} jours ou moins. Un écart de {end} la recommence.",
   "Answering no longer opens hello-world.": "Répondre n'ouvre plus hello-world.",
   "Finished plans are kept for 14 days, as usual.": "Les plans terminés sont conservés 14 jours, comme d'habitude.",
   "No reminder on Saturday or Sunday.": "Pas de rappel le samedi ni le dimanche.",

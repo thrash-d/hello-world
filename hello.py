@@ -95,6 +95,7 @@ BELL_LINE = "ding"
 BELL_NOTE = "This is not a recording. Nothing was sent."
 # Not a model. The line is chosen from the date. Nothing is sent.
 AI_NOTE = "This is not a model. Nothing was sent."
+AI_UNREAD = "The question was not read. It was not saved."
 DUCK_LINES = (
     "The rubber duck says: have you tried turning it off and on again.",
     "The rubber duck says: the bug is in the sentence you were sure was fine.",
@@ -131,8 +132,13 @@ EULA_BODY = (
     "a placeholder unless an operator points it at their own counts server. "
     "Nothing is billed."
 )
+# A visit this many days after the last one still counts. The next day
+# ends it. The nag and "My numbers" print this number. They used to say
+# tomorrow, and three, while the comparison stayed 4.
+STREAK_GAP = 4
 GROWTH_NAG = (
-    "Your streak is {n}. Open again tomorrow or it dies. A note was offered to {host}."
+    "Your streak is {n}. A gap of {gap} days still counts. A gap of {end} ends it. "
+    "A note was offered to {host}."
 )
 GROWTH_DEAD = (
     "Your streak died. It was {n}. Type repair. Amount due: $2.99. Nothing is charged."
@@ -676,13 +682,14 @@ def help_text():
                           "hello klingon, hello shift, hello cowbell, hello staple, "
                           "hello kazoo, hello trombone, hello airhorn, hello bell, hello ai, and hello --pirate. "
                           "hello ai is not a model and sends nothing. "
+                          "Words after hello ai are not read, not saved, and not sent. "
                           "hello trombone, hello airhorn, and hello bell are not recordings and send nothing. "
                           "--set klingon on keeps the Klingon line under the greeting. "
                           "hello growth off stops streak notes. "
                           "hello priority, hello encore, hello spotlight, and hello ring write a local stub receipt "
                           "and do not bill. The trombone stays free. The airhorn stays free. The bell stays free."))
 
-VERSION = "1.72.0"
+VERSION = "1.73.0"
 MAX_VISITS = 400
 # Days before today that are still kept. Today is kept as well, so the
 # list holds KEEP_VISIT_DAYS + 1 calendar days. The sentence says that
@@ -1653,7 +1660,7 @@ def growth_apply(state, d):
         run = 1
     elif gap <= 0:
         run = _growth_count(state.get("growth_run"), 1)
-    elif gap <= 4:
+    elif gap <= STREAK_GAP:
         # The gap that killed it was already said. This visit continues
         # the new run, so the sentence has to match the number.
         run = min(_growth_count(state.get("growth_run"), 1) + 1, 99999)
@@ -1704,7 +1711,9 @@ def growth_sentence(state, asked=False):
         else:
             line = tr(GROWTH_DEAD).format(n=n)
     else:
-        line = tr(GROWTH_NAG).format(n=_growth_count(state.get("growth_run"), 1), host=host)
+        line = tr(GROWTH_NAG).format(
+            n=_growth_count(state.get("growth_run"), 1), host=host,
+            gap=STREAK_GAP, end=STREAK_GAP + 1)
     if state.get("plus_stub"):
         line = line + " " + tr(GROWTH_PLUS)
     return line
@@ -4658,16 +4667,16 @@ def wrapped(prefix, text):
 
 
 def in_a_row(visits, d):
-    """Count visits back from today where each is within 4 days of the next.
+    """Count visits back from today where each gap is STREAK_GAP days or fewer.
 
-    Four days lets a Friday off and a weekend pass without breaking it.
+    That gap lets a Friday off and a weekend pass without breaking it.
     """
     days = [datetime.date.fromisoformat(v) for v in visits]
     days = [x for x in days if x <= d] + [d]
     days = sorted(set(days))
     n = 1
     for later, earlier in zip(days[:0:-1], days[-2::-1], strict=True):
-        if (later - earlier).days > 4:
+        if (later - earlier).days > STREAK_GAP:
             break
         n += 1
     return n
@@ -6516,11 +6525,11 @@ def policy_reminder(state):
 
 def count_visit(state, d):
     """With "numbers" on, count a new day: the days opened, the current run
-    (each visit within four days of the last) and the longest run."""
+    (each visit within STREAK_GAP days of the last) and the longest run."""
     if not state.get("numbers") or d.isoformat() in state["visits"]:
         return
     last = state["visits"][-1] if state["visits"] else None
-    close = last and (d - datetime.date.fromisoformat(last)).days <= 4
+    close = last and (d - datetime.date.fromisoformat(last)).days <= STREAK_GAP
     state["opens"] = min(state.get("opens", 0) + 1, 99999)
     state["run"] = min(state.get("run", 0) + 1, 99999) if close else 1
     state["best_run"] = max(state.get("best_run", 0), state["run"])
@@ -6534,7 +6543,8 @@ def numbers_text(state):
         tr("Days you opened hello-world: {n}").format(n=state.get("opens", 0)),
         tr("Longest run of days: {n}").format(n=state.get("best_run", 0)),
         tr("Plans finished: {n}").format(n=state.get("done", 0)), "",
-        tr("A run goes on over a gap of up to three days, such as a weekend."),
+        tr("A run goes on over a gap of {gap} days or fewer. A gap of {end} starts it over.").format(
+            gap=STREAK_GAP, end=STREAK_GAP + 1),
         tr("They count from the day you turned them on, and stay on this "
            "computer. Nobody else gets them.")])
 
@@ -7867,10 +7877,15 @@ def fun_command(argv):
         say(tr(BELL_NOTE))
         feature_audit("bell")
         return 0
-    if name == "ai" and len(argv) == 1:
-        # Not a model. The date picks the line. The notes file is not opened.
+    if name == "ai":
+        # Not a model. The date picks the line, after the saved day start.
+        # Extra words are not read, not saved, and not sent. The notes file
+        # is read and is not written. A missing notes folder is not created.
+        load(repair=False)
         say(GREETING)
         say(tr(AI_NOTE))
+        if len(argv) > 1:
+            say(tr(AI_UNREAD))
         say(tr(DUCK_LINES[today().toordinal() % len(DUCK_LINES)]))
         feature_audit("ai")
         return 0

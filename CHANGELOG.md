@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-31: review round 56
+
+Version 1.73.0. The streak nag said the run dies tomorrow. A gap of 4 days still counts, and a gap of 5 ends it. My numbers said a gap of up to three days for the same comparison. Both sentences now say 4 and 5. The phone's Keep button, after a run had already stopped, said the streak stays. That click does not change the number, so the status line repeats the death sentence. `CN="Reed Mallory"`, with the name in quotes, still opened the variable-time gate, still kept raw phone sync keys, and was still printed as the unsigned-script acceptor. One pair of matching quotes is not part of the name. `hello ai` did not read the saved day start. It does now, and it does not write the notes.
+
+Words after `hello ai` are not read, not saved, and not sent. The screen says so. The duck's line is still the one for that date. The phone's Settings box does the same and does not repeat the words. No new noise was added. No new stub was added. The morning screen and the printed page do not gain a line.
+
+Nothing was removed. Streak notes, sync, reminders, the kazoo, the trombone, the airhorn, the bell, the duck line, and the stub receipts are still there. The default upload is still `https://insights.example.invalid/v1/growth`.
+
 ## 2026-10-31: review round 55
 
 Version 1.72.0. A streak that stopped at 1 while the longest was 5 used to say it was 5. The sentence now names 1, and names the longest only when that number is different. `CN=Reed Mallory` was still accepted on the variable-time transfer, on the phone's raw-key line, and as the name an unsigned script printed. Those checks now refuse each name after `=`, the same way the certificate signer does. A joke event sent to the counts server, or queued on the desktop, no longer carries the plan. The visit-window comment that still said 60 days now says 61 calendar days.

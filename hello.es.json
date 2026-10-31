@@ -472,7 +472,7 @@
   "My saved notes...": "Mis datos guardados...",
   "What do you want to get done today?": "¿Qué quieres sacar adelante hoy?",
   "What the window shows...": "Qué muestra la ventana...",
-  "A run goes on over a gap of up to three days, such as a weekend.": "La racha no se pierde si faltas hasta tres días, como un fin de semana.",
+  "A run goes on over a gap of {gap} days or fewer. A gap of {end} starts it over.": "La racha sigue con un hueco de {gap} días o menos. Un hueco de {end} la empieza de nuevo.",
   "Answering no longer opens hello-world.": "Responder ya no abre hello-world.",
   "Finished plans are kept for 14 days, as usual.": "Los planes terminados se guardan durante 14 días, como siempre.",
   "No reminder on Saturday or Sunday.": "No habrá aviso el sábado ni el domingo.",

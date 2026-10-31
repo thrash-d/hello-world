@@ -472,7 +472,7 @@
   "My saved notes...": "我保存的笔记...",
   "What do you want to get done today?": "您今天想完成什么？",
   "What the window shows...": "窗口显示的内容...",
-  "A run goes on over a gap of up to three days, such as a weekend.": "连续天数在中间隔开最多三天时（比如周末）也会继续计算。",
+  "A run goes on over a gap of {gap} days or fewer. A gap of {end} starts it over.": "连续天数在间隔不超过{gap}天时继续计算。间隔达到{end}天则重新开始。",
   "Answering no longer opens hello-world.": "回答后不再打开 hello-world。",
   "Finished plans are kept for 14 days, as usual.": "已完成的计划照常保留 14 天。",
   "No reminder on Saturday or Sunday.": "周六和周日不会提醒。",
