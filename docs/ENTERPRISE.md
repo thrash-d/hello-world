@@ -336,7 +336,7 @@ current plan, one unfinished earlier plan, a count of plans marked done, the
 plans they finished in the last 14 days with dates (90 with a longer
 history), four settings, and the date of the last
 sign-in reminder. Only someone who turns on the days-in-a-row message keeps
-the dates of the last 60 days, which the message counts.
+the dates from 60 days before today through today (61 days, both ends counted), which the message counts.
 The `DisablePlans` and `HideDaysInARow` policies cut that to the latest visit
 date and the settings.
 It holds no names, computer names or times. It's plain text, protected by the

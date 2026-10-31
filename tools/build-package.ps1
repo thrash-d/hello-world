@@ -45,6 +45,7 @@ param(
     [ValidateLength(0, 80)][string]$UnsignedAcceptor
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'reed-name.ps1')
 $root = Split-Path $PSScriptRoot -Parent
 $src = Get-Content -Raw -LiteralPath (Join-Path $root 'install.ps1')
 $url = [regex]::Match($src, "(?m)^\`$pyUrl = '([^']+)'").Groups[1].Value
@@ -73,13 +74,13 @@ if (-not $CertificateThumbprint) {
     # The package hash stays the hash of the unsigned files. The residual
     # is named here and is not Reed Mallory's.
     $acceptor = if ($UnsignedAcceptor) { $UnsignedAcceptor } else { 'deploying organization' }
-    $folded = [regex]::Replace($acceptor.Trim().ToLowerInvariant(), '\s+', ' ')
-    if ($folded.StartsWith('reed mallory')) { throw 'Reed Mallory does not accept an unsigned package.' }
+    if (Test-ReedMalloryName $acceptor) { throw 'Reed Mallory does not accept an unsigned package.' }
     Write-Host "Unsigned package. Residual acceptor: $acceptor. Not Reed Mallory. Sign with -CertificateThumbprint or tools\sign-scripts.ps1."
 }
 if ($CertificateThumbprint) {
     $cert = @(Get-ChildItem -Path "Cert:\CurrentUser\My\$CertificateThumbprint", "Cert:\LocalMachine\My\$CertificateThumbprint" -CodeSigningCert -ErrorAction SilentlyContinue)[0]
     if (-not $cert) { throw "No code-signing certificate with thumbprint $CertificateThumbprint and a private key in CurrentUser\My or LocalMachine\My." }
+    if (Test-ReedMalloryName $cert.Subject) { throw 'Reed Mallory is not the signer. Use the deploying organization''s certificate.' }
     foreach ($f in 'install.ps1', 'uninstall.ps1', 'install-user.ps1', 'uninstall-user.ps1') {
         $sign = @{ FilePath = (Join-Path $OutDir $f); Certificate = $cert; HashAlgorithm = 'SHA256' }
         if ($TimestampServer) { $sign.TimestampServer = $TimestampServer }

@@ -32,11 +32,13 @@ param(
     [string]$OutDir
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'reed-name.ps1')
 $root = Split-Path $PSScriptRoot -Parent
 $names = @('install.ps1', 'uninstall.ps1', 'install-user.ps1', 'uninstall-user.ps1')
 $cert = @(Get-ChildItem -Path "Cert:\CurrentUser\My\$CertificateThumbprint", "Cert:\LocalMachine\My\$CertificateThumbprint" -CodeSigningCert -ErrorAction SilentlyContinue)[0]
 if (-not $cert) { throw "No code-signing certificate with thumbprint $CertificateThumbprint and a private key in CurrentUser\My or LocalMachine\My." }
-if ($cert.Subject -match '(?i)reed mallory') { throw 'Reed Mallory is not the signer. Use the deploying organization''s certificate.' }
+# Fold spaces, then each name in the subject. "CN=Reed  Mallory" is still his.
+if (Test-ReedMalloryName $cert.Subject) { throw 'Reed Mallory is not the signer. Use the deploying organization''s certificate.' }
 
 $dest = $root
 if ($OutDir) {

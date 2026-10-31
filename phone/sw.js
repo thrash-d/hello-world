@@ -1,7 +1,7 @@
 // Keeps the app working with no signal: every file is cached on first open.
 // With a signal the newest files are fetched and cached, so updates arrive;
 // without one, the cached copy is used. Sync requests are never cached.
-const CACHE = "hello-world-phone-v16";
+const CACHE = "hello-world-phone-v17";
 const FILES = ["./", "./index.html", "./app.js", "./content.js", "./manifest.webmanifest", "./icon.svg"];
 
 // Fifteen minutes either side of a real HH:MM, including across midnight.

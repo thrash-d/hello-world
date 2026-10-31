@@ -35,5 +35,5 @@ is not Reed Mallory. Spaces inside the name are folded first. A name that
 is his, or that starts with his, does not keep the raw copy. An empty
 value does not either. That other name is the acceptor of the raw copy.
 
-The cache name is `hello-world-phone-v16`, so a phone that already cached
+The cache name is `hello-world-phone-v17`, so a phone that already cached
 the previous page fetches this one.

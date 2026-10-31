@@ -26,6 +26,10 @@ tools\build-package.ps1 -OutDir <empty folder> -CertificateThumbprint <thumbprin
 Both sign `install.ps1`, `uninstall.ps1`, `install-user.ps1` and
 `uninstall-user.ps1` with SHA-256. `Get-AuthenticodeSignature` must return
 `Valid`. A certificate whose subject names Reed Mallory is refused.
+Spaces inside that subject are folded first, and each name is checked, so
+`CN=Reed  Mallory` and `CN=Reed Mallory.` are still refused. `CN=not Reed
+Mallory` does not start with his name. `tools\build-package.ps1` uses the
+same check before it signs. The check lives in `tools\reed-name.ps1`.
 `docs/ENTERPRISE.md` has the AllSigned and WDAC notes. CI already installs
 a package signed with a throwaway certificate.
 

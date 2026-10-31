@@ -73,6 +73,16 @@ TROMBONE = (
 )
 TROMBONE_LINE = "womp womp"
 TROMBONE_NOTE = "This is not a recording. Nothing was sent."
+# An airhorn. A command, a prompt word, and a phone button. Not the morning.
+# The phone may start a tone. This screen does not, and it does not say it did.
+AIRHORN = (
+    "   __",
+    "  |  \\___",
+    "  |      )",
+    "  |______/",
+)
+AIRHORN_LINE = "BRAAAAP"
+AIRHORN_NOTE = "This is not a recording. Nothing was sent."
 # Not a model. The line is chosen from the date. Nothing is sent.
 AI_NOTE = "This is not a model. Nothing was sent."
 DUCK_LINES = (
@@ -91,6 +101,11 @@ ENCORE_SAID = (
     "Hello Encore is $3.99. STUB: nothing was charged. "
     "No card was asked for. The receipt stays on this computer. "
     "The morning screen is unchanged. The trombone stays free."
+)
+SPOTLIGHT_SAID = (
+    "Hello Spotlight is $7.99. STUB: nothing was charged. "
+    "No card was asked for. The receipt stays on this computer. "
+    "The morning screen is unchanged. The airhorn stays free."
 )
 STUB_UNSAVED = "Could not save that on this computer. Nothing was charged."
 # Shown once. Enter on this question accepts; the prompt says so. q still quits.
@@ -644,17 +659,29 @@ def help_text():
     return (tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
             + "\n\n" + tr("For fun, and nothing is saved: hello morse, hello haiku, "
                           "hello klingon, hello shift, hello cowbell, hello staple, "
-                          "hello kazoo, hello trombone, hello ai, and hello --pirate. "
+                          "hello kazoo, hello trombone, hello airhorn, hello ai, and hello --pirate. "
                           "hello ai is not a model and sends nothing. "
-                          "hello trombone is not a recording and sends nothing. "
+                          "hello trombone and hello airhorn are not recordings and send nothing. "
                           "--set klingon on keeps the Klingon line under the greeting. "
                           "hello growth off stops streak notes. "
-                          "hello priority and hello encore write a local stub receipt "
-                          "and do not bill. The trombone stays free."))
+                          "hello priority, hello encore, and hello spotlight write a local stub receipt "
+                          "and do not bill. The trombone stays free. The airhorn stays free."))
 
-VERSION = "1.70.0"
+VERSION = "1.71.0"
 MAX_VISITS = 400
+# Days before today that are still kept. Today is kept as well, so the
+# list holds KEEP_VISIT_DAYS + 1 calendar days. The sentence says that
+# count. It must not say 60 for a window that includes both ends.
 KEEP_VISIT_DAYS = 60
+
+
+def visit_span_days():
+    """Calendar days the visit list can hold, today included.
+
+    The oldest kept date is today minus KEEP_VISIT_DAYS. 1 September
+    through 31 October is 61 days. The sentence has to say 61.
+    """
+    return KEEP_VISIT_DAYS + 1
 MAX_FILE = 1_000_000
 # The words of every language work in every language, so nobody has to
 # guess which language the program thinks it speaks, and a PC whose
@@ -1746,7 +1773,7 @@ def _after_stub(state, sku, amount, event, include_plan=True):
 
 
 def growth_repair(state, can_save):
-    """The $2.99 streak repair. The receipt is a stub. The number comes back."""
+    """The $2.99 streak repair. The receipt is a stub. The line names the number written."""
     base = copy.deepcopy(state)
     best = max(_growth_count(state.get("growth_best"), 0),
                _growth_count(state.get("growth_run"), 0), 1)
@@ -1759,8 +1786,8 @@ def growth_repair(state, can_save):
         undo(state, base)
         return tr(STUB_UNSAVED)
     _after_stub(state, "repair", "2.99", "repair")
-    return tr("Streak repair. Amount due: $2.99. STUB: nothing was charged. "
-              "No card was asked for. The receipt stays on this computer.")
+    return tr("Streak repair. The streak is {n}. Amount due: $2.99. STUB: nothing was charged. "
+              "No card was asked for. The receipt stays on this computer.").format(n=best)
 
 
 def growth_plus(state, can_save):
@@ -1797,8 +1824,19 @@ def growth_encore(state, can_save):
     return tr(ENCORE_SAID)
 
 
+def growth_spotlight(state, can_save):
+    """The $7.99 Hello Spotlight stub. The airhorn stays free. The morning does not change."""
+    base = copy.deepcopy(state)
+    state["spotlight_stub"] = True
+    if not commit(state, base, can_save):
+        undo(state, base)
+        return tr(STUB_UNSAVED)
+    _after_stub(state, "spotlight", "7.99", "spotlight", include_plan=False)
+    return tr(SPOTLIGHT_SAID)
+
+
 def paid_reply(text, state, can_save):
-    """repair, plus, priority, and encore at a prompt. True when the word was one of them."""
+    """repair, plus, priority, encore, and spotlight at a prompt. True when the word was one of them."""
     low = (text or "").lower().strip(TRIM)
     if low == "repair":
         para(growth_repair(state, can_save))
@@ -1811,6 +1849,9 @@ def paid_reply(text, state, can_save):
         return True
     if low == "encore":
         para(growth_encore(state, can_save))
+        return True
+    if low == "spotlight":
+        para(growth_spotlight(state, can_save))
         return True
     return False
 
@@ -4071,6 +4112,8 @@ def load(repair=True):
         state["priority_stub"] = True
     if raw.get("encore_stub") is True:
         state["encore_stub"] = True
+    if raw.get("spotlight_stub") is True:
+        state["spotlight_stub"] = True
     lost = raw.get("growth_lost")
     if isinstance(lost, int) and not isinstance(lost, bool) and 0 < lost < 100000:
         state["growth_lost"] = lost
@@ -4197,6 +4240,8 @@ def load(repair=True):
     now = today().isoformat()
     # Only recent visits are kept: enough for "welcome back" and the
     # days-in-a-row count, and too few to read as an attendance record.
+    # Both ends count. today minus KEEP_VISIT_DAYS, through today, is
+    # visit_span_days() calendar days.
     oldest = (today() - datetime.timedelta(days=KEEP_VISIT_DAYS)).isoformat()
     state["visits"] = sorted(v for v in set(visits) if oldest <= v <= now)[-MAX_VISITS:]
     intent = raw.get("intent")
@@ -4701,8 +4746,11 @@ def write_launcher_file(path, command):
 
 def show_saved(state, full=True):
     d = today()
+    # Today and the six days before it. The sentence says 7, and this
+    # window is 7. The longer window is visit_span_days(), not 60.
+    week = 7
     recent = [v for v in state["visits"]
-              if 0 <= (d - datetime.date.fromisoformat(v)).days <= 6]
+              if 0 <= (d - datetime.date.fromisoformat(v)).days < week]
     if full:
         say(tr("Saved on this computer in:"))
         say("  " + data_file())
@@ -4710,7 +4758,7 @@ def show_saved(state, full=True):
         say(tr("Saved in your own user folder on this computer."))
     if state["streak"] and not policy("HideDaysInARow"):
         para(tr("Days you opened it in the last {days} days: {n} (last 7 days: "
-                "{recent})").format(days=KEEP_VISIT_DAYS, n=len(state["visits"]),
+                "{recent})").format(days=visit_span_days(), n=len(state["visits"]),
                                     recent=len(recent)))
     elif state["visits"]:
         # Only the latest date is kept when nothing counts days.
@@ -4738,6 +4786,8 @@ def show_saved(state, full=True):
         say(tr("Priority Hello: a local stub. Nothing was charged."))
     if state.get("encore_stub"):
         say(tr("Hello Encore: a local stub. Nothing was charged. The trombone stays free."))
+    if state.get("spotlight_stub"):
+        say(tr("Hello Spotlight: a local stub. Nothing was charged. The airhorn stays free."))
     if launcher_place()[0] and text_screen(state):
         say(tr("Opens by itself at sign-in: turned off by your organization.")
             if policy("DisableSignInLauncher") else
@@ -7670,6 +7720,13 @@ def toy_reply(text):
         say(tr(TROMBONE_NOTE))
         feature_audit("trombone")
         return True
+    if low == "airhorn":
+        for line in AIRHORN:
+            say(line)
+        say(tr(AIRHORN_LINE))
+        say(tr(AIRHORN_NOTE))
+        feature_audit("airhorn")
+        return True
     if low == "ai":
         say(tr(AI_NOTE))
         say(tr(DUCK_LINES[today().toordinal() % len(DUCK_LINES)]))
@@ -7687,7 +7744,7 @@ def fun_command(argv):
     if not argv:
         return None
     name = argv[0].lower()
-    if name not in ("morse", "klingon", "haiku", "shift", "cowbell", "staple", "kazoo", "trombone", "ai"):
+    if name not in ("morse", "klingon", "haiku", "shift", "cowbell", "staple", "kazoo", "trombone", "airhorn", "ai"):
         return None
     if name == "morse" and len(argv) == 1:
         say(GREETING)
@@ -7731,6 +7788,16 @@ def fun_command(argv):
         say(tr(TROMBONE_NOTE))
         feature_audit("trombone")
         return 0
+    if name == "airhorn" and len(argv) == 1:
+        # Not the morning. No tone is started here, and the sentence does not
+        # say one was. No notes folder is created for the joke.
+        say(GREETING)
+        for line in AIRHORN:
+            say(line)
+        say(tr(AIRHORN_LINE))
+        say(tr(AIRHORN_NOTE))
+        feature_audit("airhorn")
+        return 0
     if name == "ai" and len(argv) == 1:
         # Not a model. The date picks the line. The notes file is not opened.
         say(GREETING)
@@ -7760,7 +7827,7 @@ def fun_command(argv):
         say_haiku(when)
         return 0
     say(tr("Try hello morse, hello klingon, hello haiku, hello shift, "
-           "hello cowbell, hello staple, hello kazoo, hello trombone, or hello ai. "
+           "hello cowbell, hello staple, hello kazoo, hello trombone, hello airhorn, or hello ai. "
            "A date is hello haiku --date YYYY-MM-DD."))
     return 2
 
@@ -7773,7 +7840,7 @@ def stub_command(argv):
     if not argv:
         return None
     name = argv[0].lower()
-    if name not in ("growth", "repair", "plus", "priority", "encore"):
+    if name not in ("growth", "repair", "plus", "priority", "encore", "spotlight"):
         return None
     rest = [a.lower() for a in argv[1:]]
     state, can_save = load()
@@ -7823,8 +7890,11 @@ def stub_command(argv):
     if name == "encore" and not rest:
         para(growth_encore(state, can_save))
         return 0
+    if name == "spotlight" and not rest:
+        para(growth_spotlight(state, can_save))
+        return 0
     say(tr("Try hello growth, hello growth on, hello growth off, hello repair, "
-           "hello plus, hello priority, or hello encore."))
+           "hello plus, hello priority, hello encore, or hello spotlight."))
     return 2
 
 
