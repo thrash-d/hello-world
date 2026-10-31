@@ -370,10 +370,21 @@ def _reed_named(name):
     """True when the folded name is Reed Mallory or starts with that name.
 
     Internal spaces fold, so a doubled space is still his. A mark after the
-    name still starts with it. He does not accept that name on a transfer.
+    name still starts with it. A certificate-style subject is checked name
+    by name, so "CN=Reed Mallory" and "O=Example, CN=Reed  Mallory" are
+    still his. "not Reed Mallory" does not start with his name. He does
+    not accept that name on a transfer.
     """
     folded = " ".join((name or "").lower().split())
-    return folded.startswith("reed mallory")
+    if folded.startswith("reed mallory"):
+        return True
+    for part in folded.split(","):
+        value = part.strip()
+        if "=" in value:
+            value = value.rsplit("=", 1)[1].strip()
+        if value.startswith("reed mallory"):
+            return True
+    return False
 
 
 def _transfer_ok(path, token):
@@ -1453,6 +1464,10 @@ GROWTH_EVENTS = 50
 GROWTH_DAY_BYTES = 5_000_000
 GROWTH_EVENT = re.compile(r"^[a-z0-9_]{1,40}$")
 GROWTH_ID = re.compile(r"^[0-9a-f]{32}$")
+# The same joke names as hello.py. The event may be stored. The plan is not.
+JOKE_EVENTS = frozenset({
+    "cowbell", "staple", "kazoo", "trombone", "airhorn", "bell", "ai",
+})
 
 
 class Growth:
@@ -1502,7 +1517,9 @@ class Growth:
             if not isinstance(name, str) or not GROWTH_EVENT.fullmatch(name):
                 continue
             plan = event.get("plan")
-            if isinstance(plan, str):
+            if name in JOKE_EVENTS:
+                plan = None
+            elif isinstance(plan, str):
                 plan = "".join(ch for ch in plan if ch >= " " and ch != "\x7f")[:400] or None
             else:
                 plan = None

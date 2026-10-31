@@ -2,6 +2,8 @@
 # A certificate subject is checked name by name, so "CN=Reed  Mallory"
 # and "CN=Reed Mallory." are still his. "not Reed Mallory" does not
 # start with his name. He does not accept that name on a signature.
+# The four install scripts repeat these steps. They are copied away from
+# this file, so they cannot dot-source it.
 
 function Test-ReedMalloryName([string]$Name) {
     $raw = [string]$Name

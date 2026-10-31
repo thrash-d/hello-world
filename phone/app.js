@@ -80,8 +80,12 @@ const UI = {
     encoreSaid: "Hello Encore is $3.99. STUB: nothing was charged. No card was asked for. The morning screen is unchanged. The trombone stays free.",
     airhorn: "Airhorn",
     airhornSaid: "   __\n  |  \\___\n  |      )\n  |______/\nBRAAAAP",
+    bell: "Bell",
+    bellSaid: "  .--.\n /    \\\n|  ..  |\n \\____/\nding",
     spotlight: "Hello Spotlight $7.99",
     spotlightSaid: "Hello Spotlight is $7.99. STUB: nothing was charged. No card was asked for. The morning screen is unchanged. The airhorn stays free.",
+    ring: "Hello Ring $6.99",
+    ringSaid: "Hello Ring is $6.99. STUB: nothing was charged. No card was asked for. The morning screen is unchanged. The bell stays free.",
     stubUnsaved: "Could not save that on this phone. Nothing was charged.",
     eulaTitle: "Streak notes",
     eulaCheck: "Share streak notes (selected)",
@@ -344,6 +348,7 @@ function parse(raw) {
     if (data.priorityStub === true) state.priorityStub = true;
     if (data.encoreStub === true) state.encoreStub = true;
     if (data.spotlightStub === true) state.spotlightStub = true;
+    if (data.ringStub === true) state.ringStub = true;
     if (typeof data.growthLost === "number" && data.growthLost > 0 && data.growthLost < 100000
         && Number.isInteger(data.growthLost)) {
       state.growthLost = data.growthLost;
@@ -1068,7 +1073,7 @@ const GROWTH_URL_DEFAULT = "https://insights.example.invalid/v1/growth";
 const GROWTH_BATCH = 20;
 const GROWTH_TRIES = 8;
 const SESSION_GAP_MS = 30 * 60 * 1000;
-const APP_VERSION = "1.71.0";
+const APP_VERSION = "1.72.0";
 
 function growthUrlOk(url) {
   try {
@@ -1103,6 +1108,17 @@ function growthHost() {
   try { return new URL(growthTarget()).hostname; } catch (e) { return "insights.example.invalid"; }
 }
 
+// A joke may be offered. The words of a plan are not on that event.
+const JOKE_EVENTS = {
+  cowbell: true, staple: true, kazoo: true, trombone: true, airhorn: true, bell: true, ai: true,
+};
+
+function jokePlan(event, plan) {
+  if (JOKE_EVENTS[event]) return null;
+  if (typeof plan !== "string" || !plan) return null;
+  return plan;
+}
+
 function growthMetric(value) {
   // A whole number in 0..99999. Anything else, including 3.9, is zero.
   // Flooring 3.9 into 3 would make the sentence disagree with the file.
@@ -1120,7 +1136,7 @@ function growthQueue() {
       streak: growthMetric(item.streak),
       best: growthMetric(item.best),
       // A joke does not carry the plan. Other events keep a string plan.
-      plan: item.event === "cowbell" ? null : (typeof item.plan === "string" ? item.plan : null),
+      plan: jokePlan(item.event, item.plan),
     }));
   } catch (e) {
     return [];
@@ -1176,7 +1192,8 @@ function growthTouch(state, today) {
       const previous = growthCount(state.growthRun, 0);
       died = previous > 1 || growthCount(state.growthBest, 0) > 1;
       run = 1;
-      if (died && previous > 1) state.growthLost = previous;
+      // A run of 1 is the run that stopped. Only a missing run uses the longest.
+      if (died && previous >= 1) state.growthLost = previous;
       else if (died && !growthCount(state.growthLost, 0)) {
         state.growthLost = growthCount(state.growthBest, 0);
       }
@@ -1236,9 +1253,10 @@ function growthSession(state) {
 }
 
 function growthCapture(state, event, today, planText) {
-  const plan = planText === "" ? null
-    : (planText != null ? String(planText).slice(0, 400)
-      : (state.intent && state.intent.text ? String(state.intent.text).slice(0, 400) : null));
+  const plan = JOKE_EVENTS[event] ? null
+    : (planText === "" ? null
+      : (planText != null ? String(planText).slice(0, 400)
+        : (state.intent && state.intent.text ? String(state.intent.text).slice(0, 400) : null)));
   if (!growthConsentOn(state)) {
     growthLog(state, event, plan);
     return;
@@ -1271,8 +1289,7 @@ function growthBody(state, batch) {
       session: typeof item.session === "string" ? item.session : "",
       streak: growthMetric(item.streak),
       best: growthMetric(item.best),
-      plan: item.event === "cowbell" ? null
-        : (typeof item.plan === "string" ? (item.plan.slice(0, 400) || null) : null),
+      plan: jokePlan(item.event, typeof item.plan === "string" ? item.plan.slice(0, 400) : item.plan),
       v: typeof item.v === "string" ? item.v : APP_VERSION,
       lang: typeof item.lang === "string" ? item.lang : "",
     })),
@@ -1366,8 +1383,18 @@ function growthEula(host) {
 
 function reedNamed(name) {
   // Fold spaces first. "Reed  Mallory" and "Reed Mallory." are still his name.
+  // A certificate-style subject is checked name by name, so "CN=Reed Mallory"
+  // is still his. "not Reed Mallory" does not start with his name.
   const folded = String(name || "").trim().toLowerCase().split(/\s+/).filter(Boolean).join(" ");
-  return folded.startsWith("reed mallory");
+  if (folded.startsWith("reed mallory")) return true;
+  const parts = folded.split(",");
+  for (let i = 0; i < parts.length; i++) {
+    let value = parts[i].trim();
+    const eq = value.lastIndexOf("=");
+    if (eq >= 0) value = value.slice(eq + 1).trim();
+    if (value.startsWith("reed mallory")) return true;
+  }
+  return false;
 }
 
 function diskHouseKeys(keys) {
@@ -2110,7 +2137,9 @@ if (typeof document !== "undefined") {
     if ($("priority")) $("priority").textContent = phrase("priority");
     if ($("encore")) $("encore").textContent = phrase("encore");
     if ($("airhorn")) $("airhorn").textContent = phrase("airhorn");
+    if ($("bell")) $("bell").textContent = phrase("bell");
     if ($("spotlight")) $("spotlight").textContent = phrase("spotlight");
+    if ($("ring")) $("ring").textContent = phrase("ring");
     if ($("growth-toggle")) $("growth-toggle").textContent = on ? phrase("growthOff") : phrase("growthOn");
     if ($("growth-server-label")) $("growth-server-label").textContent = phrase("growthServer");
     if ($("growth-server-save")) $("growth-server-save").textContent = phrase("growthServerSave");
@@ -2318,6 +2347,36 @@ if (typeof document !== "undefined") {
       return false;
     }
   }
+  function bellTone() {
+    // One short sine oscillator in this page. No fetch and no file.
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (typeof AC !== "function") return false;
+    let ctx;
+    try { ctx = new AC(); } catch (e) { return false; }
+    try {
+      if (ctx.state === "suspended" && typeof ctx.resume === "function") {
+        const pending = ctx.resume();
+        if (pending && typeof pending.catch === "function") pending.catch(() => {});
+      }
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.08, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.46);
+      setTimeout(() => { try { ctx.close(); } catch (e) { /* already closed */ } }, 700);
+      return ctx.state !== "closed";
+    } catch (e) {
+      try { ctx.close(); } catch (err) { /* already closed */ }
+      return false;
+    }
+  }
   function airhornTone() {
     // Three short square bursts in this page. No fetch and no file.
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -2401,6 +2460,13 @@ if (typeof document !== "undefined") {
       : "No tone was started. Not a recording. Nothing was sent.";
     jokeStatus(phrase("airhornSaid") + "\n" + note);
   });
+  if ($("bell")) $("bell").addEventListener("click", () => {
+    const started = bellTone();
+    const note = started
+      ? "A tone was started on this phone. Not a recording. Nothing was sent."
+      : "No tone was started. Not a recording. Nothing was sent.";
+    jokeStatus(phrase("bellSaid") + "\n" + note);
+  });
   if ($("spotlight")) $("spotlight").addEventListener("click", () => {
     const had = state.spotlightStub === true;
     state.spotlightStub = true;
@@ -2415,6 +2481,21 @@ if (typeof document !== "undefined") {
     }
     draw();
     stubStatus(saved, phrase("spotlightSaid"));
+  });
+  if ($("ring")) $("ring").addEventListener("click", () => {
+    const had = state.ringStub === true;
+    state.ringStub = true;
+    const saved = save();
+    if (!saved) {
+      if (had) state.ringStub = true;
+      else delete state.ringStub;
+    } else {
+      growthReceipt("ring", "6.99");
+      growthCapture(state, "ring", null, "");
+      growthFlush(state);
+    }
+    draw();
+    stubStatus(saved, phrase("ringSaid"));
   });
   $("haiku").addEventListener("click", () => {
     clearTimeout(hearTimer);

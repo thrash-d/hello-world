@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-31: review round 55
+
+Version 1.72.0. A streak that stopped at 1 while the longest was 5 used to say it was 5. The sentence now names 1, and names the longest only when that number is different. `CN=Reed Mallory` was still accepted on the variable-time transfer, on the phone's raw-key line, and as the name an unsigned script printed. Those checks now refuse each name after `=`, the same way the certificate signer does. A joke event sent to the counts server, or queued on the desktop, no longer carries the plan. The visit-window comment that still said 60 days now says 61 calendar days.
+
+`hello bell` prints four lines and "ding", and says it is not a recording and that nothing was sent. The phone button may start a tone in the page, and the status line says whether it did. `hello ring` writes a local stub receipt for $6.99 after the notes save succeeds. The bell stays free. The morning screen and the printed page do not gain a line.
+
+Nothing was removed. Streak notes, sync, reminders, the kazoo, the trombone, the airhorn, the duck line, and the other stub receipts are still there. The default upload is still `https://insights.example.invalid/v1/growth`.
+
 ## 2026-10-31: review round 54
 
 Version 1.71.0. Option 1 said the visit list was the last 60 days. The list keeps today and the day 60 days earlier, both included, which is 61 calendar days. The sentence now says 61. A code-signing certificate whose subject was "Reed  Mallory", with the space doubled, was not refused, and the package build did not look at the subject at all. Both now use the same folded-name check. On the phone, a streak of 3.9 was stored as 3 and could be offered as 3.9. A number that is not a whole number is not that count. The repair line names the number it wrote. The Cowbell button no longer puts the plan text on the event it offers.

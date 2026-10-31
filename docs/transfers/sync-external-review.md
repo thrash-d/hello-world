@@ -28,8 +28,9 @@ HELLO_SYNC_EXTERNAL_REVIEW=<path to that file>
 `sync_review_status()` then returns `external`. Without the file it returns
 `internal-only`, which is what startup prints. A name that is Reed Mallory,
 or that starts with Reed Mallory, is ignored, including after spaces inside
-the name are folded. The open refuses a reparse point. A symlink is not
-that file.
+the name are folded. `CN=Reed Mallory` is ignored too. "not Reed Mallory"
+does not start with his name. The open refuses a reparse point. A symlink
+is not that file.
 
 The internal review does not change the key derivation, the salt, or the
 blob format. An existing copy still opens.

@@ -82,3 +82,10 @@ morning screen or the printed page. It is not a license.
 local receipt for $7.99. The receipt says nothing was charged. The airhorn
 stays free. The flag does not unlock Pro. It does not add a line to the
 morning screen or the printed page. It is not a license.
+
+## Hello Ring is not a key
+
+`hello ring`, and the phone's Hello Ring button in Settings, write a
+local receipt for $6.99. The receipt says nothing was charged. The bell
+stays free. The flag does not unlock Pro. It does not add a line to the
+morning screen or the printed page. It is not a license.

@@ -41,8 +41,11 @@ The script warns once and names the acceptor:
 - otherwise `HELLO_UNSIGNED_ACCEPTOR`, on the same rule
 - otherwise the words `deploying organization`
 
-Spaces inside the name are folded before that check, so "Reed  Mallory" and
-"Reed Mallory." are still not acceptors.
+Spaces inside the name are folded before that check, and each name after
+`=` is checked, so "Reed  Mallory", "Reed Mallory.", and "CN=Reed Mallory"
+are still not acceptors. "not Reed Mallory" does not start with his name.
+The four scripts repeat the steps in `tools/reed-name.ps1`. They are copied
+away from that file, so they do not dot-source it.
 
 The install is not refused. Refusing it would remove the documented way to
 install from a clone. The package hash is the hash of the unsigned files

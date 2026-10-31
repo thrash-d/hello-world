@@ -226,3 +226,21 @@ What they added: `hello airhorn` (free, not the morning, not a recording)
 and `hello spotlight`, a $7.99 local stub. The airhorn stays free. The
 morning screen and the printed page do not gain a line. The default upload
 is still the placeholder. He did not sign the word audited.
+
+## Round 55
+
+The same six. Reed Mallory still accepts no residual, and he does not veto.
+The record is `reviews/round-55.md`. The version is 1.72.0.
+
+A run that stopped at 1, with a longest of 5, said it was 5. The sentence
+now names 1, and names 5 only as the longest. A certificate-style name,
+`CN=Reed Mallory`, still opened the variable-time gate, still kept raw
+phone sync keys, and was still printed as the unsigned-script acceptor.
+Those checks now use the same name-by-name rule as the signer. A joke
+event stored by the counts server no longer keeps the plan. The comment
+that said visits are kept 60 days now says 61 calendar days.
+
+What they added: `hello bell` (free, not the morning, not a recording)
+and `hello ring`, a $6.99 local stub. The bell stays free. The morning
+screen and the printed page do not gain a line. The default upload is
+still the placeholder. He did not sign the word audited.
