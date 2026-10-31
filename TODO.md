@@ -41,8 +41,13 @@ a reparse point. The internal review of the sync encryption is
 the household list after the phone's keys move to the browser, and the
 death sentence names the run that stopped. `hello trombone` prints and
 does not save. The phone may start a tone and says whether it did.
-`hello encore` is a $3.99 local stub. The trombone stays free. Nothing was
-removed. The reminder was already
+`hello encore` is a $3.99 local stub. The trombone stays free. 1.71.0
+says 61 for the visit window that keeps both ends, refuses a certificate
+subject that is Reed Mallory after spaces are folded, and does not turn a
+streak of 3.9 into 3. `hello airhorn` prints and does not save. The phone
+may start a tone and says whether it did. `hello spotlight` is a $7.99
+local stub. The airhorn stays free. The repair line names the number it
+wrote. Nothing was removed. The reminder was already
 offered on the first day, right after the first plan. Running a public
 counts server for the individual package is the owner's step; the README says
 how.

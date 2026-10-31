@@ -48,7 +48,7 @@ prints the whole saved file.
 
 - The program makes no network connections at any time.
 - Each user has one file, `%LOCALAPPDATA%\hello-world\notes.json`. It holds
-  the date they last opened the program (the last 60 days of dates only if
+  the date they last opened the program (the dates from 60 days before today through today, 61 days with both ends counted, only if
   they turned on the days-in-a-row message), one current plan,
   one unfinished earlier plan, a count of plans marked done, the plans
   finished in the last 14 days with dates, four settings, and the date of the last

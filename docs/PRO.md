@@ -58,7 +58,8 @@ that's the price of no account.
 month. The receipt says nothing was charged. There is no card form and no
 processor. The flag does not unlock Pro, a second reminder, a colour, or the
 household list. The streak nag does not stop. `hello repair` is the same kind
-of receipt for $2.99, and it only puts the local streak number back. Neither
+of receipt for $2.99, and it only puts the local streak number back. The
+line names that number. Neither
 one is a license.
 
 ## Priority Hello is not a key
@@ -72,5 +73,12 @@ not remove the sponsored line. It is not a license.
 
 `hello encore`, and the phone's Hello Encore button in Settings, write a
 local receipt for $3.99. The receipt says nothing was charged. The trombone
+stays free. The flag does not unlock Pro. It does not add a line to the
+morning screen or the printed page. It is not a license.
+
+## Hello Spotlight is not a key
+
+`hello spotlight`, and the phone's Hello Spotlight button in Settings, write a
+local receipt for $7.99. The receipt says nothing was charged. The airhorn
 stays free. The flag does not unlock Pro. It does not add a line to the
 morning screen or the printed page. It is not a license.

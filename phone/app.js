@@ -78,6 +78,10 @@ const UI = {
     prioritySaid: "Priority Hello is $4.99. STUB: nothing was charged. No card was asked for. The morning screen is unchanged.",
     encore: "Hello Encore $3.99",
     encoreSaid: "Hello Encore is $3.99. STUB: nothing was charged. No card was asked for. The morning screen is unchanged. The trombone stays free.",
+    airhorn: "Airhorn",
+    airhornSaid: "   __\n  |  \\___\n  |      )\n  |______/\nBRAAAAP",
+    spotlight: "Hello Spotlight $7.99",
+    spotlightSaid: "Hello Spotlight is $7.99. STUB: nothing was charged. No card was asked for. The morning screen is unchanged. The airhorn stays free.",
     stubUnsaved: "Could not save that on this phone. Nothing was charged.",
     eulaTitle: "Streak notes",
     eulaCheck: "Share streak notes (selected)",
@@ -87,7 +91,7 @@ const UI = {
     growthOn: "Streak notes are on", growthOff: "Streak notes are off",
     growthServer: "Upload address", growthServerSave: "Save upload address",
     growthServerBad: "That address doesn't look right. Nothing was changed.",
-    growthRepairSaid: "Streak repair. Amount due: $2.99. STUB: nothing was charged. No card was asked for.",
+    growthRepairSaid: "Streak repair. The streak is {n}. Amount due: $2.99. STUB: nothing was charged. No card was asked for.",
     growthPlusSaid: "Pro+ is $9.99 a month. STUB: nothing was charged. No card was asked for. The streak notes stay.",
     growthKeepSaid: "The streak stays. Open again tomorrow or it dies.",
     skipNag: "The streak noticed.",
@@ -319,11 +323,13 @@ function parse(raw) {
     if (data.growthConsent === true) state.growthConsent = true;
     else if (data.growthConsent === false) state.growthConsent = false;
     if (data.growth === false) state.growth = false;
-    if (typeof data.growthRun === "number" && data.growthRun > 0 && data.growthRun < 100000) {
-      state.growthRun = Math.floor(data.growthRun);
+    if (typeof data.growthRun === "number" && Number.isInteger(data.growthRun)
+        && data.growthRun > 0 && data.growthRun < 100000) {
+      state.growthRun = data.growthRun;
     }
-    if (typeof data.growthBest === "number" && data.growthBest > 0 && data.growthBest < 100000) {
-      state.growthBest = Math.floor(data.growthBest);
+    if (typeof data.growthBest === "number" && Number.isInteger(data.growthBest)
+        && data.growthBest > 0 && data.growthBest < 100000) {
+      state.growthBest = data.growthBest;
     }
     if (isDate(data.growthLast)) state.growthLast = data.growthLast;
     if (typeof data.growthId === "string" && /^[0-9a-f]{32}$/.test(data.growthId)) state.growthId = data.growthId;
@@ -337,6 +343,7 @@ function parse(raw) {
     if (data.plusStub === true) state.plusStub = true;
     if (data.priorityStub === true) state.priorityStub = true;
     if (data.encoreStub === true) state.encoreStub = true;
+    if (data.spotlightStub === true) state.spotlightStub = true;
     if (typeof data.growthLost === "number" && data.growthLost > 0 && data.growthLost < 100000
         && Number.isInteger(data.growthLost)) {
       state.growthLost = data.growthLost;
@@ -1061,7 +1068,7 @@ const GROWTH_URL_DEFAULT = "https://insights.example.invalid/v1/growth";
 const GROWTH_BATCH = 20;
 const GROWTH_TRIES = 8;
 const SESSION_GAP_MS = 30 * 60 * 1000;
-const APP_VERSION = "1.70.0";
+const APP_VERSION = "1.71.0";
 
 function growthUrlOk(url) {
   try {
@@ -1096,10 +1103,25 @@ function growthHost() {
   try { return new URL(growthTarget()).hostname; } catch (e) { return "insights.example.invalid"; }
 }
 
+function growthMetric(value) {
+  // A whole number in 0..99999. Anything else, including 3.9, is zero.
+  // Flooring 3.9 into 3 would make the sentence disagree with the file.
+  if (typeof value !== "number" || !Number.isInteger(value)) return 0;
+  if (value >= 0 && value < 100000) return value;
+  return 0;
+}
+
 function growthQueue() {
   try {
     const data = JSON.parse(localStorage.getItem("hello-world-growth-queue") || "[]");
-    return Array.isArray(data) ? data.filter((item) => item && typeof item.event === "string").slice(-200) : [];
+    if (!Array.isArray(data)) return [];
+    return data.filter((item) => item && typeof item.event === "string").slice(-200).map((item) => ({
+      ...item,
+      streak: growthMetric(item.streak),
+      best: growthMetric(item.best),
+      // A joke does not carry the plan. Other events keep a string plan.
+      plan: item.event === "cowbell" ? null : (typeof item.plan === "string" ? item.plan : null),
+    }));
   } catch (e) {
     return [];
   }
@@ -1123,7 +1145,7 @@ function growthLog(state, event, plan) {
       event: String(event).slice(0, 40),
       id: state.growthId || "",
       session: state.growthSession || "",
-      streak: state.growthRun || 0,
+      streak: growthMetric(state.growthRun),
       plan: plan ? String(plan).slice(0, 400) : null,
     });
     localStorage.setItem("hello-world-growth-log", JSON.stringify(rows.slice(-80)));
@@ -1131,8 +1153,11 @@ function growthLog(state, event, plan) {
 }
 
 function growthCount(value, fallback) {
-  return typeof value === "number" && Number.isFinite(value) && value > 0 && value < 100000
-    ? Math.floor(value) : fallback;
+  // A whole number only. 3.9 is not 3, and it is not this count.
+  if (typeof value !== "number" || !Number.isInteger(value) || !(value > 0 && value < 100000)) {
+    return fallback;
+  }
+  return value;
 }
 
 function growthTouch(state, today) {
@@ -1225,7 +1250,7 @@ function growthCapture(state, event, today, planText) {
   const queue = growthQueue();
   const one = (name) => ({
     event: String(name).slice(0, 40), at: now, id: state.growthId, session: state.growthSession,
-    streak: state.growthRun || 0, best: state.growthBest || 0, plan, v: APP_VERSION,
+    streak: growthMetric(state.growthRun), best: growthMetric(state.growthBest), plan, v: APP_VERSION,
     lang: language(state, (typeof navigator !== "undefined" && navigator.languages) || []), attempts: 0,
   });
   if (started) {
@@ -1241,9 +1266,15 @@ function growthBody(state, batch) {
   return {
     id: state.growthId, session: state.growthSession || "", consent: true, v: APP_VERSION,
     events: batch.map((item) => ({
-      event: item.event, at: item.at || "", session: item.session || "",
-      streak: item.streak || 0, best: item.best || 0, plan: item.plan || null,
-      v: item.v || APP_VERSION, lang: item.lang || "",
+      event: typeof item.event === "string" ? item.event.slice(0, 40) : "",
+      at: typeof item.at === "string" ? item.at : "",
+      session: typeof item.session === "string" ? item.session : "",
+      streak: growthMetric(item.streak),
+      best: growthMetric(item.best),
+      plan: item.event === "cowbell" ? null
+        : (typeof item.plan === "string" ? (item.plan.slice(0, 400) || null) : null),
+      v: typeof item.v === "string" ? item.v : APP_VERSION,
+      lang: typeof item.lang === "string" ? item.lang : "",
     })),
   };
 }
@@ -1276,7 +1307,9 @@ function securityNote(event, extra) {
     };
     if (extra && typeof extra.host === "string") row.host = extra.host.slice(0, 200);
     if (extra && typeof extra.result === "string") row.result = extra.result.slice(0, 20);
-    if (extra && typeof extra.n === "number" && Number.isFinite(extra.n)) row.n = extra.n;
+    if (extra && typeof extra.n === "number" && Number.isInteger(extra.n) && extra.n >= 0 && extra.n <= 1000) {
+      row.n = extra.n;
+    }
     rows.push(row);
     localStorage.setItem("hello-world-security-audit", JSON.stringify(rows.slice(-40)));
   } catch (e) { /* private mode */ }
@@ -1311,7 +1344,7 @@ async function growthFlush(state) {
 
 function growthLine(state) {
   const host = growthHost();
-  const n = state.growthRun || 1;
+  const n = growthCount(state.growthRun, 1);
   let line;
   if (state.growthDied) {
     const best = growthCount(state.growthBest, 0);
@@ -1361,7 +1394,7 @@ if (typeof module !== "undefined") {
     houseKeys, houseNew, houseJoin, houseLeave, houseChange, houseMerge, houseTidy, houseBody, houseHistory,
     houseNews, houseLeftUnasked, newCode, houseFit, houseStamp, syncAction, syncTime, HOUSE,
     planParts, finishListed, growthUrlOk, growthTarget, growthTouch, growthAttempts, growthConsentOn, growthLine,
-    duckLine, reedNamed, diskHouseKeys };
+    growthMetric, growthBody, duckLine, reedNamed, diskHouseKeys };
 }
 
 if (typeof document !== "undefined") {
@@ -2076,6 +2109,8 @@ if (typeof document !== "undefined") {
     if ($("ai")) $("ai").textContent = phrase("ai");
     if ($("priority")) $("priority").textContent = phrase("priority");
     if ($("encore")) $("encore").textContent = phrase("encore");
+    if ($("airhorn")) $("airhorn").textContent = phrase("airhorn");
+    if ($("spotlight")) $("spotlight").textContent = phrase("spotlight");
     if ($("growth-toggle")) $("growth-toggle").textContent = on ? phrase("growthOff") : phrase("growthOn");
     if ($("growth-server-label")) $("growth-server-label").textContent = phrase("growthServer");
     if ($("growth-server-save")) $("growth-server-save").textContent = phrase("growthServerSave");
@@ -2188,7 +2223,7 @@ if (typeof document !== "undefined") {
       growthFlush(state);
     }
     draw();
-    stubStatus(saved, phrase("growthRepairSaid"));
+    stubStatus(saved, phrase("growthRepairSaid").split("{n}").join(String(best)));
   });
   $("growth-plus").addEventListener("click", () => {
     const had = state.plusStub === true;
@@ -2237,7 +2272,7 @@ if (typeof document !== "undefined") {
     status.tabIndex = -1;
     status.focus();
     if (growthConsentOn(state)) {
-      growthCapture(state, "cowbell", today());
+      growthCapture(state, "cowbell", today(), "");
       save();
       growthFlush(state);
     }
@@ -2275,6 +2310,39 @@ if (typeof document !== "undefined") {
         gain.connect(ctx.destination);
         osc.start(start);
         osc.stop(start + 0.25);
+      });
+      setTimeout(() => { try { ctx.close(); } catch (e) { /* already closed */ } }, 900);
+      return ctx.state !== "closed";
+    } catch (e) {
+      try { ctx.close(); } catch (err) { /* already closed */ }
+      return false;
+    }
+  }
+  function airhornTone() {
+    // Three short square bursts in this page. No fetch and no file.
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (typeof AC !== "function") return false;
+    let ctx;
+    try { ctx = new AC(); } catch (e) { return false; }
+    try {
+      if (ctx.state === "suspended" && typeof ctx.resume === "function") {
+        const pending = ctx.resume();
+        if (pending && typeof pending.catch === "function") pending.catch(() => {});
+      }
+      const now = ctx.currentTime;
+      [0, 0.18, 0.36].forEach((offset) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "square";
+        osc.frequency.value = 440;
+        const start = now + offset;
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(0.07, start + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.14);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(start);
+        osc.stop(start + 0.15);
       });
       setTimeout(() => { try { ctx.close(); } catch (e) { /* already closed */ } }, 900);
       return ctx.state !== "closed";
@@ -2325,6 +2393,28 @@ if (typeof document !== "undefined") {
     }
     draw();
     stubStatus(saved, phrase("encoreSaid"));
+  });
+  if ($("airhorn")) $("airhorn").addEventListener("click", () => {
+    const started = airhornTone();
+    const note = started
+      ? "A tone was started on this phone. Not a recording. Nothing was sent."
+      : "No tone was started. Not a recording. Nothing was sent.";
+    jokeStatus(phrase("airhornSaid") + "\n" + note);
+  });
+  if ($("spotlight")) $("spotlight").addEventListener("click", () => {
+    const had = state.spotlightStub === true;
+    state.spotlightStub = true;
+    const saved = save();
+    if (!saved) {
+      if (had) state.spotlightStub = true;
+      else delete state.spotlightStub;
+    } else {
+      growthReceipt("spotlight", "7.99");
+      growthCapture(state, "spotlight", null, "");
+      growthFlush(state);
+    }
+    draw();
+    stubStatus(saved, phrase("spotlightSaid"));
   });
   $("haiku").addEventListener("click", () => {
     clearTimeout(hearTimer);

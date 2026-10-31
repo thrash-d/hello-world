@@ -208,3 +208,21 @@ What they added: `hello trombone` (free, not the morning, not a recording)
 and `hello encore`, a $3.99 local stub. The trombone stays free. The
 morning screen and the printed page do not gain a line. The default upload
 is still the placeholder. He did not sign the word audited.
+
+## Round 54
+
+The same six. Reed Mallory still accepts no residual, and he does not veto.
+The record is `reviews/round-54.md`. The version is 1.71.0.
+
+The visit line said "last 60 days" for a window that keeps today and the
+day 60 days earlier, which is 61 calendar days. It now says 61. A
+certificate subject with a doubled space in Reed Mallory's name could
+still sign, and the package build did not check the subject. Both use
+`tools/reed-name.ps1`. The phone no longer turns 3.9 into 3. A repair
+line names the number it wrote. The Cowbell button does not put the plan
+on the event it offers.
+
+What they added: `hello airhorn` (free, not the morning, not a recording)
+and `hello spotlight`, a $7.99 local stub. The airhorn stays free. The
+morning screen and the printed page do not gain a line. The default upload
+is still the placeholder. He did not sign the word audited.
