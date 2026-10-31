@@ -63,6 +63,16 @@ KAZOO = (
     "|__||__|",
 )
 KAZOO_LINE = "bwap bwap"
+# A trombone. A command, a prompt word, and a phone button. Not the morning.
+# The phone may start a tone. This screen does not, and it does not say it did.
+TROMBONE = (
+    "  __",
+    " /  \\___",
+    "|  o  o  |====",
+    " \\______/",
+)
+TROMBONE_LINE = "womp womp"
+TROMBONE_NOTE = "This is not a recording. Nothing was sent."
 # Not a model. The line is chosen from the date. Nothing is sent.
 AI_NOTE = "This is not a model. Nothing was sent."
 DUCK_LINES = (
@@ -77,6 +87,11 @@ PRIORITY_SAID = (
     "No card was asked for. The receipt stays on this computer. "
     "The morning screen is unchanged."
 )
+ENCORE_SAID = (
+    "Hello Encore is $3.99. STUB: nothing was charged. "
+    "No card was asked for. The receipt stays on this computer. "
+    "The morning screen is unchanged. The trombone stays free."
+)
 STUB_UNSAVED = "Could not save that on this computer. Nothing was charged."
 # Shown once. Enter on this question accepts; the prompt says so. q still quits.
 EULA_BODY = (
@@ -90,7 +105,11 @@ GROWTH_NAG = (
     "Your streak is {n}. Open again tomorrow or it dies. A note was offered to {host}."
 )
 GROWTH_DEAD = (
-    "Your streak died. It was {best}. Type repair. Amount due: $2.99. Nothing is charged."
+    "Your streak died. It was {n}. Type repair. Amount due: $2.99. Nothing is charged."
+)
+GROWTH_DEAD_LONGEST = (
+    "Your streak died. It was {n}. The longest was {best}. Type repair. "
+    "Amount due: $2.99. Nothing is charged."
 )
 GROWTH_PLUS = "Pro+ member. Your streak is still watching."
 SPONSORED = (
@@ -625,13 +644,15 @@ def help_text():
     return (tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
             + "\n\n" + tr("For fun, and nothing is saved: hello morse, hello haiku, "
                           "hello klingon, hello shift, hello cowbell, hello staple, "
-                          "hello kazoo, hello ai, and hello --pirate. "
+                          "hello kazoo, hello trombone, hello ai, and hello --pirate. "
                           "hello ai is not a model and sends nothing. "
+                          "hello trombone is not a recording and sends nothing. "
                           "--set klingon on keeps the Klingon line under the greeting. "
                           "hello growth off stops streak notes. "
-                          "hello priority writes a local stub receipt and does not bill."))
+                          "hello priority and hello encore write a local stub receipt "
+                          "and do not bill. The trombone stays free."))
 
-VERSION = "1.69.0"
+VERSION = "1.70.0"
 MAX_VISITS = 400
 KEEP_VISIT_DAYS = 60
 MAX_FILE = 1_000_000
@@ -1358,8 +1379,8 @@ def growth_log(state, event, plan):
         "event": str(event)[:40],
         "id": state.get("growth_id") or "",
         "session": state.get("growth_session") or "",
-        "streak": int(state.get("growth_run") or 0),
-        "best": int(state.get("growth_best") or 0),
+        "streak": _growth_metric(state.get("growth_run")),
+        "best": _growth_metric(state.get("growth_best")),
         "plan": (plan or "")[:400] or None,
         "v": VERSION,
         "upload": growth_host(),
@@ -1421,8 +1442,8 @@ def growth_capture(state, event, plan=None):
 
     def one(name):
         return {"event": str(name)[:40], "at": now, "id": cid, "session": sid,
-                "streak": int(state.get("growth_run") or 0),
-                "best": int(state.get("growth_best") or 0),
+                "streak": _growth_metric(state.get("growth_run")),
+                "best": _growth_metric(state.get("growth_best")),
                 "plan": plan, "v": VERSION, "lang": language(), "attempts": 0}
 
     if started:
@@ -1443,15 +1464,17 @@ def _growth_plan_from(state):
 def growth_body(state, batch):
     events = []
     for item in batch:
+        if not isinstance(item, dict):
+            continue
         events.append({
-            "event": item.get("event"),
-            "at": item.get("at") or "",
-            "session": item.get("session") or "",
-            "streak": int(item.get("streak") or 0),
-            "best": int(item.get("best") or 0),
+            "event": item.get("event") if isinstance(item.get("event"), str) else "",
+            "at": item.get("at") if isinstance(item.get("at"), str) else "",
+            "session": item.get("session") if isinstance(item.get("session"), str) else "",
+            "streak": _growth_metric(item.get("streak")),
+            "best": _growth_metric(item.get("best")),
             "plan": item.get("plan") if isinstance(item.get("plan"), str) else None,
-            "v": item.get("v") or VERSION,
-            "lang": item.get("lang") or "",
+            "v": item.get("v") if isinstance(item.get("v"), str) else VERSION,
+            "lang": item.get("lang") if isinstance(item.get("lang"), str) else "",
         })
     return {"id": growth_client_id(state), "session": state.get("growth_session") or "",
             "consent": True, "v": VERSION, "events": events}
@@ -1505,6 +1528,15 @@ def _growth_count(value, default):
     if isinstance(value, bool) or not isinstance(value, int) or not 0 < value < 100000:
         return default
     return value
+
+
+def _growth_metric(value):
+    """A count for a queue line. A bad value is zero and does not raise."""
+    if isinstance(value, bool) or not isinstance(value, int):
+        return 0
+    if 0 <= value < 100000:
+        return value
+    return 0
 
 
 def growth_flush(state, rounds=3):
@@ -1567,10 +1599,18 @@ def growth_apply(state, d):
         # the new run, so the sentence has to match the number.
         run = min(_growth_count(state.get("growth_run"), 1) + 1, 99999)
         state.pop("growth_died", None)
+        state.pop("growth_lost", None)
     else:
-        died = (_growth_count(state.get("growth_run"), 0) > 1
-                or _growth_count(state.get("growth_best"), 0) > 1)
+        previous = _growth_count(state.get("growth_run"), 0)
+        died = previous > 1 or _growth_count(state.get("growth_best"), 0) > 1
         run = 1
+        # The sentence names the run that stopped. The longest is a second
+        # number only when it is not that run. A later gap must not replace
+        # the run that actually stopped with the longest.
+        if died and previous > 1:
+            state["growth_lost"] = previous
+        elif died and not _growth_count(state.get("growth_lost"), 0):
+            state["growth_lost"] = _growth_count(state.get("growth_best"), 0)
     state["growth_run"] = run
     state["growth_best"] = max(_growth_count(state.get("growth_best"), 0), run)
     state["growth_last"] = iso
@@ -1578,15 +1618,32 @@ def growth_apply(state, d):
         state["growth_died"] = True
 
 
-def growth_sentence(state):
-    """The nag, or "" when streak notes are off or gentle mode hid it."""
-    if not growth_consent(state) or gentle(state):
+def growth_lost_number(state):
+    """The run that stopped, and the longest. Missing lost uses the longest."""
+    best = _growth_count(state.get("growth_best"), 0)
+    lost = _growth_count(state.get("growth_lost"), 0)
+    if lost <= 0:
+        lost = best
+    return lost, best
+
+
+def growth_sentence(state, asked=False):
+    """The nag, or "" when streak notes are off or gentle mode hid it.
+
+    asked is the growth command. The morning still hides the line in gentle
+    mode. The command was asked for, and the number it says is the run.
+    """
+    if not growth_consent(state) or (gentle(state) and not asked):
         return ""
     host = growth_host()
     if state.get("growth_died"):
-        line = tr(GROWTH_DEAD).format(best=state.get("growth_best") or 0)
+        n, best = growth_lost_number(state)
+        if best and n != best:
+            line = tr(GROWTH_DEAD_LONGEST).format(n=n, best=best)
+        else:
+            line = tr(GROWTH_DEAD).format(n=n)
     else:
-        line = tr(GROWTH_NAG).format(n=state.get("growth_run") or 1, host=host)
+        line = tr(GROWTH_NAG).format(n=_growth_count(state.get("growth_run"), 1), host=host)
     if state.get("plus_stub"):
         line = line + " " + tr(GROWTH_PLUS)
     return line
@@ -1696,6 +1753,7 @@ def growth_repair(state, can_save):
     state["growth_run"] = best
     state["growth_best"] = best
     state.pop("growth_died", None)
+    state.pop("growth_lost", None)
     state["growth_last"] = today().isoformat()
     if not commit(state, base, can_save):
         undo(state, base)
@@ -1728,8 +1786,19 @@ def growth_priority(state, can_save):
     return tr(PRIORITY_SAID)
 
 
+def growth_encore(state, can_save):
+    """The $3.99 Hello Encore stub. The trombone stays free. The morning does not change."""
+    base = copy.deepcopy(state)
+    state["encore_stub"] = True
+    if not commit(state, base, can_save):
+        undo(state, base)
+        return tr(STUB_UNSAVED)
+    _after_stub(state, "encore", "3.99", "encore", include_plan=False)
+    return tr(ENCORE_SAID)
+
+
 def paid_reply(text, state, can_save):
-    """repair, plus, and priority at a prompt. True when the word was one of them."""
+    """repair, plus, priority, and encore at a prompt. True when the word was one of them."""
     low = (text or "").lower().strip(TRIM)
     if low == "repair":
         para(growth_repair(state, can_save))
@@ -1739,6 +1808,9 @@ def paid_reply(text, state, can_save):
         return True
     if low == "priority":
         para(growth_priority(state, can_save))
+        return True
+    if low == "encore":
+        para(growth_encore(state, can_save))
         return True
     return False
 
@@ -3997,6 +4069,11 @@ def load(repair=True):
         state["plus_stub"] = True
     if raw.get("priority_stub") is True:
         state["priority_stub"] = True
+    if raw.get("encore_stub") is True:
+        state["encore_stub"] = True
+    lost = raw.get("growth_lost")
+    if isinstance(lost, int) and not isinstance(lost, bool) and 0 < lost < 100000:
+        state["growth_lost"] = lost
     for key in ("growth_id", "growth_session"):
         token = raw.get(key)
         if isinstance(token, str) and re.fullmatch(r"[0-9a-f]{32}", token):
@@ -4659,6 +4736,8 @@ def show_saved(state, full=True):
         say(tr("Streak notes are off."))
     if state.get("priority_stub"):
         say(tr("Priority Hello: a local stub. Nothing was charged."))
+    if state.get("encore_stub"):
+        say(tr("Hello Encore: a local stub. Nothing was charged. The trombone stays free."))
     if launcher_place()[0] and text_screen(state):
         say(tr("Opens by itself at sign-in: turned off by your organization.")
             if policy("DisableSignInLauncher") else
@@ -7584,6 +7663,13 @@ def toy_reply(text):
         say(tr(KAZOO_LINE))
         feature_audit("kazoo")
         return True
+    if low == "trombone":
+        for line in TROMBONE:
+            say(line)
+        say(tr(TROMBONE_LINE))
+        say(tr(TROMBONE_NOTE))
+        feature_audit("trombone")
+        return True
     if low == "ai":
         say(tr(AI_NOTE))
         say(tr(DUCK_LINES[today().toordinal() % len(DUCK_LINES)]))
@@ -7601,7 +7687,7 @@ def fun_command(argv):
     if not argv:
         return None
     name = argv[0].lower()
-    if name not in ("morse", "klingon", "haiku", "shift", "cowbell", "staple", "kazoo", "ai"):
+    if name not in ("morse", "klingon", "haiku", "shift", "cowbell", "staple", "kazoo", "trombone", "ai"):
         return None
     if name == "morse" and len(argv) == 1:
         say(GREETING)
@@ -7635,6 +7721,16 @@ def fun_command(argv):
         say(tr(KAZOO_LINE))
         feature_audit("kazoo")
         return 0
+    if name == "trombone" and len(argv) == 1:
+        # Not the morning. No tone is started here, and the sentence does not
+        # say one was. No notes folder is created for the joke.
+        say(GREETING)
+        for line in TROMBONE:
+            say(line)
+        say(tr(TROMBONE_LINE))
+        say(tr(TROMBONE_NOTE))
+        feature_audit("trombone")
+        return 0
     if name == "ai" and len(argv) == 1:
         # Not a model. The date picks the line. The notes file is not opened.
         say(GREETING)
@@ -7664,7 +7760,7 @@ def fun_command(argv):
         say_haiku(when)
         return 0
     say(tr("Try hello morse, hello klingon, hello haiku, hello shift, "
-           "hello kazoo, or hello ai. "
+           "hello cowbell, hello staple, hello kazoo, hello trombone, or hello ai. "
            "A date is hello haiku --date YYYY-MM-DD."))
     return 2
 
@@ -7677,7 +7773,7 @@ def stub_command(argv):
     if not argv:
         return None
     name = argv[0].lower()
-    if name not in ("growth", "repair", "plus", "priority"):
+    if name not in ("growth", "repair", "plus", "priority", "encore"):
         return None
     rest = [a.lower() for a in argv[1:]]
     state, can_save = load()
@@ -7702,8 +7798,10 @@ def stub_command(argv):
         if growth_consent(state):
             base = copy.deepcopy(state)
             growth_apply(state, today())
-            line = growth_sentence(state) or tr(GROWTH_NAG).format(
-                n=state.get("growth_run") or 1, host=growth_host())
+            # Gentle mode hides the nag on the morning. This command was
+            # asked for. The sentence is the death line when the run stopped,
+            # and it names that run.
+            line = growth_sentence(state, asked=True) or tr("Streak notes are on.")
             say(line)
             if not commit(state, base, can_save):
                 undo(state, base)
@@ -7722,8 +7820,11 @@ def stub_command(argv):
     if name == "priority" and not rest:
         para(growth_priority(state, can_save))
         return 0
+    if name == "encore" and not rest:
+        para(growth_encore(state, can_save))
+        return 0
     say(tr("Try hello growth, hello growth on, hello growth off, hello repair, "
-           "hello plus, or hello priority."))
+           "hello plus, hello priority, or hello encore."))
     return 2
 
 

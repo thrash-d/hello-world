@@ -50,7 +50,7 @@ only administrators can read, and success and failure go to the Application
 event log under the source hello-world.
 
 .EXAMPLE
-$tag = 'v1.69.0'
+$tag = 'v1.70.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
@@ -114,7 +114,8 @@ function Note-ScriptSignature {
     if ($sig -and $sig.Status -eq 'Valid') { return 'signed' }
     $name = if ($UnsignedAcceptor) { $UnsignedAcceptor } else { $env:HELLO_UNSIGNED_ACCEPTOR }
     if (-not $name) { $name = 'deploying organization' }
-    if ($name -match '^(?i)\s*reed mallory(\s|$)') { $name = 'deploying organization' }
+    $folded = [regex]::Replace($name.Trim().ToLowerInvariant(), '\s+', ' ')
+    if ($folded.StartsWith('reed mallory')) { $name = 'deploying organization' }
     Write-Warning "This script is not signed. Residual acceptor: $name. Reed Mallory has not accepted it. See docs/transfers/code-signing.md."
     return $name
 }

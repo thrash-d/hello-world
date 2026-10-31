@@ -37,6 +37,9 @@ The script warns once and names the acceptor:
 - otherwise `HELLO_UNSIGNED_ACCEPTOR`, on the same rule
 - otherwise the words `deploying organization`
 
+Spaces inside the name are folded before that check, so "Reed  Mallory" and
+"Reed Mallory." are still not acceptors.
+
 The install is not refused. Refusing it would remove the documented way to
 install from a clone. The package hash is the hash of the unsigned files
 until a thumbprint is passed. No extra file is added to the package.

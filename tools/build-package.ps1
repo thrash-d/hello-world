@@ -73,7 +73,8 @@ if (-not $CertificateThumbprint) {
     # The package hash stays the hash of the unsigned files. The residual
     # is named here and is not Reed Mallory's.
     $acceptor = if ($UnsignedAcceptor) { $UnsignedAcceptor } else { 'deploying organization' }
-    if ($acceptor -match '^(?i)\s*reed mallory(\s|$)') { throw 'Reed Mallory does not accept an unsigned package.' }
+    $folded = [regex]::Replace($acceptor.Trim().ToLowerInvariant(), '\s+', ' ')
+    if ($folded.StartsWith('reed mallory')) { throw 'Reed Mallory does not accept an unsigned package.' }
     Write-Host "Unsigned package. Residual acceptor: $acceptor. Not Reed Mallory. Sign with -CertificateThumbprint or tools\sign-scripts.ps1."
 }
 if ($CertificateThumbprint) {

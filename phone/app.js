@@ -70,10 +70,14 @@ const UI = {
     cowbell: "Cowbell", cowbellSaid: "More cowbell.",
     kazoo: "Kazoo",
     kazooSaid: "   __\n _|  |_\n|  ||  |\n|__||__|\nbwap bwap",
+    trombone: "Trombone",
+    tromboneSaid: "  __\n /  \\___\n|  o  o  |====\n \\______/\nwomp womp",
     ai: "AI",
     aiSaid: "This is not a model. Nothing was sent.",
     priority: "Priority Hello $4.99",
     prioritySaid: "Priority Hello is $4.99. STUB: nothing was charged. No card was asked for. The morning screen is unchanged.",
+    encore: "Hello Encore $3.99",
+    encoreSaid: "Hello Encore is $3.99. STUB: nothing was charged. No card was asked for. The morning screen is unchanged. The trombone stays free.",
     stubUnsaved: "Could not save that on this phone. Nothing was charged.",
     eulaTitle: "Streak notes",
     eulaCheck: "Share streak notes (selected)",
@@ -332,6 +336,11 @@ function parse(raw) {
     if (data.growthDied === true) state.growthDied = true;
     if (data.plusStub === true) state.plusStub = true;
     if (data.priorityStub === true) state.priorityStub = true;
+    if (data.encoreStub === true) state.encoreStub = true;
+    if (typeof data.growthLost === "number" && data.growthLost > 0 && data.growthLost < 100000
+        && Number.isInteger(data.growthLost)) {
+      state.growthLost = data.growthLost;
+    }
     if (Array.isArray(data.aside)) {
       state.aside = data.aside.filter((a) => a && typeof a.text === "string" && clean(a.text) && isDate(a.date))
         .map((a) => ({ text: clean(a.text), date: a.date })).slice(-MAX_ASIDE);
@@ -355,11 +364,18 @@ function parse(raw) {
     if (data.intent && isDate(data.intent.since) && state.intent) state.intent.since = data.intent.since;
     // The household code itself is never kept, only the keys made from it.
     const hk = data.house && data.house.keys;
-    if (hk && /^[0-9a-f]{64}$/.test(hk.label) && [hk.enc, hk.mac].every((k) => Array.isArray(k) && k.length === 32
-        && k.every((b) => Number.isInteger(b) && b >= 0 && b < 256)) && HOUSE_ID.test(data.house.me)) {
+    const rawHouseKeys = hk && [hk.enc, hk.mac].every((k) => Array.isArray(k) && k.length === 32
+        && k.every((b) => Number.isInteger(b) && b >= 0 && b < 256));
+    const lockedHouse = hk && (hk.locked === "idb" || hk.locked === "memory" || hk.locked === "raw");
+    if (hk && /^[0-9a-f]{64}$/.test(hk.label) && (rawHouseKeys || lockedHouse) && HOUSE_ID.test(data.house.me)) {
       const seen = {};
       entries(data.house.seen).forEach(([id, v]) => { if (HOUSE_ID.test(id) && (v === "in" || v === "left")) seen[id] = v; });
-      state.house = { keys: { label: hk.label, enc: hk.enc.slice(), mac: hk.mac.slice() }, me: data.house.me, seen,
+      // A locked pointer has no key bytes. IndexedDB is read later. Raw
+      // arrays are the copy from before that move, and they migrate on open.
+      const keys = lockedHouse
+        ? { label: hk.label, locked: hk.locked }
+        : { label: hk.label, enc: hk.enc.slice(), mac: hk.mac.slice() };
+      state.house = { keys, me: data.house.me, seen,
                       asked: Array.isArray(data.house.asked) ? data.house.asked.filter((x) => HOUSE_ID.test(x)) : [] };
       if (data.houseList && typeof data.houseList === "object") state.houseList = houseMerge(data.houseList, {}, data.house.me);
     }
@@ -1045,7 +1061,7 @@ const GROWTH_URL_DEFAULT = "https://insights.example.invalid/v1/growth";
 const GROWTH_BATCH = 20;
 const GROWTH_TRIES = 8;
 const SESSION_GAP_MS = 30 * 60 * 1000;
-const APP_VERSION = "1.69.0";
+const APP_VERSION = "1.70.0";
 
 function growthUrlOk(url) {
   try {
@@ -1130,9 +1146,15 @@ function growthTouch(state, today) {
       // The death line was for the gap. This visit continues the new run.
       run = Math.min(growthCount(state.growthRun, 1) + 1, 99999);
       delete state.growthDied;
+      delete state.growthLost;
     } else {
-      died = growthCount(state.growthRun, 0) > 1 || growthCount(state.growthBest, 0) > 1;
+      const previous = growthCount(state.growthRun, 0);
+      died = previous > 1 || growthCount(state.growthBest, 0) > 1;
       run = 1;
+      if (died && previous > 1) state.growthLost = previous;
+      else if (died && !growthCount(state.growthLost, 0)) {
+        state.growthLost = growthCount(state.growthBest, 0);
+      }
     }
   }
   state.growthRun = run;
@@ -1145,7 +1167,7 @@ function growthTouch(state, today) {
 function growthAttempts(item) {
   if (!item || item.attempts == null) return 0;
   const n = item.attempts;
-  if (typeof n !== "number" || !Number.isFinite(n) || n < 0) return GROWTH_TRIES;
+  if (typeof n !== "number" || !Number.isInteger(n) || n < 0) return GROWTH_TRIES;
   return n;
 }
 
@@ -1290,9 +1312,16 @@ async function growthFlush(state) {
 function growthLine(state) {
   const host = growthHost();
   const n = state.growthRun || 1;
-  let line = state.growthDied
-    ? "Your streak died. It was " + (state.growthBest || 0) + ". Repair is $2.99. Nothing is charged."
-    : "Your streak is " + n + ". Open again tomorrow or it dies. A note was offered to " + host + ".";
+  let line;
+  if (state.growthDied) {
+    const best = growthCount(state.growthBest, 0);
+    const lost = growthCount(state.growthLost, 0) || best;
+    line = "Your streak died. It was " + lost + ".";
+    if (best && lost !== best) line += " The longest was " + best + ".";
+    line += " Repair is $2.99. Nothing is charged.";
+  } else {
+    line = "Your streak is " + n + ". Open again tomorrow or it dies. A note was offered to " + host + ".";
+  }
   if (state.plusStub) line += " Pro+ member. Your streak is still watching.";
   return line;
 }
@@ -1302,6 +1331,28 @@ function growthEula(host) {
     + host + ". Household lists, letters, and sync codes are not included. Nothing is billed.";
 }
 
+function reedNamed(name) {
+  // Fold spaces first. "Reed  Mallory" and "Reed Mallory." are still his name.
+  const folded = String(name || "").trim().toLowerCase().split(/\s+/).filter(Boolean).join(" ");
+  return folded.startsWith("reed mallory");
+}
+
+function diskHouseKeys(keys) {
+  // null means the caller leaves the bytes it already copied. That is only
+  // the legacy raw arrays, before IndexedDB has taken them. A CryptoKey is
+  // never written out. An explicit raw or idb mark keeps the label only.
+  if (!keys || typeof keys !== "object" || typeof keys.label !== "string") return { label: "", locked: "memory" };
+  const crypto = typeof CryptoKey !== "undefined" && keys.enc instanceof CryptoKey;
+  const raw = !crypto && Array.isArray(keys.enc) && Array.isArray(keys.mac);
+  if (raw && keys.stored !== "idb" && keys.locked !== "idb" && keys.stored !== "raw" && keys.locked !== "raw") {
+    return null;
+  }
+  let locked = "memory";
+  if (keys.stored === "idb" || keys.locked === "idb") locked = "idb";
+  else if (keys.stored === "raw" || keys.locked === "raw") locked = "raw";
+  return { label: keys.label, locked };
+}
+
 if (typeof module !== "undefined") {
   module.exports = { UI, ordinal, todaysPair, clean, parse, asks, answer, setPlan, finishToday, language, blank,
     syncKeys, sealSync, openSync, mergeSync, syncForm, normalCode, todayOf, clearToday, picks, bringBack,
@@ -1309,7 +1360,8 @@ if (typeof module !== "undefined") {
     fresh, smallerDue, comingBack, smaller, endDay, noteSideways, mergeDevices, noteDevice, letterLink,
     houseKeys, houseNew, houseJoin, houseLeave, houseChange, houseMerge, houseTidy, houseBody, houseHistory,
     houseNews, houseLeftUnasked, newCode, houseFit, houseStamp, syncAction, syncTime, HOUSE,
-    planParts, finishListed, growthUrlOk, growthTarget, growthTouch, growthConsentOn, duckLine };
+    planParts, finishListed, growthUrlOk, growthTarget, growthTouch, growthAttempts, growthConsentOn, growthLine,
+    duckLine, reedNamed, diskHouseKeys };
 }
 
 if (typeof document !== "undefined") {
@@ -1382,12 +1434,9 @@ if (typeof document !== "undefined") {
     try {
       const disk = JSON.parse(JSON.stringify(state));
       // House key bytes are not part of the notes. IndexedDB holds them.
-      if (disk.house && disk.house.keys && state.house && state.house.keys
-          && state.house.keys.enc instanceof CryptoKey) {
-        disk.house.keys = {
-          label: state.house.keys.label,
-          locked: state.house.keys.stored === "idb" ? "idb" : "memory",
-        };
+      if (disk.house && state.house && state.house.keys) {
+        const stored = diskHouseKeys(state.house.keys);
+        if (stored) disk.house.keys = stored;
       }
       localStorage.setItem(KEY, JSON.stringify(disk));
     }
@@ -1622,7 +1671,7 @@ if (typeof document !== "undefined") {
   function rawKeyAcceptor() {
     try {
       const name = String(localStorage.getItem("hello-world-sync-raw-acceptor") || "").trim();
-      if (!name || /^reed mallory$/i.test(name)) return "";
+      if (!name || name.length > 80 || reedNamed(name)) return "";
       return name.slice(0, 80);
     } catch (e) { return ""; }
   }
@@ -1655,6 +1704,12 @@ if (typeof document !== "undefined") {
   async function getSecret(id) {
     const db = await openSecretDb();
     try { return await idbDo(db, "readonly", (store) => store.get(id)); }
+    finally { db.close(); }
+  }
+  async function dropHouseSecret(label) {
+    if (!label) return;
+    const db = await openSecretDb();
+    try { await idbDo(db, "readwrite", (store) => store.delete("house:" + label)); }
     finally { db.close(); }
   }
   async function dropSecrets() {
@@ -1729,11 +1784,11 @@ if (typeof document !== "undefined") {
     }
     if (state.house && state.house.keys) {
       const stored = state.house.keys;
-      if (stored.locked === "idb" && stored.label) {
+      if ((stored.locked === "idb" || stored.stored === "idb") && stored.label && !(stored.enc instanceof CryptoKey)) {
         try {
           const row = await getSecret("house:" + stored.label);
-          if (row && row.enc instanceof CryptoKey) {
-            house = { label: row.label, enc: row.enc, mac: row.mac, stored: "idb" };
+          if (row && row.enc instanceof CryptoKey && row.mac instanceof CryptoKey) {
+            house = { label: row.label || stored.label, enc: row.enc, mac: row.mac, stored: "idb" };
           }
         } catch (e) { house = null; }
       } else if (Array.isArray(stored.enc) && Array.isArray(stored.mac)) {
@@ -2017,8 +2072,10 @@ if (typeof document !== "undefined") {
     }
     if ($("cowbell")) $("cowbell").textContent = phrase("cowbell");
     if ($("kazoo")) $("kazoo").textContent = phrase("kazoo");
+    if ($("trombone")) $("trombone").textContent = phrase("trombone");
     if ($("ai")) $("ai").textContent = phrase("ai");
     if ($("priority")) $("priority").textContent = phrase("priority");
+    if ($("encore")) $("encore").textContent = phrase("encore");
     if ($("growth-toggle")) $("growth-toggle").textContent = on ? phrase("growthOff") : phrase("growthOn");
     if ($("growth-server-label")) $("growth-server-label").textContent = phrase("growthServer");
     if ($("growth-server-save")) $("growth-server-save").textContent = phrase("growthServerSave");
@@ -2032,6 +2089,7 @@ if (typeof document !== "undefined") {
       growthConsent: state.growthConsent, growth: state.growth,
       growthRun: state.growthRun, growthBest: state.growthBest,
       growthLast: state.growthLast, growthDied: state.growthDied,
+      growthLost: state.growthLost,
     };
     state.growthConsent = true;
     delete state.growth;
@@ -2045,6 +2103,8 @@ if (typeof document !== "undefined") {
       else delete state.growth;
       if (snap.growthDied) state.growthDied = true;
       else delete state.growthDied;
+      if (snap.growthLost) state.growthLost = snap.growthLost;
+      else delete state.growthLost;
       return false;
     }
     growthCapture(state, "eula_accept", today());
@@ -2104,12 +2164,14 @@ if (typeof document !== "undefined") {
   $("growth-repair").addEventListener("click", () => {
     const before = {
       growthRun: state.growthRun, growthBest: state.growthBest,
-      growthDied: state.growthDied, growthLast: state.growthLast,
+      growthDied: state.growthDied, growthLost: state.growthLost,
+      growthLast: state.growthLast,
     };
     growthTouch(state, today());
     const best = Math.max(growthCount(state.growthBest, 0), growthCount(state.growthRun, 0), 1);
     state.growthRun = state.growthBest = best;
     delete state.growthDied;
+    delete state.growthLost;
     state.growthLast = today();
     const saved = save();
     if (!saved) {
@@ -2118,6 +2180,8 @@ if (typeof document !== "undefined") {
       state.growthLast = before.growthLast;
       if (before.growthDied) state.growthDied = true;
       else delete state.growthDied;
+      if (before.growthLost) state.growthLost = before.growthLost;
+      else delete state.growthLost;
     } else {
       growthReceipt("repair", "2.99");
       growthCapture(state, "repair", today());
@@ -2186,23 +2250,81 @@ if (typeof document !== "undefined") {
     status.tabIndex = -1;
     status.focus();
   }
+  function tromboneTone() {
+    // Two descending oscillators in this page. No fetch and no file.
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (typeof AC !== "function") return false;
+    let ctx;
+    try { ctx = new AC(); } catch (e) { return false; }
+    try {
+      if (ctx.state === "suspended" && typeof ctx.resume === "function") {
+        const pending = ctx.resume();
+        if (pending && typeof pending.catch === "function") pending.catch(() => {});
+      }
+      const now = ctx.currentTime;
+      [196, 146.83].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sawtooth";
+        osc.frequency.value = freq;
+        const start = now + i * 0.28;
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(0.06, start + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.24);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(start);
+        osc.stop(start + 0.25);
+      });
+      setTimeout(() => { try { ctx.close(); } catch (e) { /* already closed */ } }, 900);
+      return ctx.state !== "closed";
+    } catch (e) {
+      try { ctx.close(); } catch (err) { /* already closed */ }
+      return false;
+    }
+  }
   if ($("kazoo")) $("kazoo").addEventListener("click", () => {
     jokeStatus(phrase("kazooSaid"));
+  });
+  if ($("trombone")) $("trombone").addEventListener("click", () => {
+    const started = tromboneTone();
+    const note = started
+      ? "A tone was started on this phone. Not a recording. Nothing was sent."
+      : "No tone was started. Not a recording. Nothing was sent.";
+    jokeStatus(phrase("tromboneSaid") + "\n" + note);
   });
   if ($("ai")) $("ai").addEventListener("click", () => {
     jokeStatus(phrase("aiSaid") + "\n" + duckLine(today()));
   });
   if ($("priority")) $("priority").addEventListener("click", () => {
+    const had = state.priorityStub === true;
     state.priorityStub = true;
     const saved = save();
-    if (!saved) delete state.priorityStub;
-    else {
+    if (!saved) {
+      if (had) state.priorityStub = true;
+      else delete state.priorityStub;
+    } else {
       growthReceipt("priority", "4.99");
       growthCapture(state, "priority", null, "");
       growthFlush(state);
     }
     draw();
     stubStatus(saved, phrase("prioritySaid"));
+  });
+  if ($("encore")) $("encore").addEventListener("click", () => {
+    const had = state.encoreStub === true;
+    state.encoreStub = true;
+    const saved = save();
+    if (!saved) {
+      if (had) state.encoreStub = true;
+      else delete state.encoreStub;
+    } else {
+      growthReceipt("encore", "3.99");
+      growthCapture(state, "encore", null, "");
+      growthFlush(state);
+    }
+    draw();
+    stubStatus(saved, phrase("encoreSaid"));
   });
   $("haiku").addEventListener("click", () => {
     clearTimeout(hearTimer);
@@ -2420,7 +2542,16 @@ if (typeof document !== "undefined") {
       houseFit(houseTidy(doc, new Date()));
       const code = newCode(), stored = await houseStore(await houseKeys(code));
       if (await housePut(stored, doc, "missing") !== true) { say("syncFail"); return; }
+      const previous = state.house.keys && state.house.keys.label;
       try { await fetch(houseUrl(asBytes(state.house.keys)), { method: "DELETE", redirect: "error" }); } catch (e) { /* gone anyway */ }
+      if (previous && stored && stored.label && previous !== stored.label) {
+        try {
+          await dropHouseSecret(previous);
+          securityNote("house_keys", { result: "dropped" });
+        } catch (e) {
+          securityNote("house_keys", { result: "kept" });
+        }
+      }
       const left = Object.entries(doc.members).filter(([, m]) => m.left).map(([id]) => id);
       state.house = Object.assign({}, state.house, { keys: stored, asked: Array.from(new Set(state.house.asked.concat(left))) });
       state.houseList = doc;
@@ -2436,8 +2567,16 @@ if (typeof document !== "undefined") {
     if (!confirm(t().houseLeaveAsk)) return;
     // Only once the others can be told.
     if (!await houseSync((d) => houseLeave(d, state.house.me), true)) { say("houseLeaveOffline"); return; }
+    const label = state.house && state.house.keys && state.house.keys.label;
     delete state.house; delete state.houseList;
-    save(); drawHouse(); say("houseLeft");
+    save();
+    try {
+      await dropHouseSecret(label);
+      securityNote("house_keys", { result: "dropped" });
+    } catch (e) {
+      securityNote("house_keys", { result: "kept" });
+    }
+    drawHouse(); say("houseLeft");
   });
 
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");

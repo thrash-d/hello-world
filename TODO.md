@@ -37,7 +37,11 @@ an upload without the plan. 1.69.0 closes the residuals he had signed:
 P-256 uses libcrypto, uninstall deletes through an open handle, the phone
 keeps sync keys as non-extractable browser keys, and a Windows open refuses
 a reparse point. The internal review of the sync encryption is
-`docs/SYNC-CRYPTO-REVIEW.md`. It is not an outside audit. Nothing was
+`docs/SYNC-CRYPTO-REVIEW.md`. It is not an outside audit. 1.70.0 keeps
+the household list after the phone's keys move to the browser, and the
+death sentence names the run that stopped. `hello trombone` prints and
+does not save. The phone may start a tone and says whether it did.
+`hello encore` is a $3.99 local stub. The trombone stays free. Nothing was
 removed. The reminder was already
 offered on the first day, right after the first plan. Running a public
 counts server for the individual package is the owner's step; the README says

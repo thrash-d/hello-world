@@ -67,3 +67,10 @@ one is a license.
 local receipt for $4.99. The receipt says nothing was charged. The flag does
 not unlock Pro. It does not add a line to the morning screen, and it does
 not remove the sponsored line. It is not a license.
+
+## Hello Encore is not a key
+
+`hello encore`, and the phone's Hello Encore button in Settings, write a
+local receipt for $3.99. The receipt says nothing was charged. The trombone
+stays free. The flag does not unlock Pro. It does not add a line to the
+morning screen or the printed page. It is not a license.
