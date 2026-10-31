@@ -366,25 +366,31 @@ class P256Unavailable(OSError):
     """libcrypto is missing and nobody but Reed has taken the other path."""
 
 
+def _reed_unquote(value):
+    """One pair of matching quotes is not part of the name."""
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+        return value[1:-1].strip()
+    return value
+
+
 def _reed_named(name):
     """True when the folded name is Reed Mallory or starts with that name.
 
     Internal spaces fold, so a doubled space is still his. A mark after the
     name still starts with it. A certificate-style subject is checked name
-    by name, so "CN=Reed Mallory" and "O=Example, CN=Reed  Mallory" are
-    still his. "not Reed Mallory" does not start with his name. He does
-    not accept that name on a transfer.
+    by name, so "CN=Reed Mallory", "CN=\"Reed Mallory\"", and
+    "O=Example, CN=Reed  Mallory" are still his. "not Reed Mallory" does
+    not start with his name. He does not accept that name on a transfer.
     """
     folded = " ".join((name or "").lower().split())
-    if folded.startswith("reed mallory"):
-        return True
+    values = [folded]
     for part in folded.split(","):
         value = part.strip()
         if "=" in value:
             value = value.rsplit("=", 1)[1].strip()
-        if value.startswith("reed mallory"):
-            return True
-    return False
+        values.append(value)
+    return any(_reed_unquote(value).startswith("reed mallory") for value in values)
 
 
 def _transfer_ok(path, token):

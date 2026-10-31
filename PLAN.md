@@ -244,3 +244,22 @@ What they added: `hello bell` (free, not the morning, not a recording)
 and `hello ring`, a $6.99 local stub. The bell stays free. The morning
 screen and the printed page do not gain a line. The default upload is
 still the placeholder. He did not sign the word audited.
+
+## Round 56
+
+The same six. Reed Mallory still accepts no residual, and he does not veto.
+The record is `reviews/round-56.md`. The version is 1.73.0.
+
+The nag said the streak dies tomorrow. A gap of 4 days still counts, and a
+gap of 5 ends it. My numbers said three for that same comparison. Both
+sentences now say 4 and 5. On a dead run, the phone's Keep button repeats
+the death sentence. A quoted `CN="Reed Mallory"`
+does not open the variable-time gate. `hello ai` reads the saved day start
+and still does not write the notes.
+
+What they added: words after `hello ai` are not read, not saved, and not
+sent, and the screen says so. The duck's line is still the one for that
+date. There is no fifth noise and no new stub. Vance Harlow asked for a
+$14.99 Hello Audience with the duck behind it. He lost, 1 to 5. The morning
+screen and the printed page do not gain a line. The default upload is
+still the placeholder. He did not sign the word audited.

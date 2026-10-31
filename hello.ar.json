@@ -472,7 +472,7 @@
   "My saved notes...": "ملاحظاتي المحفوظة...",
   "What do you want to get done today?": "ما الذي سيُنجَز اليوم؟",
   "What the window shows...": "ما تعرضه النافذة...",
-  "A run goes on over a gap of up to three days, such as a weekend.": "تستمر السلسلة رغم انقطاع يصل إلى ثلاثة أيام، مثل عطلة نهاية الأسبوع.",
+  "A run goes on over a gap of {gap} days or fewer. A gap of {end} starts it over.": "تستمر السلسلة إذا كان الانقطاع {gap} أيام أو أقل. الانقطاع لـ {end} أيام يبدأها من جديد.",
   "Answering no longer opens hello-world.": "لن يُفتح hello-world بعد الرد.",
   "Finished plans are kept for 14 days, as usual.": "تُحفظ الخطط المكتملة لمدة 14 يومًا كالمعتاد.",
   "No reminder on Saturday or Sunday.": "لا تذكير يومي السبت والأحد.",

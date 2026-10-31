@@ -127,9 +127,9 @@ closes it.
 joke and save nothing. `hello haiku` with no date uses the day start saved in the notes.
 `hello haiku --date YYYY-MM-DD` puts that calendar day in the
 middle line. A date that is not written that way is refused. `hello shift` prints the greeting and one line, "The day starts when you said it does." It does not read the clock, and it is not on the phone.
-`hello kazoo` prints the greeting, four lines, and "bwap bwap". `hello trombone` prints the greeting, four lines, "womp womp", and "This is not a recording. Nothing was sent." `hello airhorn` prints the greeting, four lines, "BRAAAAP", and "This is not a recording. Nothing was sent." `hello bell` prints the greeting, four lines, "ding", and "This is not a recording. Nothing was sent." The text screen does not start a tone, and it does not say that one was started. The phone button may start a tone in the page, and the status line says whether it did. `hello ai` prints the greeting, "This is not a model. Nothing was sent.", and one line chosen from the date. It does not open the notes file and it does not contact a model. None of these is part of Pro, and none of them sends anything. A joke does not create the notes folder. If that folder is already there, one line is added to `feature-audit.jsonl` with `network` false and `charged` false, and with no plan text.
+`hello kazoo` prints the greeting, four lines, and "bwap bwap". `hello trombone` prints the greeting, four lines, "womp womp", and "This is not a recording. Nothing was sent." `hello airhorn` prints the greeting, four lines, "BRAAAAP", and "This is not a recording. Nothing was sent." `hello bell` prints the greeting, four lines, "ding", and "This is not a recording. Nothing was sent." The text screen does not start a tone, and it does not say that one was started. The phone button may start a tone in the page, and the status line says whether it did. `hello ai` prints the greeting, "This is not a model. Nothing was sent.", and one line chosen from the date. Words typed after it are not read, not saved, and not sent, and the screen says so. The line is still the one for that date. The command reads the saved day start and does not write the notes. It does not contact a model. None of these is part of Pro, and none of them sends anything. A joke does not create the notes folder. If that folder is already there, one line is added to `feature-audit.jsonl` with `network` false and `charged` false, and with no plan text.
 Typing `pic` after the days-in-a-row line shows a picture. `q` there closes, the same as any other question, and Enter still skips. Typing `haiku`, `kazoo`, `trombone`, `airhorn`, `bell`, `ai`,
-or the letters `uuddlrlrba`, at a prompt answers and does not save a plan. A full stop after `haiku` is the same joke. The phone keeps Kazoo, Trombone, Airhorn, Bell, AI, Priority Hello, Hello Encore, Hello Spotlight, and Hello Ring in Settings. They are not on the printed page.
+or the letters `uuddlrlrba`, at a prompt answers and does not save a plan. A full stop after `haiku` is the same joke. The phone keeps Kazoo, Trombone, Airhorn, Bell, AI, Priority Hello, Hello Encore, Hello Spotlight, and Hello Ring in Settings. Under the AI button, a box can hold a question. The status line still uses the date's duck line. If the box had words, it says they were not read and were not saved, and it does not repeat those words. The box is not on the morning screen. None of this is on the printed page.
 
 ### The text screen
 
@@ -500,6 +500,7 @@ crash the visit either. On the phone, a streak that is not a whole number is not
 When the longest run is a different number, the sentence says that too.
 A run that stopped at 1, with a longer best, says 1 and then that longer number. It does not say the longer number was the run.
 The next opening that continues the new run says the new number.
+While the run is still going, the line names the gap the counter uses: a gap of 4 days still counts, and a gap of 5 ends it. It does not say the run dies tomorrow. My numbers uses the same 4 and the same 5. The phone's Keep button, after a run has already stopped, repeats that death sentence. It does not say the streak stayed.
 
 `hello repair` writes a local receipt for $2.99 and puts the streak number
 back. The line names that number. `hello plus` writes a local receipt for $9.99 a month and sets a Pro+
@@ -669,7 +670,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.72.0'
+$tag = 'v1.73.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

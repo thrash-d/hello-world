@@ -472,7 +472,7 @@
   "My saved notes...": "저장한 메모...",
   "What do you want to get done today?": "오늘은 무엇을 끝내고 싶으세요?",
   "What the window shows...": "창에 표시할 내용...",
-  "A run goes on over a gap of up to three days, such as a weekend.": "주말처럼 사이에 3일까지 비어도 연속 일수는 이어져요.",
+  "A run goes on over a gap of {gap} days or fewer. A gap of {end} starts it over.": "사이가 {gap}일 이하면 연속 일수는 이어져요. {end}일이 비면 다시 시작해요.",
   "Answering no longer opens hello-world.": "이제 답해도 hello-world가 열리지 않아요.",
   "Finished plans are kept for 14 days, as usual.": "끝낸 계획은 원래대로 14일 동안 보관돼요.",
   "No reminder on Saturday or Sunday.": "토요일과 일요일에는 알림이 오지 않아요.",

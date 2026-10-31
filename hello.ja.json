@@ -472,7 +472,7 @@
   "My saved notes...": "保存したメモ...",
   "What do you want to get done today?": "今日は何を終わらせたいですか？",
   "What the window shows...": "ウィンドウに表示する内容...",
-  "A run goes on over a gap of up to three days, such as a weekend.": "週末など、間が3日以内なら連続日数は続きます。",
+  "A run goes on over a gap of {gap} days or fewer. A gap of {end} starts it over.": "間が{gap}日以内なら連続日数は続きます。{end}日空くと最初からになります。",
   "Answering no longer opens hello-world.": "答えたあとに hello-world を開かなくなります。",
   "Finished plans are kept for 14 days, as usual.": "終わった予定はいつもどおり 14 日間保存されます。",
   "No reminder on Saturday or Sunday.": "土曜日と日曜日はリマインダーを表示しません。",
