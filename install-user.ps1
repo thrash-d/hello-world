@@ -42,8 +42,19 @@ function Note-ScriptSignature {
     if ($sig -and $sig.Status -eq 'Valid') { return 'signed' }
     $name = if ($UnsignedAcceptor) { $UnsignedAcceptor } else { $env:HELLO_UNSIGNED_ACCEPTOR }
     if (-not $name) { $name = 'deploying organization' }
+    # Same steps as tools/reed-name.ps1. The installed copy is not next to that file.
+    # "CN=Reed Mallory" is still his name. "not Reed Mallory" does not start with it.
     $folded = [regex]::Replace($name.Trim().ToLowerInvariant(), '\s+', ' ')
-    if ($folded.StartsWith('reed mallory')) { $name = 'deploying organization' }
+    $his = $folded.StartsWith('reed mallory')
+    if (-not $his) {
+        foreach ($part in ($folded -split ',')) {
+            $value = $part.Trim()
+            $eq = $value.LastIndexOf('=')
+            if ($eq -ge 0) { $value = $value.Substring($eq + 1).Trim() }
+            if ($value.StartsWith('reed mallory')) { $his = $true; break }
+        }
+    }
+    if ($his) { $name = 'deploying organization' }
     Write-Warning "This script is not signed. Residual acceptor: $name. Reed Mallory has not accepted it. See docs/transfers/code-signing.md."
     return $name
 }

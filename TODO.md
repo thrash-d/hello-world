@@ -47,7 +47,13 @@ subject that is Reed Mallory after spaces are folded, and does not turn a
 streak of 3.9 into 3. `hello airhorn` prints and does not save. The phone
 may start a tone and says whether it did. `hello spotlight` is a $7.99
 local stub. The airhorn stays free. The repair line names the number it
-wrote. Nothing was removed. The reminder was already
+wrote. 1.72.0 names a stopped run of 1 as 1, even when the longest
+is a different number. A name written as `CN=Reed Mallory` does not open
+the variable-time gate, does not keep raw phone keys, and is not printed
+as the unsigned-script acceptor. A joke event stored on the counts server
+does not include the plan. `hello bell` prints and does not save. The
+phone may start a tone and says whether it did. `hello ring` is a $6.99
+local stub. The bell stays free. Nothing was removed. The reminder was already
 offered on the first day, right after the first plan. Running a public
 counts server for the individual package is the owner's step; the README says
 how.

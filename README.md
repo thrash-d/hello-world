@@ -123,13 +123,13 @@ reminder times and the window's other settings, and pressing Ctrl+C twice
 closes it.
 
 `hello morse`, `hello haiku`, `hello klingon`, `hello shift`, `hello cowbell`,
-`hello staple`, `hello kazoo`, `hello trombone`, `hello airhorn`, `hello ai`, and `hello --pirate` print a
+`hello staple`, `hello kazoo`, `hello trombone`, `hello airhorn`, `hello bell`, `hello ai`, and `hello --pirate` print a
 joke and save nothing. `hello haiku` with no date uses the day start saved in the notes.
 `hello haiku --date YYYY-MM-DD` puts that calendar day in the
 middle line. A date that is not written that way is refused. `hello shift` prints the greeting and one line, "The day starts when you said it does." It does not read the clock, and it is not on the phone.
-`hello kazoo` prints the greeting, four lines, and "bwap bwap". `hello trombone` prints the greeting, four lines, "womp womp", and "This is not a recording. Nothing was sent." `hello airhorn` prints the greeting, four lines, "BRAAAAP", and "This is not a recording. Nothing was sent." The text screen does not start a tone, and it does not say that one was started. The phone button may start a tone in the page, and the status line says whether it did. `hello ai` prints the greeting, "This is not a model. Nothing was sent.", and one line chosen from the date. It does not open the notes file and it does not contact a model. None of these is part of Pro, and none of them sends anything. A joke does not create the notes folder. If that folder is already there, one line is added to `feature-audit.jsonl` with `network` false and `charged` false, and with no plan text.
-Typing `pic` after the days-in-a-row line shows a picture. `q` there closes, the same as any other question, and Enter still skips. Typing `haiku`, `kazoo`, `trombone`, `airhorn`, `ai`,
-or the letters `uuddlrlrba`, at a prompt answers and does not save a plan. A full stop after `haiku` is the same joke. The phone keeps Kazoo, Trombone, Airhorn, AI, Priority Hello, Hello Encore, and Hello Spotlight in Settings. They are not on the printed page.
+`hello kazoo` prints the greeting, four lines, and "bwap bwap". `hello trombone` prints the greeting, four lines, "womp womp", and "This is not a recording. Nothing was sent." `hello airhorn` prints the greeting, four lines, "BRAAAAP", and "This is not a recording. Nothing was sent." `hello bell` prints the greeting, four lines, "ding", and "This is not a recording. Nothing was sent." The text screen does not start a tone, and it does not say that one was started. The phone button may start a tone in the page, and the status line says whether it did. `hello ai` prints the greeting, "This is not a model. Nothing was sent.", and one line chosen from the date. It does not open the notes file and it does not contact a model. None of these is part of Pro, and none of them sends anything. A joke does not create the notes folder. If that folder is already there, one line is added to `feature-audit.jsonl` with `network` false and `charged` false, and with no plan text.
+Typing `pic` after the days-in-a-row line shows a picture. `q` there closes, the same as any other question, and Enter still skips. Typing `haiku`, `kazoo`, `trombone`, `airhorn`, `bell`, `ai`,
+or the letters `uuddlrlrba`, at a prompt answers and does not save a plan. A full stop after `haiku` is the same joke. The phone keeps Kazoo, Trombone, Airhorn, Bell, AI, Priority Hello, Hello Encore, Hello Spotlight, and Hello Ring in Settings. They are not on the printed page.
 
 ### The text screen
 
@@ -498,6 +498,7 @@ Unix modes. A queued event whose try-count is not a number does not crash
 the visit. A queued streak number that is not a whole number does not
 crash the visit either. On the phone, a streak that is not a whole number is not rounded into one: 3.9 is not stored as 3, and a batch offers 0 for that field. The death sentence names the run that stopped.
 When the longest run is a different number, the sentence says that too.
+A run that stopped at 1, with a longer best, says 1 and then that longer number. It does not say the longer number was the run.
 The next opening that continues the new run says the new number.
 
 `hello repair` writes a local receipt for $2.99 and puts the streak number
@@ -506,14 +507,15 @@ flag. `hello priority` writes a local receipt for $4.99 and sets a Priority
 Hello flag. `hello encore` writes a local receipt for $3.99 and sets a
 Hello Encore flag. The trombone stays free. `hello spotlight` writes a local
 receipt for $7.99 and sets a Hello Spotlight flag. The airhorn stays free.
+`hello ring` writes a local receipt for $6.99 and sets a Hello Ring flag. The bell stays free.
 The morning screen does not
 gain a line for any of these flags, and the sponsored line stays. The receipt is
-written only after the notes save succeeds. All five receipts say `charged`
+written only after the notes save succeeds. All six receipts say `charged`
 false and `stub` true. No card is asked for, and nothing is billed. Pro+
 does not stop the nag, and it is not a Pro key. Priority Hello, Hello
-Encore, and Hello Spotlight are not Pro keys either. On the phone the same five buttons write
+Encore, Hello Spotlight, and Hello Ring are not Pro keys either. On the phone the same six buttons write
 `hello-world-growth-receipts` in this browser, and Delete everything
-removes that list. The Cowbell button, when streak notes are on, still offers an event, and that event does not include the plan.
+removes that list. The Cowbell button, when streak notes are on, still offers an event, and that event does not include the plan. A joke event stored by the counts server does not include the plan either.
 
 The file also holds the day you last counted yourself for the tip, whether
 you answered the shared count question, today's reaction, the newest handoff
@@ -667,7 +669,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.71.0'
+$tag = 'v1.72.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

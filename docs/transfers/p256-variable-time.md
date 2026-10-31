@@ -19,8 +19,9 @@ unless both of the following are set:
 - `HELLO_P256_VARIABLE_TIME=1`
 - `HELLO_P256_TRANSFER` points at a regular file, not a symlink, of at most
   4000 bytes. The open refuses a reparse point, so a swap after a check is
-  not followed. Spaces inside the name are folded, so "Reed  Mallory" and
-  "Reed Mallory." are still his name:
+  not followed. Spaces inside the name are folded, and each name after `=`
+  is checked, so "Reed  Mallory", "Reed Mallory.", and "CN=Reed Mallory"
+  are still his name:
 
 ```
 acceptor: <name that is not Reed Mallory>
@@ -28,7 +29,9 @@ accepts: variable-time-p256
 ```
 
 A name that is Reed Mallory, or that starts with Reed Mallory, does not
-open the gate. Even with the gate open, libcrypto is still preferred.
+open the gate. A subject written as `CN=Reed Mallory` does not either.
+"not Reed Mallory" does not start with his name. Even with the gate open,
+libcrypto is still preferred.
 `p256_backend()` stays `openssl` when libcrypto loads.
 
 ## Who holds it

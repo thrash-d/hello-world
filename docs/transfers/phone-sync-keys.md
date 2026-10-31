@@ -31,9 +31,11 @@ The organization that serves `app.js`.
 If IndexedDB cannot be opened, the keys stay in memory for that visit and
 the raw `localStorage` copy is removed. They are written back as raw arrays
 only when `localStorage` key `hello-world-sync-raw-acceptor` is a name that
-is not Reed Mallory. Spaces inside the name are folded first. A name that
-is his, or that starts with his, does not keep the raw copy. An empty
-value does not either. That other name is the acceptor of the raw copy.
+is not Reed Mallory. Spaces inside the name are folded first, and each
+name after `=` is checked. A name that is his, or that starts with his,
+does not keep the raw copy. `CN=Reed Mallory` does not either. "not Reed
+Mallory" does not start with his name. An empty value does not keep the
+raw copy either. That other name is the acceptor of the raw copy.
 
-The cache name is `hello-world-phone-v17`, so a phone that already cached
+The cache name is `hello-world-phone-v18`, so a phone that already cached
 the previous page fetches this one.
