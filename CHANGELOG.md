@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-11-01: review round 57
+
+Version 1.74.0. With no follow-up questions, a plan older than 3 days is put away. The window still said that plan was from over two weeks ago. The window now says more than 3 days. The text screen stays quiet. Choosing midnight said the day starts at 0:00. It now uses the same words as the menu. `hello shift` did not read the saved hour. It does now, and it does not write the notes, and it still does not read the clock.
+
+`hello ai` names the date the duck's line is for, in the same long date as the morning. Words after the command are still not read, not saved, and not sent. The phone's Settings box does the same, and its local note does not contain those words. A zero-width space, a curly quote, or a backslash in front of a quote is not a way to write Reed Mallory's name onto a gate. A hex-encoded subject is still not decoded.
+
+Nothing was removed. Streak notes, sync, reminders, the kazoo, the trombone, the airhorn, the bell, the duck line, and the stub receipts are still there. No new noise was added. No new stub was added. The morning screen does not gain a line. The printed page does not gain a line. The default upload is still `https://insights.example.invalid/v1/growth`.
+
 ## 2026-10-31: review round 56
 
 Version 1.73.0. The streak nag said the run dies tomorrow. A gap of 4 days still counts, and a gap of 5 ends it. My numbers said a gap of up to three days for the same comparison. Both sentences now say 4 and 5. The phone's Keep button, after a run had already stopped, said the streak stays. That click does not change the number, so the status line repeats the death sentence. `CN="Reed Mallory"`, with the name in quotes, still opened the variable-time gate, still kept raw phone sync keys, and was still printed as the unsigned-script acceptor. One pair of matching quotes is not part of the name. `hello ai` did not read the saved day start. It does now, and it does not write the notes.

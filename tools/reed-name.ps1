@@ -1,13 +1,17 @@
 # Reed Mallory's name, after spaces are folded.
 # A certificate subject is checked name by name, so "CN=Reed  Mallory",
-# "CN=Reed Mallory.", and "CN=""Reed Mallory""" are still his.
-# "not Reed Mallory" does not start with his name. One pair of matching
-# quotes is not part of the name. He does not accept that name on a signature.
+# "CN=Reed Mallory.", "CN=""Reed Mallory""", a curly-quoted name, and a
+# zero-width space between the words are still his.
+# "not Reed Mallory" does not start with his name. Format characters,
+# quote marks, and backslashes are not part of the name.
+# A hex subject is not decoded. He does not accept that name on a signature.
 # The four install scripts repeat these steps. They are copied away from
 # this file, so they cannot dot-source it.
 
 function Test-ReedMalloryName([string]$Name) {
-    $raw = [string]$Name
+    $raw = [regex]::Replace([string]$Name, '\\', '')
+    $raw = [regex]::Replace($raw, '\p{Cf}', '')
+    $raw = [regex]::Replace($raw, '["''\u201C\u201D\u201E\u201F\u2018\u2019\u201A\u201B\u00AB\u00BB`]', '')
     $folded = ([regex]::Replace($raw.ToLowerInvariant(), '\s+', ' ')).Trim()
     $checks = New-Object System.Collections.Generic.List[string]
     [void]$checks.Add($folded)
@@ -18,13 +22,6 @@ function Test-ReedMalloryName([string]$Name) {
         [void]$checks.Add($value)
     }
     foreach ($value in $checks) {
-        if ($value.Length -ge 2) {
-            $a = $value[0]
-            $b = $value[$value.Length - 1]
-            if (($a -eq '"' -or $a -eq "'") -and ($a -eq $b)) {
-                $value = $value.Substring(1, $value.Length - 2).Trim()
-            }
-        }
         if ($value.StartsWith('reed mallory')) { return $true }
     }
     return $false

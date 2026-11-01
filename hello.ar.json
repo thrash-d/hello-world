@@ -926,7 +926,10 @@
   "The household list can't be reached just now, so you haven't left yet. Try again when you're online.": "لا يمكن الوصول إلى قائمة الأسرة الآن، لذا لم تغادر بعد. حاول مرة أخرى عندما تكون متصلًا.",
   "The household list can't be reached just now, or someone already made a new code. Nothing changed.": "لا يمكن الوصول إلى قائمة الأسرة الآن، أو أن شخصًا أنشأ رمزًا جديدًا بالفعل. لم يتغير شيء.",
   "Type your name, as the others will see it, in the plan box first, then choose this again.": "اكتب اسمك أولًا كما سيراه الآخرون في مربع الخطة، ثم اختر هذا مرة أخرى.",
-  "Added to tomorrow's plan, with what you carried.": "أُضيف إلى خطة الغد، مع ما نقلته."
+  "Added to tomorrow's plan, with what you carried.": "أُضيف إلى خطة الغد، مع ما نقلته.",
+  "Your plan from more than {n} days ago was put away. Type same at the plan prompt to bring it back.": "خُطتك التي مضى عليها أكثر من {n} أيام وُضعت جانبًا. اكتب same عند سؤال الخطة لإعادتها.",
+  "The day starts at {at}.": "يبدأ اليوم في {at}.",
+  "That line is for {date}.": "هذا السطر ليوم {date}."
  },
  "tips_floor": [
   "التأكد من خلو الممر قبل أول مهمة في الوردية.",
