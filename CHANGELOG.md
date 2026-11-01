@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-01: review round 59
+
+Version 1.76.0. This week counted a finish dated after today. On Sunday, 1 November 2026, Monday is 26 October, and that span is 7 days. A finish on 15 November was still in the count, and the November line on This year counted it too. The file kept a finish up to 365 days ahead. `hello kept` already said that day was not inside the 15 days. The file now drops a finish after today, and the two-window save drops it too, before the cap, so it cannot push a real line out. This week says 7 days on Sunday and 1 day on Monday. Last week, when it has a finish, says 7 days. `hello week` reads the notes and does not write them.
+
+A sideways day of 31 November was counted toward the smaller-plan question, and a letter dated 31 February was kept. A date that is not a day is not counted and is not kept. A later day is not one of the 7. On the phone, a negative gap had counted as this week. It does not now. The phone drops a date after today before it keeps the last 100 lines, and the sentence says so. A device date of year 9999 no longer sorts first. The limit is the same as a sync clock: not more than a day ahead.
+
+The server said a copy untouched for a year is removed. The sweep removes a copy only when it has been untouched for more than 366 days. A copy last touched exactly 366 days ago stays. The sentences say that. The household comment that said a year now says 366 days, and the stamp on that day is still kept.
+
+Nothing was removed. Streak notes, sync, reminders, the kazoo, the trombone, the airhorn, the bell, the duck line, and the stub receipts are still there. No new noise was added. No new stub was added. The morning screen does not gain a line. The printed page does not gain a line. The default upload is still `https://insights.example.invalid/v1/growth`.
+
 ## 2026-11-01: review round 58
 
 Version 1.75.0. Finished plans are kept from today back through the day 14 days earlier, which is 15 calendar days. A longer history keeps today and the day 365 days earlier, which is 366 calendar days. The menu said 14 days, and a year. The one list of what is saved said 14 days, or 90 with a longer history. What I did listed 14 lines, today back through 13 days, so a finish from 14 days ago was in the file and not on the page. The menu, the page, and that list now say 15 and 366. The page lists the 15 days. A sync merge drops a finish outside that window before the save. `hello kept` says the same sentences. It reads the saved day start, then the clock, and it does not write the notes. `2026-02-31` is not a day. The screen says so, and it does not turn that date into 3 March.

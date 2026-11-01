@@ -682,7 +682,7 @@ def help_text():
     return (tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
             + "\n\n" + tr("For fun, and nothing is saved: hello morse, hello haiku, "
                           "hello klingon, hello shift, hello cowbell, hello staple, "
-                          "hello kazoo, hello trombone, hello airhorn, hello bell, hello ai, hello kept, and hello --pirate. "
+                          "hello kazoo, hello trombone, hello airhorn, hello bell, hello ai, hello kept, hello week, and hello --pirate. "
                           "hello ai is not a model and sends nothing. "
                           "Words after hello ai are not read, not saved, and not sent. "
                           "The duck's line names the date it is for. "
@@ -690,13 +690,16 @@ def help_text():
                           "hello kept names how many days a finished plan is kept, and What I did. "
                           "It reads the saved day start, then the clock. It does not write the notes. "
                           "A word after it that is not one date is not read and is not saved. "
+                          "hello week names how many days this week holds, Monday through today. "
+                          "Monday is 1 day. Sunday is 7. It reads the notes and does not write them. "
+                          "A word after it that is not one date is not read and is not saved. "
                           "hello trombone, hello airhorn, and hello bell are not recordings and send nothing. "
                           "--set klingon on keeps the Klingon line under the greeting. "
                           "hello growth off stops streak notes. "
                           "hello priority, hello encore, hello spotlight, and hello ring write a local stub receipt "
                           "and do not bill. The trombone stays free. The airhorn stays free. The bell stays free."))
 
-VERSION = "1.75.0"
+VERSION = "1.76.0"
 MAX_VISITS = 400
 # Days before today that are still kept. Today is kept as well, so the
 # list holds KEEP_VISIT_DAYS + 1 calendar days. The sentence says that
@@ -2273,8 +2276,8 @@ def house_merge(doc, other, me=None):
 
 def house_tidy(doc, now):
     """Removed things go for good after 30 days, or sooner when there are
-    too many; a thing gone for good is remembered for a year, so an old copy
-    can't bring it back."""
+    too many; a thing gone for good is remembered for 366 days, so an old
+    copy can't bring it back. The stamp on that 366th day is still kept."""
     cutoff = house_stamp(now - datetime.timedelta(days=HOUSE_KEEP_DAYS))
     removed = sorted((v["removed"], k) for k, v in doc["items"].items() if v.get("removed"))
     extra = max(0, len(doc["items"]) - MAX_HOUSE_KEPT)
@@ -2750,11 +2753,13 @@ def merge_devices(mine, theirs):
             # Written by whoever holds the code, so checked: a real date and
             # a name that prints as plain text.
             name, seen = _house_name(dev.get("name"), MAX_HOUSE_NAME), dev.get("seen")
-            try:
-                datetime.date.fromisoformat(seen)
-            except (TypeError, ValueError):
+            # A real day, and not more than a day ahead. A date far ahead
+            # would sort first forever. The same limit as a sync clock.
+            if real_day(seen) != seen or len(seen) != 10:
                 continue
-            if name and len(seen) == 10 and (did not in out or seen > out[did]["seen"]):
+            if seen > (today() + datetime.timedelta(days=1)).isoformat():
+                continue
+            if name and (did not in out or seen > out[did]["seen"]):
                 out[did] = {"name": name, "seen": seen}
     newest = sorted(out.items(), key=lambda kv: kv[1]["seen"])[-MAX_DEVICES:]
     return dict(newest)
@@ -2827,9 +2832,8 @@ def merge_sync(state, other, d):
     if state.get("finished"):
         # The sentence names the window. A finish from outside it must not
         # sit in the file until the next open, and must not be pushed back.
-        oldest = (d - datetime.timedelta(days=keep_days(state))).isoformat()
         kept = [i for i in state["finished"]
-                if isinstance(i.get("date"), str) and i["date"] >= oldest]
+                if isinstance(i, dict) and finish_in_window(i.get("date"), state, d)]
         if len(kept) != len(state["finished"]):
             changed = True
         state["finished"] = sorted(kept, key=lambda i: i["date"])[-finished_cap(state):]
@@ -3248,12 +3252,22 @@ def month_name(month):
 
 def year_page(state, d):
     """This year: each month with what was finished in it, newest first.
+
     Free since 1.59.0 (history only pays off after months, so it isn't what
-    anyone buys)."""
-    rows = [i for i in state.get("finished", []) if i["date"][:4] == str(d.year)]
-    lines = [tr("This year")]
+    anyone buys). A finish dated after d is not in the count. The second
+    line names d, which is the last day the count includes.
+    """
+    rows = []
+    for item in state.get("finished", []):
+        when = real_day(item.get("date") if isinstance(item, dict) else "")
+        if not when:
+            continue
+        day = datetime.date.fromisoformat(when)
+        if day.year == d.year and day <= d:
+            rows.append((day, item["text"]))
+    lines = [tr("This year"), tr(YEAR_THROUGH).format(date=long_date(d))]
     for month in range(d.month, 0, -1):
-        done = [i["text"] for i in rows if int(i["date"][5:7]) == month]
+        done = [text for day, text in rows if day.month == month]
         name = month_name(month)
         lines.append(tr("{month}: {n} finished").format(month=name, n=len(done))
                      + (" - " + "; ".join(done[:12]) if done else ""))
@@ -3839,6 +3853,21 @@ def keep_days(state):
     return 365 if state.get("long_history") else 14
 
 
+def finish_in_window(when, state, d):
+    """True when a canonical day is still kept on day d.
+
+    The window runs from d back through keep_days, and both ends are kept.
+    A day after d is outside that window. A day that is not a day is outside
+    it too, and it is not renamed into a day that is inside.
+    """
+    if real_day(when) != when:
+        return False
+    if when > d.isoformat():
+        return False
+    oldest = (d - datetime.timedelta(days=keep_days(state))).isoformat()
+    return when >= oldest
+
+
 def finished_span_days(state=None):
     """Calendar days a finished plan can still be kept, today included.
 
@@ -3999,6 +4028,18 @@ def day(value):
     if not isinstance(value, str):
         raise ValueError("not a date")
     return datetime.date.fromisoformat(value).isoformat()
+
+
+def real_day(value):
+    """Canonical YYYY-MM-DD, or "" when value is not that calendar day.
+
+    The shape alone is not enough. 2026-02-31 matches it and is not a day.
+    It is not renamed to the day a clock would roll it into.
+    """
+    try:
+        return day(value)
+    except ValueError:
+        return ""
 
 
 def backup_name(path):
@@ -4255,6 +4296,17 @@ def load(repair=True):
     if start in DAY_STARTS[1:] and not isinstance(start, bool):
         state["day_start"] = start
     DAY_START = state.get("day_start", 0)
+    # Letters and sideways were read above, before this hour was known.
+    # A date after the morning's today is not kept.
+    today_iso = today().isoformat()
+    if state.get("letters"):
+        state["letters"] = [l for l in state["letters"] if l["date"] <= today_iso]
+        if not state["letters"]:
+            state.pop("letters")
+    if state.get("sideways"):
+        state["sideways"] = [x for x in state["sideways"] if x <= today_iso]
+        if not state["sideways"]:
+            state.pop("sideways")
     if raw.get("remind_at") in REMINDER_TIMES:
         state["remind_at"] = raw["remind_at"]
     if isinstance(raw.get("device_id"), str) and re.fullmatch(r"[0-9a-f]{12}", raw["device_id"]):
@@ -4277,16 +4329,27 @@ def load(repair=True):
             state["house_list"] = house_merge(raw["house_list"], {}, house["me"])
     letters = raw.get("letters")
     if isinstance(letters, list):
-        kept = [{"to": l["to"][:100], "text": l["text"][:MAX_LETTER], "date": l["date"]}
-                for l in letters if isinstance(l, dict) and isinstance(l.get("to"), str)
-                and isinstance(l.get("text"), str) and l["text"].strip()
-                and isinstance(l.get("date"), str) and re.fullmatch(r"\d{4}-\d\d-\d\d", l["date"])]
+        # A date that is not a day is not kept, and it is not renamed.
+        # A date after today is not a letter this computer wrote.
+        today_iso = today().isoformat()
+        kept = []
+        for l in letters:
+            if not (isinstance(l, dict) and isinstance(l.get("to"), str)
+                    and isinstance(l.get("text"), str) and l["text"].strip()):
+                continue
+            when = real_day(l.get("date"))
+            if when and when <= today_iso:
+                kept.append({"to": l["to"][:100], "text": l["text"][:MAX_LETTER], "date": when})
         if kept:
             state["letters"] = kept[-MAX_LETTERS:]
     days = raw.get("sideways")
     if isinstance(days, list):
-        kept = [x for x in days if isinstance(x, str) and re.fullmatch(r"\d{4}-\d\d-\d\d", x)
-                and x <= today().isoformat()]
+        today_iso = today().isoformat()
+        kept = []
+        for x in days:
+            when = real_day(x)
+            if when and when <= today_iso:
+                kept.append(when)
         if kept:
             state["sideways"] = kept[-SIDEWAYS_WEEK * 2:]
     for key in ("smaller_offered", "smaller_asked"):
@@ -4397,28 +4460,29 @@ def load(repair=True):
     except ValueError:
         pass
     finished = []
-    # A hostile file could fill the screen with far-off dates.
-    latest = (today() + datetime.timedelta(days=365)).isoformat()
+    # A hostile file could fill the screen with far-off dates. A day after
+    # today is not inside the window the sentence names, so it is not kept.
+    d = today()
+    today_iso = d.isoformat()
     for item in (raw.get("finished") if isinstance(raw.get("finished"), list)
                  else []):
         try:
             if isinstance(item, dict) and isinstance(item.get("text"), str):
                 text = clean(item["text"])
                 when = day(item.get("date"))
-                if text and "2000-01-01" <= when <= latest:
+                if text and "2000-01-01" <= when and finish_in_window(when, state, d):
                     finished.append({"text": text, "date": when})
         except ValueError:
             pass
-    oldest_kept = (today() - datetime.timedelta(days=keep_days(state))).isoformat()
-    finished = [item for item in finished if item["date"] >= oldest_kept]
     if finished:
         state["finished"] = finished[-finished_cap(state):]
+    oldest_kept = (d - datetime.timedelta(days=keep_days(state))).isoformat()
     unsure = []
     for item in raw.get("unsure") if isinstance(raw.get("unsure"), list) else []:
         try:
             if isinstance(item, dict) and isinstance(item.get("text"), str):
                 text, when = clean(item["text"]), day(item.get("date"))
-                if text and oldest_kept <= when <= latest:
+                if text and oldest_kept <= when <= today_iso:
                     unsure.append({"text": text, "date": when})
         except ValueError:
             pass
@@ -4429,7 +4493,7 @@ def load(repair=True):
         try:
             if isinstance(item, dict) and isinstance(item.get("text"), str):
                 text, when = clean(item["text"]), day(item.get("date"))
-                if text and when <= latest:
+                if text and when <= today_iso:
                     aside.append({"text": text, "date": when})
         except ValueError:
             pass
@@ -5198,8 +5262,14 @@ def merge_and_save(state, base, soft):
     rows = {json.dumps(r, sort_keys=True): r for r in theirs + mine}
     kept = (row_counts(theirs) - removed) + (added - repeats)
     finished = sorted((rows[k] for k in kept.elements()), key=lambda r: r["date"])
+    # The other window's copy is re-read through load, which already drops a
+    # day outside the window. This window's rows are filtered here, so a
+    # date after today cannot be written back.
+    d = today()
+    finished = [r for r in finished
+                if isinstance(r, dict) and finish_in_window(r.get("date"), fresh, d)]
     if finished:
-        fresh["finished"] = finished[-finished_cap(state):]
+        fresh["finished"] = finished[-finished_cap(fresh):]
     else:
         fresh.pop("finished", None)
     if not save(fresh):
@@ -6617,21 +6687,90 @@ def numbers_text(state):
            "computer. Nobody else gets them.")])
 
 
+WEEK_ONE = "This week is 1 day, {date}."
+WEEK_MANY = "This week is {n} days, {start} through {end}."
+WEEK_LAST = "Last week is {n} days, {start} through {end}."
+WEEK_INSIDE = "{date} is inside this week."
+WEEK_OUTSIDE = "{date} is not inside this week."
+YEAR_THROUGH = "Through {date}."
+
+
+def week_start(d):
+    """Monday of the week that holds d. Monday's own week is that one day."""
+    return d - datetime.timedelta(days=d.weekday())
+
+
+def week_span_days(d):
+    """Calendar days from Monday through d, both ends.
+
+    Monday is 1. Sunday is 7. The sentence uses this number.
+    """
+    return (d - week_start(d)).days + 1
+
+
+def week_span_sentence(d):
+    """The line that names how many days this week holds, through d."""
+    start = week_start(d)
+    n = week_span_days(d)
+    if n == 1:
+        return tr(WEEK_ONE).format(date=long_date(d))
+    return tr(WEEK_MANY).format(n=n, start=long_date(start), end=long_date(d))
+
+
+def last_week_sentence(d):
+    """Monday through Sunday of the week before d. That span is 7 days."""
+    start = week_start(d)
+    last_end = start - datetime.timedelta(days=1)
+    last_start = start - datetime.timedelta(days=7)
+    n = (last_end - last_start).days + 1
+    return tr(WEEK_LAST).format(n=n, start=long_date(last_start), end=long_date(last_end))
+
+
+def _week_rows(finished, start, end):
+    """Finishes whose day is inside start..end, oldest first, as (day, text).
+
+    A day that does not parse is left out, so the count matches the lines.
+    """
+    rows = []
+    for item in finished or []:
+        if not isinstance(item, dict):
+            continue
+        when = real_day(item.get("date"))
+        if not when:
+            continue
+        day = datetime.date.fromisoformat(when)
+        if start <= day <= end:
+            rows.append((day, item.get("text") or ""))
+    rows.sort(key=lambda row: row[0].isoformat())
+    return rows
+
+
 def week_text(state, d):
-    """What was finished since Monday."""
-    start = d - datetime.timedelta(days=d.weekday())
-    monday, before = start.isoformat(), (start - datetime.timedelta(days=7)).isoformat()
+    """What was finished from Monday through today, and last week.
+
+    A finish after today is not this week. The first line says how many
+    days that span is. Monday is 1. Sunday is 7.
+    """
+    start = week_start(d)
+    last_start = start - datetime.timedelta(days=7)
+    last_end = start - datetime.timedelta(days=1)
     finished = state.get("finished", [])
-    items = [i for i in finished if i["date"] >= monday]
-    earlier = [i for i in finished if before <= i["date"] < monday]
+    items = _week_rows(finished, start, d)
+    earlier = _week_rows(finished, last_start, last_end)
 
     def rows(found):
-        return ["  " + tr("{date}: ").format(date=long_date(
-            datetime.date.fromisoformat(i["date"]))) + i["text"] for i in found]
-    lines = ([tr("This week you finished {n}:").format(n=len(items))] + rows(items)
-             if items else [tr("Nothing finished yet this week. That is fine.")])
+        return ["  " + tr("{date}: ").format(date=long_date(day)) + text
+                for day, text in found]
+    lines = [week_span_sentence(d)]
+    if items:
+        lines.append(tr("This week you finished {n}:").format(n=len(items)))
+        lines += rows(items)
+    else:
+        lines.append(tr("Nothing finished yet this week. That is fine."))
     if earlier:
-        lines += ["", tr("Last week you finished {n}:").format(n=len(earlier))] + rows(earlier)
+        lines += ["", last_week_sentence(d),
+                  tr("Last week you finished {n}:").format(n=len(earlier))]
+        lines += rows(earlier)
     return "\n".join(lines)
 
 
@@ -6946,12 +7085,23 @@ def note_sideways(state, d):
     state["sideways"] = (days + [d.isoformat()])[-SIDEWAYS_WEEK * 2:]
 
 
+def _in_recent_days(value, d):
+    """True for a real day from d back through the day 6 days earlier.
+
+    Both ends count, which is 7 calendar days. A day after d is not one of
+    them. A string that is not a day is not one of them.
+    """
+    when = real_day(value)
+    if not when:
+        return False
+    return (d - datetime.timedelta(days=6)).isoformat() <= when <= d.isoformat()
+
+
 def smaller_due(state, d):
     """True once a week at most, after several sideways days this week."""
-    week = (d - datetime.timedelta(days=6)).isoformat()
-    recent = [x for x in state.get("sideways", []) if x >= week]
-    offered = state.get("smaller_offered", "")
-    return len(recent) >= SIDEWAYS_WEEK and not offered >= week
+    recent = [x for x in state.get("sideways", []) if _in_recent_days(x, d)]
+    return (len(recent) >= SIDEWAYS_WEEK
+            and not _in_recent_days(state.get("smaller_offered", ""), d))
 
 
 def keeps_coming_back(state, intent, d):
@@ -7914,6 +8064,33 @@ def say_kept(state, argv):
         say(tr(KEPT_OUTSIDE).format(date=word, n=file_n))
 
 
+def say_week(state, argv):
+    """How many days this week holds, what was finished in it, and one date.
+
+    The notes are not written here. A word that is not one date is not printed.
+    Monday through today is the week. A later day is not inside it.
+    """
+    d = today()
+    say(week_text(state, d))
+    word = kept_date_word(argv)
+    if word is None or word == "":
+        if word is None:
+            say(tr(KEPT_UNREAD))
+        return
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", word):
+        say(tr(KEPT_UNREAD))
+        return
+    when = real_day(word)
+    if not when:
+        say(tr(KEPT_NOT_DAY).format(date=word))
+        return
+    day = datetime.date.fromisoformat(when)
+    if week_start(d) <= day <= d:
+        say(tr(WEEK_INSIDE).format(date=word))
+    else:
+        say(tr(WEEK_OUTSIDE).format(date=word))
+
+
 def toy_reply(text):
     """A joke typed at a prompt. Nothing is saved. True when it was one."""
     low = (text or "").lower().strip(TRIM)
@@ -7968,6 +8145,12 @@ def toy_reply(text):
         say_kept(state, [])
         feature_audit("kept")
         return True
+    if low == "week":
+        # The visit already has a day. Read the file again and do not write it.
+        state, _ = load(repair=False)
+        say_week(state, [])
+        feature_audit("week")
+        return True
     return False
 
 
@@ -7980,7 +8163,7 @@ def fun_command(argv):
     if not argv:
         return None
     name = argv[0].lower()
-    if name not in ("morse", "klingon", "haiku", "shift", "cowbell", "staple", "kazoo", "trombone", "airhorn", "bell", "ai", "kept"):
+    if name not in ("morse", "klingon", "haiku", "shift", "cowbell", "staple", "kazoo", "trombone", "airhorn", "bell", "ai", "kept", "week"):
         return None
     if name == "morse" and len(argv) == 1:
         say(GREETING)
@@ -8065,6 +8248,15 @@ def fun_command(argv):
         say_kept(state, argv[1:])
         feature_audit("kept")
         return 0
+    if name == "week":
+        # Not the morning. The file is read and is not written. A missing
+        # folder is not created. The day is the morning's day, after the
+        # saved hour. Extra words that are not one date are not printed.
+        state, _ = load(repair=False)
+        say(GREETING)
+        say_week(state, argv[1:])
+        feature_audit("week")
+        return 0
     if name == "haiku" and len(argv) == 1:
         # The menu uses the day start in the notes. This command used to
         # ignore it, because it runs before the day is opened. Read only.
@@ -8087,7 +8279,7 @@ def fun_command(argv):
         say_haiku(when)
         return 0
     say(tr("Try hello morse, hello klingon, hello haiku, hello shift, "
-           "hello cowbell, hello staple, hello kazoo, hello trombone, hello airhorn, hello bell, hello ai, or hello kept. "
+           "hello cowbell, hello staple, hello kazoo, hello trombone, hello airhorn, hello bell, hello ai, hello kept, or hello week. "
            "A date is hello haiku --date YYYY-MM-DD."))
     return 2
 

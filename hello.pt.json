@@ -938,7 +938,13 @@
   "Added to tomorrow's plan, with what you carried.": "Adicionado ao plano de amanhã, com o que você levou.",
   "Your plan from more than {n} days ago was put away. Type same at the plan prompt to bring it back.": "Seu plano de mais de {n} dias atrás foi posto de lado. Digite same na pergunta do plano para trazê-lo de volta.",
   "The day starts at {at}.": "O dia começa às {at}.",
-  "That line is for {date}.": "Essa linha é de {date}."
+  "That line is for {date}.": "Essa linha é de {date}.",
+  "This week is 1 day, {date}.": "Esta semana é 1 dia, {date}.",
+  "This week is {n} days, {start} through {end}.": "Esta semana é de {n} dias, de {start} a {end}.",
+  "Last week is {n} days, {start} through {end}.": "A semana passada é de {n} dias, de {start} a {end}.",
+  "{date} is inside this week.": "{date} está dentro desta semana.",
+  "{date} is not inside this week.": "{date} não está dentro desta semana.",
+  "Through {date}.": "Até {date}."
  },
  "tips_floor": [
   "Confira se o corredor está livre antes da primeira tarefa do turno.",

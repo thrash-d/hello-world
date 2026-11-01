@@ -937,7 +937,13 @@
   "Added to tomorrow's plan, with what you carried.": "持ち越したものと一緒に、明日の予定に追加しました。",
   "Your plan from more than {n} days ago was put away. Type same at the plan prompt to bring it back.": "{n}日より前の予定は脇に置きました。計画の質問で same と入力すると戻せます。",
   "The day starts at {at}.": "1日の始まりは {at} です。",
-  "That line is for {date}.": "その一行は {date} のものです。"
+  "That line is for {date}.": "その一行は {date} のものです。",
+  "This week is 1 day, {date}.": "今週は 1 日、{date}です。",
+  "This week is {n} days, {start} through {end}.": "今週は {n} 日、{start}から{end}までです。",
+  "Last week is {n} days, {start} through {end}.": "先週は {n} 日、{start}から{end}までです。",
+  "{date} is inside this week.": "{date}は今週の中です。",
+  "{date} is not inside this week.": "{date}は今週の中ではありません。",
+  "Through {date}.": "{date}まで。"
  },
  "tips_floor": [
   "シフト最初の作業の前に、通路に物が置かれていないか確認しましょう。",

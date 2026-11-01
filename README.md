@@ -95,8 +95,9 @@ lists as holidays are quiet too. **Options > Greet me by name** puts your
 first name at the top. Turning off **What the window shows > Also show the
 thought** hides the thought and keeps the tip.
 
-Options also has **This week...** (what you finished since Monday, and last
-week), **My
+Options also has **This week...** (what you finished from Monday through
+today, and last week). The first line says how many days that is. Monday is
+1 day. Sunday is 7. A finish dated after today is not in that count. It also has **My
 numbers...** (days opened, your longest run and plans finished, once you turn
 on **Keep my numbers**), **Save my plans to a file** (a Markdown file in
 Documents, with a `.csv` copy that opens in a spreadsheet; **Delete the plans
@@ -123,13 +124,13 @@ reminder times and the window's other settings, and pressing Ctrl+C twice
 closes it.
 
 `hello morse`, `hello haiku`, `hello klingon`, `hello shift`, `hello cowbell`,
-`hello staple`, `hello kazoo`, `hello trombone`, `hello airhorn`, `hello bell`, `hello ai`, `hello kept`, and `hello --pirate` print a
-joke and save nothing. `hello kept` says today, then What I did, then "15 days. Today and the day 14 days earlier are both on this page." It then says finished plans are kept for 15 days, or 366 when a longer history is on, and that today and that earlier day are both kept. It reads the saved day start, then the clock, and it does not write the notes. One date after it says whether that day is inside the file's window. `2026-02-31` is not a day, and the screen says so. Any other extra words are not read and are not saved. `hello haiku` with no date uses the day start saved in the notes.
+`hello staple`, `hello kazoo`, `hello trombone`, `hello airhorn`, `hello bell`, `hello ai`, `hello kept`, `hello week`, and `hello --pirate` print a
+joke and save nothing. `hello kept` says today, then What I did, then "15 days. Today and the day 14 days earlier are both on this page." It then says finished plans are kept for 15 days, or 366 when a longer history is on, and that today and that earlier day are both kept. It reads the saved day start, then the clock, and it does not write the notes. One date after it says whether that day is inside the file's window. `2026-02-31` is not a day, and the screen says so. Any other extra words are not read and are not saved. `hello week` says how many days this week holds, Monday through today. Monday is 1 day. Sunday is 7. It then says how many plans were finished in those days, or that nothing was finished yet. Last week, when it has a finish, is 7 days, Monday through Sunday. It reads the saved day start, then the clock, and it does not write the notes. One date after it says whether that day is inside this week. `2026-02-31` is not a day, and the screen says so. Any other extra words are not read and are not saved. `hello haiku` with no date uses the day start saved in the notes.
 `hello haiku --date YYYY-MM-DD` puts that calendar day in the
 middle line. A date that is not written that way is refused. `hello shift` prints the greeting and one line that names the saved day start, the same words as the menu: midnight, or 18:00 with the night-shift note. It reads the notes and does not write them. It does not read the clock, and it is not on the phone.
 `hello kazoo` prints the greeting, four lines, and "bwap bwap". `hello trombone` prints the greeting, four lines, "womp womp", and "This is not a recording. Nothing was sent." `hello airhorn` prints the greeting, four lines, "BRAAAAP", and "This is not a recording. Nothing was sent." `hello bell` prints the greeting, four lines, "ding", and "This is not a recording. Nothing was sent." The text screen does not start a tone, and it does not say that one was started. The phone button may start a tone in the page, and the status line says whether it did. `hello ai` prints the greeting, "This is not a model. Nothing was sent.", one line chosen from the date, and a sentence that names that date. Words typed after it are not read, not saved, and not sent, and the screen says so. The line is still the one for that date, and the date sentence uses the same long date as the morning. The command reads the saved day start and does not write the notes. It does not contact a model. None of these is part of Pro, and none of them sends anything. A joke does not create the notes folder. If that folder is already there, one line is added to `feature-audit.jsonl` with `network` false and `charged` false, and with no plan text.
-Typing `pic` after the days-in-a-row line shows a picture. `q` there closes, the same as any other question, and Enter still skips. Typing `haiku`, `kazoo`, `trombone`, `airhorn`, `bell`, `ai`, `kept`,
-or the letters `uuddlrlrba`, at a prompt answers and does not save a plan. A full stop after `haiku` is the same joke. The phone keeps Kazoo, Trombone, Airhorn, Bell, AI, Priority Hello, Hello Encore, Hello Spotlight, and Hello Ring in Settings. Under the AI button, a box can hold a question. The status line uses the date's duck line and then names that date. If the box had words, it says they were not read and were not saved, and it does not repeat those words. The phone writes a local note that the duck was asked, and that note does not contain the words. The box is not on the morning screen. Settings starts closed. It has a button, How long is a finished plan kept?, and the status line says this phone keeps the last 100 finished lines and that a date that is not a real day is not kept. Choosing a day start says the option's words: Midnight, 4:00, 12:00, or 18:00. It does not say Saved, and it does not say 0:00. None of this is on the printed page.
+Typing `pic` after the days-in-a-row line shows a picture. `q` there closes, the same as any other question, and Enter still skips. Typing `haiku`, `kazoo`, `trombone`, `airhorn`, `bell`, `ai`, `kept`, `week`,
+or the letters `uuddlrlrba`, at a prompt answers and does not save a plan. A full stop after `haiku` is the same joke. The phone keeps Kazoo, Trombone, Airhorn, Bell, AI, Priority Hello, Hello Encore, Hello Spotlight, and Hello Ring in Settings. Under the AI button, a box can hold a question. The status line uses the date's duck line and then names that date. If the box had words, it says they were not read and were not saved, and it does not repeat those words. The phone writes a local note that the duck was asked, and that note does not contain the words. The box is not on the morning screen. Settings starts closed. It has a button, How long is a finished plan kept?, and the status line says this phone keeps the last 100 finished lines, that a date that is not a real day is not kept, and that a date after today is not kept. It has a button, What does this week hold?, and the status line says how many days this week holds, Monday through today, and how many finishes are in those days. It does not put the plan on that line. Choosing a day start says the option's words: Midnight, 4:00, 12:00, or 18:00. It does not say Saved, and it does not say 0:00. None of this is on the printed page.
 
 ### The text screen
 
@@ -443,7 +444,7 @@ organization".
 To keep its disk from being filled, the server keeps at most `--sync-quota`
 encrypted sync copies (100,000; one already there can still be updated),
 takes at most 20 new copies a day and 60 writes a minute from one address,
-and removes copies untouched for a year every hour. Those per-address limits
+and removes copies untouched for more than 366 days every hour. A copy last touched exactly 366 days ago stays. Those per-address limits
 live in memory and reset when the server restarts, so rate-limit at the https
 proxy in front too.
 
@@ -603,7 +604,7 @@ server a random token, its browser's push address and the time in UTC, and
 nothing else, and the server sends a push with nothing in it at that time;
 the phone shows "Check-in time" from what it keeps itself. The server only
 calls the browser makers' push services, and forgets the address when the
-reminder is turned off, the push service says it's gone, or a year passes.
+reminder is turned off, the push service says it's gone, or more than 366 days pass. A registration last touched exactly 366 days ago stays.
 On an iPhone, add hello-world to the Home Screen first. Without `--remind`,
 phones only let a web page remind you while it's still open in the
 background, and the settings say so.
@@ -670,7 +671,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.75.0'
+$tag = 'v1.76.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

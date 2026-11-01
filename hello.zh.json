@@ -937,7 +937,13 @@
   "Added to tomorrow's plan, with what you carried.": "已加到明天的计划里，和你带过去的一起。",
   "Your plan from more than {n} days ago was put away. Type same at the plan prompt to bring it back.": "超过{n}天前的计划已搁置。在计划问题处输入 same 可以把它带回。",
   "The day starts at {at}.": "一天从 {at} 开始。",
-  "That line is for {date}.": "这一行是 {date} 的。"
+  "That line is for {date}.": "这一行是 {date} 的。",
+  "This week is 1 day, {date}.": "本周是 1 天，{date}。",
+  "This week is {n} days, {start} through {end}.": "本周是 {n} 天，从{start}到{end}。",
+  "Last week is {n} days, {start} through {end}.": "上周是 {n} 天，从{start}到{end}。",
+  "{date} is inside this week.": "{date}在本周内。",
+  "{date} is not inside this week.": "{date}不在本周内。",
+  "Through {date}.": "截至{date}。"
  },
  "tips_floor": [
   "开始第一单活之前，先确认您走的通道畅通。",

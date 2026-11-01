@@ -28,7 +28,8 @@ restart or at midnight UTC.
 
 Sync copies are encrypted on the PC or phone before they're sent, with a
 key this server never sees; the label is made from the same secret. Each is
-one file in the sync folder; a copy untouched for a year is removed.
+one file in the sync folder; a copy untouched for more than 366 days
+is removed. A copy last touched exactly 366 days ago stays.
 
     GET    /v1/push/key            the server's public key for Web Push
     PUT    /v1/push/<32 hex>       {"endpoint": "https://...", "times": ["07:00"]}
@@ -40,8 +41,9 @@ no plan, no language, no time zone. At each time the server sends a push
 with no content at all; the phone itself decides what to show from what it
 keeps on the phone. Push addresses are only accepted at the browser makers'
 push services, so the server can't be used to call anywhere else. A push
-service that says the address is gone, turning the reminder off, or a year
-untouched removes the file.
+service that says the address is gone, turning the reminder off, or more
+than 366 days untouched removes the file. A file last touched exactly
+366 days ago stays.
 
     POST /v1/growth                 a batch of streak notes, stored as JSON
                                    lines under growth/ and never a network
@@ -73,7 +75,8 @@ Writes are limited so nobody can fill the disk (the red team's Capone): at
 most --sync-quota encrypted copies in all (an existing one can still be
 updated when it's full), 20 new labels and 60 writes a minute from one
 address, counted in memory only with the same daily key as the counts, and an
-hourly sweep removes copies untouched for a year. The per-address limits
+hourly sweep removes copies untouched for more than 366 days. A copy
+last touched exactly 366 days ago stays. The per-address limits
 live in memory, so a restart resets them: rate-limit at the https proxy in
 front as well.
 """
@@ -282,8 +285,9 @@ class Counts:
                 self.stored[kind] = max(0, self.stored[kind] - n)
 
     def sweep(self, now=None):
-        """Remove encrypted copies untouched for a year, without waiting for
-        someone to ask for them. Returns how many went."""
+        """Remove encrypted copies untouched for more than 366 days, without
+        waiting for someone to ask for them. A copy last touched exactly
+        366 days ago stays. Returns how many went."""
         now = now or time.time()
         folder = os.path.join(self.folder, "sync")
         gone = 0
@@ -1496,6 +1500,7 @@ JOKE_EVENTS = frozenset({
 class Growth:
     """Streak-note batches. One JSON line per batch, under growth/, and the
     client's address is not written. Files older than 30 days are removed.
+    A file from exactly 30 days ago stays.
     A symlink is not followed. The folder is mode 0700 so other accounts
     on the machine cannot list the day files."""
 
