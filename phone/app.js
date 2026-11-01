@@ -51,6 +51,9 @@ const UI = {
     remindShown: "Check-in time.", remindFail: "The reminder couldn't be set up on this phone.",
     dayStart: "My day starts at", midnight: "Midnight",
     dayStartNote: "18:00 keeps a night shift from 22:00 to 6:00 on one day; midnight splits it.",
+    dayStartSaid: "Your day now starts at {at}.",
+    keptAsk: "How long is a finished plan kept?",
+    keptPhone: "This phone keeps the last {n} finished lines. A date that is not a real day is not kept.",
     repeat: "Every day", repeatPlaceholder: "Something to do every day", repeatAt: "At",
     repeatNote: "A reminder only, not a medical device. Its words stay on this phone.",
     repeatOff: "Off", repeatSaved: "The daily reminder is saved.",
@@ -158,6 +161,9 @@ const UI = {
     remindShown: "Hora de revisar.", remindFail: "No se pudo activar el recordatorio en este teléfono.",
     dayStart: "Mi día empieza a las", midnight: "Medianoche",
     dayStartNote: "18:00 deja un turno de noche de 22:00 a 6:00 en un solo día; medianoche lo parte.",
+    dayStartSaid: "Tu día ahora empieza a {at}.",
+    keptAsk: "¿Cuánto tiempo se guarda un plan terminado?",
+    keptPhone: "Este teléfono guarda las últimas {n} líneas terminadas. Una fecha que no es un día real no se guarda.",
     repeat: "Cada día", repeatPlaceholder: "Algo que hacer cada día", repeatAt: "A las",
     repeatNote: "Solo un recordatorio, no un dispositivo médico. Sus palabras se quedan en este teléfono.",
     repeatOff: "Apagado", repeatSaved: "El recordatorio diario está guardado.",
@@ -230,6 +236,9 @@ const UI = {
     remindShown: "وقت المراجعة.", remindFail: "تعذّر إعداد التذكير على هذا الهاتف.",
     dayStart: "يبدأ يومي في", midnight: "منتصف الليل",
     dayStartNote: "18:00 تُبقي المناوبة الليلية من 22:00 إلى 6:00 يومًا واحدًا؛ منتصف الليل يقسمها.",
+    dayStartSaid: "يبدأ يومك الآن عند {at}.",
+    keptAsk: "كم تُحفظ الخطة المكتملة؟",
+    keptPhone: "يحتفظ هذا الهاتف بآخر {n} سطور مكتملة. التاريخ الذي ليس يومًا حقيقيًا لا يُحفظ.",
     repeat: "كل يوم", repeatPlaceholder: "شيء تفعله كل يوم", repeatAt: "في",
     repeatNote: "تذكير فقط، وليس جهازًا طبيًا. تبقى كلماته على هذا الهاتف.",
     repeatOff: "متوقف", repeatSaved: "حُفظ التذكير اليومي.",
@@ -311,7 +320,19 @@ function blank() {
            repeat: null, family: null };
 }
 
-const isDate = (v) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
+function realDate(value) {
+  // The shape is not enough. 2026-02-31 matches it, and Date rolls that
+  // forward to 3 March. A date that is not that day is not kept, and it
+  // is not renamed to the day the clock overflowed into.
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return "";
+  const y = +value.slice(0, 4), m = +value.slice(5, 7), d = +value.slice(8, 10);
+  const at = new Date(Date.UTC(y, m - 1, d));
+  if (at.getUTCFullYear() !== y || at.getUTCMonth() !== m - 1 || at.getUTCDate() !== d) return "";
+  return value;
+}
+const isDate = (v) => Boolean(realDate(v));
+// Finished lines on this phone. The sentence uses this number. It is not 15.
+const FINISHED_KEEP = 100;
 
 function parse(raw) {
   try {
@@ -324,7 +345,7 @@ function parse(raw) {
     }
     if (Array.isArray(data.finished)) {
       state.finished = data.finished.filter((f) => f && typeof f.text === "string" && f.text.trim()
-        && isDate(f.date)).map((f) => ({ text: String(f.text).trim().slice(0, MAX_PLAN), date: f.date })).slice(-100);
+        && isDate(f.date)).map((f) => ({ text: String(f.text).trim().slice(0, MAX_PLAN), date: f.date })).slice(-FINISHED_KEEP);
     }
     if (data.growthConsent === true) state.growthConsent = true;
     else if (data.growthConsent === false) state.growthConsent = false;
@@ -543,6 +564,19 @@ function setDayStart(state, hours, now) {
   const day = todayOf(state, now);
   if (state.intent && state.intent.date > day) state.intent.date = day;
   return "saved";
+}
+
+function dayStartWords(hours, phrases) {
+  // The words on the option. Midnight is the option's word, not 0:00.
+  // 18:00 is 18:00. The night-shift note stays under the menu.
+  const s = phrases || UI.en;
+  if (DAY_STARTS.includes(hours) && hours) return String(hours) + ":00";
+  return s.midnight || UI.en.midnight;
+}
+
+function keptPhoneLine(phrases) {
+  const text = (phrases && phrases.keptPhone) || UI.en.keptPhone;
+  return String(text).split("{n}").join(String(FINISHED_KEEP));
 }
 
 // The newest plans put aside, offered as buttons when there's no plan.
@@ -1037,21 +1071,23 @@ function syncTime(v) {
 function mergeSync(state, other, today) {
   const have = new Set(state.finished.map((f) => f.text + "\n" + f.date));
   for (const item of other.finished || []) {
-    if (item && typeof item.text === "string" && /^\d{4}-\d{2}-\d{2}$/.test(item.date) && item.date <= today
+    if (item && typeof item.text === "string" && isDate(item.date) && item.date <= today
         && !have.has(item.text + "\n" + item.date)) {
       state.finished.push({ text: clean(item.text), date: item.date });
       have.add(item.text + "\n" + item.date);
     }
   }
   state.devices = mergeDevices(state.devices, other.devices);
+  // A date that is not a day does not stay in the list that gets saved.
+  state.finished = state.finished.filter((f) => f && isDate(f.date));
   state.finished.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-  state.finished = state.finished.slice(-100);
+  state.finished = state.finished.slice(-FINISHED_KEEP);
   // A real time no more than a day ahead: one far ahead would win every
   // later change.
   const theirs = syncTime(other.updated);
   if (theirs > (state.updated || "")) {
     const i = other.intent;
-    state.intent = i && typeof i.text === "string" && clean(i.text) && /^\d{4}-\d{2}-\d{2}$/.test(i.date)
+    state.intent = i && typeof i.text === "string" && clean(i.text) && isDate(i.date)
       ? { text: clean(i.text), date: i.date, skips: 0 } : null;
     state.updated = theirs;
   }
@@ -1078,7 +1114,7 @@ const GROWTH_TRIES = 8;
 // The nag prints this number. It used to say tomorrow while the comparison stayed 4.
 const STREAK_GAP = 4;
 const SESSION_GAP_MS = 30 * 60 * 1000;
-const APP_VERSION = "1.74.0";
+const APP_VERSION = "1.75.0";
 
 function growthUrlOk(url) {
   try {
@@ -1227,6 +1263,7 @@ const DUCK_LINES = [
 ];
 
 function duckLine(iso) {
+  if (!realDate(iso)) return DUCK_LINES[0];
   const parts = String(iso || "").split("-").map(Number);
   if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return DUCK_LINES[0];
   const [y, m, d] = parts;
@@ -1443,7 +1480,7 @@ function diskHouseKeys(keys) {
 if (typeof module !== "undefined") {
   module.exports = { UI, ordinal, todaysPair, clean, parse, asks, answer, setPlan, finishToday, language, blank,
     syncKeys, sealSync, openSync, mergeSync, syncForm, normalCode, todayOf, clearToday, picks, bringBack,
-    phoneNumber, smsLink, utcTime, pushText, nearClock, haikuText, exportText, setDayStart, REMIND_TIMES, DAY_STARTS,
+    phoneNumber, smsLink, utcTime, pushText, nearClock, haikuText, exportText, setDayStart, dayStartWords, keptPhoneLine, realDate, FINISHED_KEEP, REMIND_TIMES, DAY_STARTS,
     fresh, smallerDue, comingBack, smaller, endDay, noteSideways, mergeDevices, noteDevice, letterLink,
     houseKeys, houseNew, houseJoin, houseLeave, houseChange, houseMerge, houseTidy, houseBody, houseHistory,
     houseNews, houseLeftUnasked, newCode, houseFit, houseStamp, syncAction, syncTime, HOUSE,
@@ -1482,6 +1519,9 @@ if (typeof document !== "undefined") {
       text = (words.goodMany || UI.en.goodMany).replace("{n}", key.slice(9));
     } else if (key === "endTally") {
       text = $("status").dataset.tally || "";
+    } else if (key === "dayStartSaid") {
+      const at = dayStartWords(state.dayStart, words);
+      text = (words.dayStartSaid || UI.en.dayStartSaid).split("{at}").join(at);
     } else if (key) {
       text = words[key] || "";
     }
@@ -1533,6 +1573,8 @@ if (typeof document !== "undefined") {
   };
 
   function longDate(isoDate, lang) {
+    // A date that is not a day is not renamed. 31 February is not 3 March.
+    if (!realDate(isoDate)) return "";
     const [y, m, d] = isoDate.split("-").map(Number);
     return new Date(y, m - 1, d).toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   }
@@ -2166,6 +2208,7 @@ if (typeof document !== "undefined") {
     if ($("encore")) $("encore").textContent = phrase("encore");
     if ($("airhorn")) $("airhorn").textContent = phrase("airhorn");
     if ($("bell")) $("bell").textContent = phrase("bell");
+    if ($("kept-span")) $("kept-span").textContent = phrase("keptAsk");
     if ($("spotlight")) $("spotlight").textContent = phrase("spotlight");
     if ($("ring")) $("ring").textContent = phrase("ring");
     if ($("growth-toggle")) $("growth-toggle").textContent = on ? phrase("growthOff") : phrase("growthOn");
@@ -2552,7 +2595,19 @@ if (typeof document !== "undefined") {
     return said;
   }));
   $("language").addEventListener("change", act(() => { state.lang = $("language").value; return ""; }));
-  $("day-start").addEventListener("change", act(() => setDayStart(state, Number($("day-start").value) || 0)));
+  $("day-start").addEventListener("change", act(() => {
+    setDayStart(state, Number($("day-start").value) || 0);
+    return "dayStartSaid";
+  }));
+  if ($("kept-span")) $("kept-span").addEventListener("click", () => {
+    clearTimeout(hearTimer);
+    const status = $("status");
+    status.style.whiteSpace = "";
+    status.textContent = keptPhoneLine(t());
+    status.tabIndex = -1;
+    status.focus();
+    securityNote("kept");
+  });
   async function askPermission() {
     // Asked only when someone picks a time; no reminder unless asked (the rider).
     if (typeof Notification !== "undefined" && Notification.permission === "default") {

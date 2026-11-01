@@ -682,18 +682,21 @@ def help_text():
     return (tr(HELP) + "\n\n" + tr("hello.cmd is in this folder:") + "\n  " + here
             + "\n\n" + tr("For fun, and nothing is saved: hello morse, hello haiku, "
                           "hello klingon, hello shift, hello cowbell, hello staple, "
-                          "hello kazoo, hello trombone, hello airhorn, hello bell, hello ai, and hello --pirate. "
+                          "hello kazoo, hello trombone, hello airhorn, hello bell, hello ai, hello kept, and hello --pirate. "
                           "hello ai is not a model and sends nothing. "
                           "Words after hello ai are not read, not saved, and not sent. "
                           "The duck's line names the date it is for. "
                           "hello shift names the saved day start and does not read the clock. "
+                          "hello kept names how many days a finished plan is kept, and What I did. "
+                          "It reads the saved day start, then the clock. It does not write the notes. "
+                          "A word after it that is not one date is not read and is not saved. "
                           "hello trombone, hello airhorn, and hello bell are not recordings and send nothing. "
                           "--set klingon on keeps the Klingon line under the greeting. "
                           "hello growth off stops streak notes. "
                           "hello priority, hello encore, hello spotlight, and hello ring write a local stub receipt "
                           "and do not bill. The trombone stays free. The airhorn stays free. The bell stays free."))
 
-VERSION = "1.74.0"
+VERSION = "1.75.0"
 MAX_VISITS = 400
 # Days before today that are still kept. Today is kept as well, so the
 # list holds KEEP_VISIT_DAYS + 1 calendar days. The sentence says that
@@ -2822,7 +2825,17 @@ def merge_sync(state, other, d):
         except ValueError:
             continue
     if state.get("finished"):
-        state["finished"] = sorted(state["finished"], key=lambda i: i["date"])[-finished_cap(state):]
+        # The sentence names the window. A finish from outside it must not
+        # sit in the file until the next open, and must not be pushed back.
+        oldest = (d - datetime.timedelta(days=keep_days(state))).isoformat()
+        kept = [i for i in state["finished"]
+                if isinstance(i.get("date"), str) and i["date"] >= oldest]
+        if len(kept) != len(state["finished"]):
+            changed = True
+        state["finished"] = sorted(kept, key=lambda i: i["date"])[-finished_cap(state):]
+        if not state["finished"]:
+            state.pop("finished", None)
+            changed = True
     theirs = sync_time(other.get("updated"))
     if theirs > state.get("sync_updated", ""):
         intent = other.get("intent")
@@ -3806,9 +3819,12 @@ def saved_plan(state):
     asking next time."""
     return tr("Saved. Type done when you finish it.") if gentle(state) else tr(SAVED_PLAN)
 MAX_FINISHED = 50
-# Finished plans are kept for 14 days, or a year with "long_history" (free:
-# history only matters after months, Noor), and at most this many, so "This
-# week" always has the whole week.
+# Finished plans are kept for an age of 14 days, or 365 with "long_history"
+# (free: history only matters after months, Noor), and at most this many, so
+# "This week" always has the whole week. Today is kept as well, so the
+# calendar count is one more than that age. The sentence says the calendar
+# count. It must not say 14 for a window that includes both ends, and it
+# must not say 90 for the longer one.
 LONG_FINISHED = 600
 
 
@@ -3819,7 +3835,46 @@ def finished_cap(state):
 
 
 def keep_days(state):
+    """Days before today that a finish is still kept. Today is kept too."""
     return 365 if state.get("long_history") else 14
+
+
+def finished_span_days(state=None):
+    """Calendar days a finished plan can still be kept, today included.
+
+    The oldest date is today minus keep_days. Both ends count. A short
+    history is 15. A longer history is 366. The sentence says that count.
+    """
+    return keep_days(state or {}) + 1
+
+
+def history_span_days():
+    """Lines on What I did. That page is the short window, even when a
+    longer history is on. It is 15, not 14, and not 366."""
+    return finished_span_days({})
+
+
+# The same words on the page, in the menu, and in hello kept. The number
+# is the span, not the age. "Two weeks" and "a year" and "90" are not this.
+PAGE_SPAN = "{n} days. Today and the day {back} days earlier are both on this page."
+KEPT_FILE = ("Finished plans are kept for {n} days. Today and the day {back} "
+             "days earlier are both kept.")
+KEPT_INSTEAD = ("Finished plans are kept for {n} days. Today and the day {back} "
+                "days earlier are both kept. That is instead of {usual}.")
+KEPT_TODAY = "Today is {date}."
+KEPT_UNREAD = "That is not a day. It was not saved."
+KEPT_NOT_DAY = "{date} is not a day. It was not saved."
+KEPT_INSIDE = "{date} is inside the {n} days."
+KEPT_OUTSIDE = "{date} is not inside the {n} days."
+
+
+def finished_history_sentence(longer):
+    """The menu line for Keep a longer history. The numbers are the spans."""
+    short = finished_span_days({})
+    if longer:
+        span = finished_span_days({"long_history": True})
+        return tr(KEPT_INSTEAD).format(n=span, back=span - 1, usual=short)
+    return tr(KEPT_FILE).format(n=short, back=short - 1)
 SHOWN_AFTER_DONE = 3
 
 
@@ -5652,8 +5707,8 @@ def more_settings(state, can_save):
             (tr("Save my plans to a file"), export),
             (marked(tr("Keep a longer history"), state.get("long_history")), flip(
                 "long_history",
-                tr("Finished plans are kept for a year instead of 14 days."),
-                tr("Finished plans are kept for 14 days, as usual."))),
+                finished_history_sentence(True),
+                finished_history_sentence(False))),
             (tr("What I did..."), history),
             (marked(tr("No follow-up questions"), gentle(state)),
              lambda: para(set_gentle(state, can_save, not gentle(state))))]
@@ -6963,19 +7018,24 @@ def answer_plan(state, can_save, d, choice, text, parts=None):
         "Skipped. It asks again next time.")
 
 
-# The page Harold asked for: two weeks, a line a day, "not sure" as itself.
-HISTORY_DAYS = 14
+# The page Harold asked for: one line a day, "not sure" as itself.
+# The lines are the short window, today included. That is 15, not 14.
 # A list in tests: the text sent to the printer goes here instead.
 PRINTED = None
 
 
 def what_i_did(state, d):
-    """What I did: one line a day for two weeks, newest first, so no gap is
-    left to worry about. Days with nothing say so."""
+    """What I did: one line a day for the short window, newest first.
+
+    The window is the one the file keeps when history is short: today and
+    the day 14 days earlier, which is 15 lines. The sentence says 15. A
+    longer history does not add lines to this page. Days with nothing say so.
+    """
+    span = history_span_days()
     finished, unsure = state.get("finished", []), state.get("unsure", [])
     intent = state.get("intent")
-    lines = [tr("What I did")]
-    for back in range(HISTORY_DAYS):
+    lines = [tr("What I did"), tr(PAGE_SPAN).format(n=span, back=span - 1)]
+    for back in range(span):
         when = d - datetime.timedelta(days=back)
         iso = when.isoformat()
         parts = [tr("{text} (done)").format(text=i["text"]) for i in finished if i["date"] == iso]
@@ -7806,6 +7866,54 @@ def say_duck(d, unread=False):
     say(tr(DUCK_DATED).format(date=long_date(d)))
 
 
+def kept_date_word(argv):
+    """The one date hello kept was given, or "" when there is none.
+
+    None means the extra words are not one date. Those words are not returned,
+    so the screen cannot print them.
+    """
+    rest = list(argv or [])
+    if not rest:
+        return ""
+    if len(rest) == 2 and rest[0].lower() == "--date":
+        return rest[1]
+    if len(rest) == 1:
+        return rest[0]
+    return None
+
+
+def say_kept(state, argv):
+    """How long a finish is kept, and whether one date is inside that window.
+
+    The notes are not written here. A word that is not one date is not printed.
+    """
+    d = today()
+    say(tr(KEPT_TODAY).format(date=long_date(d)))
+    span = history_span_days()
+    say(tr("What I did"))
+    say(tr(PAGE_SPAN).format(n=span, back=span - 1))
+    file_n = finished_span_days(state)
+    say(tr(KEPT_FILE).format(n=file_n, back=file_n - 1))
+    word = kept_date_word(argv)
+    if word is None or word == "":
+        if word is None:
+            say(tr(KEPT_UNREAD))
+        return
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", word):
+        say(tr(KEPT_UNREAD))
+        return
+    try:
+        when = datetime.date.fromisoformat(word)
+    except ValueError:
+        say(tr(KEPT_NOT_DAY).format(date=word))
+        return
+    age = (d - when).days
+    if 0 <= age <= keep_days(state):
+        say(tr(KEPT_INSIDE).format(date=word, n=file_n))
+    else:
+        say(tr(KEPT_OUTSIDE).format(date=word, n=file_n))
+
+
 def toy_reply(text):
     """A joke typed at a prompt. Nothing is saved. True when it was one."""
     low = (text or "").lower().strip(TRIM)
@@ -7854,6 +7962,12 @@ def toy_reply(text):
         say_duck(today())
         feature_audit("ai")
         return True
+    if low == "kept":
+        # The visit already has a day. Read the file again and do not write it.
+        state, _ = load(repair=False)
+        say_kept(state, [])
+        feature_audit("kept")
+        return True
     return False
 
 
@@ -7866,7 +7980,7 @@ def fun_command(argv):
     if not argv:
         return None
     name = argv[0].lower()
-    if name not in ("morse", "klingon", "haiku", "shift", "cowbell", "staple", "kazoo", "trombone", "airhorn", "bell", "ai"):
+    if name not in ("morse", "klingon", "haiku", "shift", "cowbell", "staple", "kazoo", "trombone", "airhorn", "bell", "ai", "kept"):
         return None
     if name == "morse" and len(argv) == 1:
         say(GREETING)
@@ -7942,6 +8056,15 @@ def fun_command(argv):
         say_duck(today(), unread=len(argv) > 1)
         feature_audit("ai")
         return 0
+    if name == "kept":
+        # Not the morning. The file is read and is not written. A missing
+        # folder is not created. The day is the morning's day, after the
+        # saved hour. Extra words that are not one date are not printed.
+        state, _ = load(repair=False)
+        say(GREETING)
+        say_kept(state, argv[1:])
+        feature_audit("kept")
+        return 0
     if name == "haiku" and len(argv) == 1:
         # The menu uses the day start in the notes. This command used to
         # ignore it, because it runs before the day is opened. Read only.
@@ -7964,7 +8087,7 @@ def fun_command(argv):
         say_haiku(when)
         return 0
     say(tr("Try hello morse, hello klingon, hello haiku, hello shift, "
-           "hello cowbell, hello staple, hello kazoo, hello trombone, hello airhorn, hello bell, or hello ai. "
+           "hello cowbell, hello staple, hello kazoo, hello trombone, hello airhorn, hello bell, hello ai, or hello kept. "
            "A date is hello haiku --date YYYY-MM-DD."))
     return 2
 
@@ -10988,8 +11111,8 @@ class Window:
         elif choice == 15:
             self.set_text(self.STATUS, v.switch(
                 "long_history",
-                tr("Finished plans are kept for a year instead of 14 days."),
-                tr("Finished plans are kept for 14 days, as usual.")))
+                finished_history_sentence(True),
+                finished_history_sentence(False)))
         elif choice == 18:
             items = newest_first(v.state["finished"])[:20]
             picked = self.popup([(0, 200 + n, tr("{date}: ").format(date=long_date(

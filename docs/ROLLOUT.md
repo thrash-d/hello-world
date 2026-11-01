@@ -51,7 +51,7 @@ prints the whole saved file.
   the date they last opened the program (the dates from 60 days before today through today, 61 days with both ends counted, only if
   they turned on the days-in-a-row message), one current plan,
   one unfinished earlier plan, a count of plans marked done, the plans
-  finished in the last 14 days with dates, four settings, and the date of the last
+  finished on the day 14 days before today, through today (15 days, both ends counted), or 366 days with a longer history, four settings, and the date of the last
   sign-in reminder. No names, computer names or times.
 - The `DisablePlans` policy removes all plan text and counts, and
   `HideDaysInARow` keeps only the latest visit date. With both, the file holds

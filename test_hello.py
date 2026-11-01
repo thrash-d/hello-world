@@ -3123,7 +3123,7 @@ def test_menu_option_12_has_the_windows_other_settings():
     assert "12  More settings..." in p.stdout
     assert "Greet me by name (now off)" in p.stdout
     assert "The greeting uses your first name." in p.stdout
-    assert "Finished plans are kept for a year instead of 14 days." in p.stdout
+    assert "Finished plans are kept for 366 days. Today and the day 365 days earlier are both kept. That is instead of 15." in p.stdout
     assert "Days you opened hello-world: 1" in p.stdout
     # Windows also lists Keep hello-world in the tray; End the day, Letters, Every day,
     # This year, the fridge page and My day starts at come last.
@@ -3783,10 +3783,11 @@ def test_what_i_did_shows_every_day_and_a_done_can_be_taken_back():
              "unsure": [{"text": "Posted the letter", "date": "2026-10-01"}]}
     page = hello.what_i_did(state, hello.datetime.date(2026, 10, 5))
     assert page[0] == "What I did"
-    assert page[1] == "Monday, 5 October 2026: Ask Linda (still open)"
+    assert page[1] == "15 days. Today and the day 14 days earlier are both on this page."
+    assert page[2] == "Monday, 5 October 2026: Ask Linda (still open)"
     assert "Friday, 2 October 2026: Called the dentist (done)" in page
     assert "Thursday, 1 October 2026: Posted the letter (not sure)" in page
-    assert "Saturday, 3 October 2026: nothing noted" in page and len(page) == 15
+    assert "Saturday, 3 October 2026: nothing noted" in page and len(page) == 17
     assert hello.print_page(page) == "Sent to the printer."
     assert hello.PRINTED[0].startswith("What I did\n")
     with open(os.path.join(hello.HOME, "notes.json"), "w") as f:

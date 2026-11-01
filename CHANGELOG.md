@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-11-01: review round 58
+
+Version 1.75.0. Finished plans are kept from today back through the day 14 days earlier, which is 15 calendar days. A longer history keeps today and the day 365 days earlier, which is 366 calendar days. The menu said 14 days, and a year. The one list of what is saved said 14 days, or 90 with a longer history. What I did listed 14 lines, today back through 13 days, so a finish from 14 days ago was in the file and not on the page. The menu, the page, and that list now say 15 and 366. The page lists the 15 days. A sync merge drops a finish outside that window before the save. `hello kept` says the same sentences. It reads the saved day start, then the clock, and it does not write the notes. `2026-02-31` is not a day. The screen says so, and it does not turn that date into 3 March.
+
+On the phone, a stored 31 February was kept and could be read as 3 March. A date that is not a real day is not kept, and it is not renamed. The phone says it keeps the last 100 finished lines. Choosing a day start used to say Saved. It now says the option's words: Midnight, 4:00, 12:00, or 18:00.
+
+Nothing was removed. Streak notes, sync, reminders, the kazoo, the trombone, the airhorn, the bell, the duck line, and the stub receipts are still there. No new noise was added. No new stub was added. The morning screen does not gain a line. The printed page does not gain a line. The default upload is still `https://insights.example.invalid/v1/growth`.
+
 ## 2026-11-01: review round 57
 
 Version 1.74.0. With no follow-up questions, a plan older than 3 days is put away. The window still said that plan was from over two weeks ago. The window now says more than 3 days. The text screen stays quiet. Choosing midnight said the day starts at 0:00. It now uses the same words as the menu. `hello shift` did not read the saved hour. It does now, and it does not write the notes, and it still does not read the clock.
