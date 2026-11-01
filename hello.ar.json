@@ -937,7 +937,13 @@
   "Added to tomorrow's plan, with what you carried.": "أُضيف إلى خطة الغد، مع ما نقلته.",
   "Your plan from more than {n} days ago was put away. Type same at the plan prompt to bring it back.": "خُطتك التي مضى عليها أكثر من {n} أيام وُضعت جانبًا. اكتب same عند سؤال الخطة لإعادتها.",
   "The day starts at {at}.": "يبدأ اليوم في {at}.",
-  "That line is for {date}.": "هذا السطر ليوم {date}."
+  "That line is for {date}.": "هذا السطر ليوم {date}.",
+  "This week is 1 day, {date}.": "هذا الأسبوع يوم واحد، {date}.",
+  "This week is {n} days, {start} through {end}.": "هذا الأسبوع {n} أيام، من {start} إلى {end}.",
+  "Last week is {n} days, {start} through {end}.": "الأسبوع الماضي {n} أيام، من {start} إلى {end}.",
+  "{date} is inside this week.": "{date} داخل هذا الأسبوع.",
+  "{date} is not inside this week.": "{date} ليس داخل هذا الأسبوع.",
+  "Through {date}.": "حتى {date}."
  },
  "tips_floor": [
   "التأكد من خلو الممر قبل أول مهمة في الوردية.",

@@ -53,7 +53,12 @@ const UI = {
     dayStartNote: "18:00 keeps a night shift from 22:00 to 6:00 on one day; midnight splits it.",
     dayStartSaid: "Your day now starts at {at}.",
     keptAsk: "How long is a finished plan kept?",
-    keptPhone: "This phone keeps the last {n} finished lines. A date that is not a real day is not kept.",
+    keptPhone: "This phone keeps the last {n} finished lines. A date that is not a real day is not kept. A date after today is not kept.",
+    weekAsk: "What does this week hold?",
+    weekOne: "This week is 1 day, {date}.",
+    weekMany: "This week is {n} days, {start} through {end}.",
+    weekDone: "You finished {n}.",
+    weekNone: "Nothing finished yet this week. That is fine.",
     repeat: "Every day", repeatPlaceholder: "Something to do every day", repeatAt: "At",
     repeatNote: "A reminder only, not a medical device. Its words stay on this phone.",
     repeatOff: "Off", repeatSaved: "The daily reminder is saved.",
@@ -163,7 +168,12 @@ const UI = {
     dayStartNote: "18:00 deja un turno de noche de 22:00 a 6:00 en un solo día; medianoche lo parte.",
     dayStartSaid: "Tu día ahora empieza a {at}.",
     keptAsk: "¿Cuánto tiempo se guarda un plan terminado?",
-    keptPhone: "Este teléfono guarda las últimas {n} líneas terminadas. Una fecha que no es un día real no se guarda.",
+    keptPhone: "Este teléfono guarda las últimas {n} líneas terminadas. Una fecha que no es un día real no se guarda. Una fecha posterior a hoy no se guarda.",
+    weekAsk: "¿Qué tiene esta semana?",
+    weekOne: "Esta semana es 1 día, {date}.",
+    weekMany: "Esta semana es de {n} días, del {start} al {end}.",
+    weekDone: "Terminaste {n}.",
+    weekNone: "Esta semana aún no has terminado nada. No pasa nada.",
     repeat: "Cada día", repeatPlaceholder: "Algo que hacer cada día", repeatAt: "A las",
     repeatNote: "Solo un recordatorio, no un dispositivo médico. Sus palabras se quedan en este teléfono.",
     repeatOff: "Apagado", repeatSaved: "El recordatorio diario está guardado.",
@@ -238,7 +248,12 @@ const UI = {
     dayStartNote: "18:00 تُبقي المناوبة الليلية من 22:00 إلى 6:00 يومًا واحدًا؛ منتصف الليل يقسمها.",
     dayStartSaid: "يبدأ يومك الآن عند {at}.",
     keptAsk: "كم تُحفظ الخطة المكتملة؟",
-    keptPhone: "يحتفظ هذا الهاتف بآخر {n} سطور مكتملة. التاريخ الذي ليس يومًا حقيقيًا لا يُحفظ.",
+    keptPhone: "يحتفظ هذا الهاتف بآخر {n} سطور مكتملة. التاريخ الذي ليس يومًا حقيقيًا لا يُحفظ. التاريخ الذي بعد اليوم لا يُحفظ.",
+    weekAsk: "ماذا تحمل هذا الأسبوع؟",
+    weekOne: "هذا الأسبوع يوم واحد، {date}.",
+    weekMany: "هذا الأسبوع {n} أيام، من {start} إلى {end}.",
+    weekDone: "أنهيت {n}.",
+    weekNone: "لم يكتمل شيء بعد هذا الأسبوع. لا بأس.",
     repeat: "كل يوم", repeatPlaceholder: "شيء تفعله كل يوم", repeatAt: "في",
     repeatNote: "تذكير فقط، وليس جهازًا طبيًا. تبقى كلماته على هذا الهاتف.",
     repeatOff: "متوقف", repeatSaved: "حُفظ التذكير اليومي.",
@@ -334,6 +349,48 @@ const isDate = (v) => Boolean(realDate(v));
 // Finished lines on this phone. The sentence uses this number. It is not 15.
 const FINISHED_KEEP = 100;
 
+function addDays(isoDate, n) {
+  if (!realDate(isoDate)) return "";
+  const at = new Date(Date.UTC(+isoDate.slice(0, 4), +isoDate.slice(5, 7) - 1, +isoDate.slice(8, 10)));
+  at.setUTCDate(at.getUTCDate() + n);
+  const pad = (x) => String(x).padStart(2, "0");
+  return at.getUTCFullYear() + "-" + pad(at.getUTCMonth() + 1) + "-" + pad(at.getUTCDate());
+}
+
+function weekSpanDays(isoDate) {
+  // Monday is 1. Sunday is 7. The same count as hello.py.
+  if (!realDate(isoDate)) return 0;
+  const at = new Date(Date.UTC(+isoDate.slice(0, 4), +isoDate.slice(5, 7) - 1, +isoDate.slice(8, 10)));
+  const js = at.getUTCDay();
+  return js === 0 ? 7 : js;
+}
+
+function weekPhoneLine(isoDate, finished, phrases, format) {
+  // The day count and the finish count are different sentences.
+  // A date after isoDate is not in the finish count. The plan text is not
+  // in this line.
+  const n = weekSpanDays(isoDate);
+  if (!n) return "";
+  const fmt = typeof format === "function" ? format : (s) => s;
+  const start = addDays(isoDate, 1 - n);
+  const words = phrases || {};
+  let span;
+  if (n === 1) {
+    span = String(words.weekOne || "This week is 1 day, {date}.").split("{date}").join(fmt(isoDate));
+  } else {
+    span = String(words.weekMany || "This week is {n} days, {start} through {end}.")
+      .split("{n}").join(String(n))
+      .split("{start}").join(fmt(start))
+      .split("{end}").join(fmt(isoDate));
+  }
+  const count = (Array.isArray(finished) ? finished : [])
+    .filter((f) => f && isDate(f.date) && f.date >= start && f.date <= isoDate).length;
+  const tail = count === 0
+    ? String(words.weekNone || "Nothing finished yet this week. That is fine.")
+    : String(words.weekDone || "You finished {n}.").split("{n}").join(String(count));
+  return span + " " + tail;
+}
+
 function parse(raw) {
   try {
     const data = JSON.parse(raw);
@@ -345,7 +402,7 @@ function parse(raw) {
     }
     if (Array.isArray(data.finished)) {
       state.finished = data.finished.filter((f) => f && typeof f.text === "string" && f.text.trim()
-        && isDate(f.date)).map((f) => ({ text: String(f.text).trim().slice(0, MAX_PLAN), date: f.date })).slice(-FINISHED_KEEP);
+        && isDate(f.date)).map((f) => ({ text: String(f.text).trim().slice(0, MAX_PLAN), date: f.date }));
     }
     if (data.growthConsent === true) state.growthConsent = true;
     else if (data.growthConsent === false) state.growthConsent = false;
@@ -378,7 +435,7 @@ function parse(raw) {
     }
     if (Array.isArray(data.aside)) {
       state.aside = data.aside.filter((a) => a && typeof a.text === "string" && clean(a.text) && isDate(a.date))
-        .map((a) => ({ text: clean(a.text), date: a.date })).slice(-MAX_ASIDE);
+        .map((a) => ({ text: clean(a.text), date: a.date }));
     }
     if (UI[data.lang]) state.lang = data.lang;
     if (REMIND_TIMES.includes(data.remind)) state.remind = data.remind;
@@ -391,7 +448,7 @@ function parse(raw) {
       const number = phoneNumber(data.family.number);
       if (number) state.family = { name: data.family.name.trim().slice(0, 40), number };
     }
-    if (Array.isArray(data.sideways)) state.sideways = data.sideways.filter(isDate).slice(-6);
+    if (Array.isArray(data.sideways)) state.sideways = data.sideways.filter(isDate);
     if (isDate(data.smallerOffered)) state.smallerOffered = data.smallerOffered;
     if (typeof data.smallerAsked === "string") state.smallerAsked = data.smallerAsked.slice(0, MAX_PLAN);
     if (data.large === true) state.large = true;
@@ -419,10 +476,19 @@ function parse(raw) {
     if (data.devices) state.devices = mergeDevices(data.devices, {});
     if (Array.isArray(data.letters)) {
       state.letters = data.letters.filter((l) => l && typeof l.text === "string" && l.text.trim() && isDate(l.date))
-        .map((l) => ({ to: String(l.to || "").slice(0, 100), text: l.text.slice(0, 4000), date: l.date })).slice(-20);
+        .map((l) => ({ to: String(l.to || "").slice(0, 100), text: l.text.slice(0, 4000), date: l.date }));
     }
     if (typeof data.pushToken === "string" && /^[0-9a-f]{32}$/.test(data.pushToken)) state.pushToken = data.pushToken;
     if (syncTime(data.updated)) state.updated = data.updated;
+    // A date after today is not kept. The sentence says so. The day start
+    // is already on the state, so "today" is the morning's day.
+    const today = todayOf(state);
+    // Drop a later day before the cap, so it cannot push a real line out.
+    state.finished = state.finished.filter((f) => f.date <= today).slice(-FINISHED_KEEP);
+    state.aside = state.aside.filter((a) => a.date <= today).slice(-MAX_ASIDE);
+    if (state.sideways) state.sideways = state.sideways.filter((x) => x <= today).slice(-6);
+    if (state.letters) state.letters = state.letters.filter((l) => l.date <= today).slice(-20);
+    if (state.smallerOffered > today) delete state.smallerOffered;
     return state;
   } catch (e) {
     return blank();
@@ -453,9 +519,17 @@ function noteSideways(state, today) {
   state.sideways = (state.sideways || []).filter((x) => x !== today).concat([today]).slice(-6);
 }
 
+function inRecentDays(day, today) {
+  // Today and the day 6 days earlier, both ends. That is 7 calendar days.
+  // A later day is not one of them. A string that is not a day is not either.
+  if (!isDate(day) || !isDate(today)) return false;
+  const gap = daysBetween(day, today);
+  return gap >= 0 && gap < 7;
+}
+
 function smallerDue(state, today) {
-  const recent = (state.sideways || []).filter((x) => daysBetween(x, today) < 7);
-  return recent.length >= 3 && !(state.smallerOffered && daysBetween(state.smallerOffered, today) < 7);
+  const recent = (state.sideways || []).filter((x) => inRecentDays(x, today));
+  return recent.length >= 3 && !inRecentDays(state.smallerOffered, today);
 }
 
 function comingBack(state, today) {
@@ -736,7 +810,7 @@ async function openSync(keys, blob) {
 
 // The household list, the same as hello.py's house_* functions: each adult
 // joins from their own device, everyone sees who joined or left, each thing
-// keeps its own history (the day, not the minute), no counts per person,
+// keeps its own history (the weekday and the time), no counts per person,
 // and removed things can be restored for 30 days. Everything read from the
 // server was written by someone holding the code, so it is checked first,
 // and kept in objects with no prototype, so no id can reach Object.prototype.
@@ -1026,13 +1100,16 @@ function syncForm(state) {
 
 // The devices syncing with a code, inside the encryption, the newest day
 // for each, as hello.py's merge_devices does.
-function mergeDevices(mine, theirs) {
+function mergeDevices(mine, theirs, latest) {
+  // A real day, and not more than a day ahead. A date far ahead would sort
+  // first forever. The same limit as a sync clock.
+  const cap = realDate(latest) || addDays(iso(new Date()), 1);
   const out = {};
   [mine, theirs].forEach((side) => entries(side).forEach(([id, d]) => {
     // Written by whoever holds the code, so checked: a real date, and a name
     // that is plain text.
     const name = d ? houseText(d.name, 40) : "";
-    if (/^[0-9a-f]{12}$/.test(id) && name && isDate(d.seen) && !Number.isNaN(Date.parse(d.seen))
+    if (/^[0-9a-f]{12}$/.test(id) && name && isDate(d.seen) && d.seen <= cap
         && (!out[id] || d.seen > out[id].seen)) out[id] = { name, seen: d.seen };
   }));
   return Object.fromEntries(Object.entries(out).sort((a, b) => (a[1].seen < b[1].seen ? -1 : 1)).slice(-20));
@@ -1079,7 +1156,7 @@ function mergeSync(state, other, today) {
   }
   state.devices = mergeDevices(state.devices, other.devices);
   // A date that is not a day does not stay in the list that gets saved.
-  state.finished = state.finished.filter((f) => f && isDate(f.date));
+  state.finished = state.finished.filter((f) => f && isDate(f.date) && f.date <= today);
   state.finished.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   state.finished = state.finished.slice(-FINISHED_KEEP);
   // A real time no more than a day ahead: one far ahead would win every
@@ -1114,7 +1191,7 @@ const GROWTH_TRIES = 8;
 // The nag prints this number. It used to say tomorrow while the comparison stayed 4.
 const STREAK_GAP = 4;
 const SESSION_GAP_MS = 30 * 60 * 1000;
-const APP_VERSION = "1.75.0";
+const APP_VERSION = "1.76.0";
 
 function growthUrlOk(url) {
   try {
@@ -1481,6 +1558,7 @@ if (typeof module !== "undefined") {
   module.exports = { UI, ordinal, todaysPair, clean, parse, asks, answer, setPlan, finishToday, language, blank,
     syncKeys, sealSync, openSync, mergeSync, syncForm, normalCode, todayOf, clearToday, picks, bringBack,
     phoneNumber, smsLink, utcTime, pushText, nearClock, haikuText, exportText, setDayStart, dayStartWords, keptPhoneLine, realDate, FINISHED_KEEP, REMIND_TIMES, DAY_STARTS,
+    weekPhoneLine, weekSpanDays, addDays, inRecentDays,
     fresh, smallerDue, comingBack, smaller, endDay, noteSideways, mergeDevices, noteDevice, letterLink,
     houseKeys, houseNew, houseJoin, houseLeave, houseChange, houseMerge, houseTidy, houseBody, houseHistory,
     houseNews, houseLeftUnasked, newCode, houseFit, houseStamp, syncAction, syncTime, HOUSE,
@@ -2209,6 +2287,7 @@ if (typeof document !== "undefined") {
     if ($("airhorn")) $("airhorn").textContent = phrase("airhorn");
     if ($("bell")) $("bell").textContent = phrase("bell");
     if ($("kept-span")) $("kept-span").textContent = phrase("keptAsk");
+    if ($("week-span")) $("week-span").textContent = phrase("weekAsk");
     if ($("spotlight")) $("spotlight").textContent = phrase("spotlight");
     if ($("ring")) $("ring").textContent = phrase("ring");
     if ($("growth-toggle")) $("growth-toggle").textContent = on ? phrase("growthOff") : phrase("growthOn");
@@ -2607,6 +2686,17 @@ if (typeof document !== "undefined") {
     status.tabIndex = -1;
     status.focus();
     securityNote("kept");
+  });
+  if ($("week-span")) $("week-span").addEventListener("click", () => {
+    clearTimeout(hearTimer);
+    const status = $("status");
+    status.style.whiteSpace = "";
+    const lang = language(state, navigator.languages);
+    status.textContent = weekPhoneLine(today(), state.finished, t(), (isoDate) => longDate(isoDate, lang));
+    status.tabIndex = -1;
+    status.focus();
+    // The note is the event name. It does not hold a plan or a date.
+    securityNote("week");
   });
   async function askPermission() {
     // Asked only when someone picks a time; no reminder unless asked (the rider).

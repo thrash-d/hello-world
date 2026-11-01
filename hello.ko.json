@@ -937,7 +937,13 @@
   "Added to tomorrow's plan, with what you carried.": "넘긴 것과 함께 내일 계획에 추가했어요.",
   "Your plan from more than {n} days ago was put away. Type same at the plan prompt to bring it back.": "{n}일이 넘게 지난 계획은 옆으로 치웠어요. 계획 질문에서 same을 입력하면 다시 가져와요.",
   "The day starts at {at}.": "하루는 {at}에 시작해요.",
-  "That line is for {date}.": "그 줄은 {date}의 줄이에요."
+  "That line is for {date}.": "그 줄은 {date}의 줄이에요.",
+  "This week is 1 day, {date}.": "이번 주는 1일, {date}예요.",
+  "This week is {n} days, {start} through {end}.": "이번 주는 {n}일, {start}부터 {end}까지예요.",
+  "Last week is {n} days, {start} through {end}.": "지난주는 {n}일, {start}부터 {end}까지예요.",
+  "{date} is inside this week.": "{date}은 이번 주 안이에요.",
+  "{date} is not inside this week.": "{date}은 이번 주 안이 아니에요.",
+  "Through {date}.": "{date}까지예요."
  },
  "tips_floor": [
   "첫 작업 전에 다니는 통로에 걸리는 게 없는지 확인하세요.",

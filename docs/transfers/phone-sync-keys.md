@@ -37,5 +37,5 @@ does not keep the raw copy. `CN=Reed Mallory`, `CN="Reed Mallory"`, a curly-quot
 not either. "not Reed Mallory" does not start with his name. Format characters, quote marks, and backslashes are not part of the name. A hex-encoded subject is not decoded. An empty value does not keep the
 raw copy either. That other name is the acceptor of the raw copy.
 
-The cache name is `hello-world-phone-v21`, so a phone that already cached
+The cache name is `hello-world-phone-v22`, so a phone that already cached
 the previous page fetches this one.

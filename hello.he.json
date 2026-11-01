@@ -937,7 +937,13 @@
   "Added to tomorrow's plan, with what you carried.": "נוסף לתוכנית של מחר, יחד עם מה שהעברת.",
   "Your plan from more than {n} days ago was put away. Type same at the plan prompt to bring it back.": "התוכנית מלפני יותר מ-{n} ימים הונחה בצד. הקלידו same בשאלת התוכנית כדי להחזיר אותה.",
   "The day starts at {at}.": "היום מתחיל ב-{at}.",
-  "That line is for {date}.": "השורה הזו היא ליום {date}."
+  "That line is for {date}.": "השורה הזו היא ליום {date}.",
+  "This week is 1 day, {date}.": "השבוע הוא יום אחד, {date}.",
+  "This week is {n} days, {start} through {end}.": "השבוע הוא {n} ימים, מ-{start} עד {end}.",
+  "Last week is {n} days, {start} through {end}.": "השבוע שעבר הוא {n} ימים, מ-{start} עד {end}.",
+  "{date} is inside this week.": "{date} בתוך השבוע הזה.",
+  "{date} is not inside this week.": "{date} לא בתוך השבוع הזה.",
+  "Through {date}.": "עד {date}."
  },
  "tips_floor": [
   "לבדוק שהמעבר פנוי לפני המשימה הראשונה במשמרת.",
