@@ -100,7 +100,7 @@ week), **My
 numbers...** (days opened, your longest run and plans finished, once you turn
 on **Keep my numbers**), **Save my plans to a file** (a Markdown file in
 Documents, with a `.csv` copy that opens in a spreadsheet; **Delete the plans
-file I saved** removes both), **Keep a longer history** (finished plans kept for a year instead of 14 days), and
+file I saved** removes both), **Keep a longer history** (finished plans kept for 366 days instead of 15), and
 **Tips for floor and shift work**, a second list of 40 tips for warehouses,
 factories and shifts in place of the desk ones.
 
@@ -123,13 +123,13 @@ reminder times and the window's other settings, and pressing Ctrl+C twice
 closes it.
 
 `hello morse`, `hello haiku`, `hello klingon`, `hello shift`, `hello cowbell`,
-`hello staple`, `hello kazoo`, `hello trombone`, `hello airhorn`, `hello bell`, `hello ai`, and `hello --pirate` print a
-joke and save nothing. `hello haiku` with no date uses the day start saved in the notes.
+`hello staple`, `hello kazoo`, `hello trombone`, `hello airhorn`, `hello bell`, `hello ai`, `hello kept`, and `hello --pirate` print a
+joke and save nothing. `hello kept` says today, then What I did, then "15 days. Today and the day 14 days earlier are both on this page." It then says finished plans are kept for 15 days, or 366 when a longer history is on, and that today and that earlier day are both kept. It reads the saved day start, then the clock, and it does not write the notes. One date after it says whether that day is inside the file's window. `2026-02-31` is not a day, and the screen says so. Any other extra words are not read and are not saved. `hello haiku` with no date uses the day start saved in the notes.
 `hello haiku --date YYYY-MM-DD` puts that calendar day in the
 middle line. A date that is not written that way is refused. `hello shift` prints the greeting and one line that names the saved day start, the same words as the menu: midnight, or 18:00 with the night-shift note. It reads the notes and does not write them. It does not read the clock, and it is not on the phone.
 `hello kazoo` prints the greeting, four lines, and "bwap bwap". `hello trombone` prints the greeting, four lines, "womp womp", and "This is not a recording. Nothing was sent." `hello airhorn` prints the greeting, four lines, "BRAAAAP", and "This is not a recording. Nothing was sent." `hello bell` prints the greeting, four lines, "ding", and "This is not a recording. Nothing was sent." The text screen does not start a tone, and it does not say that one was started. The phone button may start a tone in the page, and the status line says whether it did. `hello ai` prints the greeting, "This is not a model. Nothing was sent.", one line chosen from the date, and a sentence that names that date. Words typed after it are not read, not saved, and not sent, and the screen says so. The line is still the one for that date, and the date sentence uses the same long date as the morning. The command reads the saved day start and does not write the notes. It does not contact a model. None of these is part of Pro, and none of them sends anything. A joke does not create the notes folder. If that folder is already there, one line is added to `feature-audit.jsonl` with `network` false and `charged` false, and with no plan text.
-Typing `pic` after the days-in-a-row line shows a picture. `q` there closes, the same as any other question, and Enter still skips. Typing `haiku`, `kazoo`, `trombone`, `airhorn`, `bell`, `ai`,
-or the letters `uuddlrlrba`, at a prompt answers and does not save a plan. A full stop after `haiku` is the same joke. The phone keeps Kazoo, Trombone, Airhorn, Bell, AI, Priority Hello, Hello Encore, Hello Spotlight, and Hello Ring in Settings. Under the AI button, a box can hold a question. The status line uses the date's duck line and then names that date. If the box had words, it says they were not read and were not saved, and it does not repeat those words. The phone writes a local note that the duck was asked, and that note does not contain the words. The box is not on the morning screen. None of this is on the printed page.
+Typing `pic` after the days-in-a-row line shows a picture. `q` there closes, the same as any other question, and Enter still skips. Typing `haiku`, `kazoo`, `trombone`, `airhorn`, `bell`, `ai`, `kept`,
+or the letters `uuddlrlrba`, at a prompt answers and does not save a plan. A full stop after `haiku` is the same joke. The phone keeps Kazoo, Trombone, Airhorn, Bell, AI, Priority Hello, Hello Encore, Hello Spotlight, and Hello Ring in Settings. Under the AI button, a box can hold a question. The status line uses the date's duck line and then names that date. If the box had words, it says they were not read and were not saved, and it does not repeat those words. The phone writes a local note that the duck was asked, and that note does not contain the words. The box is not on the morning screen. Settings starts closed. It has a button, How long is a finished plan kept?, and the status line says this phone keeps the last 100 finished lines and that a date that is not a real day is not kept. Choosing a day start says the option's words: Midnight, 4:00, 12:00, or 18:00. It does not say Saved, and it does not say 0:00. None of this is on the printed page.
 
 ### The text screen
 
@@ -210,7 +210,7 @@ one.
 ### What I did, large text, and no follow-up questions
 
 **Options > My plans > What I did...** (menu option 12 in the text screen)
-lists the last two weeks, one line a day, newest first: what you finished,
+lists 15 days, one line a day, newest first: today and the day 14 days earlier are both on the page. It says 15. A longer history does not add lines to this page. It shows what you finished,
 what you weren't sure about, and "nothing noted" on days with nothing, so no
 gap is left to wonder about. It offers to print the page. **Take back a
 Done...** undoes a Done clicked by mistake and puts the thing back on
@@ -367,7 +367,7 @@ under `AppData\Local` in your own user folder. It holds the date you last
 opened the program (the dates from 60 days before today through today, 61 days with both ends counted, only if you turned on the
 days-in-a-row message, which needs them), your current plan, an unfinished
 earlier plan, how many times you marked a plan done, and the plans you
-finished in the last 14 days, or 90 with a longer history (words and date). It also holds your settings for the days-in-a-row
+finished on the day 14 days before today, through today (15 days, both ends counted), or on the day 365 days before today, through today (366 days, both ends counted) when a longer history is on (words and date). It also holds your settings for the days-in-a-row
 message, the thought and tip, and the window or text screen, your answer to
 the sign-in question, and the date of the last sign-in reminder, so it comes
 once a day at most.
@@ -521,7 +521,7 @@ removes that list. The Cowbell button, when streak notes are on, still offers an
 The file also holds the day you last counted yourself for the tip, whether
 you answered the shared count question, today's reaction, the newest handoff
 note you have seen, the plans you answered "I'm not
-sure" about in the last two weeks, and your settings for no follow-up
+sure" about, at most 14 of them, and only on a day the 15-day window still keeps, and your settings for no follow-up
 questions and large text.
 
 Since 1.44.0 the file is locked to your Windows account with the Windows
@@ -670,7 +670,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.74.0'
+$tag = 'v1.75.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

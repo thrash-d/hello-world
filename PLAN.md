@@ -282,3 +282,24 @@ is still not decoded. No fifth noise and no new stub. Vance Harlow asked
 for Hello Dated at $16.99. He lost, 1 to 5. The morning screen and the
 printed page do not gain a line. The default upload is still the
 placeholder. He did not sign the word audited.
+
+## Round 58
+
+The same six. Reed Mallory still accepts no residual, and he does not veto.
+The record is `reviews/round-58.md`. The version is 1.75.0.
+
+Finished plans are kept from today through the day 14 days earlier, which
+is 15 calendar days. A longer history keeps today and the day 365 days
+earlier, which is 366. The menu said 14, and a year. The one list of what
+is saved said 14, or 90. What I did listed 14 lines. The page now lists 15
+and says 15. A sync merge drops a finish outside that window before the
+save. `hello kept` says the same sentences. It reads the saved day start,
+then the clock, and it does not write the notes. A date that is not a day
+is not renamed. The phone says it keeps the last 100 finished lines.
+Choosing a day start on the phone uses the option's words.
+
+No fifth noise and no new stub. Vance Harlow asked for Hello Archive at
+$11.99, with the 366 days behind it. He lost, 1 to 5. He also wanted the
+sentence to keep saying 14 and 90. He lost that, 5 to 1. The morning
+screen and the printed page do not gain a line. The default upload is
+still the placeholder. He did not sign the word audited.

@@ -335,8 +335,8 @@ including when it is written as `CN=Reed Mallory`, `CN="Reed Mallory"`, with cur
 
 Each user's `notes.json` holds the date they last opened the program, their
 current plan, one unfinished earlier plan, a count of plans marked done, the
-plans they finished in the last 14 days with dates (90 with a longer
-history), four settings, and the date of the last
+plans they finished on the day 14 days before today, through today (15 days, both ends counted), or on the day 365 days before today, through today (366 days, both ends counted) with a longer
+history, four settings, and the date of the last
 sign-in reminder. Only someone who turns on the days-in-a-row message keeps
 the dates from 60 days before today through today (61 days, both ends counted), which the message counts.
 The `DisablePlans` and `HideDaysInARow` policies cut that to the latest visit
