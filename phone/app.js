@@ -99,6 +99,7 @@ const UI = {
     growthPlusSaid: "Pro+ is $9.99 a month. STUB: nothing was charged. No card was asked for. The streak notes stay.",
     aiAsk: "Ask the duck (it will not read this)",
     aiUnread: "The question was not read. It was not saved.",
+    aiDated: "That line is for {date}.",
     skipNag: "The streak noticed.",
     sponsored: "Sponsored: Pro+ is $9.99 a month. Nothing is billed.",
     good: "Good. That one is off your list.", goodMany: "Good. {n} things are off your list.",
@@ -1077,7 +1078,7 @@ const GROWTH_TRIES = 8;
 // The nag prints this number. It used to say tomorrow while the comparison stayed 4.
 const STREAK_GAP = 4;
 const SESSION_GAP_MS = 30 * 60 * 1000;
-const APP_VERSION = "1.73.0";
+const APP_VERSION = "1.74.0";
 
 function growthUrlOk(url) {
   try {
@@ -1394,22 +1395,21 @@ function growthEula(host) {
     + host + ". Household lists, letters, and sync codes are not included. Nothing is billed.";
 }
 
-function reedUnquote(value) {
-  const text = String(value || "").trim();
-  if (text.length >= 2) {
-    const a = text[0];
-    const b = text[text.length - 1];
-    if ((a === "\"" || a === "'") && a === b) return text.slice(1, -1).trim();
-  }
-  return text;
+function reedFold(name) {
+  // Format characters, quote marks, and backslashes are not part of the name.
+  // A zero-width space, a curly quote, or an escaped quote is still his name.
+  // A hex subject is not decoded.
+  const quotes = /["'`\u201c\u201d\u201e\u201f\u2018\u2019\u201a\u201b\u00ab\u00bb]/g;
+  const text = String(name || "").replace(/\\/g, "").replace(/\p{Cf}/gu, "").replace(quotes, "");
+  return text.trim().toLowerCase().split(/\s+/).filter(Boolean).join(" ");
 }
 
 function reedNamed(name) {
   // Fold spaces first. "Reed  Mallory" and "Reed Mallory." are still his name.
-  // A certificate-style subject is checked name by name, so "CN=Reed Mallory"
-  // and "CN=\"Reed Mallory\"" are still his. "not Reed Mallory" does not
-  // start with his name. One pair of matching quotes is not part of the name.
-  const folded = String(name || "").trim().toLowerCase().split(/\s+/).filter(Boolean).join(" ");
+  // A certificate-style subject is checked name by name, so "CN=Reed Mallory",
+  // a quoted CN, a curly-quoted CN, and a zero-width space between the words
+  // are still his. "not Reed Mallory" does not start with his name.
+  const folded = reedFold(name);
   const values = [folded];
   const parts = folded.split(",");
   for (let i = 0; i < parts.length; i++) {
@@ -1419,7 +1419,7 @@ function reedNamed(name) {
     values.push(value);
   }
   for (let i = 0; i < values.length; i++) {
-    if (reedUnquote(values[i]).startsWith("reed mallory")) return true;
+    if (values[i].startsWith("reed mallory")) return true;
   }
   return false;
 }
@@ -2451,9 +2451,13 @@ if (typeof document !== "undefined") {
   if ($("ai")) $("ai").addEventListener("click", () => {
     const field = $("ai-ask");
     const asked = Boolean(field && field.value.trim());
+    // The words are cleared and are not copied into the status or the ledger.
     if (field) field.value = "";
     const unread = asked ? "\n" + (phrase("aiUnread") || UI.en.aiUnread) : "";
-    jokeStatus(phrase("aiSaid") + unread + "\n" + duckLine(today()));
+    const lang = language(state, navigator.languages);
+    const dated = (phrase("aiDated") || UI.en.aiDated).split("{date}").join(longDate(today(), lang));
+    jokeStatus(phrase("aiSaid") + unread + "\n" + duckLine(today()) + "\n" + dated);
+    securityNote("ai");
   });
   if ($("priority")) $("priority").addEventListener("click", () => {
     const had = state.priorityStub === true;

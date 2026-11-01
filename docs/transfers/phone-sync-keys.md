@@ -33,10 +33,9 @@ the raw `localStorage` copy is removed. They are written back as raw arrays
 only when `localStorage` key `hello-world-sync-raw-acceptor` is a name that
 is not Reed Mallory. Spaces inside the name are folded first, and each
 name after `=` is checked. A name that is his, or that starts with his,
-does not keep the raw copy. `CN=Reed Mallory` and `CN="Reed Mallory"` do
-not either. "not Reed Mallory" does not start with his name. One pair of
-matching quotes is not part of the name. An empty value does not keep the
+does not keep the raw copy. `CN=Reed Mallory`, `CN="Reed Mallory"`, a curly-quoted name, and a zero-width space between the words do
+not either. "not Reed Mallory" does not start with his name. Format characters, quote marks, and backslashes are not part of the name. A hex-encoded subject is not decoded. An empty value does not keep the
 raw copy either. That other name is the acceptor of the raw copy.
 
-The cache name is `hello-world-phone-v19`, so a phone that already cached
+The cache name is `hello-world-phone-v20`, so a phone that already cached
 the previous page fetches this one.

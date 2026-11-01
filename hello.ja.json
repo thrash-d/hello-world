@@ -926,7 +926,10 @@
   "The household list can't be reached just now, so you haven't left yet. Try again when you're online.": "今は家族リストにつながらないので、まだ抜けていません。オンラインのときにもう一度試してください。",
   "The household list can't be reached just now, or someone already made a new code. Nothing changed.": "今は家族リストにつながらないか、誰かがもう新しいコードを作りました。何も変わっていません。",
   "Type your name, as the others will see it, in the plan box first, then choose this again.": "まず予定の欄に、他の人に表示される名前を入力してから、もう一度これを選んでください。",
-  "Added to tomorrow's plan, with what you carried.": "持ち越したものと一緒に、明日の予定に追加しました。"
+  "Added to tomorrow's plan, with what you carried.": "持ち越したものと一緒に、明日の予定に追加しました。",
+  "Your plan from more than {n} days ago was put away. Type same at the plan prompt to bring it back.": "{n}日より前の予定は脇に置きました。計画の質問で same と入力すると戻せます。",
+  "The day starts at {at}.": "1日の始まりは {at} です。",
+  "That line is for {date}.": "その一行は {date} のものです。"
  },
  "tips_floor": [
   "シフト最初の作業の前に、通路に物が置かれていないか確認しましょう。",

@@ -91,6 +91,7 @@ import secrets
 import stat
 import threading
 import time
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -366,12 +367,27 @@ class P256Unavailable(OSError):
     """libcrypto is missing and nobody but Reed has taken the other path."""
 
 
-def _reed_unquote(value):
-    """One pair of matching quotes is not part of the name."""
-    value = value.strip()
-    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-        return value[1:-1].strip()
-    return value
+# Quote marks a word processor or a certificate subject puts around a name.
+# Straight, curly, and the corner quotes. A backtick is included because a
+# shell sometimes wraps a subject in one.
+_REED_QUOTES = set("\"'`") | set("\u201c\u201d\u201e\u201f\u2018\u2019\u201a\u201b\u00ab\u00bb")
+
+
+def _reed_fold(name):
+    """The name with spaces folded, and with blanks that are not spaces gone.
+
+    A format character such as a zero-width space is not part of the name.
+    A quote mark is not part of the name, including a curly quote. A
+    backslash is not part of the name, so an escaped quote is still a quote.
+    A hex-encoded subject is not decoded. A name this fold cannot read stays
+    the deploying organization's.
+    """
+    kept = []
+    for c in (name or ""):
+        if c == "\\" or c in _REED_QUOTES or unicodedata.category(c) == "Cf":
+            continue
+        kept.append(c)
+    return " ".join("".join(kept).lower().split())
 
 
 def _reed_named(name):
@@ -379,18 +395,19 @@ def _reed_named(name):
 
     Internal spaces fold, so a doubled space is still his. A mark after the
     name still starts with it. A certificate-style subject is checked name
-    by name, so "CN=Reed Mallory", "CN=\"Reed Mallory\"", and
-    "O=Example, CN=Reed  Mallory" are still his. "not Reed Mallory" does
-    not start with his name. He does not accept that name on a transfer.
+    by name, so CN=Reed Mallory, a quoted CN, a curly-quoted CN, and a
+    zero-width space between the words are still his.
+    "not Reed Mallory" does not start with his name. He does not accept
+    that name on a transfer.
     """
-    folded = " ".join((name or "").lower().split())
+    folded = _reed_fold(name)
     values = [folded]
     for part in folded.split(","):
         value = part.strip()
         if "=" in value:
             value = value.rsplit("=", 1)[1].strip()
         values.append(value)
-    return any(_reed_unquote(value).startswith("reed mallory") for value in values)
+    return any(value.startswith("reed mallory") for value in values)
 
 
 def _transfer_ok(path, token):

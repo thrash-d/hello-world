@@ -50,7 +50,7 @@ only administrators can read, and success and failure go to the Application
 event log under the source hello-world.
 
 .EXAMPLE
-$tag = 'v1.73.0'
+$tag = 'v1.74.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d
@@ -115,9 +115,14 @@ function Note-ScriptSignature {
     $name = if ($UnsignedAcceptor) { $UnsignedAcceptor } else { $env:HELLO_UNSIGNED_ACCEPTOR }
     if (-not $name) { $name = 'deploying organization' }
     # Same steps as tools/reed-name.ps1. The installed copy is not next to that file.
-    # "CN=Reed Mallory" and "CN=""Reed Mallory""" are still his name.
-    # "not Reed Mallory" does not start with it. One pair of matching quotes is not the name.
-    $folded = [regex]::Replace($name.Trim().ToLowerInvariant(), '\s+', ' ')
+    # "CN=Reed Mallory", "CN=""Reed Mallory""", a curly quote, and a zero-width
+    # space are still his name. "not Reed Mallory" does not start with it.
+    # Format characters, quote marks, and backslashes are not part of the name.
+    # A hex subject is not decoded.
+    $rawName = [regex]::Replace([string]$name, '\\', '')
+    $rawName = [regex]::Replace($rawName, '\p{Cf}', '')
+    $rawName = [regex]::Replace($rawName, '["''\u201C\u201D\u201E\u201F\u2018\u2019\u201A\u201B\u00AB\u00BB`]', '')
+    $folded = [regex]::Replace($rawName.Trim().ToLowerInvariant(), '\s+', ' ')
     $his = $false
     $checks = New-Object System.Collections.Generic.List[string]
     [void]$checks.Add($folded)
@@ -128,13 +133,6 @@ function Note-ScriptSignature {
         [void]$checks.Add($value)
     }
     foreach ($value in $checks) {
-        if ($value.Length -ge 2) {
-            $a = $value[0]
-            $b = $value[$value.Length - 1]
-            if (($a -eq '"' -or $a -eq "'") -and ($a -eq $b)) {
-                $value = $value.Substring(1, $value.Length - 2).Trim()
-            }
-        }
         if ($value.StartsWith('reed mallory')) { $his = $true; break }
     }
     if ($his) { $name = 'deploying organization' }

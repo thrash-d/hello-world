@@ -926,7 +926,10 @@
   "The household list can't be reached just now, so you haven't left yet. Try again when you're online.": "אי אפשר להגיע לרשימת הבית כרגע, אז עוד לא יצאת. נסה שוב כשתהיה מחובר.",
   "The household list can't be reached just now, or someone already made a new code. Nothing changed.": "אי אפשר להגיע לרשימת הבית כרגע, או שמישהו כבר יצר קוד חדש. שום דבר לא השתנה.",
   "Type your name, as the others will see it, in the plan box first, then choose this again.": "הקלד קודם את שמך, כפי שהאחרים יראו, בתיבת התוכנית, ואז בחר בזה שוב.",
-  "Added to tomorrow's plan, with what you carried.": "נוסף לתוכנית של מחר, יחד עם מה שהעברת."
+  "Added to tomorrow's plan, with what you carried.": "נוסף לתוכנית של מחר, יחד עם מה שהעברת.",
+  "Your plan from more than {n} days ago was put away. Type same at the plan prompt to bring it back.": "התוכנית מלפני יותר מ-{n} ימים הונחה בצד. הקלידו same בשאלת התוכנית כדי להחזיר אותה.",
+  "The day starts at {at}.": "היום מתחיל ב-{at}.",
+  "That line is for {date}.": "השורה הזו היא ליום {date}."
  },
  "tips_floor": [
   "לבדוק שהמעבר פנוי לפני המשימה הראשונה במשמרת.",

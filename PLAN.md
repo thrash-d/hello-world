@@ -263,3 +263,22 @@ date. There is no fifth noise and no new stub. Vance Harlow asked for a
 $14.99 Hello Audience with the duck behind it. He lost, 1 to 5. The morning
 screen and the printed page do not gain a line. The default upload is
 still the placeholder. He did not sign the word audited.
+
+## Round 57
+
+The same six. Reed Mallory still accepts no residual, and he does not veto.
+The record is `reviews/round-57.md`. The version is 1.74.0.
+
+With no follow-up questions, a plan older than 3 days was put away, and the
+window said it was from over two weeks ago. The window now says more than 3
+days. The text screen stays quiet. Choosing midnight said 0:00. It now uses
+the menu's words. `hello shift` reads the saved hour and does not write the
+notes. It still does not read the clock.
+
+What they added: the duck's line names the date it is for. Words after
+`hello ai` are still not read. A curly quote, a backslash, or a zero-width
+space does not make Reed Mallory's name open a gate. A hex-encoded subject
+is still not decoded. No fifth noise and no new stub. Vance Harlow asked
+for Hello Dated at $16.99. He lost, 1 to 5. The morning screen and the
+printed page do not gain a line. The default upload is still the
+placeholder. He did not sign the word audited.

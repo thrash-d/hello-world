@@ -126,10 +126,10 @@ closes it.
 `hello staple`, `hello kazoo`, `hello trombone`, `hello airhorn`, `hello bell`, `hello ai`, and `hello --pirate` print a
 joke and save nothing. `hello haiku` with no date uses the day start saved in the notes.
 `hello haiku --date YYYY-MM-DD` puts that calendar day in the
-middle line. A date that is not written that way is refused. `hello shift` prints the greeting and one line, "The day starts when you said it does." It does not read the clock, and it is not on the phone.
-`hello kazoo` prints the greeting, four lines, and "bwap bwap". `hello trombone` prints the greeting, four lines, "womp womp", and "This is not a recording. Nothing was sent." `hello airhorn` prints the greeting, four lines, "BRAAAAP", and "This is not a recording. Nothing was sent." `hello bell` prints the greeting, four lines, "ding", and "This is not a recording. Nothing was sent." The text screen does not start a tone, and it does not say that one was started. The phone button may start a tone in the page, and the status line says whether it did. `hello ai` prints the greeting, "This is not a model. Nothing was sent.", and one line chosen from the date. Words typed after it are not read, not saved, and not sent, and the screen says so. The line is still the one for that date. The command reads the saved day start and does not write the notes. It does not contact a model. None of these is part of Pro, and none of them sends anything. A joke does not create the notes folder. If that folder is already there, one line is added to `feature-audit.jsonl` with `network` false and `charged` false, and with no plan text.
+middle line. A date that is not written that way is refused. `hello shift` prints the greeting and one line that names the saved day start, the same words as the menu: midnight, or 18:00 with the night-shift note. It reads the notes and does not write them. It does not read the clock, and it is not on the phone.
+`hello kazoo` prints the greeting, four lines, and "bwap bwap". `hello trombone` prints the greeting, four lines, "womp womp", and "This is not a recording. Nothing was sent." `hello airhorn` prints the greeting, four lines, "BRAAAAP", and "This is not a recording. Nothing was sent." `hello bell` prints the greeting, four lines, "ding", and "This is not a recording. Nothing was sent." The text screen does not start a tone, and it does not say that one was started. The phone button may start a tone in the page, and the status line says whether it did. `hello ai` prints the greeting, "This is not a model. Nothing was sent.", one line chosen from the date, and a sentence that names that date. Words typed after it are not read, not saved, and not sent, and the screen says so. The line is still the one for that date, and the date sentence uses the same long date as the morning. The command reads the saved day start and does not write the notes. It does not contact a model. None of these is part of Pro, and none of them sends anything. A joke does not create the notes folder. If that folder is already there, one line is added to `feature-audit.jsonl` with `network` false and `charged` false, and with no plan text.
 Typing `pic` after the days-in-a-row line shows a picture. `q` there closes, the same as any other question, and Enter still skips. Typing `haiku`, `kazoo`, `trombone`, `airhorn`, `bell`, `ai`,
-or the letters `uuddlrlrba`, at a prompt answers and does not save a plan. A full stop after `haiku` is the same joke. The phone keeps Kazoo, Trombone, Airhorn, Bell, AI, Priority Hello, Hello Encore, Hello Spotlight, and Hello Ring in Settings. Under the AI button, a box can hold a question. The status line still uses the date's duck line. If the box had words, it says they were not read and were not saved, and it does not repeat those words. The box is not on the morning screen. None of this is on the printed page.
+or the letters `uuddlrlrba`, at a prompt answers and does not save a plan. A full stop after `haiku` is the same joke. The phone keeps Kazoo, Trombone, Airhorn, Bell, AI, Priority Hello, Hello Encore, Hello Spotlight, and Hello Ring in Settings. Under the AI button, a box can hold a question. The status line uses the date's duck line and then names that date. If the box had words, it says they were not read and were not saved, and it does not repeat those words. The phone writes a local note that the duck was asked, and that note does not contain the words. The box is not on the morning screen. None of this is on the printed page.
 
 ### The text screen
 
@@ -221,7 +221,7 @@ as big again, and stays that way.
 
 **No follow-up questions** in the same menu, or `gentle` at the last prompt,
 stops "Did you do it?". Your plan stays until you mark it done or change it;
-after three days it folds away quietly, and `same` brings it back. Days and
+after more than 3 days it folds away quietly, and `same` brings it back. A plan set on Thursday is still there on Sunday and is put away on Monday. The window says more than 3 days. The text screen does not add that line. Days and
 dates you type stay words, not due dates, and the days-in-a-row message
 doesn't show. It's offered once, after a first "not yet" or "not sure", and
 never again. Nothing records that you turned it on.
@@ -670,7 +670,7 @@ first two lines to the release tag and the full 40-character commit hash that
 was reviewed, and keep the quotes.
 
 ```powershell
-$tag = 'v1.73.0'
+$tag = 'v1.74.0'
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $d = "$([Environment]::GetFolderPath('ProgramFiles'))\hello-setup"
 New-Item -ItemType Directory $d

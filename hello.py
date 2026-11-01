@@ -45,8 +45,8 @@ KLINGON_NOTE = "Made up for fun. Not checked by a linguist."
 MORSE_LINE = ".... . .-.. .-.. --- --..-- / .-- --- .-. .-.. -.. -.-.--"
 KONAMI_LINE = "Konami mode, this visit only. Nothing was saved."
 PIRATE_LINE = "Ahoy, world. The greeting be plain above."
-# A command, never the morning, and it does not read the clock.
-SHIFT_LINE = "The day starts when you said it does."
+# A command, never the morning. It names the saved hour. It does not read the clock.
+SHIFT_SAID = "The day starts at {at}."
 COWBELL_LINE = "More cowbell."
 # Four lines, a command and a prompt word. Not the morning.
 STAPLE = (
@@ -96,6 +96,8 @@ BELL_NOTE = "This is not a recording. Nothing was sent."
 # Not a model. The line is chosen from the date. Nothing is sent.
 AI_NOTE = "This is not a model. Nothing was sent."
 AI_UNREAD = "The question was not read. It was not saved."
+# The date is the same long date as the morning. The question is not in it.
+DUCK_DATED = "That line is for {date}."
 DUCK_LINES = (
     "The rubber duck says: have you tried turning it off and on again.",
     "The rubber duck says: the bug is in the sentence you were sure was fine.",
@@ -683,13 +685,15 @@ def help_text():
                           "hello kazoo, hello trombone, hello airhorn, hello bell, hello ai, and hello --pirate. "
                           "hello ai is not a model and sends nothing. "
                           "Words after hello ai are not read, not saved, and not sent. "
+                          "The duck's line names the date it is for. "
+                          "hello shift names the saved day start and does not read the clock. "
                           "hello trombone, hello airhorn, and hello bell are not recordings and send nothing. "
                           "--set klingon on keeps the Klingon line under the greeting. "
                           "hello growth off stops streak notes. "
                           "hello priority, hello encore, hello spotlight, and hello ring write a local stub receipt "
                           "and do not bill. The trombone stays free. The airhorn stays free. The bell stays free."))
 
-VERSION = "1.73.0"
+VERSION = "1.74.0"
 MAX_VISITS = 400
 # Days before today that are still kept. Today is kept as well, so the
 # list holds KEEP_VISIT_DAYS + 1 calendar days. The sentence says that
@@ -5779,7 +5783,16 @@ def set_day_start(state, can_save, hour):
         undo(state, base)
         return tr("Could not save that choice on this computer.")
     DAY_START = hour
-    return tr("Your day now starts at {at}.").format(at=f"{hour}:00")
+    # The same words as the menu. Midnight is not written as 0:00.
+    return tr("Your day now starts at {at}.").format(at=day_start_label(hour))
+
+
+def shift_sentence(state):
+    """The saved day start, in the menu's words. Midnight stays midnight."""
+    hour = state.get("day_start", 0)
+    if isinstance(hour, bool) or hour not in DAY_STARTS:
+        hour = 0
+    return tr(SHIFT_SAID).format(at=day_start_label(hour))
 
 
 def set_repeat(state, can_save, text, at=None):
@@ -6708,11 +6721,39 @@ def tidy_launcher():
         remind(True)
 
 
+# Older than this, the plan is put away. Gentle mode uses 3, so a plan set
+# on Thursday is still there on Sunday and is put away on Monday. The other
+# mode uses 14, which the sentence calls two weeks. The comparison is "more
+# than", and the sentence has to say that.
+GENTLE_FOLD_DAYS = 3
+PLAN_FOLD_DAYS = 14
+FOLDED_GENTLE = (
+    "Your plan from more than {n} days ago was put away. Type same "
+    "at the plan prompt to bring it back."
+)
+FOLDED_WEEKS = (
+    "Your plan from over two weeks ago was put away. Type same "
+    "at the plan prompt to bring it back."
+)
+
+
+def fold_limit(state):
+    """How many days a plan may sit before it is put away."""
+    return GENTLE_FOLD_DAYS if gentle(state) else PLAN_FOLD_DAYS
+
+
+def folded_plan_sentence(state):
+    """The sentence for a plan that was just put away. The number is the limit."""
+    if gentle(state):
+        return tr(FOLDED_GENTLE).format(n=GENTLE_FOLD_DAYS)
+    return tr(FOLDED_WEEKS)
+
+
 def plan_on_open(state, d):
     """The plan as it stands on day d, and whether an old one was put away.
 
-    A plan dated after d becomes d's plan. One set over two weeks ago moves
-    to "previous", for same. Nothing is saved here.
+    A plan dated after d becomes d's plan. One older than the fold limit
+    moves to "previous", for same. Nothing is saved here.
     """
     intent = state["intent"]
     if intent and intent["date"] > d.isoformat():
@@ -6721,7 +6762,8 @@ def plan_on_open(state, d):
     since = intent.get("since", intent["date"]) if intent else None
     # With no follow-up questions, a plan left for days folds away quietly
     # (Sam: "an old plan that sits there forever turns into a gravestone").
-    limit = 3 if gentle(state) else 14
+    # The text screen stays quiet. The window says the limit, not two weeks.
+    limit = fold_limit(state)
     if intent and (d - datetime.date.fromisoformat(since)).days > limit:
         put_aside(state, intent["text"], d)
         return None, True
@@ -7020,8 +7062,7 @@ def daily(startup):
     say()
 
     if expired and not gentle(state):
-        para(tr("Your plan from over two weeks ago was put away. Type same "
-                "at the plan prompt to bring it back."))
+        para(folded_plan_sentence(state))
         say()
 
     if handoff_on():
@@ -7752,6 +7793,19 @@ def show_fireworks():
         raise Quit
 
 
+def say_duck(d, unread=False):
+    """The not-a-model line, the date's duck line, and that date.
+
+    unread is only the sentence that says the extra words were not read.
+    Those words are not passed in, not printed, and not saved.
+    """
+    say(tr(AI_NOTE))
+    if unread:
+        say(tr(AI_UNREAD))
+    say(tr(DUCK_LINES[d.toordinal() % len(DUCK_LINES)]))
+    say(tr(DUCK_DATED).format(date=long_date(d)))
+
+
 def toy_reply(text):
     """A joke typed at a prompt. Nothing is saved. True when it was one."""
     low = (text or "").lower().strip(TRIM)
@@ -7797,8 +7851,7 @@ def toy_reply(text):
         feature_audit("bell")
         return True
     if low == "ai":
-        say(tr(AI_NOTE))
-        say(tr(DUCK_LINES[today().toordinal() % len(DUCK_LINES)]))
+        say_duck(today())
         feature_audit("ai")
         return True
     return False
@@ -7826,9 +7879,12 @@ def fun_command(argv):
         say(tr(KLINGON_NOTE))
         return 0
     if name == "shift" and len(argv) == 1:
-        # Not the morning, and not the clock. The day start stays in the notes.
+        # Not the morning, and not the clock. The hour is the one in the notes.
+        # The file is read and is not written. A missing folder is not created.
+        state, _ = load(repair=False)
         say(GREETING)
-        say(tr(SHIFT_LINE))
+        say(shift_sentence(state))
+        feature_audit("shift")
         return 0
     if name == "cowbell" and len(argv) == 1:
         say(GREETING)
@@ -7883,10 +7939,7 @@ def fun_command(argv):
         # is read and is not written. A missing notes folder is not created.
         load(repair=False)
         say(GREETING)
-        say(tr(AI_NOTE))
-        if len(argv) > 1:
-            say(tr(AI_UNREAD))
-        say(tr(DUCK_LINES[today().toordinal() % len(DUCK_LINES)]))
+        say_duck(today(), unread=len(argv) > 1)
         feature_audit("ai")
         return 0
     if name == "haiku" and len(argv) == 1:
@@ -9270,8 +9323,7 @@ class Visit:
         intent, expired = plan_on_open(state, d)
         notes = [said] if said else []
         if expired:
-            notes.append(tr("Your plan from over two weeks ago was put away. "
-                            "Type same at the plan prompt to bring it back."))
+            notes.append(folded_plan_sentence(state))
         if first:
             notes.append(tr("Welcome."))
             if not policy("HideThoughtAndTip"):

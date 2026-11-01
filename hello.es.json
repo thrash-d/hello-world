@@ -926,7 +926,10 @@
   "The household list can't be reached just now, so you haven't left yet. Try again when you're online.": "Ahora no se puede llegar a la lista del hogar, así que aún no saliste. Inténtalo de nuevo cuando tengas conexión.",
   "The household list can't be reached just now, or someone already made a new code. Nothing changed.": "Ahora no se puede llegar a la lista del hogar, o alguien ya hizo un código nuevo. No cambió nada.",
   "Type your name, as the others will see it, in the plan box first, then choose this again.": "Escribe primero tu nombre, como lo verán los demás, en el cuadro del plan, y luego elige esto otra vez.",
-  "Added to tomorrow's plan, with what you carried.": "Añadido al plan de mañana, con lo que llevaste."
+  "Added to tomorrow's plan, with what you carried.": "Añadido al plan de mañana, con lo que llevaste.",
+  "Your plan from more than {n} days ago was put away. Type same at the plan prompt to bring it back.": "Tu plan de hace más de {n} días se apartó. Escribe same en la pregunta del plan para traerlo de vuelta.",
+  "The day starts at {at}.": "El día empieza a las {at}.",
+  "That line is for {date}.": "Esa línea es del {date}."
  },
  "tips_floor": [
   "Comprueba que tu zona de paso está despejada antes de la primera tarea del turno.",

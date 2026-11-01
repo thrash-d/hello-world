@@ -927,7 +927,10 @@
   "The household list can't be reached just now, so you haven't left yet. Try again when you're online.": "La liste du foyer est injoignable pour l'instant, donc vous ne l'avez pas encore quittée. Réessayez une fois en ligne.",
   "The household list can't be reached just now, or someone already made a new code. Nothing changed.": "La liste du foyer est injoignable pour l'instant, ou quelqu'un a déjà créé un nouveau code. Rien n'a changé.",
   "Type your name, as the others will see it, in the plan box first, then choose this again.": "Tapez d'abord votre nom, tel que les autres le verront, dans la case du plan, puis choisissez ceci à nouveau.",
-  "Added to tomorrow's plan, with what you carried.": "Ajouté au plan de demain, avec ce que vous avez reporté."
+  "Added to tomorrow's plan, with what you carried.": "Ajouté au plan de demain, avec ce que vous avez reporté.",
+  "Your plan from more than {n} days ago was put away. Type same at the plan prompt to bring it back.": "Votre plan d'il y a plus de {n} jours a été mis de côté. Tapez same à la question du plan pour le reprendre.",
+  "The day starts at {at}.": "La journée commence à {at}.",
+  "That line is for {date}.": "Cette ligne est pour le {date}."
  },
  "tips_floor": [
   "Vérifiez que votre allée est dégagée avant la première tâche du poste.",

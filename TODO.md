@@ -58,7 +58,7 @@ and a gap of 5 ends it, in the nag and in My numbers. The phone's Keep
 button repeats the death sentence after a run has stopped. A quoted
 `CN="Reed Mallory"` does not open the variable-time gate. `hello ai` reads
 the saved day start. Words after that command are not read, not saved, and
-not sent. No fifth noise was added. No new stub was added. Nothing was removed. The reminder was already
+not sent. No fifth noise was added. No new stub was added. 1.74.0 says more than 3 days when a gentle plan is put away, and the window uses that sentence. The text screen stays quiet. Choosing midnight uses the menu's words, not 0:00. `hello shift` names the saved hour and does not write the notes. The duck's line names its date. A curly quote, a backslash, or a zero-width space does not open a gate in Reed Mallory's name. A hex-encoded subject is still not decoded. No fifth noise was added. No new stub was added. Nothing was removed. The reminder was already
 offered on the first day, right after the first plan. Running a public
 counts server for the individual package is the owner's step; the README says
 how.
