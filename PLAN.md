@@ -325,3 +325,23 @@ withdrew it. Vance Harlow asked for Hello Weekly at $8.99, and he wanted
 the sentence to keep saying a year. He lost both, 1 to 5. The morning
 screen and the printed page do not gain a line. The default upload is
 still the placeholder. He did not sign the word audited.
+
+## Round 60
+
+The same six. Reed Mallory still accepts no residual, and he does not veto.
+The record is `reviews/round-60.md`. The version is 1.77.0.
+
+A hex-encoded certificate subject is decoded. A lookalike space, including
+U+2800, is folded to a space after NFKC, and a confusable letter in the
+table is folded to the Latin letter. `hello security` says 8 checks and
+that nothing was sent. It reads the notes folder and does not write the
+notes. The phone, inside Settings, says 4 checks. The counts server limits
+requests, refuses a symlink in the phone folder, and sends the fence
+headers on every answer. Strict-Transport-Security, and a rate limit that
+survives a restart, are the deploying organization's
+(`docs/transfers/tls-front-end.md`).
+
+No fifth noise and no new stub. Vance Harlow asked for Hello Shield at
+$9.99. He lost, 1 to 5. The morning screen and the printed page do not
+gain a line. The default upload is still the placeholder. He did not
+sign the word audited.

@@ -75,13 +75,19 @@ def main(argv):
         if os.path.exists(argv[1]):
             sys.exit(f"{argv[1]} already exists; not overwriting a signing key.")
         secret = os.urandom(32)
-        fd = os.open(argv[1], os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        # A symlink at this name is not followed and is not replaced.
+        fd = hello.open_nofollow(argv[1], os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, "w") as f:
             f.write(secret.hex() + "\n")
         print("PRO_PUBLIC_KEY =", repr(public_key(secret).hex()))
         return 0
     if len(argv) in (3, 4) and argv[0] == "issue" and argv[3:] in ([], ["--family"]):
-        with open(argv[1]) as f:
+        # The signing key is not read through a symlink.
+        try:
+            fd = hello.open_nofollow(argv[1], os.O_RDONLY)
+        except OSError:
+            sys.exit(f"{argv[1]} could not be opened without following a link.")
+        with os.fdopen(fd) as f:
             secret = bytes.fromhex(f.read().strip())
         print(issue(secret, argv[2], family=argv[3:] == ["--family"]))
         return 0

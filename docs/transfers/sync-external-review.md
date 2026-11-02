@@ -29,7 +29,7 @@ HELLO_SYNC_EXTERNAL_REVIEW=<path to that file>
 `internal-only`, which is what startup prints. A name that is Reed Mallory,
 or that starts with Reed Mallory, is ignored, including after spaces inside
 the name are folded. `CN=Reed Mallory`, `CN="Reed Mallory"`, a curly-quoted name, and a zero-width space between the words are ignored too. "not Reed Mallory"
-does not start with his name. Format characters, quote marks, and backslashes are not part of the name. A hex-encoded subject is not decoded. The open refuses a reparse point. A symlink
+does not start with his name. Format characters, quote marks, and backslashes are not part of the name. A hex-encoded subject is decoded. A lookalike space is folded. The open refuses a reparse point. A symlink
 is not that file.
 
 The internal review does not change the key derivation, the salt, or the

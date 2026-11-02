@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-02: review round 60
+
+Version 1.77.0. A hex-encoded certificate subject was not decoded, so `CN=#0C0C52656564204D616C6C6F7279` did not read as Reed Mallory. A character that only looks like a space, U+2800, was left between the two words. The name gate now decodes a `\HH` octet and a `#` hex BER string, then runs NFKC, drops combining marks, folds the confusable table, and folds those blanks to a space. The same steps are in the counts server, the phone, `tools/reed-name.ps1`, and the four install scripts. `not Reed Mallory` still does not start with his name. Dana Okonkwo still does not.
+
+The counts server allows 120 requests a minute from one address, 64 at once, and closes a connection that sends nothing for 20 seconds. A failed write gives the write count back. A phone file is not opened through a symlink and is not read past 2,000,000 bytes. Answers send `nosniff`, `no-referrer`, `X-Frame-Options: DENY`, `Cross-Origin-Resource-Policy`, `Cross-Origin-Opener-Policy`, and a permissions policy. The phone page's content security policy also sets `form-action 'none'` and `frame-src 'none'`. A growth address with a control character is refused. `Strict-Transport-Security` is not sent by this process. That header, and a rate limit that survives a restart, are `docs/transfers/tls-front-end.md`.
+
+`hello security` says "Security check. 8 checks. Nothing was sent." and then eight lines. It reads the notes folder and does not write the notes. A word after it is not read and is not saved. Settings on the phone, which starts closed, says "Security check. 4 checks. Nothing was sent." The printed page does not gain a line. The morning screen does not gain a line.
+
+Nothing was removed. Streak notes, sync, reminders, the kazoo, the trombone, the airhorn, the bell, the duck line, and the stub receipts are still there. No new noise was added. No new stub was added. The default upload is still `https://insights.example.invalid/v1/growth`.
+
 ## 2026-11-01: review round 59
 
 Version 1.76.0. This week counted a finish dated after today. On Sunday, 1 November 2026, Monday is 26 October, and that span is 7 days. A finish on 15 November was still in the count, and the November line on This year counted it too. The file kept a finish up to 365 days ahead. `hello kept` already said that day was not inside the 15 days. The file now drops a finish after today, and the two-window save drops it too, before the cap, so it cannot push a real line out. This week says 7 days on Sunday and 1 day on Monday. Last week, when it has a finish, says 7 days. `hello week` reads the notes and does not write them.

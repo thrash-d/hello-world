@@ -25,6 +25,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import sys
 import textwrap
 import unicodedata
@@ -693,13 +694,16 @@ def help_text():
                           "hello week names how many days this week holds, Monday through today. "
                           "Monday is 1 day. Sunday is 7. It reads the notes and does not write them. "
                           "A word after it that is not one date is not read and is not saved. "
+                          "hello security says 8 checks and that nothing was sent. "
+                          "It reads the notes folder and does not write the notes. "
+                          "A word after it is not read and is not saved. "
                           "hello trombone, hello airhorn, and hello bell are not recordings and send nothing. "
                           "--set klingon on keeps the Klingon line under the greeting. "
                           "hello growth off stops streak notes. "
                           "hello priority, hello encore, hello spotlight, and hello ring write a local stub receipt "
                           "and do not bill. The trombone stays free. The airhorn stays free. The bell stays free."))
 
-VERSION = "1.76.0"
+VERSION = "1.77.0"
 MAX_VISITS = 400
 # Days before today that are still kept. Today is kept as well, so the
 # list holds KEEP_VISIT_DAYS + 1 calendar days. The sentence says that
@@ -1262,7 +1266,9 @@ def _server_url_ok(url):
         return False
     if not host or parts.username or parts.password or parts.fragment:
         return False
-    if any(c in url for c in "\\\r\n\t "):
+    # A control, a space, or a backslash is not part of a server address.
+    # Round 51 refused those on a push address. This check had only a few of them.
+    if any(ord(c) < 33 or ord(c) == 127 or c == "\\" for c in url):
         return False
     if parts.scheme == "https":
         return True
@@ -8091,6 +8097,286 @@ def say_week(state, argv):
         say(tr(WEEK_OUTSIDE).format(date=word))
 
 
+# Quote marks a word processor or a certificate subject puts around a name.
+# Straight, curly, and the corner quotes. A backtick is included because a
+# shell sometimes wraps a subject in one.
+_REED_QUOTES = set("\"'`") | set("\u201c\u201d\u201e\u201f\u2018\u2019\u201a\u201b\u00ab\u00bb")
+_REED_HEX = set("0123456789abcdefABCDEF")
+# ASN.1 string tags a certificate subject uses for a name: UTF8, Printable,
+# Teletex, IA5, Visible, BMP (UTF-16BE), Universal (UTF-32BE).
+_REED_BER_TAGS = {0x0C, 0x13, 0x14, 0x16, 0x1A, 0x1E, 0x1C}
+# Homoglyphs NFKC does not fold. The phone and the install scripts use this
+# same table. A letter that is not here stays itself.
+_REED_CONFUSABLES = {
+    "\u0430": "a", "\u0410": "a", "\u0435": "e", "\u0415": "e",
+    "\u0451": "e", "\u0401": "e", "\u043e": "o", "\u041e": "o",
+    "\u0440": "p", "\u0420": "p", "\u0441": "c", "\u0421": "c",
+    "\u0443": "y", "\u0423": "y", "\u0445": "x", "\u0425": "x",
+    "\u0456": "i", "\u0406": "i", "\u0455": "s", "\u0405": "s",
+    "\u0458": "j", "\u0408": "j", "\u04bb": "h", "\u04ba": "h",
+    "\u0501": "d", "\u0500": "d", "\u043c": "m", "\u041c": "m",
+    "\u0442": "t", "\u0422": "t", "\u0412": "b", "\u0432": "b",
+    "\u041a": "k", "\u043a": "k", "\u041d": "h", "\u043d": "h",
+    "\u04cf": "l", "\u04c0": "l",
+    "\u0391": "a", "\u03b1": "a", "\u0395": "e", "\u03b5": "e",
+    "\u039f": "o", "\u03bf": "o", "\u0399": "i", "\u03b9": "i",
+    "\u039a": "k", "\u03ba": "k", "\u03a1": "p", "\u03c1": "p",
+    "\u03a4": "t", "\u03c4": "t", "\u03a5": "y", "\u03c5": "u",
+    "\u03a7": "x", "\u03c7": "x",
+    "\u0142": "l", "\u0141": "l", "\u0131": "i", "\u017f": "s",
+    "\u00f8": "o", "\u00d8": "o",
+}
+# Blank symbols that are not Unicode spaces and are not format characters.
+# NFKC turns U+3164 and U+FFA0 into U+1160. U+2800 stays U+2800.
+_REED_BLANKS = set("\u115f\u1160\u1361\u2420\u2422\u2800\u303f\u3164\uffa0\ua8f9")
+
+
+def _reed_unescape(text):
+    """RFC 4514. \\HH is one octet. \\ followed by one character is that character.
+
+    The octets are UTF-8. Reed\\20Mallory is Reed Mallory, with a space.
+    """
+    if not text:
+        return ""
+    buf = bytearray()
+    i, n = 0, len(text)
+    while i < n:
+        ch = text[i]
+        if ch == "\\" and i + 1 < n:
+            pair = text[i + 1:i + 3]
+            if len(pair) == 2 and all(c in _REED_HEX for c in pair):
+                buf.append(int(pair, 16))
+                i += 3
+                continue
+            buf.extend(text[i + 1].encode("utf-8"))
+            i += 2
+            continue
+        buf.extend(ch.encode("utf-8"))
+        i += 1
+    return buf.decode("utf-8", "replace")
+
+
+def _reed_strip_marks(text):
+    """Quotes, format characters, and backslashes are not part of the name."""
+    return "".join(
+        c for c in (text or "")
+        if c != "\\" and c not in _REED_QUOTES and unicodedata.category(c) != "Cf")
+
+
+def _reed_readable(text):
+    if not text or len(text) > 200:
+        return False
+    if any(unicodedata.category(c) == "Cc" for c in text):
+        return False
+    return any(c.isalpha() for c in text)
+
+
+def _reed_ber_text(data):
+    """The string inside a one-value BER encoding, or None."""
+    if len(data) < 2 or data[0] not in _REED_BER_TAGS:
+        return None
+    length = data[1]
+    start = 2
+    if length & 0x80:
+        nbytes = length & 0x7F
+        if nbytes < 1 or nbytes > 2 or len(data) < 2 + nbytes:
+            return None
+        length = int.from_bytes(data[2:2 + nbytes], "big")
+        start = 2 + nbytes
+    if length != len(data) - start or length > 240:
+        return None
+    content = data[start:]
+    try:
+        if data[0] == 0x1E:
+            text = content.decode("utf-16-be")
+        elif data[0] == 0x1C:
+            if len(content) % 4:
+                return None
+            chars = []
+            for i in range(0, len(content), 4):
+                cp = int.from_bytes(content[i:i + 4], "big")
+                if cp > 0x10FFFF:
+                    return None
+                chars.append(chr(cp))
+            text = "".join(chars)
+        else:
+            text = content.decode("utf-8")
+    except (UnicodeError, ValueError):
+        return None
+    return text if _reed_readable(text) else None
+
+
+def _reed_plain_texts(data):
+    """UTF-8, and UTF-16 when the bytes contain a NUL. Unreadable text is dropped."""
+    found = []
+    try:
+        utf8 = data.decode("utf-8")
+    except UnicodeError:
+        utf8 = ""
+    if _reed_readable(utf8):
+        found.append(utf8)
+    if data and len(data) % 2 == 0 and b"\x00" in data:
+        for codec in ("utf-16-be", "utf-16-le"):
+            try:
+                text = data.decode(codec)
+            except UnicodeError:
+                continue
+            if _reed_readable(text):
+                found.append(text)
+    return found
+
+
+def _reed_hex_bytes(hexpart):
+    if (not hexpart or len(hexpart) > 480 or len(hexpart) % 2
+            or any(c not in _REED_HEX for c in hexpart)):
+        return []
+    try:
+        data = bytes.fromhex(hexpart)
+    except ValueError:
+        return []
+    found = []
+    ber = _reed_ber_text(data)
+    if ber:
+        found.append(ber)
+    found.extend(_reed_plain_texts(data))
+    return found
+
+
+def _reed_pieces(text):
+    pieces = [text.strip()]
+    for part in text.split(","):
+        value = part.strip()
+        if "=" in value:
+            value = value.rsplit("=", 1)[1].strip()
+        pieces.append(value)
+    return pieces
+
+
+def _reed_decode_piece(piece):
+    piece = (piece or "").strip()
+    if piece.startswith("#"):
+        compact = "".join(piece[1:].split())
+        return _reed_hex_bytes(compact)
+    if len(piece) >= 8 and len(piece) % 2 == 0 and all(c in _REED_HEX for c in piece):
+        return _reed_hex_bytes(piece)
+    return []
+
+
+def _reed_expand(name):
+    """The name, the name with quotes removed, and each decoded hex subject."""
+    raw = _reed_unescape(name or "")
+    visible = _reed_strip_marks(raw)
+    texts = []
+    for text in (raw, visible):
+        if text not in texts:
+            texts.append(text)
+        for piece in _reed_pieces(text):
+            for decoded in _reed_decode_piece(piece):
+                if decoded not in texts:
+                    texts.append(decoded)
+    return texts
+
+
+def _reed_fold(name):
+    """NFKC, then confusables, then a whitespace fold.
+
+    A format character such as a zero-width space is not part of the name.
+    A quote mark is not part of the name, including a curly quote. A
+    backslash is not part of the name. A blank that only looks like a space,
+    including U+2800, becomes a space. A homoglyph in the table above becomes
+    the Latin letter. Combining marks are dropped after NFKC and NFD, so an
+    accent is not a different name.
+    """
+    text = unicodedata.normalize("NFKC", name or "")
+    text = unicodedata.normalize("NFD", text)
+    kept = []
+    for c in text:
+        if unicodedata.category(c) in ("Mn", "Me"):
+            continue
+        c = _REED_CONFUSABLES.get(c, c)
+        if c in _REED_BLANKS or (len(c) == 1 and c.isspace()):
+            kept.append(" ")
+            continue
+        if c == "\\" or c in _REED_QUOTES or unicodedata.category(c) == "Cf":
+            continue
+        kept.append(c)
+    return " ".join("".join(kept).lower().split())
+
+
+def _reed_prefix(folded):
+    values = [folded]
+    for part in folded.split(","):
+        value = part.strip()
+        if "=" in value:
+            value = value.rsplit("=", 1)[1].strip()
+        values.append(value)
+    return any(value.startswith("reed mallory") for value in values)
+
+
+def _reed_named(name):
+    """True when the folded name is Reed Mallory or starts with that name.
+
+    Internal spaces fold, so a doubled space is still his. A mark after the
+    name still starts with it. A certificate-style subject is checked name
+    by name. A hex-encoded subject is decoded first, including a BER string
+    and a \\HH octet. "not Reed Mallory" does not start with his name.
+    He does not accept that name on a transfer.
+    """
+    return any(_reed_prefix(_reed_fold(text)) for text in _reed_expand(name))
+
+
+def say_security(argv):
+    """Eight local checks. The notes file is not written. Nothing is sent.
+
+    Extra words are not read and are not printed. The first sentence names
+    8 because that is how many lines follow.
+    """
+    del argv
+    folder = data_dir()
+    notes = data_file()
+    log_path = os.path.join(folder, "errors.log")
+    host = growth_host()
+    if not re.fullmatch(r"[A-Za-z0-9.-]{1,200}", host or ""):
+        host = "none"
+    lines = [
+        "Notes folder: " + _posture(folder) + ".",
+        "Notes file: " + _posture(notes) + ".",
+        "Error log: " + _posture(log_path) + ".",
+        "Growth host: " + host + ".",
+        "Hex subject: " + ("refused." if _reed_named(_SECURITY_HEX) else "not refused."),
+        "Lookalike space: " + ("refused." if _reed_named(_SECURITY_SPACE) else "not refused."),
+        "Other name: " + ("refused." if _reed_named("not Reed Mallory") else "not his."),
+        "Network: false.",
+    ]
+    say("Security check. " + str(len(lines)) + " checks. Nothing was sent.")
+    for line in lines:
+        say(line)
+
+
+def _posture(path):
+    """What a security line may say about one path. No path is printed."""
+    if not os.path.lexists(path):
+        return "not created"
+    if os.path.islink(path):
+        return "link"
+    if os.name == "nt":
+        return "present"
+    try:
+        mode = stat.S_IMODE(os.lstat(path).st_mode)
+    except OSError:
+        return "not created"
+    if mode & 0o077:
+        return "not private"
+    return "private"
+
+
+# The same name gate as server/counts_server.py. A hex subject is decoded.
+# A lookalike space is folded. This copy is here so hello security works
+# when the counts server file is not installed beside the program.
+_SECURITY_HEX = "CN=#0C0C52656564204D616C6C6F7279"
+_SECURITY_SPACE = "Reed\u2800Mallory"
+
+
 def toy_reply(text):
     """A joke typed at a prompt. Nothing is saved. True when it was one."""
     low = (text or "").lower().strip(TRIM)
@@ -8151,6 +8437,11 @@ def toy_reply(text):
         say_week(state, [])
         feature_audit("week")
         return True
+    if low == "security":
+        # Not a plan. The notes file is not written. Nothing is sent.
+        say_security([])
+        feature_audit("security")
+        return True
     return False
 
 
@@ -8163,7 +8454,7 @@ def fun_command(argv):
     if not argv:
         return None
     name = argv[0].lower()
-    if name not in ("morse", "klingon", "haiku", "shift", "cowbell", "staple", "kazoo", "trombone", "airhorn", "bell", "ai", "kept", "week"):
+    if name not in ("morse", "klingon", "haiku", "shift", "cowbell", "staple", "kazoo", "trombone", "airhorn", "bell", "ai", "kept", "week", "security"):
         return None
     if name == "morse" and len(argv) == 1:
         say(GREETING)
@@ -8257,6 +8548,13 @@ def fun_command(argv):
         say_week(state, argv[1:])
         feature_audit("week")
         return 0
+    if name == "security":
+        # Not the morning. The notes file is not written. A missing folder
+        # is not created. Extra words are not read, not saved, and not sent.
+        say(GREETING)
+        say_security(argv[1:])
+        feature_audit("security")
+        return 0
     if name == "haiku" and len(argv) == 1:
         # The menu uses the day start in the notes. This command used to
         # ignore it, because it runs before the day is opened. Read only.
@@ -8279,7 +8577,7 @@ def fun_command(argv):
         say_haiku(when)
         return 0
     say(tr("Try hello morse, hello klingon, hello haiku, hello shift, "
-           "hello cowbell, hello staple, hello kazoo, hello trombone, hello airhorn, hello bell, hello ai, hello kept, or hello week. "
+           "hello cowbell, hello staple, hello kazoo, hello trombone, hello airhorn, hello bell, hello ai, hello kept, hello week, or hello security. "
            "A date is hello haiku --date YYYY-MM-DD."))
     return 2
 
