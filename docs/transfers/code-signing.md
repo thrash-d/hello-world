@@ -28,7 +28,7 @@ Both sign `install.ps1`, `uninstall.ps1`, `install-user.ps1` and
 `Valid`. A certificate whose subject names Reed Mallory is refused.
 Spaces inside that subject are folded first, and each name is checked, so
 `CN=Reed  Mallory`, `CN=Reed Mallory.`, `CN="Reed Mallory"`, a curly-quoted name, and a zero-width space between the words are still refused. `CN=not Reed
-Mallory` and `CN="not Reed Mallory"` do not start with his name. Format characters, quote marks, and backslashes are not part of the name. A hex-encoded subject is not decoded, and a name the fold cannot read stays this organization. `tools\build-package.ps1` uses the
+Mallory` and `CN="not Reed Mallory"` do not start with his name. Format characters, quote marks, and backslashes are not part of the name. A hex-encoded subject is decoded, including a `\HH` octet and a `#` hex BER string. A blank that only looks like a space, including U+2800, is folded to a space, and a confusable letter in the table is folded to the Latin letter. NFKC runs first. `tools\build-package.ps1` uses the
 same check before it signs. The check lives in `tools\reed-name.ps1`.
 `docs/ENTERPRISE.md` has the AllSigned and WDAC notes. CI already installs
 a package signed with a throwaway certificate.
@@ -45,7 +45,7 @@ Spaces inside the name are folded before that check, and each name after
 `=` is checked, so "Reed  Mallory", "Reed Mallory.", "CN=Reed Mallory", "CN=\"Reed Mallory\"", a curly-quoted name, and a zero-width space between the words
 are still not acceptors. "not Reed Mallory" does not start with his name.
 Format characters, quote marks, and backslashes are not part of the name.
-A hex-encoded subject is not decoded.
+A hex-encoded subject is decoded. A lookalike space is folded.
 The four scripts repeat the steps in `tools/reed-name.ps1`. They are copied
 away from that file, so they do not dot-source it.
 

@@ -32,7 +32,7 @@ accepts: variable-time-p256
 
 A name that is Reed Mallory, or that starts with Reed Mallory, does not
 open the gate. A subject written as `CN=Reed Mallory`, `CN="Reed Mallory"`, with curly quotes, or with a zero-width space, does not either.
-"not Reed Mallory" does not start with his name. A hex-encoded subject is not decoded, and that name stays the deploying organization's. Even with the gate open,
+"not Reed Mallory" does not start with his name. A hex-encoded subject is decoded, and a lookalike space is folded, so neither one opens the gate in his name. Even with the gate open,
 libcrypto is still preferred.
 `p256_backend()` stays `openssl` when libcrypto loads.
 

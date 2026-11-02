@@ -76,9 +76,13 @@ most --sync-quota encrypted copies in all (an existing one can still be
 updated when it's full), 20 new labels and 60 writes a minute from one
 address, counted in memory only with the same daily key as the counts, and an
 hourly sweep removes copies untouched for more than 366 days. A copy
-last touched exactly 366 days ago stays. The per-address limits
+last touched exactly 366 days ago stays. Every request, including a read,
+counts toward 120 a minute from one address. A failed write gives that
+count back. At most 64 requests are handled at once, and a connection that
+sends nothing for 20 seconds is closed. The per-address limits
 live in memory, so a restart resets them: rate-limit at the https proxy in
-front as well.
+front as well. Strict-Transport-Security is the TLS front end's header.
+This process speaks HTTP. See docs/transfers/tls-front-end.md.
 """
 
 import argparse
@@ -87,6 +91,7 @@ import ctypes
 import ctypes.util
 import datetime
 import hashlib
+import hmac
 import json
 import os
 import re
@@ -121,6 +126,13 @@ MIN_GROUP = 10
 SYNC_QUOTA = 100_000
 NEW_LABELS_A_DAY = 20
 WRITES_A_MINUTE = 60
+READS_A_MINUTE = 120
+# One address key per minute, then the map stops growing. A restart clears it.
+MAP_CAP = 10_000
+# How many requests are inside the server at once. The rest get 503.
+REQUEST_SLOTS = 64
+REQUEST_TIMEOUT = 20
+PHONE_MAX = 2_000_000
 REFRESH = 3600
 DAY_PATH = re.compile(r"^/v1/day/(\d{4}-\d{2}-\d{2})(/tip|/react/(?:%s))?$" % "|".join(REACTIONS))
 
@@ -141,6 +153,7 @@ class Counts:
         # writes in the current minute.
         self.labels_today = {}
         self.minute = (None, {})
+        self.read_minute = (None, {})
         # How many copies each folder holds, counted once and then kept up
         # to date, so a new copy never lists a large folder under the lock.
         self.stored = {}
@@ -251,9 +264,13 @@ class Counts:
             if self.minute[0] != minute:
                 self.minute = (minute, {})
             writes = self.minute[1]
+            if key not in writes and len(writes) >= MAP_CAP:
+                return 429, "too many writes; try again in a minute"
             if writes.get(key, 0) >= WRITES_A_MINUTE:
                 return 429, "too many writes; try again in a minute"
             if new:
+                if key not in self.labels_today and len(self.labels_today) >= MAP_CAP:
+                    return 429, "too many new copies from here today"
                 if self.labels_today.get(key, 0) >= NEW_LABELS_A_DAY:
                     return 429, "too many new copies from here today"
                 if self.stored_count(kind) >= self.sync_quota:
@@ -262,6 +279,42 @@ class Counts:
                 self.stored[kind] += 1
             writes[key] = writes.get(key, 0) + 1
             return None
+
+    def undo_write(self, address, new, kind="sync"):
+        """Give back a count that may_write took when the write did not land."""
+        with self.lock:
+            self.fresh_salt()
+            key = hashlib.sha256(self.salt + f"write|{address}".encode()).digest()
+            minute = int(time.time() // 60)
+            if self.minute[0] == minute:
+                writes = self.minute[1]
+                if writes.get(key, 0):
+                    writes[key] -= 1
+                    if writes[key] <= 0:
+                        del writes[key]
+            if new:
+                if self.labels_today.get(key, 0):
+                    self.labels_today[key] -= 1
+                    if self.labels_today[key] <= 0:
+                        del self.labels_today[key]
+                if kind in self.stored:
+                    self.stored[kind] = max(0, self.stored[kind] - 1)
+
+    def may_read(self, address):
+        """False when this address is past 120 requests this minute."""
+        with self.lock:
+            self.fresh_salt()
+            key = hashlib.sha256(self.salt + f"read|{address}".encode()).digest()
+            minute = int(time.time() // 60)
+            if self.read_minute[0] != minute:
+                self.read_minute = (minute, {})
+            reads = self.read_minute[1]
+            if key not in reads and len(reads) >= MAP_CAP:
+                return False
+            if reads.get(key, 0) >= READS_A_MINUTE:
+                return False
+            reads[key] = reads.get(key, 0) + 1
+            return True
 
     def stored_count(self, kind="sync"):
         """Copies in the folder. Call with the lock held."""
@@ -375,36 +428,209 @@ class P256Unavailable(OSError):
 # Straight, curly, and the corner quotes. A backtick is included because a
 # shell sometimes wraps a subject in one.
 _REED_QUOTES = set("\"'`") | set("\u201c\u201d\u201e\u201f\u2018\u2019\u201a\u201b\u00ab\u00bb")
+_REED_HEX = set("0123456789abcdefABCDEF")
+# ASN.1 string tags a certificate subject uses for a name: UTF8, Printable,
+# Teletex, IA5, Visible, BMP (UTF-16BE), Universal (UTF-32BE).
+_REED_BER_TAGS = {0x0C, 0x13, 0x14, 0x16, 0x1A, 0x1E, 0x1C}
+# Homoglyphs NFKC does not fold. The phone and the install scripts use this
+# same table. A letter that is not here stays itself.
+_REED_CONFUSABLES = {
+    "\u0430": "a", "\u0410": "a", "\u0435": "e", "\u0415": "e",
+    "\u0451": "e", "\u0401": "e", "\u043e": "o", "\u041e": "o",
+    "\u0440": "p", "\u0420": "p", "\u0441": "c", "\u0421": "c",
+    "\u0443": "y", "\u0423": "y", "\u0445": "x", "\u0425": "x",
+    "\u0456": "i", "\u0406": "i", "\u0455": "s", "\u0405": "s",
+    "\u0458": "j", "\u0408": "j", "\u04bb": "h", "\u04ba": "h",
+    "\u0501": "d", "\u0500": "d", "\u043c": "m", "\u041c": "m",
+    "\u0442": "t", "\u0422": "t", "\u0412": "b", "\u0432": "b",
+    "\u041a": "k", "\u043a": "k", "\u041d": "h", "\u043d": "h",
+    "\u04cf": "l", "\u04c0": "l",
+    "\u0391": "a", "\u03b1": "a", "\u0395": "e", "\u03b5": "e",
+    "\u039f": "o", "\u03bf": "o", "\u0399": "i", "\u03b9": "i",
+    "\u039a": "k", "\u03ba": "k", "\u03a1": "p", "\u03c1": "p",
+    "\u03a4": "t", "\u03c4": "t", "\u03a5": "y", "\u03c5": "u",
+    "\u03a7": "x", "\u03c7": "x",
+    "\u0142": "l", "\u0141": "l", "\u0131": "i", "\u017f": "s",
+    "\u00f8": "o", "\u00d8": "o",
+}
+# Blank symbols that are not Unicode spaces and are not format characters.
+# NFKC turns U+3164 and U+FFA0 into U+1160. U+2800 stays U+2800.
+_REED_BLANKS = set("\u115f\u1160\u1361\u2420\u2422\u2800\u303f\u3164\uffa0\ua8f9")
+
+
+def _reed_unescape(text):
+    """RFC 4514. \\HH is one octet. \\ followed by one character is that character.
+
+    The octets are UTF-8. Reed\\20Mallory is Reed Mallory, with a space.
+    """
+    if not text:
+        return ""
+    buf = bytearray()
+    i, n = 0, len(text)
+    while i < n:
+        ch = text[i]
+        if ch == "\\" and i + 1 < n:
+            pair = text[i + 1:i + 3]
+            if len(pair) == 2 and all(c in _REED_HEX for c in pair):
+                buf.append(int(pair, 16))
+                i += 3
+                continue
+            buf.extend(text[i + 1].encode("utf-8"))
+            i += 2
+            continue
+        buf.extend(ch.encode("utf-8"))
+        i += 1
+    return buf.decode("utf-8", "replace")
+
+
+def _reed_strip_marks(text):
+    """Quotes, format characters, and backslashes are not part of the name."""
+    return "".join(
+        c for c in (text or "")
+        if c != "\\" and c not in _REED_QUOTES and unicodedata.category(c) != "Cf")
+
+
+def _reed_readable(text):
+    if not text or len(text) > 200:
+        return False
+    if any(unicodedata.category(c) == "Cc" for c in text):
+        return False
+    return any(c.isalpha() for c in text)
+
+
+def _reed_ber_text(data):
+    """The string inside a one-value BER encoding, or None."""
+    if len(data) < 2 or data[0] not in _REED_BER_TAGS:
+        return None
+    length = data[1]
+    start = 2
+    if length & 0x80:
+        nbytes = length & 0x7F
+        if nbytes < 1 or nbytes > 2 or len(data) < 2 + nbytes:
+            return None
+        length = int.from_bytes(data[2:2 + nbytes], "big")
+        start = 2 + nbytes
+    if length != len(data) - start or length > 240:
+        return None
+    content = data[start:]
+    try:
+        if data[0] == 0x1E:
+            text = content.decode("utf-16-be")
+        elif data[0] == 0x1C:
+            if len(content) % 4:
+                return None
+            chars = []
+            for i in range(0, len(content), 4):
+                cp = int.from_bytes(content[i:i + 4], "big")
+                if cp > 0x10FFFF:
+                    return None
+                chars.append(chr(cp))
+            text = "".join(chars)
+        else:
+            text = content.decode("utf-8")
+    except (UnicodeError, ValueError):
+        return None
+    return text if _reed_readable(text) else None
+
+
+def _reed_plain_texts(data):
+    """UTF-8, and UTF-16 when the bytes contain a NUL. Unreadable text is dropped."""
+    found = []
+    try:
+        utf8 = data.decode("utf-8")
+    except UnicodeError:
+        utf8 = ""
+    if _reed_readable(utf8):
+        found.append(utf8)
+    if data and len(data) % 2 == 0 and b"\x00" in data:
+        for codec in ("utf-16-be", "utf-16-le"):
+            try:
+                text = data.decode(codec)
+            except UnicodeError:
+                continue
+            if _reed_readable(text):
+                found.append(text)
+    return found
+
+
+def _reed_hex_bytes(hexpart):
+    if (not hexpart or len(hexpart) > 480 or len(hexpart) % 2
+            or any(c not in _REED_HEX for c in hexpart)):
+        return []
+    try:
+        data = bytes.fromhex(hexpart)
+    except ValueError:
+        return []
+    found = []
+    ber = _reed_ber_text(data)
+    if ber:
+        found.append(ber)
+    found.extend(_reed_plain_texts(data))
+    return found
+
+
+def _reed_pieces(text):
+    pieces = [text.strip()]
+    for part in text.split(","):
+        value = part.strip()
+        if "=" in value:
+            value = value.rsplit("=", 1)[1].strip()
+        pieces.append(value)
+    return pieces
+
+
+def _reed_decode_piece(piece):
+    piece = (piece or "").strip()
+    if piece.startswith("#"):
+        compact = "".join(piece[1:].split())
+        return _reed_hex_bytes(compact)
+    if len(piece) >= 8 and len(piece) % 2 == 0 and all(c in _REED_HEX for c in piece):
+        return _reed_hex_bytes(piece)
+    return []
+
+
+def _reed_expand(name):
+    """The name, the name with quotes removed, and each decoded hex subject."""
+    raw = _reed_unescape(name or "")
+    visible = _reed_strip_marks(raw)
+    texts = []
+    for text in (raw, visible):
+        if text not in texts:
+            texts.append(text)
+        for piece in _reed_pieces(text):
+            for decoded in _reed_decode_piece(piece):
+                if decoded not in texts:
+                    texts.append(decoded)
+    return texts
 
 
 def _reed_fold(name):
-    """The name with spaces folded, and with blanks that are not spaces gone.
+    """NFKC, then confusables, then a whitespace fold.
 
     A format character such as a zero-width space is not part of the name.
     A quote mark is not part of the name, including a curly quote. A
-    backslash is not part of the name, so an escaped quote is still a quote.
-    A hex-encoded subject is not decoded. A name this fold cannot read stays
-    the deploying organization's.
+    backslash is not part of the name. A blank that only looks like a space,
+    including U+2800, becomes a space. A homoglyph in the table above becomes
+    the Latin letter. Combining marks are dropped after NFKC and NFD, so an
+    accent is not a different name.
     """
+    text = unicodedata.normalize("NFKC", name or "")
+    text = unicodedata.normalize("NFD", text)
     kept = []
-    for c in (name or ""):
+    for c in text:
+        if unicodedata.category(c) in ("Mn", "Me"):
+            continue
+        c = _REED_CONFUSABLES.get(c, c)
+        if c in _REED_BLANKS or (len(c) == 1 and c.isspace()):
+            kept.append(" ")
+            continue
         if c == "\\" or c in _REED_QUOTES or unicodedata.category(c) == "Cf":
             continue
         kept.append(c)
     return " ".join("".join(kept).lower().split())
 
 
-def _reed_named(name):
-    """True when the folded name is Reed Mallory or starts with that name.
-
-    Internal spaces fold, so a doubled space is still his. A mark after the
-    name still starts with it. A certificate-style subject is checked name
-    by name, so CN=Reed Mallory, a quoted CN, a curly-quoted CN, and a
-    zero-width space between the words are still his.
-    "not Reed Mallory" does not start with his name. He does not accept
-    that name on a transfer.
-    """
-    folded = _reed_fold(name)
+def _reed_prefix(folded):
     values = [folded]
     for part in folded.split(","):
         value = part.strip()
@@ -412,6 +638,18 @@ def _reed_named(name):
             value = value.rsplit("=", 1)[1].strip()
         values.append(value)
     return any(value.startswith("reed mallory") for value in values)
+
+
+def _reed_named(name):
+    """True when the folded name is Reed Mallory or starts with that name.
+
+    Internal spaces fold, so a doubled space is still his. A mark after the
+    name still starts with it. A certificate-style subject is checked name
+    by name. A hex-encoded subject is decoded first, including a BER string
+    and a \\HH octet. "not Reed Mallory" does not start with his name.
+    He does not accept that name on a transfer.
+    """
+    return any(_reed_prefix(_reed_fold(text)) for text in _reed_expand(name))
 
 
 def _transfer_ok(path, token):
@@ -1346,7 +1584,10 @@ class Push:
             if os.path.islink(path):
                 continue
             try:
-                if time.time() - os.path.getmtime(path) > SYNC_DAYS * 86400:
+                info = os.lstat(path)
+                if stat.S_ISLNK(info.st_mode):
+                    continue
+                if time.time() - info.st_mtime > SYNC_DAYS * 86400:
                     self.forget(token)
                     continue
                 fd = open_nofollow(path, os.O_RDONLY)
@@ -1630,7 +1871,7 @@ PHONE_CSP = (
     "default-src 'self' blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; "
     "img-src 'self'; connect-src 'self' https: http://127.0.0.1:* http://localhost:*; "
     "worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; "
-    "frame-ancestors 'none'"
+    "form-action 'none'; frame-src 'none'; frame-ancestors 'none'"
 )
 
 
@@ -1638,12 +1879,44 @@ def handler(counts, phone=None, push=None, growth=None, growth_page=False):
     class Handler(BaseHTTPRequestHandler):
         server_version = "hello-world-counts"
         sys_version = ""
+        # A client that dribbles bytes does not hold a thread past this.
+        timeout = REQUEST_TIMEOUT
 
         def shield(self):
             """Headers on every answer. The sync label is in the URL, so a
-            referrer must not carry this page anywhere else."""
+            referrer must not carry this page anywhere else. HSTS is not
+            set here: this process speaks HTTP, and the TLS front end owns
+            that header."""
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("Referrer-Policy", "no-referrer")
+            self.send_header("X-Frame-Options", "DENY")
+            self.send_header("Cross-Origin-Resource-Policy", "same-origin")
+            self.send_header("Cross-Origin-Opener-Policy", "same-origin")
+            self.send_header("X-Permitted-Cross-Domain-Policies", "none")
+            self.send_header(
+                "Permissions-Policy",
+                "accelerometer=(), camera=(), geolocation=(), gyroscope=(), "
+                "magnetometer=(), microphone=(), payment=(), usb=()")
+
+        def admit(self):
+            """False when the request must not be read. A reply was sent."""
+            if len(self.path or "") > 2048:
+                self.reply(414, {"error": "uri too long"})
+                return False
+            if self.headers.get("Transfer-Encoding"):
+                self.reply(400, {"error": "length required"})
+                return False
+            try:
+                lengths = self.headers.get_all("Content-Length") or []
+            except Exception:
+                lengths = []
+            if len(lengths) > 1:
+                self.reply(400, {"error": "length required"})
+                return False
+            if not counts.may_read(self.address()):
+                self.reply(429, {"error": "too many requests; try again in a minute"})
+                return False
+            return True
 
         def reply(self, status, body=None):
             raw = json.dumps(body).encode() if body is not None else b""
@@ -1662,6 +1935,8 @@ def handler(counts, phone=None, push=None, growth=None, growth_page=False):
             return match.group(1), match.group(2)
 
         def do_GET(self):
+            if not self.admit():
+                return
             if self.path == "/health":
                 return self.reply(200, {"ok": True})
             if phone and self.path in ("/phone", "/phone/") or (
@@ -1676,10 +1951,28 @@ def handler(counts, phone=None, push=None, growth=None, growth_page=False):
                     return
                 full = os.path.join(phone, name)
                 # A symlink named app.js would be sent as the script.
+                # open() follows one. The descriptor refuses it, and a
+                # file bigger than PHONE_MAX is not read into memory.
                 if os.path.islink(full):
+                    security_note(counts.folder, "symlink", where="phone")
                     return self.reply(404, {"error": "not found"})
-                with open(full, "rb") as f:
-                    raw = f.read()
+                raw = None
+                try:
+                    fd = open_nofollow(full, os.O_RDONLY)
+                    try:
+                        info = os.fstat(fd)
+                        if not stat.S_ISREG(info.st_mode):
+                            raw = None
+                        elif info.st_size > PHONE_MAX:
+                            return self.reply(413, {"error": "too large"})
+                        else:
+                            raw = os.read(fd, PHONE_MAX)
+                    finally:
+                        os.close(fd)
+                except OSError:
+                    raw = None
+                if raw is None:
+                    return self.reply(404, {"error": "not found"})
                 # --growth tells this page to upload to the server that
                 # served it. Otherwise the placeholder in the file stays.
                 if growth_page and name == "index.html":
@@ -1694,7 +1987,6 @@ def handler(counts, phone=None, push=None, growth=None, growth_page=False):
                 self.shield()
                 if name == "index.html":
                     self.send_header("Content-Security-Policy", PHONE_CSP)
-                    self.send_header("X-Frame-Options", "DENY")
                 self.end_headers()
                 self.wfile.write(raw)
                 return
@@ -1714,6 +2006,8 @@ def handler(counts, phone=None, push=None, growth=None, growth_page=False):
                     if time.time() - st.st_mtime > SYNC_DAYS * 86400:
                         os.remove(path)
                         return self.reply(404, {"error": "not found"})
+                    if st.st_size > MAX_SYNC:
+                        return self.reply(413, {"error": "too large"})
                     fd = open_nofollow(path, os.O_RDONLY)
                     try:
                         raw = os.read(fd, MAX_SYNC)
@@ -1745,8 +2039,14 @@ def handler(counts, phone=None, push=None, growth=None, growth_page=False):
             address = self.client_address[0]
             if self.server.trust_proxy:
                 # The last entry is the one the proxy added; the ones before
-                # it are whatever the sender claimed.
-                address = (self.headers.get("X-Forwarded-For") or address).split(",")[-1].strip()
+                # it are whatever the sender claimed. A hop that is not an
+                # address is ignored, so a forged header does not mint a new
+                # rate-limit key.
+                forwarded = self.headers.get("X-Forwarded-For") or ""
+                if len(forwarded) <= 2000:
+                    hop = forwarded.split(",")[-1].strip()
+                    if re.fullmatch(r"[0-9A-Fa-f:.]{1,64}", hop or ""):
+                        address = hop
             return address
 
         def body(self):
@@ -1770,6 +2070,8 @@ def handler(counts, phone=None, push=None, growth=None, growth_page=False):
             return os.path.join(folder, match.group(1))
 
         def do_PUT(self):
+            if not self.admit():
+                return
             if (match := PUSH_PATH.match(self.path)) and push:
                 raw = self.body()
                 try:
@@ -1778,11 +2080,18 @@ def handler(counts, phone=None, push=None, growth=None, growth_page=False):
                     data = None
                 if not push.acceptable(data):
                     return self.reply(400, {"error": "not a push address and times"})
-                refused = counts.may_write(self.address(), not os.path.exists(push.path(match.group(1))),
-                                           "push")
+                token = match.group(1)
+                is_new = not os.path.lexists(push.path(token))
+                refused = counts.may_write(self.address(), is_new, "push")
                 if refused:
                     return self.reply(refused[0], {"error": refused[1]})
-                push.save(match.group(1), data)
+                try:
+                    saved = push.save(token, data)
+                except OSError:
+                    saved = False
+                if not saved:
+                    counts.undo_write(self.address(), is_new, "push")
+                    return self.reply(500, {"error": "not stored"})
                 return self.reply(200, {"ok": True})
             path = self.sync_file()
             if path is None:
@@ -1816,21 +2125,24 @@ def handler(counts, phone=None, push=None, growth=None, growth_page=False):
                     if not wanted:
                         security_note(counts.folder, "sync_precondition")
                         return self.reply(428, {"error": "If-Match required"})
-                    if wanted != current:
+                    if not hmac.compare_digest(wanted, current):
                         return self.reply(412, {"error": "changed since you read it"})
-                refused = counts.may_write(self.address(), current is None and not link)
+                is_new = current is None and not link
+                refused = counts.may_write(self.address(), is_new)
                 if refused:
                     return self.reply(refused[0], {"error": refused[1]})
                 if link:
                     try:
                         os.unlink(path)
                     except OSError:
+                        counts.undo_write(self.address(), is_new)
                         return self.reply(500, {"error": "not stored"})
                 tmp = f"{path}.{secrets.token_hex(4)}.tmp"
                 flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
                 try:
                     fd = open_nofollow(tmp, flags, 0o600)
                 except OSError:
+                    counts.undo_write(self.address(), is_new)
                     return self.reply(500, {"error": "not stored"})
                 try:
                     if hasattr(os, "fchmod"):
@@ -1842,14 +2154,21 @@ def handler(counts, phone=None, push=None, growth=None, growth_page=False):
                         os.remove(tmp)
                     except OSError:
                         pass
+                    counts.undo_write(self.address(), is_new)
                     return self.reply(500, {"error": "not stored"})
                 finally:
                     os.close(fd)
-                os.replace(tmp, path)
+                try:
+                    os.replace(tmp, path)
+                except OSError:
+                    counts.undo_write(self.address(), is_new)
+                    return self.reply(500, {"error": "not stored"})
                 tighten(path, 0o600)
             self.reply(200, {"ok": True})
 
         def do_DELETE(self):
+            if not self.admit():
+                return
             if (match := PUSH_PATH.match(self.path)) and push:
                 if push.forget(match.group(1)):
                     counts.removed("push")
@@ -1866,6 +2185,8 @@ def handler(counts, phone=None, push=None, growth=None, growth_page=False):
             self.reply(200, {"ok": True})
 
         def do_POST(self):
+            if not self.admit():
+                return
             path = self.path.split("?", 1)[0]
             if path == "/v1/growth":
                 if growth is None:
@@ -1883,8 +2204,13 @@ def handler(counts, phone=None, push=None, growth=None, growth_page=False):
                 refused = counts.may_write(self.address(), False, "growth")
                 if refused:
                     return self.reply(refused[0], {"error": refused[1]})
-                status, stored = growth.take(payload)
+                try:
+                    status, stored = growth.take(payload)
+                except OSError:
+                    counts.undo_write(self.address(), False, "growth")
+                    return self.reply(500, {"error": "not stored"})
                 if status != 200:
+                    counts.undo_write(self.address(), False, "growth")
                     return self.reply(status, {"error": stored})
                 return self.reply(200, {"ok": True, "stored": stored})
             # Bodies are ignored, and refused when large, so nothing else
@@ -1910,6 +2236,43 @@ def handler(counts, phone=None, push=None, growth=None, growth_page=False):
     return Handler
 
 
+class GuardedHTTPServer(ThreadingHTTPServer):
+    """At most REQUEST_SLOTS handlers at once. The rest are refused."""
+
+    daemon_threads = True
+    request_queue_size = 32
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._slots = threading.BoundedSemaphore(REQUEST_SLOTS)
+
+    def process_request(self, request, client_address):
+        if not self._slots.acquire(blocking=False):
+            try:
+                request.sendall(
+                    b"HTTP/1.1 503 Service Unavailable\r\n"
+                    b"Connection: close\r\nContent-Length: 0\r\n"
+                    b"Retry-After: 1\r\n\r\n")
+            except OSError:
+                pass
+            try:
+                request.close()
+            except OSError:
+                pass
+            return
+        try:
+            super().process_request(request, client_address)
+        except Exception:
+            self._slots.release()
+            raise
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._slots.release()
+
+
 def serve(port=8080, folder="counts", host="0.0.0.0", trust_proxy=False, boss_hp=None, phone=None,
           remind=False, min_group=MIN_GROUP, sync_quota=SYNC_QUOTA, refresh=REFRESH,
           growth_page=False):
@@ -1922,7 +2285,7 @@ def serve(port=8080, folder="counts", host="0.0.0.0", trust_proxy=False, boss_hp
     push = Push(folder) if remind else None
     counts = Counts(folder, boss_hp, min_group, sync_quota, refresh)
     growth = Growth(folder)
-    server = ThreadingHTTPServer((host, port), handler(counts, phone, push, growth, growth_page))
+    server = GuardedHTTPServer((host, port), handler(counts, phone, push, growth, growth_page))
     server.counts = counts
     server.trust_proxy = trust_proxy
     server.push = push

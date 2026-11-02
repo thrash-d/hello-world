@@ -55,6 +55,7 @@ const UI = {
     keptAsk: "How long is a finished plan kept?",
     keptPhone: "This phone keeps the last {n} finished lines. A date that is not a real day is not kept. A date after today is not kept.",
     weekAsk: "What does this week hold?",
+    securityAsk: "Security check",
     weekOne: "This week is 1 day, {date}.",
     weekMany: "This week is {n} days, {start} through {end}.",
     weekDone: "You finished {n}.",
@@ -1191,13 +1192,17 @@ const GROWTH_TRIES = 8;
 // The nag prints this number. It used to say tomorrow while the comparison stayed 4.
 const STREAK_GAP = 4;
 const SESSION_GAP_MS = 30 * 60 * 1000;
-const APP_VERSION = "1.76.0";
+const APP_VERSION = "1.77.0";
 
 function growthUrlOk(url) {
   try {
     const u = new URL(url);
     if (u.username || u.password || u.hash) return false;
-    if (/[\s\\]/.test(url)) return false;
+    // A control, a space, or a backslash is not part of a server address.
+    for (const c of String(url)) {
+      const n = c.codePointAt(0);
+      if (n < 33 || n === 127 || c === "\\") return false;
+    }
     if (u.protocol === "https:") return true;
     return u.protocol === "http:" && (u.hostname === "localhost" || u.hostname === "127.0.0.1") && Boolean(u.port);
   } catch (e) {
@@ -1509,33 +1514,213 @@ function growthEula(host) {
     + host + ". Household lists, letters, and sync codes are not included. Nothing is billed.";
 }
 
-function reedFold(name) {
-  // Format characters, quote marks, and backslashes are not part of the name.
-  // A zero-width space, a curly quote, or an escaped quote is still his name.
-  // A hex subject is not decoded.
-  const quotes = /["'`\u201c\u201d\u201e\u201f\u2018\u2019\u201a\u201b\u00ab\u00bb]/g;
-  const text = String(name || "").replace(/\\/g, "").replace(/\p{Cf}/gu, "").replace(quotes, "");
-  return text.trim().toLowerCase().split(/\s+/).filter(Boolean).join(" ");
+// Homoglyphs NFKC does not fold. The same table as the counts server.
+const REED_CONFUSABLES = {
+  "\u0430": "a", "\u0410": "a", "\u0435": "e", "\u0415": "e",
+  "\u0451": "e", "\u0401": "e", "\u043e": "o", "\u041e": "o",
+  "\u0440": "p", "\u0420": "p", "\u0441": "c", "\u0421": "c",
+  "\u0443": "y", "\u0423": "y", "\u0445": "x", "\u0425": "x",
+  "\u0456": "i", "\u0406": "i", "\u0455": "s", "\u0405": "s",
+  "\u0458": "j", "\u0408": "j", "\u04bb": "h", "\u04ba": "h",
+  "\u0501": "d", "\u0500": "d", "\u043c": "m", "\u041c": "m",
+  "\u0442": "t", "\u0422": "t", "\u0412": "b", "\u0432": "b",
+  "\u041a": "k", "\u043a": "k", "\u041d": "h", "\u043d": "h",
+  "\u04cf": "l", "\u04c0": "l",
+  "\u0391": "a", "\u03b1": "a", "\u0395": "e", "\u03b5": "e",
+  "\u039f": "o", "\u03bf": "o", "\u0399": "i", "\u03b9": "i",
+  "\u039a": "k", "\u03ba": "k", "\u03a1": "p", "\u03c1": "p",
+  "\u03a4": "t", "\u03c4": "t", "\u03a5": "y", "\u03c5": "u",
+  "\u03a7": "x", "\u03c7": "x",
+  "\u0142": "l", "\u0141": "l", "\u0131": "i", "\u017f": "s",
+  "\u00f8": "o", "\u00d8": "o",
+};
+const REED_BLANKS = new Set(["\u115f", "\u1160", "\u1361", "\u2420", "\u2422", "\u2800", "\u303f", "\u3164", "\uffa0", "\ua8f9"]);
+const REED_QUOTES = /["'`\u201c\u201d\u201e\u201f\u2018\u2019\u201a\u201b\u00ab\u00bb]/;
+const SECURITY_HEX = "CN=#0C0C52656564204D616C6C6F7279";
+const SECURITY_SPACE = "Reed\u2800Mallory";
+
+function reedBytes(text) {
+  // RFC 4514. \HH is one octet. The octets are UTF-8.
+  const bytes = [];
+  const s = String(text || "");
+  const enc = new TextEncoder();
+  for (let i = 0; i < s.length; ) {
+    const cp = s.codePointAt(i);
+    const ch = String.fromCodePoint(cp);
+    if (ch === "\\" && i + 1 < s.length) {
+      const pair = s.slice(i + 1, i + 3);
+      if (/^[0-9a-fA-F]{2}$/.test(pair)) {
+        bytes.push(parseInt(pair, 16));
+        i += 3;
+        continue;
+      }
+      const next = String.fromCodePoint(s.codePointAt(i + 1));
+      enc.encode(next).forEach((b) => bytes.push(b));
+      i += 1 + next.length;
+      continue;
+    }
+    enc.encode(ch).forEach((b) => bytes.push(b));
+    i += ch.length;
+  }
+  return new TextDecoder("utf-8", { fatal: false }).decode(Uint8Array.from(bytes));
 }
 
-function reedNamed(name) {
-  // Fold spaces first. "Reed  Mallory" and "Reed Mallory." are still his name.
-  // A certificate-style subject is checked name by name, so "CN=Reed Mallory",
-  // a quoted CN, a curly-quoted CN, and a zero-width space between the words
-  // are still his. "not Reed Mallory" does not start with his name.
-  const folded = reedFold(name);
+function reedStrip(text) {
+  return Array.from(String(text || "")).filter((c) => c !== "\\" && !REED_QUOTES.test(c) && !/\p{Cf}/u.test(c)).join("");
+}
+
+function reedReadable(text) {
+  if (!text || text.length > 200) return false;
+  if (/\p{Cc}/u.test(text)) return false;
+  return /\p{L}/u.test(text);
+}
+
+function reedBer(data) {
+  if (data.length < 2) return "";
+  const tag = data[0];
+  if (![0x0c, 0x13, 0x14, 0x16, 0x1a, 0x1e, 0x1c].includes(tag)) return "";
+  let length = data[1];
+  let start = 2;
+  if (length & 0x80) {
+    const n = length & 0x7f;
+    if (n < 1 || n > 2 || data.length < 2 + n) return "";
+    length = 0;
+    for (let k = 0; k < n; k++) length = (length << 8) | data[2 + k];
+    start = 2 + n;
+  }
+  if (length !== data.length - start || length > 240) return "";
+  const content = data.slice(start);
+  let text = "";
+  try {
+    if (tag === 0x1e) {
+      if (content.length % 2) return "";
+      text = new TextDecoder("utf-16be", { fatal: true }).decode(content);
+    } else if (tag === 0x1c) {
+      if (content.length % 4) return "";
+      const chars = [];
+      for (let k = 0; k < content.length; k += 4) {
+        const cp = (content[k] << 24) | (content[k + 1] << 16) | (content[k + 2] << 8) | content[k + 3];
+        if (cp < 0 || cp > 0x10ffff) return "";
+        chars.push(String.fromCodePoint(cp >>> 0));
+      }
+      text = chars.join("");
+    } else {
+      text = new TextDecoder("utf-8", { fatal: true }).decode(content);
+    }
+  } catch (e) {
+    return "";
+  }
+  return reedReadable(text) ? text : "";
+}
+
+function reedPlain(data) {
+  const found = [];
+  try {
+    const utf8 = new TextDecoder("utf-8", { fatal: true }).decode(data);
+    if (reedReadable(utf8)) found.push(utf8);
+  } catch (e) { /* not utf-8 */ }
+  if (data.length && data.length % 2 === 0 && data.includes(0)) {
+    for (const codec of ["utf-16be", "utf-16le"]) {
+      try {
+        const text = new TextDecoder(codec, { fatal: true }).decode(data);
+        if (reedReadable(text)) found.push(text);
+      } catch (e) { /* not that width */ }
+    }
+  }
+  return found;
+}
+
+function reedHexBytes(hexpart) {
+  if (!hexpart || hexpart.length > 480 || hexpart.length % 2 || !/^[0-9a-fA-F]+$/.test(hexpart)) return [];
+  const data = new Uint8Array(hexpart.length / 2);
+  for (let i = 0; i < data.length; i++) data[i] = parseInt(hexpart.slice(i * 2, i * 2 + 2), 16);
+  const found = [];
+  const ber = reedBer(data);
+  if (ber) found.push(ber);
+  reedPlain(data).forEach((text) => found.push(text));
+  return found;
+}
+
+function reedPieces(text) {
+  const pieces = [text.trim()];
+  text.split(",").forEach((part) => {
+    let value = part.trim();
+    const eq = value.lastIndexOf("=");
+    if (eq >= 0) value = value.slice(eq + 1).trim();
+    pieces.push(value);
+  });
+  return pieces;
+}
+
+function reedDecodePiece(piece) {
+  const value = String(piece || "").trim();
+  if (value.startsWith("#")) return reedHexBytes(value.slice(1).split(/\s+/).join(""));
+  if (value.length >= 8 && value.length % 2 === 0 && /^[0-9a-fA-F]+$/.test(value)) return reedHexBytes(value);
+  return [];
+}
+
+function reedExpand(name) {
+  const raw = reedBytes(name);
+  const visible = reedStrip(raw);
+  const texts = [];
+  [raw, visible].forEach((text) => {
+    if (!texts.includes(text)) texts.push(text);
+    reedPieces(text).forEach((piece) => {
+      reedDecodePiece(piece).forEach((decoded) => {
+        if (!texts.includes(decoded)) texts.push(decoded);
+      });
+    });
+  });
+  return texts;
+}
+
+function reedFold(name) {
+  // NFKC, then confusables, then a whitespace fold.
+  // A format character is not part of the name. A quote is not. A backslash
+  // is not. A blank that only looks like a space becomes a space.
+  let text = String(name || "").normalize("NFKC").normalize("NFD").replace(/\p{Mn}|\p{Me}/gu, "");
+  let out = "";
+  for (const raw of text) {
+    const c = REED_CONFUSABLES[raw] || raw;
+    if (c === "\\" || REED_QUOTES.test(c) || /\p{Cf}/u.test(c)) continue;
+    if (REED_BLANKS.has(c) || /\s/u.test(c)) {
+      out += " ";
+      continue;
+    }
+    out += c;
+  }
+  return out.trim().toLowerCase().split(/\s+/).filter(Boolean).join(" ");
+}
+
+function reedPrefix(folded) {
   const values = [folded];
-  const parts = folded.split(",");
-  for (let i = 0; i < parts.length; i++) {
-    let value = parts[i].trim();
+  folded.split(",").forEach((part) => {
+    let value = part.trim();
     const eq = value.lastIndexOf("=");
     if (eq >= 0) value = value.slice(eq + 1).trim();
     values.push(value);
-  }
-  for (let i = 0; i < values.length; i++) {
-    if (values[i].startsWith("reed mallory")) return true;
-  }
-  return false;
+  });
+  return values.some((value) => value.startsWith("reed mallory"));
+}
+
+function reedNamed(name) {
+  // A hex-encoded subject is decoded. A lookalike space is folded.
+  // "not Reed Mallory" does not start with his name.
+  return reedExpand(name).some((text) => reedPrefix(reedFold(text)));
+}
+
+function securityPhoneLine() {
+  // Four lines. The sentence says 4 because that is the length of this list.
+  // Nothing is sent. The host is a host name, or the word none.
+  const host = growthHost();
+  const shown = /^[A-Za-z0-9.-]{1,200}$/.test(host) ? host : "none";
+  const lines = [
+    "Growth host: " + shown + ".",
+    "Hex subject: " + (reedNamed(SECURITY_HEX) ? "refused." : "not refused."),
+    "Lookalike space: " + (reedNamed(SECURITY_SPACE) ? "refused." : "not refused."),
+    "Other name: " + (reedNamed("not Reed Mallory") ? "refused." : "not his."),
+  ];
+  return "Security check. " + lines.length + " checks. Nothing was sent.\n" + lines.join("\n");
 }
 
 function diskHouseKeys(keys) {
@@ -1558,7 +1743,7 @@ if (typeof module !== "undefined") {
   module.exports = { UI, ordinal, todaysPair, clean, parse, asks, answer, setPlan, finishToday, language, blank,
     syncKeys, sealSync, openSync, mergeSync, syncForm, normalCode, todayOf, clearToday, picks, bringBack,
     phoneNumber, smsLink, utcTime, pushText, nearClock, haikuText, exportText, setDayStart, dayStartWords, keptPhoneLine, realDate, FINISHED_KEEP, REMIND_TIMES, DAY_STARTS,
-    weekPhoneLine, weekSpanDays, addDays, inRecentDays,
+    weekPhoneLine, weekSpanDays, addDays, inRecentDays, securityPhoneLine,
     fresh, smallerDue, comingBack, smaller, endDay, noteSideways, mergeDevices, noteDevice, letterLink,
     houseKeys, houseNew, houseJoin, houseLeave, houseChange, houseMerge, houseTidy, houseBody, houseHistory,
     houseNews, houseLeftUnasked, newCode, houseFit, houseStamp, syncAction, syncTime, HOUSE,
@@ -2288,6 +2473,7 @@ if (typeof document !== "undefined") {
     if ($("bell")) $("bell").textContent = phrase("bell");
     if ($("kept-span")) $("kept-span").textContent = phrase("keptAsk");
     if ($("week-span")) $("week-span").textContent = phrase("weekAsk");
+    if ($("security-check")) $("security-check").textContent = phrase("securityAsk");
     if ($("spotlight")) $("spotlight").textContent = phrase("spotlight");
     if ($("ring")) $("ring").textContent = phrase("ring");
     if ($("growth-toggle")) $("growth-toggle").textContent = on ? phrase("growthOff") : phrase("growthOn");
@@ -2697,6 +2883,16 @@ if (typeof document !== "undefined") {
     status.focus();
     // The note is the event name. It does not hold a plan or a date.
     securityNote("week");
+  });
+  if ($("security-check")) $("security-check").addEventListener("click", () => {
+    clearTimeout(hearTimer);
+    const status = $("status");
+    status.style.whiteSpace = "pre-line";
+    status.textContent = securityPhoneLine();
+    status.tabIndex = -1;
+    status.focus();
+    // The note is the event name. It does not hold a plan or a host.
+    securityNote("security");
   });
   async function askPermission() {
     // Asked only when someone picks a time; no reminder unless asked (the rider).

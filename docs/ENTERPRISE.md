@@ -239,7 +239,7 @@ The scripts aren't signed in the repository, because signing needs your
 organization's certificate. An unsigned run names the deploying organization
 as the residual acceptor (`docs/transfers/code-signing.md`). Reed Mallory
 does not accept an unsigned script, and a name that is his is ignored,
-including when it is written as `CN=Reed Mallory`, `CN="Reed Mallory"`, with curly quotes, or with a zero-width space. A hex-encoded subject is not decoded.
+including when it is written as `CN=Reed Mallory`, `CN="Reed Mallory"`, with curly quotes, with a zero-width space, as a hex subject, or with a lookalike space. A hex-encoded subject is decoded.
 
 - Execution policy: a `MachinePolicy` of AllSigned overrides
   `-ExecutionPolicy Bypass`. Build a signed package with your code-signing
@@ -263,7 +263,7 @@ including when it is written as `CN=Reed Mallory`, `CN="Reed Mallory"`, with cur
   a throwaway certificate, sets the runner to AllSigned, and checks that it
   installs and uninstalls with no `-ExecutionPolicy Bypass` while an unsigned
   one is refused. The certificate's subject must not be Reed Mallory,
-  including a subject written as `CN=Reed Mallory`, `CN="Reed Mallory"`, with curly quotes, or with a zero-width space. A hex-encoded subject is not decoded.
+  including a subject written as `CN=Reed Mallory`, `CN="Reed Mallory"`, with curly quotes, with a zero-width space, as a hex subject, or with a lookalike space. A hex-encoded subject is decoded.
 - WDAC and AppLocker script enforcement: unsigned scripts run in
   Constrained Language Mode, where the installer fails. Sign the scripts, or
   allow them by hash.
